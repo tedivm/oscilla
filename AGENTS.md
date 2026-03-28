@@ -405,6 +405,7 @@ if __name__ == "__main__":
 
 A proposal is an openspec change consisting of `proposal.md`, `design.md`, and `tasks.md`. Documentation and testing are **first-class deliverables**, not afterthoughts. Every proposal must address them at the same level of detail and specificity as the feature itself.
 
+* Before writing a proposal or specification, you **must** use Context7 to pull current documentation for every library involved — both newly introduced libraries and existing dependencies whose APIs are relevant to the change. Design decisions must reflect the actual, up-to-date API rather than assumptions or stale knowledge.
 * `design.md` must include a **Documentation Plan** section that names every document to be created or updated, identifies its intended audience, and lists the specific topics it must cover. Vague statements like "update the docs" are not acceptable.
 * `design.md` must include a **Testing Philosophy** section (or equivalent) that describes what tiers of tests apply, what fixtures are needed, and which behaviours are verified by tests. It must call out any constraints (e.g. no tests may reference `content/`).
 * `tasks.md` must include dedicated sections for documentation tasks and testing tasks, at the same granularity as implementation tasks. Each doc and each meaningful test scenario must be its own line item.

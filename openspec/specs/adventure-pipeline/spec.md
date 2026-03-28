@@ -8,7 +8,7 @@ The adventure pipeline system orchestrates the execution of adventure content, h
 
 ### Requirement: Adventures are ordered lists of typed steps
 
-An adventure manifest SHALL define a `steps` list where each entry is a typed step object. The adventure pipeline runner SHALL execute steps in declared order. Each step SHALL have a `type` discriminator field that determines which handler processes it.
+An adventure manifest SHALL define a `steps` list where each entry is a typed step object. The adventure pipeline runner SHALL execute steps in declared order asynchronously. Each step SHALL have a `type` discriminator field that determines which handler processes it. All step handlers and the pipeline runner itself SHALL be `async def` coroutines.
 
 #### Scenario: Steps execute in order
 
@@ -24,7 +24,7 @@ An adventure manifest SHALL define a `steps` list where each entry is a typed st
 
 ### Requirement: Narrative step
 
-A `narrative` step SHALL display a text body to the player and pause until the player acknowledges it (e.g., presses a key or selects "Continue").
+A `narrative` step SHALL display a text body to the player and pause until the player acknowledges it (e.g., presses Enter). The `run_narrative` handler SHALL be an `async def` function that `await`s `tui.show_text()` and `tui.wait_for_ack()`.
 
 #### Scenario: Narrative is shown and acknowledged
 
@@ -35,7 +35,7 @@ A `narrative` step SHALL display a text body to the player and pause until the p
 
 ### Requirement: Combat step (turn-based)
 
-A `combat` step SHALL initiate a turn-based fight between the player and an enemy referenced by name from the registry. Each round the player acts first, then the enemy. Combat ends when either the player's or enemy's HP reaches zero, or the player successfully flees. On player victory, the pipeline continues. On player defeat, the adventure ends and the player is returned to the location selection with reduced HP. On flee, the adventure ends without penalty beyond the used turn.
+A `combat` step SHALL initiate a turn-based fight between the player and an enemy referenced by name from the registry. Each round the player acts first, then the enemy. Combat ends when either the player's or enemy's HP reaches zero, or the player successfully flees. The `run_combat` handler SHALL be an `async def` function that `await`s all `tui` calls.
 
 #### Scenario: Player wins combat
 
@@ -61,7 +61,7 @@ A `combat` step SHALL initiate a turn-based fight between the player and an enem
 
 ### Requirement: Choice step (branching)
 
-A `choice` step SHALL present the player with a labeled menu of options. Each option SHALL have a display label and a nested `steps` list that executes when that option is chosen. Conditions on options are evaluated at step execution time; options whose conditions are not met SHALL be hidden.
+A `choice` step SHALL present the player with a labeled menu of options. Each option SHALL have a display label and a nested `steps` list that executes when that option is chosen. Conditions on options are evaluated at step execution time; options whose conditions are not met SHALL be hidden. The `run_choice` handler SHALL be an `async def` function that `await`s `tui.show_menu()`.
 
 #### Scenario: Player selects an option
 

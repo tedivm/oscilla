@@ -1,47 +1,4 @@
-# CLI Game Loop
-
-## Purpose
-
-The CLI game loop provides the interactive terminal user interface for the game, handling menus, player input, and adventure progression.
-
-## Requirements
-
-### Requirement: Game launch command
-
-The system SHALL provide a `game` CLI command that starts a new in-memory player session and launches the menu-driven TUI game loop.
-
-#### Scenario: Game starts with character creation
-
-- **WHEN** `oscilla game` is run
-- **THEN** the player is prompted to enter a character name before the game loop begins
-
-#### Scenario: Game session is lost on exit
-
-- **WHEN** the player exits the game (via the quit option or Ctrl-C)
-- **THEN** all player state is discarded (no persistence in this phase)
-
----
-
-### Requirement: Adventure selection and execution
-
-After selecting a location, the engine SHALL randomly select one adventure from the location's adventure pool, filtered to those whose conditions are met by the current player state and weighted by the `weight` field. The selected adventure SHALL then be executed via the adventure pipeline.
-
-#### Scenario: Adventure is randomly selected from pool
-
-- **WHEN** a location has three available adventures with weights 50, 30, 20
-- **THEN** one is selected at random according to those weights and executed
-
-#### Scenario: Unavailable adventures excluded from pool
-
-- **WHEN** a location has adventures and one has a `requires` condition not met by the player
-- **THEN** that adventure is excluded from the selection pool
-
-#### Scenario: No available adventures at location
-
-- **WHEN** all adventures at a location have unmet conditions
-- **THEN** the player is notified that nothing is happening here and returned to location selection
-
----
+## MODIFIED Requirements
 
 ### Requirement: In-adventure TUI interaction
 
@@ -73,3 +30,16 @@ The TUI SHALL display a persistent player status sidebar showing: player name, l
 - **WHEN** an adventure completes (any outcome)
 - **THEN** the updated player status (including any XP/item/milestone changes) is immediately visible in the persistent sidebar before the next menu is presented
 
+---
+
+## REMOVED Requirements
+
+### Requirement: Region and location selection menus (REPL form)
+
+**Reason:** Region and location selection is now handled by the Textual game loop worker using the same `ChoiceMenu` widget as all other menus. The old numbered-menu REPL form (`_select_region` / `_select_location` as standalone `cli.py` helpers) no longer exists as a separate construct.
+**Migration:** No migration needed — this is a breaking change to an application that has never been deployed. Region and location selection behaviour (accessible filtering, weighted adventure selection) is preserved; only the delivery mechanism changes.
+
+### Requirement: Quit option (REPL form)
+
+**Reason:** Quit is still supported but is now a menu option within the Textual choice widget, consistent with all other choices. The Textual app also responds to standard terminal exit signals (Ctrl-C / Ctrl-Q).
+**Migration:** None required.

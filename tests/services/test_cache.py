@@ -5,9 +5,15 @@ from typing import Any
 import pytest
 from aiocache import caches  # type: ignore[import-untyped]
 
-from oscilla.services.cache import (NoOpCache, clear_cache, configure_caches,
-                                    delete_cached, get_cache, get_cached,
-                                    set_cached)
+from oscilla.services.cache import (
+    NoOpCache,
+    clear_cache,
+    configure_caches,
+    delete_cached,
+    get_cache,
+    get_cached,
+    set_cached,
+)
 from oscilla.settings import settings
 
 
@@ -19,19 +25,16 @@ class TestNoOpCache:
         """Create a NoOpCache instance."""
         return NoOpCache()
 
-    @pytest.mark.asyncio
     async def test_noop_cache_get(self, noop_cache: NoOpCache) -> None:
         """Test NoOpCache get returns None."""
         result = await noop_cache.get("test_key")
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_noop_cache_get_with_default(self, noop_cache: NoOpCache) -> None:
         """Test NoOpCache get returns default value."""
         result = await noop_cache.get("test_key", default="default_value")
         assert result == "default_value"
 
-    @pytest.mark.asyncio
     async def test_noop_cache_set(self, noop_cache: NoOpCache) -> None:
         """Test NoOpCache set succeeds but doesn't store."""
         result = await noop_cache.set("test_key", "test_value")
@@ -40,79 +43,66 @@ class TestNoOpCache:
         get_result = await noop_cache.get("test_key")
         assert get_result is None
 
-    @pytest.mark.asyncio
     async def test_noop_cache_set_with_ttl(self, noop_cache: NoOpCache) -> None:
         """Test NoOpCache set with TTL succeeds."""
         result = await noop_cache.set("test_key", "test_value", ttl=300)
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_noop_cache_add(self, noop_cache: NoOpCache) -> None:
         """Test NoOpCache add succeeds."""
         result = await noop_cache.add("test_key", "test_value")
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_noop_cache_add_with_ttl(self, noop_cache: NoOpCache) -> None:
         """Test NoOpCache add with TTL succeeds."""
         result = await noop_cache.add("test_key", "test_value", ttl=300)
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_noop_cache_delete(self, noop_cache: NoOpCache) -> None:
         """Test NoOpCache delete returns 0 (key not found)."""
         result = await noop_cache.delete("test_key")
         assert result == 0
 
-    @pytest.mark.asyncio
     async def test_noop_cache_exists(self, noop_cache: NoOpCache) -> None:
         """Test NoOpCache exists returns False."""
         result = await noop_cache.exists("test_key")
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_noop_cache_multi_get(self, noop_cache: NoOpCache) -> None:
         """Test NoOpCache multi_get returns all None."""
         result = await noop_cache.multi_get(["key1", "key2", "key3"])
         assert result == [None, None, None]
 
-    @pytest.mark.asyncio
     async def test_noop_cache_multi_set(self, noop_cache: NoOpCache) -> None:
         """Test NoOpCache multi_set succeeds."""
         result = await noop_cache.multi_set([("key1", "value1"), ("key2", "value2")])
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_noop_cache_increment(self, noop_cache: NoOpCache) -> None:
         """Test NoOpCache increment returns delta."""
         result = await noop_cache.increment("counter", delta=5)
         assert result == 5
 
-    @pytest.mark.asyncio
     async def test_noop_cache_increment_negative(self, noop_cache: NoOpCache) -> None:
         """Test NoOpCache increment with negative delta."""
         result = await noop_cache.increment("counter", delta=-3)
         assert result == -3
 
-    @pytest.mark.asyncio
     async def test_noop_cache_expire(self, noop_cache: NoOpCache) -> None:
         """Test NoOpCache expire returns False (key not found)."""
         result = await noop_cache.expire("test_key", ttl=300)
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_noop_cache_clear(self, noop_cache: NoOpCache) -> None:
         """Test NoOpCache clear succeeds."""
         await noop_cache.clear()
         # No assertion needed, just verify it doesn't raise
 
-    @pytest.mark.asyncio
     async def test_noop_cache_raw(self, noop_cache: NoOpCache) -> None:
         """Test NoOpCache raw returns None."""
         result = await noop_cache.raw("get", "test_key")
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_noop_cache_close(self, noop_cache: NoOpCache) -> None:
         """Test NoOpCache close doesn't raise."""
         await noop_cache.close()
@@ -142,7 +132,6 @@ class TestCacheConfigurationEnabled:
         # Clean up after test
         caches._config = {}
 
-    @pytest.mark.asyncio
     async def test_configure_caches_with_cache_enabled(self, monkeypatch: Any) -> None:
         """Test cache configuration when cache_enabled=True."""
         monkeypatch.setattr(settings, "cache_enabled", True)
@@ -155,7 +144,6 @@ class TestCacheConfigurationEnabled:
         assert memory_cache is not None
         assert "SimpleMemoryCache" in str(type(memory_cache))
 
-    @pytest.mark.asyncio
     async def test_configure_caches_with_redis(self, monkeypatch: Any) -> None:
         """Test cache configuration with Redis enabled."""
         monkeypatch.setattr(settings, "cache_enabled", True)
@@ -169,7 +157,6 @@ class TestCacheConfigurationEnabled:
         assert "persistent" in config
         assert config["persistent"]["cache"] == "aiocache.RedisCache"
 
-    @pytest.mark.asyncio
     async def test_configure_caches_fallback_to_memory(self, monkeypatch: Any) -> None:
         """Test cache fallback to memory when Redis not configured."""
         monkeypatch.setattr(settings, "cache_enabled", True)
@@ -193,7 +180,6 @@ class TestCacheConfigurationDisabled:
         yield
         caches._config = {}
 
-    @pytest.mark.asyncio
     async def test_configure_caches_with_cache_disabled(self, monkeypatch: Any) -> None:
         """Test cache configuration when cache_enabled=False."""
         monkeypatch.setattr(settings, "cache_enabled", False)
@@ -207,7 +193,6 @@ class TestCacheConfigurationDisabled:
         assert "persistent" in config
         assert "NoOpCache" in config["persistent"]["cache"]
 
-    @pytest.mark.asyncio
     async def test_noop_cache_integration_memory(self, monkeypatch: Any) -> None:
         """Test NoOpCache integration through memory cache."""
         monkeypatch.setattr(settings, "cache_enabled", False)
@@ -219,7 +204,6 @@ class TestCacheConfigurationDisabled:
         result = await memory_cache.get("test_key")
         assert result is None  # NoOpCache returns None
 
-    @pytest.mark.asyncio
     async def test_noop_cache_integration_persistent(self, monkeypatch: Any) -> None:
         """Test NoOpCache integration through persistent cache."""
         monkeypatch.setattr(settings, "cache_enabled", False)
@@ -247,27 +231,23 @@ class TestCacheHelperFunctions:
         yield
         caches._config = {}
 
-    @pytest.mark.asyncio
     async def test_get_cached_miss(self) -> None:
         """Test get_cached when key doesn't exist."""
         result = await get_cached("missing_key")
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_set_and_get_cached(self) -> None:
         """Test set_cached and get_cached."""
         await set_cached("test_key", "test_value")
         result = await get_cached("test_key")
         assert result == "test_value"
 
-    @pytest.mark.asyncio
     async def test_set_cached_with_custom_ttl(self) -> None:
         """Test set_cached with custom TTL."""
         await set_cached("test_key", "test_value", ttl=300)
         result = await get_cached("test_key")
         assert result == "test_value"
 
-    @pytest.mark.asyncio
     async def test_set_cached_uses_default_ttl(self, monkeypatch: Any) -> None:
         """Test set_cached uses default TTL from settings."""
         # This test verifies the TTL parameter is passed correctly
@@ -275,14 +255,12 @@ class TestCacheHelperFunctions:
         result = await get_cached("test_key")
         assert result == "test_value"
 
-    @pytest.mark.asyncio
     async def test_set_cached_persistent_uses_persistent_ttl(self) -> None:
         """Test set_cached on persistent cache uses persistent TTL."""
         await set_cached("test_key", "test_value", alias="persistent")
         result = await get_cached("test_key", alias="persistent")
         assert result == "test_value"
 
-    @pytest.mark.asyncio
     async def test_delete_cached(self) -> None:
         """Test delete_cached."""
         await set_cached("test_key", "test_value")
@@ -290,7 +268,6 @@ class TestCacheHelperFunctions:
         result = await get_cached("test_key")
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_delete_cached_persistent(self) -> None:
         """Test delete_cached on persistent cache."""
         await set_cached("test_key", "test_value", alias="persistent")
@@ -298,7 +275,6 @@ class TestCacheHelperFunctions:
         result = await get_cached("test_key", alias="persistent")
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_clear_cache_memory(self) -> None:
         """Test clear_cache on memory cache."""
         await set_cached("key1", "value1")
@@ -309,7 +285,6 @@ class TestCacheHelperFunctions:
         assert result1 is None
         assert result2 is None
 
-    @pytest.mark.asyncio
     async def test_clear_cache_persistent(self) -> None:
         """Test clear_cache on persistent cache."""
         await set_cached("key1", "value1", alias="persistent")
@@ -320,7 +295,6 @@ class TestCacheHelperFunctions:
         assert result1 is None
         assert result2 is None
 
-    @pytest.mark.asyncio
     async def test_cache_complex_objects(self) -> None:
         """Test caching complex Python objects."""
         test_data = {
@@ -333,7 +307,6 @@ class TestCacheHelperFunctions:
         result = await get_cached("complex_key")
         assert result == test_data
 
-    @pytest.mark.asyncio
     async def test_cache_isolation_between_aliases(self) -> None:
         """Test that memory and persistent caches are isolated."""
         await set_cached("shared_key", "memory_value", alias="memory")
@@ -358,26 +331,22 @@ class TestCacheDisabledBehavior:
         yield
         caches._config = {}
 
-    @pytest.mark.asyncio
     async def test_disabled_cache_set_returns_nothing(self) -> None:
         """Test that setting values in disabled cache has no effect."""
         await set_cached("test_key", "test_value")
         result = await get_cached("test_key")
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_disabled_cache_delete_safe(self) -> None:
         """Test that deleting from disabled cache is safe."""
         await delete_cached("test_key")
         # Should not raise any errors
 
-    @pytest.mark.asyncio
     async def test_disabled_cache_clear_safe(self) -> None:
         """Test that clearing disabled cache is safe."""
         await clear_cache()
         # Should not raise any errors
 
-    @pytest.mark.asyncio
     async def test_disabled_cache_no_side_effects(self) -> None:
         """Test that disabled cache operations have no side effects."""
         # Set multiple values
@@ -404,7 +373,6 @@ class TestCacheEdgeCases:
         yield
         caches._config = {}
 
-    @pytest.mark.asyncio
     async def test_cache_none_value(self) -> None:
         """Test caching None as a value."""
         await set_cached("none_key", None)
@@ -413,28 +381,24 @@ class TestCacheEdgeCases:
         # This tests the behavior is consistent
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_cache_empty_string(self) -> None:
         """Test caching empty string."""
         await set_cached("empty_key", "")
         result = await get_cached("empty_key")
         assert result == ""
 
-    @pytest.mark.asyncio
     async def test_cache_zero_value(self) -> None:
         """Test caching zero."""
         await set_cached("zero_key", 0)
         result = await get_cached("zero_key")
         assert result == 0
 
-    @pytest.mark.asyncio
     async def test_cache_false_value(self) -> None:
         """Test caching False."""
         await set_cached("false_key", False)
         result = await get_cached("false_key")
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_cache_large_object(self) -> None:
         """Test caching large objects."""
         large_data = {"key" + str(i): "value" + str(i) for i in range(1000)}
@@ -442,7 +406,6 @@ class TestCacheEdgeCases:
         result = await get_cached("large_key")
         assert result == large_data
 
-    @pytest.mark.asyncio
     async def test_get_cache_invalid_alias(self) -> None:
         """Test get_cache with invalid alias raises or returns None."""
         # This should handle invalid aliases gracefully

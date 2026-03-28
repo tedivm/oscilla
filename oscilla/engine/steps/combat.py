@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Awaitable, Callable
 
 from oscilla.engine.models.adventure import CombatStep, OutcomeBranch
 from oscilla.engine.pipeline import AdventureOutcome, TUICallbacks
@@ -12,12 +12,12 @@ if TYPE_CHECKING:
     from oscilla.engine.registry import ContentRegistry
 
 
-def run_combat(
+async def run_combat(
     step: CombatStep,
     player: "PlayerState",
     registry: "ContentRegistry",
     tui: TUICallbacks,
-    run_outcome_branch: Callable[[OutcomeBranch], AdventureOutcome],
+    run_outcome_branch: Callable[[OutcomeBranch], Awaitable[AdventureOutcome]],
 ) -> AdventureOutcome:
     """Execute the turn-based combat loop.
 
@@ -39,16 +39,16 @@ def run_combat(
             player.active_adventure.step_state["enemy_hp"] = enemy_hp
 
     while True:
-        tui.show_combat_round(
+        await tui.show_combat_round(
             player_hp=player.hp,
             enemy_hp=enemy_hp,
             player_name=player.name,
             enemy_name=enemy.spec.displayName,
         )
-        action = tui.show_menu("Your move:", ["Attack", "Flee"])
+        action = await tui.show_menu("Your move:", ["Attack", "Flee"])
 
         if action == 2:  # Flee
-            run_outcome_branch(step.on_flee)
+            await run_outcome_branch(step.on_flee)
             return AdventureOutcome.FLED
 
         # Player attacks — strength reduces enemy defence
@@ -60,7 +60,7 @@ def run_combat(
 
         if enemy_hp <= 0:
             player.statistics.record_enemy_defeated(step.enemy)
-            run_outcome_branch(step.on_win)
+            await run_outcome_branch(step.on_win)
             return AdventureOutcome.COMPLETED
 
         # Enemy attacks — player dexterity reduces incoming damage
@@ -70,5 +70,5 @@ def run_combat(
         player.hp = max(0, player.hp - incoming)
 
         if player.hp <= 0:
-            run_outcome_branch(step.on_defeat)
+            await run_outcome_branch(step.on_defeat)
             return AdventureOutcome.DEFEATED

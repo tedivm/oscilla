@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Awaitable, Callable
 
 from oscilla.engine.conditions import evaluate
 from oscilla.engine.models.adventure import ChoiceStep, OutcomeBranch
@@ -12,13 +12,13 @@ if TYPE_CHECKING:
     from oscilla.engine.player import PlayerState
 
 
-def run_choice(
+async def run_choice(
     step: ChoiceStep,
     player: "PlayerState",
     tui: TUICallbacks,
-    run_outcome_branch: Callable[[OutcomeBranch], AdventureOutcome],
+    run_outcome_branch: Callable[[OutcomeBranch], Awaitable[AdventureOutcome]],
 ) -> AdventureOutcome:
-    """Filter eligible options, present a numbered menu, then execute the chosen branch.
+    """Filter eligible options, present a menu, then execute the chosen branch.
 
     Options whose requires condition is not met are hidden entirely — the player
     never sees them. If all options are gated (empty eligible list), a fallback
@@ -28,15 +28,15 @@ def run_choice(
 
     if not eligible:
         # No options available; show a notice and continue the adventure.
-        tui.show_text("(No options are available here.)")
+        await tui.show_text("(No options are available here.)")
         return AdventureOutcome.COMPLETED
 
     labels = [opt.label for opt in eligible]
-    choice_idx = tui.show_menu(step.prompt, labels)
+    choice_idx = await tui.show_menu(step.prompt, labels)
     chosen = eligible[choice_idx - 1]
 
     # Fire option-level effects first, then branch via steps or goto.
     from oscilla.engine.models.adventure import OutcomeBranch as OB
 
     branch = OB(effects=chosen.effects, steps=list(chosen.steps), goto=chosen.goto)
-    return run_outcome_branch(branch)
+    return await run_outcome_branch(branch)

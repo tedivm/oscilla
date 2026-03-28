@@ -1,11 +1,11 @@
 [project]
-authors = [{"name" = "Robert Hafner"}]
-description = ""
-dynamic = ["version"]
-license = "MIT"
 name = "oscilla"
-readme = {file = "README.md", content-type = "text/markdown"}
+description = ""
+readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.12"
+license = "MIT"
+authors = [{ "name" = "Robert Hafner" }]
+dynamic = ["version"]
 
 dependencies = [
   "SQLAlchemy",
@@ -21,6 +21,7 @@ dependencies = [
   "redis",
   "rich>=14.3.3",
   "ruamel-yaml>=0.19.1",
+  "textual>=0.80.0",
   "typer",
   "uvicorn[standard]",
 ]
@@ -48,8 +49,8 @@ dev = [
 ]
 
 [build-system]
-build-backend = "setuptools.build_meta"
 requires = ["setuptools>=67.0", "setuptools_scm[toml]>=7.1"]
+build-backend = "setuptools.build_meta"
 
 [tool.coverage.run]
 concurrency = ["thread", "greenlet"]
@@ -70,15 +71,16 @@ strict_optional = true
 warn_return_any = true
 warn_unused_ignores = true
 
-[tool.pytest]
+[tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
+asyncio_mode = "auto"
 
 [tool.ruff]
 exclude = [".venv", "./oscilla/_version.py"]
 line-length = 120
 
 [tool.setuptools.dynamic]
-readme = {file = ["README.md"]}
+readme = { file = ["README.md"] }
 
 [tool.setuptools.package-data]
 oscilla = ["py.typed", "../content/**/*.yaml", "../content/**/*.yml"]

@@ -1,260 +1,247 @@
-# CLI/TUI Interface
+# TUI Interface
 
-The command-line interface provides player-facing commands and implements the terminal user interface for interactive gameplay. This document covers the CLI layer and TUI implementation details.
+The terminal user interface provides the full-screen, async interactive experience for gameplay. This document covers the Textual-based TUI implementation and the CLI commands that launch it.
 
 ## Overview
 
-The CLI layer (`oscilla/cli.py`) contains:
+The TUI stack has three layers:
 
-- **CLI Commands**: `game` (interactive play) and `validate` (content verification)
-- **Game Loop Helpers**: Region/location selection and adventure picking logic
-- **Character Creation**: Player initialization with name input
-- **TUI Integration**: Bridges engine events to Rich-based terminal output
+| Layer | File | Responsibility |
+|---|---|---|
+| CLI entry point | `oscilla/cli.py` | Command parsing, content loading |
+| Textual application | `oscilla/engine/tui.py` | Full-screen UI, async game loop |
+| Engine protocol | `oscilla/engine/pipeline.py` | `TUICallbacks` interface consumed by the pipeline |
 
-## RichTUI Implementation
+`OscillaApp` (a Textual `App`) owns the game loop as a worker coroutine. It drives `AdventurePipeline` via the `TextualTUI` adapter, which implements the async `TUICallbacks` protocol using Textual's widget API.
 
-`RichTUI` (in `oscilla/engine/tui.py`) is the concrete implementation of `TUICallbacks`:
+## Architecture
 
-```python
-class RichTUI:
-    def show_text(self, text: str) -> None:
-        """Display text with Rich rendering (markdown, colors, etc.)."""
+### Async Game Loop
 
-    def show_menu(self, prompt: str, options: List[str]) -> int:
-        """Present numbered menu using Rich prompts."""
-
-    def show_combat_round(self, player_hp: int, max_hp: int,
-                         enemy_name: str, enemy_hp: int, enemy_max_hp: int) -> None:
-        """Display combat status with health bars."""
-
-    def wait_for_ack(self) -> None:
-        """Wait for Enter key press."""
-```
-
-**Design Principle**: `tui.py` is the **only module** that imports Rich directly. This centralization:
-
-- Keeps Rich dependencies contained
-- Simplifies testing (engine tests never need Rich)
-- Allows easy replacement of the UI layer
-
-### Status Display
-
-The `show_status(player, registry)` function renders the player's current state:
-
-```
-┌─ Character Status ─┐
-│ Level: 3           │
-│ HP: 45/50          │
-│ XP: 1250/2000      │
-│ Strength: 15       │
-│ Dexterity: 12      │
-└────────────────────┘
-```
-
-**Dynamic Stat Rendering**: The status panel reads `CharacterConfig.public_stats` to determine which custom stats to display. Only stats marked as "public" appear in the status display.
-
-## Game Loop Structure
-
-The `game` command implements the core gameplay loop:
+The game runs inside a Textual **worker** — a background coroutine managed by Textual's event loop. The `@work(exclusive=True)` decorator registers `_game_loop()` as a worker, so `on_mount` just calls it directly:
 
 ```python
-def game() -> None:
-    """Main interactive game command."""
-    # 1. Load content and initialize systems
-    registry = _load_content()
-    evaluator = ConditionEvaluator()
-    tui = RichTUI()
+@work(exclusive=True)
+async def _game_loop(self) -> None:
+    ...
 
-    # 2. Character creation
-    player = _create_character(registry, tui)
-
-    # 3. Main game loop
-    while True:
-        show_status(player, registry)
-
-        region_ref = _select_region(player, registry, evaluator, tui)
-        if region_ref is None:  # Player chose Quit
-            break
-
-        location_ref = _select_location(player, registry, evaluator, region_ref, tui)
-        if location_ref is None:  # Player chose Back
-            continue
-
-        adventure_ref = _pick_adventure(player, registry, evaluator, location_ref)
-        if adventure_ref is None:  # No available adventures
-            tui.show_text("No adventures available here.")
-            continue
-
-        # Record location visit only after successful adventure selection
-        player.record_location_visited(location_ref)
-
-        # Execute adventure
-        pipeline = AdventurePipeline(registry, player, tui)
-        outcome = pipeline.run(adventure_ref)
-
-        # Show outcome and updated status
-        _show_outcome(outcome, tui)
-        show_status(player, registry)
+def on_mount(self) -> None:
+    self._game_loop()
 ```
 
-### Helper Functions
+`_game_loop()` performs region selection, location selection, weighted adventure picking, and pipeline execution — all with `await`. Player input (menus, name entry) suspends the loop via `asyncio.Event`; Textual's event handlers set those events when the player acts.
 
-#### `_select_region(player, registry, evaluator, tui)`
+### TUICallbacks Protocol
 
-- Filters regions by accessibility (condition evaluation)
-- Presents numbered menu with region names + "Quit"
-- Returns selected region reference or `None` for Quit
-- **Error Handling**: Calls `SystemExit(1)` if no regions are accessible
+All engine components interact with the TUI exclusively through the async `TUICallbacks` protocol defined in `oscilla/engine/pipeline.py`:
 
-#### `_select_location(player, registry, evaluator, region_ref, tui)`
+```python
+class TUICallbacks(Protocol):
+    async def show_text(self, text: str) -> None: ...
+    async def show_menu(self, prompt: str, options: List[str]) -> int: ...
+    async def show_combat_round(
+        self,
+        player_hp: int, max_hp: int,
+        enemy_name: str, enemy_hp: int, enemy_max_hp: int,
+    ) -> None: ...
+    async def wait_for_ack(self) -> None: ...
+```
 
-- Shows region header text (`tui.show_text(region.spec.description)`)
-- Filters locations within region by unlock conditions
-- Presents numbered menu with location names + "Back"
-- Returns selected location reference or `None` for Back
-- **Important**: Does not record location visit here
+`show_menu()` returns a **1-based** integer (the index of the chosen option).
 
-#### `_pick_adventure(player, registry, evaluator, location_ref)`
+**Design principle**: `tui.py` is the **only** module that imports Textual directly. Engine code only sees `TUICallbacks`, which makes testing completely independent of Textual.
 
-- Filters location's adventure pool by `requires` conditions
-- Uses weighted random selection (`random.choices()`) with declared weights
-- Returns adventure reference or `None` if no adventures pass conditions
-- **Statistics Note**: Adventure completion is recorded by `AdventurePipeline.run()` internally
+## Widget Inventory
 
-#### `_show_outcome(outcome, tui)`
+All widgets are defined in `oscilla/engine/tui.py`.
 
-Displays adventure results based on outcome string:
+### `NarrativeLog(RichLog)`
 
-- `"victory"`: "You emerged victorious!"
-- `"defeat"`: "You were defeated..."
-- `"fled"`: "You managed to flee to safety."
-- Custom outcomes: Display as-is
+Scrollable log that accumulates all narrative text during a session.
 
-### Visit Counter Timing Rule
+- `append_text(text: str) -> None` — wraps content in a Rich `Panel` and writes it to the log.
+- CSS: occupies the upper portion of the left panel, scrolls automatically.
 
-**Critical Timing**: `player.record_location_visited()` is called **only after** `_pick_adventure()` returns a valid adventure reference.
+### `ChoiceMenu(OptionList)`
 
-**Rationale**: Players should not get "credit" for visiting a location if no adventure was available. Empty adventure pools (due to condition gating) do not count as visits.
+Player-choice menu. Hidden between prompts; shown when a selection is needed.
+
+- `wait_for_selection(options: List[str]) -> int` — calls `set_options()` then suspends via `asyncio.Event`; returns a 1-based index when the player confirms a selection.
+- `on_option_list_option_selected(event)` — Textual event handler that stores `event.option_index + 1` and sets the event.
+- `highlighted = 0` is set after each `set_options()` call to pre-select the first item, ensuring Enter works without navigating first.
+
+`wait_for_ack()` in `TextualTUI` is implemented by calling `wait_for_selection(["▶  Press Enter to continue"])`.
+
+### `StatusPanel(Static)`
+
+Right-panel widget showing the current player state.
+
+- `set_registry(registry: ContentRegistry) -> None` — stores the registry reference for stat lookup.
+- `refresh_player(player: PlayerState) -> None` — re-renders name, level, HP, XP, and all `public_stats` declared in `CharacterConfig`.
+
+### `RegionPanel(Static)`
+
+Right-panel widget showing the current region.
+
+- `set_region(name: str, description: str) -> None` — updates the displayed region name and description.
+
+### `HelpOverlay(ModalScreen[None])`
+
+Modal overlay showing key binding help. Dismissed by `?` or `Escape`.
+
+### `OscillaApp(App[None])`
+
+The root Textual application.
+
+**Layout**:
+
+```
+┌────────────────────────────────────┬────────────────┐
+│  NarrativeLog (#left-panel, 3fr)   │  StatusPanel   │
+│                                    │  RegionPanel   │
+│  ChoiceMenu                        │  (#right-panel │
+│                                    │   1fr)         │
+├────────────────────────────────────┴────────────────┤
+│  Footer (key binding hints)                         │
+└─────────────────────────────────────────────────────┘
+│  Input#name-input  (hidden except during name prompt)
+```
+
+**Key bindings**:
+
+| Key | Action |
+|---|---|
+| `ctrl+q` | Quit application |
+| `?` | Toggle `HelpOverlay` |
+
+**Name prompt**: `_prompt_name()` shows the `Input` widget, suspends on an `asyncio.Event`, and returns the entered name (defaulting to `"Hero"` if empty).
+
+### `TextualTUI`
+
+Concrete implementation of `TUICallbacks` backed by `OscillaApp` widgets. Constructed inside `_game_loop()` with a reference to the running `OscillaApp`:
+
+```python
+tui = TextualTUI(self)  # self = OscillaApp instance
+```
+
+| Protocol method | Widget used |
+|---|---|
+| `show_text` | `NarrativeLog.append_text()` |
+| `show_menu` | `NarrativeLog.append_text()` (prompt) + `ChoiceMenu.wait_for_selection()` |
+| `show_combat_round` | `NarrativeLog` (Rich `Table` showing HP) |
+| `wait_for_ack` | `ChoiceMenu.wait_for_selection(["▶  Press Enter to continue"])` |
+
+## Game Loop Detail
+
+```
+_game_loop()
+│
+├─ _prompt_name()          → player name via Input widget
+├─ PlayerState.new_player()
+├─ StatusPanel.set_registry()
+│
+└─ while True:  ← outer region loop
+   ├─ filter accessible regions  (condition evaluator)
+   ├─ tui.show_menu()            → region choice (or Quit)
+   ├─ RegionPanel.set_region()
+   │
+   └─ while True:  ← inner location loop (stays in region after each adventure)
+      ├─ filter accessible locs
+      ├─ (no locs) → tui.show_text() + break to region loop
+      ├─ tui.show_menu()            → location choice (or Back)
+      ├─ (Back chosen) → break to region loop
+      ├─ weighted random adventure pick
+      ├─ player.statistics.record_location_visited()
+      ├─ AdventurePipeline.run()    → outcome
+      ├─ tui.show_text()            → outcome message
+      └─ StatusPanel.refresh_player()
+```
 
 ## CLI Commands
 
-### `game` Command
+### `game`
 
 ```bash
 uv run oscilla game
 ```
 
-**Behavior**:
+- Loads content from `settings.content_path` (default `./content/`).
+- Instantiates `OscillaApp(registry=registry)` and calls `.run()` — this hands control to Textual.
+- The full-screen TUI owns the session from this point onward.
 
-- Loads content from `settings.content_path` (defaults to `./content/`)
-- Prompts for character name with Rich input
-- Starts interactive game loop
-- Exits gracefully on Quit selection (exit code 0)
-
-### `validate` Command
+### `validate`
 
 ```bash
 uv run oscilla validate
 ```
 
-**Behavior**:
+- Invokes `ContentLoader.load()` on configured content path.
+- Prints success or detailed errors (file path + descriptions).
+- Exit code 0 for valid content, non-zero on any error.
 
-- Invokes `ContentLoader.load()` on configured content path
-- Prints success message or detailed error list with file paths
-- Exit code 0 for valid content, non-zero for any errors
-- Uses same content path as `game` command
+## Testing
 
-## Testing CLI Code
+### MockTUI
 
-CLI tests use `typer.testing.CliRunner` with mocked dependencies:
-
-```python
-from typer.testing import CliRunner
-from unittest.mock import patch
-
-def test_game_command_quit_exits():
-    runner = CliRunner()
-
-    # Mock RichTUI to avoid terminal interaction
-    with patch("oscilla.cli.RichTUI") as mock_tui_class:
-        mock_tui = mock_tui_class.return_value
-        mock_tui.show_menu.return_value = 0  # Select Quit
-
-        result = runner.invoke(app, ["game"])
-
-        assert result.exit_code == 0
-        assert "Goodbye!" in result.stdout
-```
-
-**Testing Patterns**:
-
-- Use `patch("oscilla.cli.RichTUI")` to inject `MockTUI` behavior
-- Control menu selections via `mock_tui.show_menu.return_value`
-- Verify terminal output through `runner.invoke()` result
-- Test error conditions with invalid content fixtures
-
-### MockTUI Integration
-
-For engine-level testing, inject `MockTUI` via the `TUICallbacks` interface:
+`tests/engine/conftest.py` provides `MockTUI`, which satisfies the async `TUICallbacks` protocol without any Textual or terminal interaction:
 
 ```python
-def test_pipeline_records_calls(base_player, minimal_registry, mock_tui):
-    pipeline = AdventurePipeline(minimal_registry, base_player, mock_tui)
-    outcome = pipeline.run("test-adventure")
+class MockTUI:
+    async def show_text(self, text: str) -> None:
+        self.texts.append(text)
 
-    # Verify captured interactions
-    assert len(mock_tui.texts) == 2
-    assert mock_tui.texts[0] == "You enter the forest..."
-    assert mock_tui.acks == 2  # Two acknowledgment pauses
+    async def show_menu(self, prompt: str, options: List[str]) -> int:
+        return self.menu_responses.pop(0)
+
+    async def show_combat_round(self, ...) -> None:
+        self.combat_rounds.append(...)
+
+    async def wait_for_ack(self) -> None:
+        self.acks += 1
 ```
 
-## Rich Integration Details
+Configure responses before the test, then assert on captured calls:
 
-The TUI layer leverages Rich features:
+```python
+async def test_pipeline_records_calls(base_player, minimal_registry, mock_tui):
+    mock_tui.menu_responses = [1]  # Always pick option 1
+    pipeline = AdventurePipeline(registry=minimal_registry, player=base_player, tui=mock_tui)
+    outcome = await pipeline.run("test-adventure")
 
-- **Text Rendering**: Supports markdown formatting in narrative text
-- **Progress Bars**: Health bars in combat display
-- **Prompts**: Numbered menu selection with validation
-- **Console Output**: Consistent styling and color themes
-- **Error Handling**: Rich exceptions for better stack traces during development
+    assert len(mock_tui.texts) > 0
+```
 
-**Performance**: Rich initialization happens once per `RichTUI` instance. The shared console object (`console = Console()`) is reused across all method calls.
+### asyncio_mode = "auto"
 
-## Error Handling
+`pyproject.toml` sets `asyncio_mode = "auto"` under `[tool.pytest.ini_options]`. All `async def test_*` functions are automatically treated as async tests — no `@pytest.mark.asyncio` decorator is needed.
 
-### Content Loading Errors
+### No Textual in Engine Tests
 
-- Missing content directory: Friendly error message + exit code 1
-- Invalid YAML syntax: File path + line number details
-- Schema validation failures: Field-level error descriptions
-- Broken cross-references: Source and target reference details
-
-### Runtime Errors
-
-- No accessible regions: `SystemExit(1)` with error message
-- Character stat conflicts: Validation error during character creation
-- Adventure execution exceptions: Caught and logged, graceful fallback
-
-### User Input Errors
-
-- Invalid menu selections: Re-prompt with error message
-- Keyboard interrupts (Ctrl+C): Clean exit with goodbye message
-- EOF errors: Handle gracefully without stack traces
+Engine tests (`tests/engine/`) never import Textual. They use `MockTUI` exclusively. This keeps the engine test suite fast and independent of the full-screen UI framework.
 
 ## Configuration
 
-CLI behavior is controlled by settings in `oscilla/conf/settings.py`:
-
 ```python
-class Settings:
-    content_path: str = Field(
-        default="./content/",
-        description="Path to game content directory"
-    )
+# oscilla/conf/settings.py
+content_path: str = Field(
+    default="./content/",
+    description="Path to game content directory",
+)
 ```
 
-Both `game` and `validate` commands use the same content path setting. Override via environment variable:
+Both `game` and `validate` use `settings.content_path`. Override via environment variable:
 
 ```bash
 CONTENT_PATH=/path/to/custom/content uv run oscilla game
 ```
+
+## Extending the TUI
+
+To add a new UI capability (e.g., a map view):
+
+1. Add a new method to the `TUICallbacks` protocol in `pipeline.py`.
+2. Implement the method as `async def` in `TextualTUI` using Textual widgets.
+3. Add a corresponding `async def` no-op or stub in `MockTUI` (`tests/engine/conftest.py`).
+4. Update any step handlers that need to call the new method.
+
+The Protocol + MockTUI pattern ensures that adding TUI features never breaks the engine test suite as long as MockTUI provides a matching async signature.

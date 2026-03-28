@@ -32,14 +32,14 @@ class MockTUI:
         self.acks: int = 0
         self._menu_responses: List[int] = list(menu_responses or [])
 
-    def show_text(self, text: str) -> None:
+    async def show_text(self, text: str) -> None:
         self.texts.append(text)
 
-    def show_menu(self, prompt: str, options: List[str]) -> int:
+    async def show_menu(self, prompt: str, options: List[str]) -> int:
         self.menus.append((prompt, options))
         return self._menu_responses.pop(0) if self._menu_responses else 1
 
-    def show_combat_round(
+    async def show_combat_round(
         self,
         player_hp: int,
         enemy_hp: int,
@@ -48,7 +48,7 @@ class MockTUI:
     ) -> None:
         self.combat_rounds.append((player_hp, enemy_hp, player_name, enemy_name))
 
-    def wait_for_ack(self) -> None:
+    async def wait_for_ack(self) -> None:
         self.acks += 1
 
 

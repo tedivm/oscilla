@@ -19,23 +19,23 @@ from oscilla.engine.signals import _EndSignal, _GotoSignal
 class TUICallbacks(Protocol):
     """Interface that step handlers use to produce player-facing output.
 
-    The concrete implementation is RichTUI (oscilla/engine/tui.py).
+    The concrete implementation is TextualTUI (oscilla/engine/tui.py).
     Tests inject MockTUI (tests/engine/conftest.py).
-    Step handlers never import RichTUI directly — they receive TUICallbacks.
+    Step handlers never import TextualTUI directly — they receive TUICallbacks.
     """
 
-    def show_text(self, text: str) -> None:
+    async def show_text(self, text: str) -> None:
         """Display a narrative passage or informational message."""
         ...
 
-    def show_menu(self, prompt: str, options: List[str]) -> int:
-        """Display a numbered list of options and return the 1-based index chosen.
+    async def show_menu(self, prompt: str, options: List[str]) -> int:
+        """Display a list of options and return the 1-based index chosen.
 
-        Must loop until a valid integer in [1, len(options)] is entered.
+        Suspends the caller until the player makes a selection.
         """
         ...
 
-    def show_combat_round(
+    async def show_combat_round(
         self,
         player_hp: int,
         enemy_hp: int,
@@ -45,7 +45,7 @@ class TUICallbacks(Protocol):
         """Display combat state before each player action in the turn loop."""
         ...
 
-    def wait_for_ack(self) -> None:
+    async def wait_for_ack(self) -> None:
         """Pause for the player to acknowledge before advancing to the next step."""
         ...
 
@@ -79,7 +79,7 @@ class AdventurePipeline:
         self._root_steps: List[Step] = []
         self._label_index: Dict[str, int] = {}
 
-    def run(self, adventure_ref: str) -> AdventureOutcome:
+    async def run(self, adventure_ref: str) -> AdventureOutcome:
         """Execute the adventure from step 0.
 
         Handles _GotoSignal by restarting _run_from() at the target step.
@@ -109,7 +109,7 @@ class AdventurePipeline:
         outcome: AdventureOutcome = AdventureOutcome.COMPLETED
         while True:
             try:
-                outcome = self._run_from(start)
+                outcome = await self._run_from(start)
                 break
             except _GotoSignal as sig:
                 # Jump to the labeled top-level step
@@ -125,29 +125,29 @@ class AdventurePipeline:
 
     # --- Internal step execution ---
 
-    def _run_from(self, start_index: int) -> AdventureOutcome:
+    async def _run_from(self, start_index: int) -> AdventureOutcome:
         """Run root steps from start_index through the end of the list."""
         for i in range(start_index, len(self._root_steps)):
             step = self._root_steps[i]
             if self._player.active_adventure:
                 self._player.active_adventure.step_index = i
-            outcome = self._dispatch(step)
+            outcome = await self._dispatch(step)
             if outcome != AdventureOutcome.COMPLETED:
                 return outcome
         return AdventureOutcome.COMPLETED
 
-    def _run_steps(self, steps: List[Step]) -> AdventureOutcome:
+    async def _run_steps(self, steps: List[Step]) -> AdventureOutcome:
         """Run a nested step list (outcome branch or choice option inline steps).
 
         _GotoSignal propagates naturally up to run() if raised inside a sub-step.
         """
         for step in steps:
-            outcome = self._dispatch(step)
+            outcome = await self._dispatch(step)
             if outcome != AdventureOutcome.COMPLETED:
                 return outcome
         return AdventureOutcome.COMPLETED
 
-    def _dispatch(self, step: Step) -> AdventureOutcome:
+    async def _dispatch(self, step: Step) -> AdventureOutcome:
         """Dispatch a step to its type-specific handler function."""
         from oscilla.engine.models.adventure import ChoiceStep, CombatStep, NarrativeStep, StatCheckStep
         from oscilla.engine.steps.choice import run_choice
@@ -157,14 +157,14 @@ class AdventurePipeline:
 
         match step:
             case NarrativeStep():
-                return run_narrative(
+                return await run_narrative(
                     step=step,
                     player=self._player,
                     tui=self._tui,
                     run_effects=self._run_effects,
                 )
             case CombatStep():
-                return run_combat(
+                return await run_combat(
                     step=step,
                     player=self._player,
                     registry=self._registry,
@@ -172,14 +172,14 @@ class AdventurePipeline:
                     run_outcome_branch=self._run_outcome_branch,
                 )
             case ChoiceStep():
-                return run_choice(
+                return await run_choice(
                     step=step,
                     player=self._player,
                     tui=self._tui,
                     run_outcome_branch=self._run_outcome_branch,
                 )
             case StatCheckStep():
-                return run_stat_check(
+                return await run_stat_check(
                     step=step,
                     player=self._player,
                     run_outcome_branch=self._run_outcome_branch,
@@ -187,14 +187,14 @@ class AdventurePipeline:
         # Unreachable with a complete match; guards against future extension.
         raise ValueError(f"Unhandled step type: {step!r}")  # pragma: no cover
 
-    def _run_effects(self, effects: List[Effect]) -> None:
-        """Apply effects silently — no TUI call, no screen produced."""
+    async def _run_effects(self, effects: List[Effect]) -> None:
+        """Apply effects and report each outcome to the player via TUI."""
         for effect in effects:
-            self._run_effect(effect, self._player, self._registry)
+            await self._run_effect(effect, self._player, self._registry, self._tui)
 
-    def _run_outcome_branch(self, branch: OutcomeBranch) -> AdventureOutcome:
+    async def _run_outcome_branch(self, branch: OutcomeBranch) -> AdventureOutcome:
         """Fire branch effects, then either run inline steps or raise a goto signal."""
-        self._run_effects(branch.effects)
+        await self._run_effects(branch.effects)
         if branch.goto is not None:
             raise _GotoSignal(branch.goto)  # caught by run(); never escapes the pipeline
-        return self._run_steps(list(branch.steps))
+        return await self._run_steps(list(branch.steps))

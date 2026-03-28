@@ -5,14 +5,20 @@ from __future__ import annotations
 import pytest
 
 from oscilla.engine.conditions import _numeric_compare, evaluate
-from oscilla.engine.models.base import (AdventuresCompletedCondition,
-                                        AllCondition, AnyCondition,
-                                        CharacterStatCondition, ClassCondition,
-                                        EnemiesDefeatedCondition,
-                                        ItemCondition, LevelCondition,
-                                        LocationsVisitedCondition,
-                                        MilestoneCondition, NotCondition,
-                                        PrestigeCountCondition)
+from oscilla.engine.models.base import (
+    AdventuresCompletedCondition,
+    AllCondition,
+    AnyCondition,
+    CharacterStatCondition,
+    ClassCondition,
+    EnemiesDefeatedCondition,
+    ItemCondition,
+    LevelCondition,
+    LocationsVisitedCondition,
+    MilestoneCondition,
+    NotCondition,
+    PrestigeCountCondition,
+)
 from oscilla.engine.player import PlayerState
 
 

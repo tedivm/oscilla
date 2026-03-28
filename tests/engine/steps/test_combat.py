@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-
 from oscilla.engine.models.adventure import CombatStep, OutcomeBranch
-from oscilla.engine.models.enemy import EnemyManifest, EnemySpec
 from oscilla.engine.models.base import Metadata
+from oscilla.engine.models.enemy import EnemyManifest, EnemySpec
 from oscilla.engine.pipeline import AdventureOutcome
 from oscilla.engine.player import AdventurePosition, PlayerState
 from oscilla.engine.registry import ContentRegistry
 from oscilla.engine.steps.combat import run_combat
-
 from tests.engine.conftest import MockTUI
 
 
@@ -39,7 +37,7 @@ def create_test_combat_registry() -> ContentRegistry:
     return registry
 
 
-def test_combat_win_scenario(base_player: PlayerState) -> None:
+async def test_combat_win_scenario(base_player: PlayerState) -> None:
     """Test winning a combat scenario."""
     registry = create_test_combat_registry()
     mock_tui = MockTUI(menu_responses=[1])  # Always attack
@@ -59,11 +57,11 @@ def test_combat_win_scenario(base_player: PlayerState) -> None:
 
     outcome_calls = []
 
-    def mock_run_outcome_branch(branch: OutcomeBranch) -> AdventureOutcome:
+    async def mock_run_outcome_branch(branch: OutcomeBranch) -> AdventureOutcome:
         outcome_calls.append(("branch", branch))
         return AdventureOutcome.COMPLETED
 
-    result = run_combat(
+    result = await run_combat(
         step=step, player=base_player, registry=registry, tui=mock_tui, run_outcome_branch=mock_run_outcome_branch
     )
 
@@ -73,7 +71,7 @@ def test_combat_win_scenario(base_player: PlayerState) -> None:
     assert base_player.statistics.enemies_defeated.get("weak-enemy", 0) == 1
 
 
-def test_combat_flee_scenario(base_player: PlayerState) -> None:
+async def test_combat_flee_scenario(base_player: PlayerState) -> None:
     """Test fleeing from combat."""
     registry = create_test_combat_registry()
     mock_tui = MockTUI(menu_responses=[2])  # Choose flee
@@ -88,11 +86,11 @@ def test_combat_flee_scenario(base_player: PlayerState) -> None:
 
     outcome_calls = []
 
-    def mock_run_outcome_branch(branch: OutcomeBranch) -> AdventureOutcome:
+    async def mock_run_outcome_branch(branch: OutcomeBranch) -> AdventureOutcome:
         outcome_calls.append(branch)
         return AdventureOutcome.FLED
 
-    result = run_combat(
+    result = await run_combat(
         step=step, player=base_player, registry=registry, tui=mock_tui, run_outcome_branch=mock_run_outcome_branch
     )
 
@@ -102,7 +100,7 @@ def test_combat_flee_scenario(base_player: PlayerState) -> None:
     assert base_player.statistics.enemies_defeated.get("weak-enemy", 0) == 0  # No kill recorded
 
 
-def test_combat_defeat_scenario(base_player: PlayerState) -> None:
+async def test_combat_defeat_scenario(base_player: PlayerState) -> None:
     """Test player defeat in combat."""
     registry = create_test_combat_registry()
     mock_tui = MockTUI(menu_responses=[1, 1, 1])  # Keep attacking
@@ -123,11 +121,11 @@ def test_combat_defeat_scenario(base_player: PlayerState) -> None:
 
     outcome_calls = []
 
-    def mock_run_outcome_branch(branch: OutcomeBranch) -> AdventureOutcome:
+    async def mock_run_outcome_branch(branch: OutcomeBranch) -> AdventureOutcome:
         outcome_calls.append(branch)
         return AdventureOutcome.DEFEATED
 
-    result = run_combat(
+    result = await run_combat(
         step=step, player=base_player, registry=registry, tui=mock_tui, run_outcome_branch=mock_run_outcome_branch
     )
 
@@ -137,7 +135,7 @@ def test_combat_defeat_scenario(base_player: PlayerState) -> None:
     assert base_player.hp == 0
 
 
-def test_combat_stat_handling_non_numeric(base_player: PlayerState) -> None:
+async def test_combat_stat_handling_non_numeric(base_player: PlayerState) -> None:
     """Test combat with non-numeric stats falls back to defaults."""
     registry = create_test_combat_registry()
     mock_tui = MockTUI(menu_responses=[1])  # Attack
@@ -157,11 +155,11 @@ def test_combat_stat_handling_non_numeric(base_player: PlayerState) -> None:
 
     outcome_calls = []
 
-    def mock_run_outcome_branch(branch: OutcomeBranch) -> AdventureOutcome:
+    async def mock_run_outcome_branch(branch: OutcomeBranch) -> AdventureOutcome:
         outcome_calls.append(branch)
         return AdventureOutcome.COMPLETED
 
-    result = run_combat(
+    result = await run_combat(
         step=step, player=base_player, registry=registry, tui=mock_tui, run_outcome_branch=mock_run_outcome_branch
     )
 
@@ -169,7 +167,7 @@ def test_combat_stat_handling_non_numeric(base_player: PlayerState) -> None:
     assert result == AdventureOutcome.COMPLETED
 
 
-def test_combat_enemy_hp_persistence_fresh_start(base_player: PlayerState) -> None:
+async def test_combat_enemy_hp_persistence_fresh_start(base_player: PlayerState) -> None:
     """Test enemy HP starts fresh when no prior step state."""
     registry = create_test_combat_registry()
     mock_tui = MockTUI(menu_responses=[2])  # Flee immediately
@@ -185,17 +183,17 @@ def test_combat_enemy_hp_persistence_fresh_start(base_player: PlayerState) -> No
         on_flee=OutcomeBranch(effects=[], steps=[], goto=None),
     )
 
-    def mock_run_outcome_branch(branch: OutcomeBranch) -> AdventureOutcome:
+    async def mock_run_outcome_branch(branch: OutcomeBranch) -> AdventureOutcome:
         return AdventureOutcome.FLED
 
-    result = run_combat(
+    result = await run_combat(
         step=step, player=base_player, registry=registry, tui=mock_tui, run_outcome_branch=mock_run_outcome_branch
     )
 
     assert result == AdventureOutcome.FLED
 
 
-def test_combat_enemy_hp_persistence_restored_state(base_player: PlayerState) -> None:
+async def test_combat_enemy_hp_persistence_restored_state(base_player: PlayerState) -> None:
     """Test enemy HP is restored from step state."""
     registry = create_test_combat_registry()
     mock_tui = MockTUI(menu_responses=[2])  # Flee
@@ -215,10 +213,10 @@ def test_combat_enemy_hp_persistence_restored_state(base_player: PlayerState) ->
         on_flee=OutcomeBranch(effects=[], steps=[], goto=None),
     )
 
-    def mock_run_outcome_branch(branch: OutcomeBranch) -> AdventureOutcome:
+    async def mock_run_outcome_branch(branch: OutcomeBranch) -> AdventureOutcome:
         return AdventureOutcome.FLED
 
-    result = run_combat(
+    result = await run_combat(
         step=step, player=base_player, registry=registry, tui=mock_tui, run_outcome_branch=mock_run_outcome_branch
     )
 
@@ -227,7 +225,7 @@ def test_combat_enemy_hp_persistence_restored_state(base_player: PlayerState) ->
     assert base_player.active_adventure.step_state["enemy_hp"] == 2
 
 
-def test_combat_damage_calculation_with_defense(base_player: PlayerState) -> None:
+async def test_combat_damage_calculation_with_defense(base_player: PlayerState) -> None:
     """Test damage calculation respects enemy defense (player deals 0 damage when strength < defense)."""
     registry = ContentRegistry()
 
@@ -254,10 +252,10 @@ def test_combat_damage_calculation_with_defense(base_player: PlayerState) -> Non
         on_flee=OutcomeBranch(effects=[], steps=[], goto=None),
     )
 
-    def mock_run_outcome_branch(branch: OutcomeBranch) -> AdventureOutcome:
+    async def mock_run_outcome_branch(branch: OutcomeBranch) -> AdventureOutcome:
         return AdventureOutcome.DEFEATED
 
-    result = run_combat(
+    result = await run_combat(
         step=step,
         player=base_player,
         registry=registry,
@@ -270,7 +268,7 @@ def test_combat_damage_calculation_with_defense(base_player: PlayerState) -> Non
     assert base_player.hp == 0
 
 
-def test_combat_dexterity_damage_mitigation(base_player: PlayerState) -> None:
+async def test_combat_dexterity_damage_mitigation(base_player: PlayerState) -> None:
     """Test dexterity provides damage mitigation."""
     registry = create_test_combat_registry()
     mock_tui = MockTUI(menu_responses=[1, 2])  # Attack then flee
@@ -289,10 +287,10 @@ def test_combat_dexterity_damage_mitigation(base_player: PlayerState) -> None:
         on_flee=OutcomeBranch(effects=[], steps=[], goto=None),
     )
 
-    def mock_run_outcome_branch(branch: OutcomeBranch) -> AdventureOutcome:
+    async def mock_run_outcome_branch(branch: OutcomeBranch) -> AdventureOutcome:
         return AdventureOutcome.FLED
 
-    result = run_combat(
+    result = await run_combat(
         step=step, player=base_player, registry=registry, tui=mock_tui, run_outcome_branch=mock_run_outcome_branch
     )
 
