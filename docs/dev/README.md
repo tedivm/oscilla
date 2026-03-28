@@ -33,6 +33,25 @@ Command-line interface built with Typer for management and automation tasks.
 
 Jinja2 templating for HTML rendering and template-based content generation.
 
+## Game Engine
+
+### [Game Engine](./game-engine.md)
+
+Engine internals, architecture, and extend points for the text-based adventure system.
+
+### [CLI Interface](./tui.md)
+
+Command-line interface layer, TUI implementation, and game loop structure.
+
+## Interface Layers
+
+The oscilla project is designed with clear separation between interface layers:
+
+- **Game Engine** - Core game logic and content processing (above)
+- **CLI Interface** - Terminal user interface and commands (above)
+- **REST API** - Web service endpoints *(future)*
+- **Frontend** - Web browser interface *(future)*
+
 ## Development Practices
 
 ### [Testing](./testing.md)

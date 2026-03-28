@@ -1,11 +1,14 @@
 """Cache service configuration and utilities for oscilla."""
 
-from typing import Any
+from typing import Any, cast
 
 from aiocache import caches  # type: ignore[import-untyped]
 from aiocache.base import BaseCache  # type: ignore[import-untyped]
 
 from ..settings import settings
+
+# Type alias for serializable cache values - aiocache can serialize most Python objects
+CacheValue = Any
 
 
 class NoOpCache(BaseCache):
@@ -27,7 +30,7 @@ class NoOpCache(BaseCache):
         """Build a cache key using the standard string builder."""
         return self._str_build_key(key, namespace)  # type: ignore[no-any-return]
 
-    async def _add(self, key: str, value: Any, ttl: int | float | None, _conn: Any = None) -> bool:
+    async def _add(self, key: str, value: CacheValue, ttl: int | float | None, _conn: object = None) -> bool:
         """
         No-op add operation.
 
@@ -35,7 +38,7 @@ class NoOpCache(BaseCache):
         """
         return True
 
-    async def _get(self, key: str, encoding: str, _conn: Any = None) -> bytes | None:
+    async def _get(self, key: str, encoding: str, _conn: object = None) -> bytes | None:
         """
         No-op get operation.
 
@@ -43,7 +46,7 @@ class NoOpCache(BaseCache):
         """
         return None
 
-    async def _gets(self, key: str, encoding: str = "utf-8", _conn: Any = None) -> bytes | None:
+    async def _gets(self, key: str, encoding: str = "utf-8", _conn: object = None) -> bytes | None:
         """
         No-op gets operation (get with CAS token).
 
@@ -51,7 +54,7 @@ class NoOpCache(BaseCache):
         """
         return None
 
-    async def _multi_get(self, keys: list[str], encoding: str, _conn: Any = None) -> list[bytes | None]:
+    async def _multi_get(self, keys: list[str], encoding: str, _conn: object = None) -> list[bytes | None]:
         """
         No-op multi-get operation.
 
@@ -60,7 +63,7 @@ class NoOpCache(BaseCache):
         return [None] * len(keys)
 
     async def _set(
-        self, key: str, value: Any, ttl: int | float | None, _cas_token: Any = None, _conn: Any = None
+        self, key: str, value: CacheValue, ttl: int | float | None, _cas_token: object = None, _conn: object = None
     ) -> bool:
         """
         No-op set operation.
@@ -69,7 +72,9 @@ class NoOpCache(BaseCache):
         """
         return True
 
-    async def _multi_set(self, pairs: list[tuple[str, Any]], ttl: int | float | None, _conn: Any = None) -> bool:
+    async def _multi_set(
+        self, pairs: list[tuple[str, CacheValue]], ttl: int | float | None, _conn: object = None
+    ) -> bool:
         """
         No-op multi-set operation.
 
@@ -77,7 +82,7 @@ class NoOpCache(BaseCache):
         """
         return True
 
-    async def _delete(self, key: str, _conn: Any = None) -> int:
+    async def _delete(self, key: str, _conn: object = None) -> int:
         """
         No-op delete operation.
 
@@ -85,7 +90,7 @@ class NoOpCache(BaseCache):
         """
         return 0
 
-    async def _exists(self, key: str, _conn: Any = None) -> bool:
+    async def _exists(self, key: str, _conn: object = None) -> bool:
         """
         No-op exists operation.
 
@@ -93,7 +98,7 @@ class NoOpCache(BaseCache):
         """
         return False
 
-    async def _increment(self, key: str, delta: int, _conn: Any = None) -> int:
+    async def _increment(self, key: str, delta: int, _conn: object = None) -> int:
         """
         No-op increment operation.
 
@@ -101,7 +106,7 @@ class NoOpCache(BaseCache):
         """
         return delta
 
-    async def _expire(self, key: str, ttl: int | float, _conn: Any = None) -> bool:
+    async def _expire(self, key: str, ttl: int | float, _conn: object = None) -> bool:
         """
         No-op expire operation.
 
@@ -109,7 +114,7 @@ class NoOpCache(BaseCache):
         """
         return False
 
-    async def _clear(self, namespace: str | None, _conn: Any = None) -> bool:
+    async def _clear(self, namespace: str | None, _conn: object = None) -> bool:
         """
         No-op clear operation.
 
@@ -117,7 +122,7 @@ class NoOpCache(BaseCache):
         """
         return True
 
-    async def _raw(self, command: str, *args: Any, **kwargs: Any) -> Any:
+    async def _raw(self, command: str, *args: object, **kwargs: object) -> object:
         """
         No-op raw operation.
 
@@ -125,7 +130,7 @@ class NoOpCache(BaseCache):
         """
         return None
 
-    async def _close(self, *args: Any, _conn: Any = None, **kwargs: Any) -> None:
+    async def _close(self, *args: object, _conn: object = None, **kwargs: object) -> None:
         """No-op close operation - nothing to close."""
         pass
 
@@ -180,7 +185,7 @@ def get_cache(alias: str = "memory") -> BaseCache:
     return caches.get(alias)
 
 
-async def get_cached(key: str, alias: str = "memory") -> Any | None:
+async def get_cached(key: str, alias: str = "memory") -> CacheValue:
     """
     Get a value from cache.
 
@@ -192,10 +197,11 @@ async def get_cached(key: str, alias: str = "memory") -> Any | None:
         Cached value or None if not found
     """
     cache = get_cache(alias)
-    return await cache.get(key)
+    result = await cache.get(key)
+    return cast(CacheValue, result)
 
 
-async def set_cached(key: str, value: Any, ttl: int | None = None, alias: str = "memory") -> None:
+async def set_cached(key: str, value: CacheValue, ttl: int | None = None, alias: str = "memory") -> None:
     """
     Set a value in cache.
 

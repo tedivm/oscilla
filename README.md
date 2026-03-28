@@ -8,10 +8,25 @@
 pip install oscilla
 ```
 
+## Playing Locally
+
+Oscilla requires a content package — a directory of YAML manifests that define the game world. By default it looks for a `content/` directory in the project root. You can point it at any content package via the `CONTENT_PATH` environment variable.
+
+```bash
+# Validate your content package (check for errors before playing)
+uv run oscilla validate
+
+# Start an interactive game session
+uv run oscilla game
+
+# Use a custom content directory
+CONTENT_PATH=/path/to/my-content uv run oscilla game
+```
+
 ## CLI
 
 ```bash
-oscilla --help
+uv run oscilla --help
 ```
 
 ## Developer Documentation

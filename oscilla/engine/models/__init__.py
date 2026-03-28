@@ -1,0 +1,43 @@
+"""Manifest model registry mapping kind strings to Pydantic model classes."""
+
+from typing import Dict, Type
+
+from oscilla.engine.models.adventure import AdventureManifest
+from oscilla.engine.models.base import ManifestEnvelope
+from oscilla.engine.models.character_config import CharacterConfigManifest
+from oscilla.engine.models.enemy import EnemyManifest
+from oscilla.engine.models.game import GameManifest
+from oscilla.engine.models.game_class import ClassManifest
+from oscilla.engine.models.item import ItemManifest
+from oscilla.engine.models.location import LocationManifest
+from oscilla.engine.models.quest import QuestManifest
+from oscilla.engine.models.recipe import RecipeManifest
+from oscilla.engine.models.region import RegionManifest
+
+MANIFEST_REGISTRY: Dict[str, Type[ManifestEnvelope]] = {
+    "Region": RegionManifest,
+    "Location": LocationManifest,
+    "Adventure": AdventureManifest,
+    "Enemy": EnemyManifest,
+    "Item": ItemManifest,
+    "Recipe": RecipeManifest,
+    "Quest": QuestManifest,
+    "Class": ClassManifest,
+    "Game": GameManifest,
+    "CharacterConfig": CharacterConfigManifest,
+}
+
+__all__ = [
+    "MANIFEST_REGISTRY",
+    "AdventureManifest",
+    "CharacterConfigManifest",
+    "ClassManifest",
+    "EnemyManifest",
+    "GameManifest",
+    "ItemManifest",
+    "LocationManifest",
+    "ManifestEnvelope",
+    "QuestManifest",
+    "RecipeManifest",
+    "RegionManifest",
+]

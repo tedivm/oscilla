@@ -1,0 +1,28 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+# Example:
+#   context: |
+#     Tech stack: TypeScript, React, Node.js
+#     We use conventional commits
+#     Domain: e-commerce platform
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+
+rules:
+  # proposal:
+  #   - Keep proposals under 500 words
+  #   - Always include a "Non-goals" section
+  tasks:
+    - Do not attempt to estimate the time a task will take.
+  design:
+    - When creating diagrams always use Mermaid Diagrams instead of Ascii Diagrams.
+    - Every design document must include a Documentation Plan section that names each document to be created or updated,
+      its intended audience, and the specific topics it must cover.
+    - Every design document must include a Testing Philosophy section (or equivalent) that describes the test tiers, 
+      required fixtures, and which behaviours each tier verifies.
+    - Documentation and testing sections must be as detailed and specific as the implementation sections. Vague entries 
+      like "write tests" or "update the docs" are not acceptable.

@@ -1,13 +1,17 @@
+from pathlib import Path
+from typing import AsyncGenerator
+
 import pytest_asyncio
+from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
 from oscilla.models.base import Base
 from oscilla.services.db import get_session_depends, test_data
-from fastapi.testclient import TestClient
 from oscilla.www import app
 
 
 @pytest_asyncio.fixture
-async def db_session_maker(tmpdir):
+async def db_session_maker(tmpdir: Path) -> AsyncGenerator[async_sessionmaker[AsyncSession], None]:
     """Creates a test database engine, complete with fake data."""
     test_database_url = f"sqlite+aiosqlite:///{tmpdir}/test_database.db"  # Use SQLite for testing; adjust as needed
     engine = create_async_engine(test_database_url, future=True, echo=False)
@@ -25,17 +29,17 @@ async def db_session_maker(tmpdir):
 
 
 @pytest_asyncio.fixture
-async def db_session(db_session_maker):
+async def db_session(db_session_maker: async_sessionmaker[AsyncSession]) -> AsyncGenerator[AsyncSession, None]:
     async with db_session_maker() as session:
         yield session
 
 
 @pytest_asyncio.fixture
-async def fastapi_client(db_session_maker):
+async def fastapi_client(db_session_maker: async_sessionmaker[AsyncSession]) -> AsyncGenerator[TestClient, None]:
     """Fixture to create a FastAPI test client."""
     client = TestClient(app)
 
-    async def get_session_depends_override():
+    async def get_session_depends_override() -> AsyncGenerator[AsyncSession, None]:
         async with db_session_maker() as session:
             yield session
 

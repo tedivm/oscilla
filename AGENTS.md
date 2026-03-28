@@ -93,7 +93,7 @@ docker compose exec service_name bash # Open a bash shell in a running service c
 
 ### General
 
-* Assume the minimum version of Python is 3.10.
+* Assume the minimum version of Python is 3.12.
 * Prefer async libraries and functions over synchronous ones.
 * Always define dependencies and tool settings in `pyproject.toml`: never use `setup.py` or `setup.cfg` files.
 * Prefer existing dependencies over adding new ones when possible.
@@ -108,6 +108,19 @@ docker compose exec service_name bash # Open a bash shell in a running service c
 * Do not log sensitive data.
 * All user input must be validated.
 * Never roll your own cryptography system.
+* Always load YAML files in safe mode to prevent arbitrary Python object deserialization.
+
+```python
+# Good: safe mode prevents arbitrary Python object deserialization
+from ruamel.yaml import YAML
+_yaml = YAML(typ="safe")
+data = _yaml.load(text)
+
+# Bad: never use these
+import yaml
+yaml.load(text)          # unsafe — allows arbitrary object instantiation
+YAML().load(text)        # unsafe — ruamel default is not safe mode
+```
 
 ### Production Ready
 
@@ -203,7 +216,7 @@ def process_users_bad(users: list[dict], config: dict) -> list:
 ### Settings
 
 * Manage application settings with the `pydantic-settings` library.
-* The main Settings class is located in `PACKAGE_NAME/conf/settings.py` - update this existing class rather than creating new ones.
+* The main Settings class is located in `oscilla/conf/settings.py` - update this existing class rather than creating new ones.
 * Sensitive configuration data must always use Pydantic `SecretStr` or `SecretBytes` types.
 * Settings that are allowed to be unset must default to `None` instead of empty strings.
 * Define settings with the Pydantic `Field` function and include descriptions for users.
@@ -228,7 +241,7 @@ class Settings(BaseSettings):
     )
 
     # Good: Optional field defaults to None
-    api_key: str | None = Field(
+    api_key: SecretStr | None = Field(
         default=None,
         description="Optional API key for external service"
     )
@@ -380,12 +393,32 @@ if __name__ == "__main__":
 * When adding new code, you must also add appropriate tests to cover that new code.
 * The test suite file structure must mirror the main code file structure.
 
+#### Game Engine Testing
+
+* Engine tests must never reference the `content/` directory. Changing or replacing the POC content package must never break any test.
+* For unit tests on already-loaded objects (conditions, player state, step handlers), construct Pydantic models and dataclasses directly in Python — no YAML loading required.
+* For integration tests that exercise the loader or full pipeline, use a minimal fixture set from `tests/fixtures/content/<scenario>/` containing only the manifests needed for that test.
+* Each distinct test scenario gets its own fixture subdirectory. Fixture manifests use a `test-` name prefix followed by the **kind or role** (e.g. `test-enemy`, `test-item`, `test-region-root`), never a content-flavoured name (e.g. never `test-goblin` or `test-sword`). This keeps fixtures unambiguously structural and prevents building narrative coherence inside test fixtures.
+* The `mock_tui` fixture in `conftest.py` must be used to drive all pipeline tests. No test should produce real terminal output.
+
+### Proposals
+
+A proposal is an openspec change consisting of `proposal.md`, `design.md`, and `tasks.md`. Documentation and testing are **first-class deliverables**, not afterthoughts. Every proposal must address them at the same level of detail and specificity as the feature itself.
+
+* `design.md` must include a **Documentation Plan** section that names every document to be created or updated, identifies its intended audience, and lists the specific topics it must cover. Vague statements like "update the docs" are not acceptable.
+* `design.md` must include a **Testing Philosophy** section (or equivalent) that describes what tiers of tests apply, what fixtures are needed, and which behaviours are verified by tests. It must call out any constraints (e.g. no tests may reference `content/`).
+* `tasks.md` must include dedicated sections for documentation tasks and testing tasks, at the same granularity as implementation tasks. Each doc and each meaningful test scenario must be its own line item.
+* New developer documents must follow `docs/dev/` placement and naming rules and must be added to the table of contents in `docs/dev/README.md`. New content author documents must follow `docs/authors/` placement and naming rules and must be added to `docs/authors/README.md`.
+* The documentation and testing sections of a proposal are reviewed with the same rigour as the implementation sections. A proposal that fully specifies the code but leaves documentation or testing vague is incomplete.
+
 ### Files
 
 * Filenames must always be lowercase for better compatibility with case-insensitive filesystems.
 * This includes documentation files, except standard files (like `README.md`, `LICENSE`, etc.).
 * Developer documentation must live in `docs/dev`.
 * New developer documents must be added to the table of contents in `docs/dev/README.md`.
+* Content author documentation must live in `docs/authors`.
+* New content author documents must be added to the table of contents in `docs/authors/README.md`.
 * Files only meant for building containers must live in the `docker/` folder.
 * Database models must live in `PACKAGE_NAME/models/`.
 * The primary settings file must live in `PACKAGE_NAME/conf/settings.py`.

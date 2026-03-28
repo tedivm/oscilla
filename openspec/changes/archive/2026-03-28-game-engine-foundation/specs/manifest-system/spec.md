@@ -1,0 +1,136 @@
+## ADDED Requirements
+
+### Requirement: YAML manifest envelope structure
+
+All content manifests SHALL use a four-field top-level envelope: `apiVersion`, `kind`, `metadata`, and `spec`. The `apiVersion` field SHALL be `game/v1`. The `kind` field SHALL be one of the registered entity kinds. The `metadata` field SHALL contain at minimum a `name` string that is unique within its kind. The `spec` field SHALL contain kind-specific configuration.
+
+#### Scenario: Valid manifest is parsed
+
+- **WHEN** the content loader reads a YAML file with a valid envelope and a recognised `kind`
+- **THEN** it parses the file into the corresponding Pydantic manifest model without error
+
+#### Scenario: Unknown kind is rejected
+
+- **WHEN** the content loader reads a YAML file with an unrecognised `kind` value
+- **THEN** it raises a validation error identifying the file and the invalid kind
+
+#### Scenario: Missing required envelope field
+
+- **WHEN** a manifest file omits `apiVersion`, `kind`, `metadata`, or `metadata.name`
+- **THEN** the loader raises a validation error identifying the missing field and file path
+
+---
+
+### Requirement: Supported entity kinds
+
+The manifest system SHALL support the following `kind` values: `Region`, `Location`, `Adventure`, `Enemy`, `Item`, `Recipe`, `Quest`, `Class`, `Game`, and `CharacterConfig`.
+
+#### Scenario: Each kind maps to a Pydantic model
+
+- **WHEN** a manifest with a supported `kind` is loaded
+- **THEN** it is validated against the corresponding Pydantic schema and stored in the content registry under that kind's namespace
+
+---
+
+### Requirement: CharacterConfig defines all player stats
+
+The `CharacterConfig` manifest SHALL declare two lists of stat definitions: `public_stats` (rendered in the player UI) and `hidden_stats` (internal only, never shown to the player). Each stat definition SHALL include a `name` (unique across both lists), a `type` (one of `int`, `float`, `str`, `bool`), and an optional `default` value that defaults to `null` when omitted. The engine SHALL use this manifest to initialise player stat storage at character creation.
+
+#### Scenario: Player stat storage matches CharacterConfig
+
+- **WHEN** a new player is created and a `CharacterConfig` manifest is present
+- **THEN** the player's stat map contains every stat defined in both `public_stats` and `hidden_stats`, initialised to each stat's declared default (or `null` if no default is set)
+
+#### Scenario: Stat name collision is rejected
+
+- **WHEN** a `CharacterConfig` manifest declares the same stat name in both `public_stats` and `hidden_stats`
+- **THEN** the content loader raises a validation error identifying the duplicate name
+
+#### Scenario: Unknown stat reference is rejected
+
+- **WHEN** a condition, adventure step, or other manifest references a stat name that does not appear in `CharacterConfig`
+- **THEN** the content loader raises a validation error at cross-reference validation time identifying the referencing manifest and the unknown stat name
+
+#### Scenario: Stat default type is validated at load time
+
+- **WHEN** a stat's `default` value is not compatible with its declared `type`
+- **THEN** the content loader raises a validation error at parse time
+
+---
+
+### Requirement: Content directory scanning
+
+The content loader SHALL accept a configurable root directory path. It SHALL recursively scan all `.yaml` and `.yml` files within that directory and attempt to load each as a manifest.
+
+#### Scenario: Configurable path is used
+
+- **WHEN** the `CONTENT_PATH` setting is set to a custom directory
+- **THEN** the loader scans that directory instead of the default bundled content path
+
+#### Scenario: Non-YAML files are ignored
+
+- **WHEN** the content directory contains files with extensions other than `.yaml` or `.yml`
+- **THEN** the loader silently ignores those files
+
+#### Scenario: Empty directory loads cleanly
+
+- **WHEN** the content directory exists but contains no YAML files
+- **THEN** the loader completes without error and the registry is empty
+
+---
+
+### Requirement: Cross-reference validation
+
+The content loader SHALL validate all cross-references between manifests after all files are parsed. Any reference (e.g., a Location referencing a Region by name, an Adventure referencing an Enemy by name) where the target does not exist in the registry SHALL be reported as a validation error.
+
+#### Scenario: Valid cross-reference resolves
+
+- **WHEN** a Location manifest references a Region by `metadata.name` that exists in the registry
+- **THEN** the reference resolves successfully with no error
+
+#### Scenario: Broken cross-reference is reported
+
+- **WHEN** a Location manifest references a Region name that does not exist in the registry
+- **THEN** the loader raises a validation error that includes both the referencing file and the missing target name
+
+---
+
+### Requirement: Region and Location inheritance of unlock conditions
+
+Regions form a tree via an optional `parent` reference in their spec. Locations belong to exactly one Region. The effective unlock condition for a Location SHALL be the logical `all` conjunction of: the Location's own `unlock` condition (if any), plus the `unlock` condition of its Region, plus all ancestor Region `unlock` conditions up to the root.
+
+#### Scenario: Location inherits ancestor conditions
+
+- **WHEN** a Location belongs to a Region that has a `level: 3` unlock condition, and the Location itself has a `milestone: found-map` unlock condition
+- **THEN** the effective condition for the Location requires both `level ≥ 3` AND `milestone: found-map`
+
+#### Scenario: Location with no own condition inherits region condition
+
+- **WHEN** a Location has no `unlock` block but its Region has an `unlock` condition
+- **THEN** the effective condition for the Location is the Region's condition
+
+#### Scenario: Root region with no unlock is always accessible
+
+- **WHEN** a Region has no parent and no `unlock` condition
+- **THEN** all Locations in that Region (with no own unlock) are always accessible
+
+---
+
+### Requirement: Validate CLI command
+
+The system SHALL provide a `validate` CLI command that loads and validates all manifests in the configured content directory and reports all errors without starting the game.
+
+#### Scenario: Valid content reports success
+
+- **WHEN** `oscilla validate` is run against a content directory with no schema or cross-reference errors
+- **THEN** the command exits with code 0 and prints a success summary
+
+#### Scenario: Invalid content reports all errors
+
+- **WHEN** `oscilla validate` is run against a content directory that contains one or more invalid manifests
+- **THEN** the command exits with a non-zero code and prints each error with its source file path
+
+#### Scenario: Validate does not start the game
+
+- **WHEN** `oscilla validate` completes (success or failure)
+- **THEN** no game session is started and no player state is initialized
