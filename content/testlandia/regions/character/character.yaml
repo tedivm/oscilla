@@ -1,0 +1,7 @@
+apiVersion: game/v1
+kind: Region
+metadata:
+  name: character
+spec:
+  displayName: "Character Testing Lab"
+  description: "A controlled environment for testing character stats, XP, and healing mechanics."

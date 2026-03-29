@@ -1,0 +1,10 @@
+apiVersion: game/v1
+kind: Region
+metadata:
+  name: test-region-mid
+spec:
+  displayName: "Middle Region"
+  description: "A region requiring level 2."
+  parent: test-region-root
+  unlock:
+    level: 2

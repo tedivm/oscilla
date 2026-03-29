@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import random
 from logging import getLogger
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Dict, List
 
 from rich.panel import Panel
 from rich.table import Table
@@ -215,6 +215,62 @@ class HelpOverlay(ModalScreen[None]):
         yield Static(_HELP_TEXT, id="help-content")
 
 
+class GameSelectScreen(ModalScreen[str]):
+    """Modal screen for selecting a game when multiple games are available."""
+
+    BINDINGS = [
+        Binding("escape", "dismiss", "Cancel"),
+    ]
+
+    CSS = """
+    #game-select {
+        background: $surface;
+        border: double $primary;
+        padding: 2 4;
+        width: auto;
+        height: auto;
+        margin: 4 8;
+    }
+    #game-list {
+        min-height: 10;
+        max-height: 20;
+    }
+    """
+
+    def __init__(self, games: "Dict[str, ContentRegistry]") -> None:
+        super().__init__()
+        self.games = games
+
+    def compose(self) -> ComposeResult:
+        # Build options list with display names and descriptions
+        options = []
+        self.game_keys = []  # Keep track of the order for selection
+        for game_key, registry in sorted(self.games.items()):
+            if registry.game is not None:
+                display_name = registry.game.spec.displayName
+                description = getattr(registry.game.spec, "description", "")
+                if description:
+                    option_text = f"{display_name} — {description}"
+                else:
+                    option_text = display_name
+                options.append(option_text)
+                self.game_keys.append(game_key)
+            else:
+                # Fallback if no game manifest
+                options.append(f"{game_key} (no game manifest)")
+                self.game_keys.append(game_key)
+
+        yield Static("Select a game to play:", id="game-select")
+        yield OptionList(*options, id="game-list")
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        """Handle game selection."""
+        selected_index = event.option_list.highlighted
+        if selected_index is not None and selected_index < len(self.game_keys):
+            selected_game = self.game_keys[selected_index]
+            self.dismiss(selected_game)
+
+
 # ─── Main application ────────────────────────────────────────────────────────
 
 _OUTCOME_MESSAGES = {
@@ -268,9 +324,17 @@ class OscillaApp(App[None]):
         Binding("question_mark", "toggle_help", "Help", show=True),
     ]
 
-    def __init__(self, registry: ContentRegistry, character_name: str | None = None) -> None:
+    def __init__(
+        self,
+        games: "Dict[str, ContentRegistry] | None" = None,
+        registry: "ContentRegistry | None" = None,
+        game_name: str | None = None,
+        character_name: str | None = None,
+    ) -> None:
         super().__init__()
+        self._games = games
         self._content_registry = registry
+        self._game_name = game_name
         self._character_name = character_name
         self._name_event: asyncio.Event | None = None
         self._player_name: str = ""
@@ -330,6 +394,30 @@ class OscillaApp(App[None]):
         from oscilla.engine.session import GameSession
         from oscilla.services.db import get_session
 
+        # Handle game selection if needed
+        if self._content_registry is None:
+            if self._games is None:
+                self.query_one(NarrativeLog).append_text("[red]Error: no games provided.[/red]")
+                return
+
+            if len(self._games) == 1:
+                # Auto-select single game
+                game_name = next(iter(self._games))
+                registry = self._games[game_name]
+            else:
+                # Show game selection screen
+                try:
+                    game_name = await self.push_screen_wait(GameSelectScreen(self._games))
+                    if game_name is None:  # User cancelled
+                        return
+                    registry = self._games[game_name]
+                except Exception:
+                    # User cancelled or other error
+                    return
+
+            self._content_registry = registry
+            self._game_name = game_name
+
         registry = self._content_registry
 
         if registry.game is None or registry.character_config is None:
@@ -349,10 +437,12 @@ class OscillaApp(App[None]):
         user_quit = False
 
         async with get_session() as db_session:
+            assert self._game_name is not None  # Guaranteed by game selection logic above
             async with GameSession(
                 registry=registry,
                 tui=tui,
                 db_session=db_session,
+                game_name=self._game_name,
                 character_name=self._character_name,
             ) as session:
                 await session.start()

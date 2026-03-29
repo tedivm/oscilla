@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Game
+metadata:
+  name: test-game
+spec:
+  displayName: "Test Game"
+  xp_thresholds:
+    - 0
+    - 100
+  hp_formula:
+    base_hp: 20
+    hp_per_level: 5

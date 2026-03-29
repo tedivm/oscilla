@@ -1,0 +1,13 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: partial-heal
+spec:
+  displayName: "Partial Heal Test"
+  description: "Direct test of fixed HP recovery."
+  steps:
+    - type: narrative
+      text: "HP restored by 10 points."
+      effects:
+        - type: heal
+          amount: 10

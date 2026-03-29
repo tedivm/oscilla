@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: test-location
+spec:
+  displayName: "Test Location"
+  description: "A test location with stat effects."
+  region: test-region
+  adventures:
+    - ref: test-stat-effects
+      weight: 100

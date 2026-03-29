@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Enemy
+metadata:
+  name: iron-golem
+spec:
+  displayName: "Iron Golem"
+  description: "Massive construct that hits very hard."
+  hp: 9999
+  attack: 50
+  defense: 10
+  xp_reward: 1000

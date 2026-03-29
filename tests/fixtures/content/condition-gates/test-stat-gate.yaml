@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-stat-gate
+spec:
+  displayName: "Stat Gate"
+  description: "Requires a character stat."
+  requires:
+    character_stat:
+      name: strength
+      gte: 12
+  steps:
+    - type: narrative
+      text: "Passed stat gate."

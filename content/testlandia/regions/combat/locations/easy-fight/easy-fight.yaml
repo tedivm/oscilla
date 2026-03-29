@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: easy-fight
+spec:
+  displayName: "Easy Combat"
+  description: "Fight glass dummy (guaranteed win)."
+  region: combat
+  adventures:
+    - ref: easy-fight
+      weight: 100

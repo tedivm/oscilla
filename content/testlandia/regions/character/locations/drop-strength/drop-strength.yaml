@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: drop-strength
+spec:
+  displayName: "Strength -1"
+  description: "Test stat_change: subtract from integer stat."
+  region: character
+  adventures:
+    - ref: drop-strength
+      weight: 100

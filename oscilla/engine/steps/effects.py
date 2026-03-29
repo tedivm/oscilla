@@ -12,13 +12,15 @@ from oscilla.engine.models.adventure import (
     HealEffect,
     ItemDropEffect,
     MilestoneGrantEffect,
+    StatChangeEffect,
+    StatSetEffect,
     XpGrantEffect,
 )
 from oscilla.engine.signals import _EndSignal
 
 if TYPE_CHECKING:
-    from oscilla.engine.pipeline import TUICallbacks
     from oscilla.engine.character import CharacterState
+    from oscilla.engine.pipeline import TUICallbacks
     from oscilla.engine.registry import ContentRegistry
 
 
@@ -44,10 +46,15 @@ async def run_effect(
             else:
                 thresholds = []
                 hp_per = 0
-            levels_gained = player.add_xp(amount=amount, xp_thresholds=thresholds, hp_per_level=hp_per)
-            await tui.show_text(f"Gained {amount} XP.")
+            levels_gained, levels_lost = player.add_xp(amount=amount, xp_thresholds=thresholds, hp_per_level=hp_per)
+            if amount >= 0:
+                await tui.show_text(f"Gained {amount} XP.")
+            else:
+                await tui.show_text(f"Lost {abs(amount)} XP.")
             for level in levels_gained:
                 await tui.show_text(f"[bold]Level up![/bold] You are now level {level}!")
+            for level in levels_lost:
+                await tui.show_text(f"[bold red]Level down![/bold red] You are now level {level}.")
 
         case ItemDropEffect(count=count, loot=loot):
             items = [entry.item for entry in loot]
@@ -80,3 +87,23 @@ async def run_effect(
             healed = player.hp - before_hp
             if healed > 0:
                 await tui.show_text(f"Restored {healed} HP. (HP: {player.hp} / {player.max_hp})")
+
+        case StatChangeEffect(stat=stat, amount=amount):
+            if stat not in player.stats:
+                await tui.show_text(f"[red]Error: stat {stat!r} not found[/red]")
+                return
+            old_value = player.stats[stat]
+            if isinstance(old_value, (int, float)) and isinstance(amount, (int, float)):
+                new_value = old_value + amount
+                player.stats[stat] = new_value
+                await tui.show_text(f"Changed {stat}: {old_value} → {new_value}")
+            else:
+                await tui.show_text(f"[red]Error: cannot change non-numeric stat {stat!r}[/red]")
+
+        case StatSetEffect(stat=stat, value=value):
+            if stat not in player.stats:
+                await tui.show_text(f"[red]Error: stat {stat!r} not found[/red]")
+                return
+            old_value = player.stats[stat]
+            player.stats[stat] = value
+            await tui.show_text(f"Set {stat}: {old_value} → {value}")

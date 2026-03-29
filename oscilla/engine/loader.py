@@ -18,6 +18,8 @@ from oscilla.engine.models.adventure import (
     AdventureManifest,
     ChoiceStep,
     CombatStep,
+    Effect,
+    NarrativeStep,
     OutcomeBranch,
     StatCheckStep,
     Step,
@@ -209,6 +211,42 @@ def _collect_step_goto_refs(step: Step, gotos: Set[str]) -> None:
             pass
 
 
+def _collect_stat_effect_refs(effects: List[Effect], stat_refs: Set[str]) -> None:
+    """Collect stat references from StatChangeEffect and StatSetEffect."""
+    from oscilla.engine.models.adventure import StatChangeEffect, StatSetEffect
+
+    for effect in effects:
+        if isinstance(effect, (StatChangeEffect, StatSetEffect)):
+            stat_refs.add(effect.stat)
+
+
+def _collect_branch_stat_refs(branch: OutcomeBranch, stat_refs: Set[str]) -> None:
+    """Collect stat references from effects and sub-steps in an OutcomeBranch."""
+    _collect_stat_effect_refs(branch.effects, stat_refs)
+    for sub in branch.steps:
+        _collect_step_stat_refs(sub, stat_refs)
+
+
+def _collect_step_stat_refs(step: Step, stat_refs: Set[str]) -> None:
+    """Collect stat references from all effects in a Step."""
+    match step:
+        case NarrativeStep():
+            _collect_stat_effect_refs(step.effects, stat_refs)
+        case CombatStep():
+            for branch in [step.on_win, step.on_defeat, step.on_flee]:
+                _collect_branch_stat_refs(branch, stat_refs)
+        case ChoiceStep():
+            for opt in step.options:
+                _collect_stat_effect_refs(opt.effects, stat_refs)
+                for sub in opt.steps:
+                    _collect_step_stat_refs(sub, stat_refs)
+        case StatCheckStep():
+            for branch in [step.on_pass, step.on_fail]:
+                _collect_branch_stat_refs(branch, stat_refs)
+        case _:
+            pass
+
+
 def validate_references(manifests: List[ManifestEnvelope]) -> List[LoadError]:
     """Check all cross-references across manifests. Accumulates all errors."""
     names_by_kind: Dict[str, Set[str]] = defaultdict(set)
@@ -267,6 +305,94 @@ def validate_references(manifests: List[ManifestEnvelope]) -> List[LoadError]:
                 for ref in enemy_refs:
                     if ref not in names_by_kind["Enemy"]:
                         errors.append(LoadError(file=Path(f"<{m.metadata.name}>"), message=f"Unknown enemy: {ref!r}"))
+
+                # Collect stat effect references and validate them
+                stat_refs: Set[str] = set()
+                for step in adv.spec.steps:
+                    _collect_step_stat_refs(step, stat_refs)
+                for ref in stat_refs:
+                    if ref not in stat_names:
+                        errors.append(
+                            LoadError(file=Path(f"<{m.metadata.name}>"), message=f"Unknown stat in effect: {ref!r}")
+                        )
+
+                # Validate stat effect types match character config
+                from oscilla.engine.models.adventure import StatChangeEffect, StatSetEffect
+
+                char_config = next(
+                    (cast(CharacterConfigManifest, m) for m in manifests if m.kind == "CharacterConfig"), None
+                )
+                if char_config:
+                    stat_types = {s.name: s.type for s in char_config.spec.public_stats + char_config.spec.hidden_stats}
+
+                    def validate_stat_effects(effects_list: List[Effect]) -> None:
+                        for effect in effects_list:
+                            if isinstance(effect, StatChangeEffect):
+                                stat_type = stat_types.get(effect.stat)
+                                if stat_type in ("int", "float") and isinstance(effect.amount, (int, float)):
+                                    continue  # Valid numeric change
+                                elif stat_type in ("int", "float"):
+                                    errors.append(
+                                        LoadError(
+                                            file=Path(f"<{m.metadata.name}>"),
+                                            message=f"stat_change on {effect.stat!r} requires numeric amount, got {type(effect.amount).__name__}",
+                                        )
+                                    )
+                                elif stat_type == "bool":
+                                    errors.append(
+                                        LoadError(
+                                            file=Path(f"<{m.metadata.name}>"),
+                                            message=f"stat_change not valid for bool stat {effect.stat!r}, use stat_set instead",
+                                        )
+                                    )
+                            elif isinstance(effect, StatSetEffect):
+                                stat_type = stat_types.get(effect.stat)
+                                if stat_type == "int" and not isinstance(effect.value, int):
+                                    errors.append(
+                                        LoadError(
+                                            file=Path(f"<{m.metadata.name}>"),
+                                            message=f"stat_set on int stat {effect.stat!r} requires int value, got {type(effect.value).__name__}",
+                                        )
+                                    )
+                                elif stat_type == "float" and not isinstance(effect.value, (int, float)):
+                                    errors.append(
+                                        LoadError(
+                                            file=Path(f"<{m.metadata.name}>"),
+                                            message=f"stat_set on float stat {effect.stat!r} requires numeric value, got {type(effect.value).__name__}",
+                                        )
+                                    )
+                                elif stat_type == "bool" and not isinstance(effect.value, bool):
+                                    errors.append(
+                                        LoadError(
+                                            file=Path(f"<{m.metadata.name}>"),
+                                            message=f"stat_set on bool stat {effect.stat!r} requires bool value, got {type(effect.value).__name__}",
+                                        )
+                                    )
+
+                    def validate_step_stat_effects(step: Step) -> None:
+                        match step:
+                            case NarrativeStep():
+                                validate_stat_effects(step.effects)
+                            case CombatStep():
+                                for branch in [step.on_win, step.on_defeat, step.on_flee]:
+                                    validate_stat_effects(branch.effects)
+                                    for sub in branch.steps:
+                                        validate_step_stat_effects(sub)
+                            case ChoiceStep():
+                                for opt in step.options:
+                                    validate_stat_effects(opt.effects)
+                                    for sub in opt.steps:
+                                        validate_step_stat_effects(sub)
+                            case StatCheckStep():
+                                for branch in [step.on_pass, step.on_fail]:
+                                    validate_stat_effects(branch.effects)
+                                    for sub in branch.steps:
+                                        validate_step_stat_effects(sub)
+                            case _:
+                                pass
+
+                    for step in adv.spec.steps:
+                        validate_step_stat_effects(step)
 
                 # Validate goto targets resolve (already checked at model level for top-level labels,
                 # but re-verify here for cross-reference completeness)
@@ -379,3 +505,39 @@ def load(content_dir: Path) -> ContentRegistry:
     elapsed_ms = (time.perf_counter() - t0) * 1000
     logger.info("Content loaded in %.1f ms (%d manifests)", elapsed_ms, len(manifests))
     return registry
+
+
+def load_games(library_root: Path) -> Dict[str, ContentRegistry]:
+    """Load all game packages found directly under library_root.
+
+    Each immediate subdirectory containing a ``game.yaml`` file is treated as a
+    game package and passed to :func:`load`.  Subdirectories without ``game.yaml``
+    are silently skipped so the library root can contain non-game files.
+
+    Raises ContentLoadError with errors prefixed by package name if any game
+    fails to load.
+    """
+    games: Dict[str, ContentRegistry] = {}
+    accumulated: List[LoadError] = []
+
+    for subdir in sorted(library_root.iterdir()):
+        if not subdir.is_dir():
+            continue
+        if not (subdir / "game.yaml").exists():
+            logger.debug("Skipping %s — no game.yaml found", subdir.name)
+            continue
+        try:
+            registry = load(subdir)
+        except ContentLoadError as exc:
+            for err in exc.errors:
+                accumulated.append(LoadError(file=err.file, message=f"[{subdir.name}] {err.message}"))
+            continue
+
+        package_key = subdir.name
+        games[package_key] = registry
+        logger.info("Loaded game package %r from %s", package_key, subdir)
+
+    if accumulated:
+        raise ContentLoadError(accumulated)
+
+    return games

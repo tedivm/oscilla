@@ -1,0 +1,22 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: flee-test
+spec:
+  displayName: "Flee Test Combat"
+  description: "Combat designed for flee testing."
+  steps:
+    - type: combat
+      enemy: iron-golem
+      on_victory:
+        steps:
+          - type: narrative
+            text: "Victory against flee test enemy."
+      on_defeat:
+        steps:
+          - type: narrative
+            text: "Defeat against flee test enemy."
+      on_flee:
+        steps:
+          - type: narrative
+            text: "**FLEE TEST SUCCESSFUL** - You successfully fled from combat when prompted."

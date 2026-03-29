@@ -491,6 +491,70 @@ def test_settings_with_env_file():
     assert hasattr(settings, "project_name")
 ```
 
+### Manual Testing with Testlandia
+
+The **Testlandia** game package (`content/testlandia/`) is a comprehensive testing sandbox designed for manual validation of engine features. **Note:** Testlandia content is never imported in automated tests - it exists purely for manual testing and development validation.
+
+#### Starting a Test Session
+
+```bash
+# Launch Testlandia directly
+uv run oscilla game --game testlandia
+
+# Validate the package
+uv run oscilla validate --game testlandia
+```
+
+#### Realm Coverage
+
+Testlandia organizes testing content into feature-specific realms:
+
+**Character Realm** (`character/`)
+
+- **Heal Location**: Test `heal` effects with full/partial healing
+- **XP Lab**: Test `xp_grant` effects including level-up, level-down, and small increments
+- **Stat Workshop**: Test `stat_change` and `stat_set` effects with all stat types (int, float, bool, str)
+
+**Combat Realm** (`combat/`)
+
+- **Training Grounds**: Test combat mechanics without real danger
+- **Damage Chamber**: Test `damage` effects with various damage amounts
+
+**Conditions Realm** (`conditions/`)
+
+- **Gated Hall**: Test stat-based, blessing-based, and wealth-based requirements
+- **Level Gates**: Test level-based conditional content access
+
+**Choices Realm** (`choices/`)
+
+- **Moral Crossroads**: Test choice-driven adventures affecting stats and blessings
+- **Puzzle Chambers**: Test strategic resource allocation and riddle mechanics
+
+**Items Realm** (`items/`)
+
+- **Treasure Chamber**: Test `item_grant` effects and item discovery
+- **Blacksmith Shop**: Test item crafting and cost-based transactions
+
+#### Developer Testing Workflow
+
+1. **Feature Testing**: Use the appropriate realm to manually verify new features
+2. **Regression Testing**: Exercise different combinations of effects and choices
+3. **Edge Case Testing**: Test boundary conditions (level 1 de-leveling, negative gold, etc.)
+4. **Integration Testing**: Verify TUI rendering, save/load, and cross-feature interactions
+
+#### Character Configuration
+
+Testlandia includes comprehensive stat types for testing:
+
+- **strength** (int): Physical power, starts at 10
+- **speed** (float): Movement speed, starts at 2.0
+- **is_blessed** (bool): Divine blessing status, starts false
+- **gold** (int): Currency, starts at 50
+- **title** (str): Character title, starts empty
+- **debug_counter** (hidden int): Testing utility, starts at 0
+
+The XP progression uses developer-friendly thresholds: [0, 25, 75, 150, 250, 400, 600, 850] making it easy to test leveling without excessive grinding.
+
 ## Test Isolation and Independence
 
 ### Principles

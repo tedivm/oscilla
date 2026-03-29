@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Literal
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import logging
+from sqlalchemy.orm.exc import StaleDataError
 
 from oscilla.engine.character import CharacterState
 from oscilla.engine.registry import ContentRegistry
@@ -21,7 +21,6 @@ from oscilla.services.character import (
     save_character,
 )
 from oscilla.services.user import derive_tui_user_key, get_or_create_user
-from sqlalchemy.orm.exc import StaleDataError
 from tests.engine.conftest import MockTUI
 
 # minimal_registry, combat_registry, and async_session fixtures come from conftest.py
@@ -37,6 +36,7 @@ async def test_start_no_characters_creates_user_and_character(
         registry=minimal_registry,
         tui=tui,
         db_session=async_session,
+        game_name="test-game",
         character_name=None,
     ) as session:
         await session.start()
@@ -46,7 +46,7 @@ async def test_start_no_characters_creates_user_and_character(
 
     user_key = derive_tui_user_key()
     user = await get_or_create_user(session=async_session, user_key=user_key)
-    characters = await list_characters_for_user(session=async_session, user_id=user.id)
+    characters = await list_characters_for_user(session=async_session, user_id=user.id, game_name="test-game")
     assert any(c.name == "NewGameHero" for c in characters)
 
 
@@ -65,13 +65,14 @@ async def test_start_one_existing_character_auto_loads(
         game_manifest=minimal_registry.game,
         character_config=minimal_registry.character_config,
     )
-    await save_character(session=async_session, state=player, user_id=user.id)
+    await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
 
     tui = MockTUI()
     async with GameSession(
         registry=minimal_registry,
         tui=tui,
         db_session=async_session,
+        game_name="test-game",
         character_name=None,
     ) as session:
         await session.start()
@@ -95,6 +96,7 @@ async def test_start_with_character_name_creates_when_missing(
         registry=minimal_registry,
         tui=tui,
         db_session=async_session,
+        game_name="test-game",
         character_name="BrandNew",
     ) as session:
         await session.start()
@@ -118,13 +120,14 @@ async def test_start_with_character_name_loads_existing(
         game_manifest=minimal_registry.game,
         character_config=minimal_registry.character_config,
     )
-    await save_character(session=async_session, state=player, user_id=user.id)
+    await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
 
     tui = MockTUI()
     async with GameSession(
         registry=minimal_registry,
         tui=tui,
         db_session=async_session,
+        game_name="test-game",
         character_name="NamedLoad",
     ) as session:
         await session.start()
@@ -148,13 +151,14 @@ async def test_run_adventure_triggers_persist_callbacks(
         game_manifest=minimal_registry.game,
         character_config=minimal_registry.character_config,
     )
-    await save_character(session=async_session, state=player, user_id=user.id)
+    await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
 
     tui = MockTUI()
     async with GameSession(
         registry=minimal_registry,
         tui=tui,
         db_session=async_session,
+        game_name="test-game",
         character_name="PipelineHero",
     ) as session:
         await session.start()
@@ -190,7 +194,7 @@ async def test_crash_recovery_clears_stale_lock(
         game_manifest=minimal_registry.game,
         character_config=minimal_registry.character_config,
     )
-    await save_character(session=async_session, state=player, user_id=user.id)
+    await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
 
     iteration_id = await get_active_iteration_id(session=async_session, character_id=player.character_id)
     assert iteration_id is not None
@@ -217,6 +221,7 @@ async def test_crash_recovery_clears_stale_lock(
             registry=minimal_registry,
             tui=tui,
             db_session=async_session,
+            game_name="test-game",
             character_name="CrashHero",
         ) as session:
             await session.start()
@@ -241,7 +246,7 @@ async def test_stale_data_error_retries(
         game_manifest=minimal_registry.game,
         character_config=minimal_registry.character_config,
     )
-    await save_character(session=async_session, state=player, user_id=user.id)
+    await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
 
     call_count = 0
 
@@ -251,6 +256,7 @@ async def test_stale_data_error_retries(
         registry=minimal_registry,
         tui=tui,
         db_session=async_session,
+        game_name="test-game",
         character_name="StaleHero",
     ) as session:
         await session.start()

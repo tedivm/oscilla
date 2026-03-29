@@ -1,0 +1,27 @@
+apiVersion: game/v1
+kind: CharacterConfig
+metadata:
+  name: testlandia-character
+spec:
+  public_stats:
+    - name: strength
+      type: int
+      default: 10
+      description: "Standard int stat. Target for stat_change and stat_set tests."
+    - name: speed
+      type: float
+      default: 1.0
+      description: "Float stat. Tests float delta and set operations."
+    - name: is_blessed
+      type: bool
+      default: false
+      description: "Bool stat. Tests stat_set toggle to true/false."
+    - name: gold
+      type: int
+      default: 0
+      description: "Standard int currency stat."
+  hidden_stats:
+    - name: debug_counter
+      type: int
+      default: 0
+      description: "Hidden int. Incremented by condition-lab adventures."

@@ -10,18 +10,18 @@ class DatabaseSettings(BaseSettings):
     database_url: str | None = Field(
         default=None,
         description=(
-            "Full async-driver database URL. When unset, auto-derived from content_path "
-            "as sqlite+aiosqlite:///<content_path.parent>/saves.db."
+            "Full async-driver database URL. When unset, auto-derived from games_path "
+            "as sqlite+aiosqlite:///<games_path.parent>/saves.db."
         ),
     )
-    content_path: Path = Field(
+    games_path: Path = Field(
         default=Path("content"),
-        description="Path to the loaded content package directory.",
+        description="Path to the game library root directory containing game package subdirectories.",
     )
 
     @model_validator(mode="after")
     def derive_sqlite_url(self) -> "DatabaseSettings":
         if self.database_url is None:
-            db_path = self.content_path.parent / "saves.db"
+            db_path = self.games_path.parent / "saves.db"
             self.database_url = f"sqlite+aiosqlite:///{db_path.resolve()}"
         return self

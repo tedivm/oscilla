@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: bump-speed
+spec:
+  displayName: "Speed Change +0.5"
+  description: "Test stat_change on float stat."
+  steps:
+    - type: narrative
+      text: "Speed increased by 0.5."
+      effects:
+        - type: stat_change
+          stat: speed
+          amount: 0.5

@@ -1,0 +1,44 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: nested-choice
+spec:
+  displayName: "Nested Choice Test"
+  description: "Test choice within choice."
+  steps:
+    - type: choice
+      prompt: "First level choice:"
+      options:
+        - label: branch_a
+          text: "Branch A (leads to sub-choice)"
+          steps:
+            - type: choice
+              prompt: "Sub-choice within Branch A:"
+              options:
+                - label: a1
+                  text: "A1 (gain speed)"
+                  steps:
+                    - type: narrative
+                      text: "**NESTED CHOICE A1** - Branch A → Sub A1 selected."
+                      effects:
+                        - type: stat_change
+                          stat: speed
+                          amount: 0.5
+                - label: a2
+                  text: "A2 (gain gold)"
+                  steps:
+                    - type: narrative
+                      text: "**NESTED CHOICE A2** - Branch A → Sub A2 selected."
+                      effects:
+                        - type: stat_change
+                          stat: gold
+                          amount: 10
+        - label: branch_b
+          text: "Branch B (direct outcome)"
+          steps:
+            - type: narrative
+              text: "**NESTED CHOICE B** - Branch B selected (no sub-choice)."
+              effects:
+                - type: stat_change
+                  stat: debug_counter
+                  amount: 1

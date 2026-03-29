@@ -58,6 +58,25 @@ def test_cache_enabled_attribute() -> None:
     assert isinstance(settings.cache_enabled, bool)
 
 
+def test_settings_has_games_path() -> None:
+    """Test that settings has games_path attribute (replaces old content_path)."""
+    assert hasattr(settings, "games_path")
+
+
+def test_settings_lacks_content_path() -> None:
+    """Test that CONTENT_PATH is no longer a recognised setting field."""
+    assert not hasattr(settings, "content_path")
+
+
+def test_games_path_env_var_is_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that GAMES_PATH env var overrides the default games_path."""
+    from pathlib import Path
+
+    monkeypatch.setenv("GAMES_PATH", "/tmp/test-games")
+    test_settings = Settings()
+    assert test_settings.games_path == Path("/tmp/test-games")
+
+
 def test_cache_enabled_default() -> None:
     """Test that cache_enabled defaults to True."""
     test_settings = Settings()

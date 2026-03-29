@@ -4,20 +4,52 @@ This guide covers creating game content for Oscilla using YAML manifest files. C
 
 ## Getting Started
 
-Content is organized in a directory structure like:
+### Game Library Structure
+
+Oscilla supports a **multi-game library** where multiple game packages can coexist in a single library directory. Each game is a self-contained package with its own content and configuration:
 
 ```
-content/
-├── game.yaml                  # Global game settings
-├── character_config.yaml      # Player stats and defaults
-├── regions/                   # Geographic areas
-├── locations/                 # Specific places within regions
-├── adventures/                # Interactive scenarios
-├── enemies/                   # Combat opponents
-├── items/                     # Equipment and consumables
-├── recipes/                   # Crafting formulas
-├── quests/                    # Multi-stage storylines
-└── classes/                   # Character classes (placeholder)
+content/                      # Game library root
+├── the-kingdom/             # Game package directory
+│   ├── game.yaml           # Game settings and configuration
+│   ├── character_config.yaml  # Player stats and defaults
+│   ├── regions/            # Geographic areas
+│   ├── locations/          # Specific places within regions
+│   ├── adventures/         # Interactive scenarios
+│   ├── enemies/            # Combat opponents
+│   ├── items/              # Equipment and consumables
+│   ├── recipes/            # Crafting formulas
+│   └── quests/             # Multi-stage storylines
+├── testlandia/             # Another game package
+│   ├── game.yaml
+│   ├── character_config.yaml
+│   └── regions/
+└── other-games/            # Additional game packages
+    └── ...
+```
+
+**Key Concepts:**
+
+- **Library root**: The `content/` directory (configurable via `GAMES_PATH`)
+- **Game package**: Each subdirectory containing a `game.yaml` file
+- **Package isolation**: Each game has independent content, saves, and configuration
+- **Game selection**: Players choose which game to play via the TUI or `--game` flag
+
+### Single Package Structure (Legacy)
+
+For simple setups with one game, you can place content directly in the library root:
+
+```
+content/                     # Game library root
+├── game.yaml               # Game settings
+├── character_config.yaml   # Player configuration
+├── regions/                # Game content directories
+├── locations/
+├── adventures/
+├── enemies/
+├── items/
+├── recipes/
+└── quests/
 ```
 
 **Validation**: Always run `uv run oscilla validate` to check for errors before testing your content.
@@ -64,6 +96,28 @@ spec:
 
   base_adventure_count: null  # Optional: default adventure count per location
 ```
+
+#### Experience and Leveling Mechanics
+
+**XP Progression**: Players start at level 1 with 0 XP. Each `xp_thresholds` value represents the total XP needed to reach that level. For example:
+
+- Level 1: 0 XP (starting level)
+- Level 2: 100 XP total
+- Level 3: 250 XP total
+- Level 4: 500 XP total
+
+**Level-Down Rules**: Negative XP can reduce player level but follows these constraints:
+
+- **Level floor**: Players cannot go below level 1
+- **XP floor**: XP cannot go below 0 (negative amounts are clamped)
+- **HP adjustment**: When losing levels, max HP is recalculated and current HP is capped to the new maximum
+
+**Example Level-Down**:
+
+- Player at level 5 (900 XP) receives -600 XP
+- New total: 300 XP → level 3 (next threshold is 500)
+- Player loses levels 5 and 4, keeps level 3
+- Max HP recalculated: base_hp + (new_level - 1) × hp_per_level
 
 ### Character Configuration (`character_config.yaml`)
 
@@ -537,7 +591,55 @@ effects:
     amount: 100          # Positive for rewards, negative for penalties
 ```
 
-**Automatic Leveling**: XP grants trigger level-up calculations based on game configuration.
+**Automatic Leveling**: XP grants trigger level-up calculations based on game configuration. **Level-down mechanics**: Negative XP can reduce player level, but never below level 1. XP cannot go below 0.
+
+### Stat Manipulation
+
+#### Stat Change
+
+Modify player stats by adding or subtracting amounts. Only works with numeric stat types (`int`, `float`):
+
+```yaml
+effects:
+  - type: stat_change
+    stat: "strength"       # Stat name from character_config.yaml
+    amount: 2             # Amount to add (positive) or subtract (negative)
+
+  - type: stat_change
+    stat: "gold"
+    amount: -25           # Spend 25 gold
+
+  - type: stat_change
+    stat: "speed"
+    amount: 1.5           # Add 1.5 to float stat
+```
+
+**Validation**: The stat must exist in `CharacterConfig` and be of type `int` or `float`. Attempting to use `stat_change` on `bool` or `str` stats will cause validation errors.
+
+#### Stat Set
+
+Set player stats to specific values. Works with any stat type:
+
+```yaml
+effects:
+  - type: stat_set
+    stat: "title"
+    value: "Hero of the Realm"    # String assignment
+
+  - type: stat_set
+    stat: "is_blessed"
+    value: true                   # Boolean assignment
+
+  - type: stat_set
+    stat: "strength"
+    value: 20                     # Numeric override
+
+  - type: stat_set
+    stat: "nickname"
+    value: ""                     # Clear string stat
+```
+
+**Validation**: The value must be type-compatible with the stat definition in `CharacterConfig`. The stat must exist and be visible (not hidden) unless the effect is in engine-internal content.
 
 ### Item Drops
 

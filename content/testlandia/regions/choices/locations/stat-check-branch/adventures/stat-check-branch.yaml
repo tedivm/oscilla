@@ -1,0 +1,29 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: stat-check-branch
+spec:
+  displayName: "Stat Check Branch Test"
+  description: "Test stat_check branching."
+  steps:
+    - type: stat_check
+      condition:
+        type: character_stat
+        name: strength
+        gte: 12
+      on_pass:
+        steps:
+          - type: narrative
+            text: "**STAT CHECK PASSED** - Your strength >= 12 qualifies you for the strong path."
+            effects:
+              - type: stat_change
+                stat: gold
+                amount: 50
+      on_fail:
+        steps:
+          - type: narrative
+            text: "**STAT CHECK FAILED** - Your strength < 12, taking the weak path."
+            effects:
+              - type: stat_change
+                stat: gold
+                amount: 10

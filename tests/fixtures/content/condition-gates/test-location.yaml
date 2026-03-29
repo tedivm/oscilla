@@ -1,0 +1,29 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: test-location
+spec:
+  displayName: "Test Location"
+  description: "Has all gate types."
+  region: test-region-root
+  adventures:
+    - ref: test-level-gate
+      weight: 10
+      requires:
+        level: 2
+    - ref: test-milestone-gate
+      weight: 10
+      requires:
+        milestone: test-milestone
+    - ref: test-item-gate
+      weight: 10
+      requires:
+        item: test-item
+    - ref: test-stat-gate
+      weight: 10
+    - ref: test-all-gate
+      weight: 10
+    - ref: test-any-gate
+      weight: 10
+    - ref: test-ungated
+      weight: 40

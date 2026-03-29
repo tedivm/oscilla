@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: flee-test
+spec:
+  displayName: "Flee Test"
+  description: "Combat with flee testing narrative."
+  region: combat
+  adventures:
+    - ref: flee-test
+      weight: 100

@@ -1,0 +1,7 @@
+apiVersion: game/v1
+kind: Class
+metadata:
+  name: test-class
+spec:
+  displayName: "Test Class"
+  description: "A test character class."

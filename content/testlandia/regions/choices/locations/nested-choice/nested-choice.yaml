@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: nested-choice
+spec:
+  displayName: "Nested Choice Test"
+  description: "Test choice within choice."
+  region: choices
+  adventures:
+    - ref: nested-choice
+      weight: 100

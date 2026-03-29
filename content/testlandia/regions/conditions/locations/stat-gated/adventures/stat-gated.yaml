@@ -1,0 +1,10 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: stat-gated
+spec:
+  displayName: "Stat Gate Test"
+  description: "Confirms stat condition worked."
+  steps:
+    - type: narrative
+      text: "**STAT GATE TEST SUCCESSFUL** - Your strength is >= 15 and you can access this location."

@@ -6,13 +6,13 @@ from pydantic import BaseModel, model_validator
 
 from oscilla.engine.models.base import ManifestEnvelope
 
-StatType = Literal["int", "float", "str", "bool"]
+StatType = Literal["int", "float", "bool"]
 
 
 class StatDefinition(BaseModel):
     name: str
     type: StatType
-    default: int | float | str | bool | None = None
+    default: int | float | bool | None = None
     description: str = ""
 
 

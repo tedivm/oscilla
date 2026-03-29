@@ -1,0 +1,34 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: or-condition
+spec:
+  displayName: "OR Condition Test"
+  description: "Test choice with inline OR conditions."
+  steps:
+    - type: choice
+      prompt: "Choose an option to test OR conditions:"
+      options:
+        - label: high_strength
+          text: "High Strength Path (strength >= 15)"
+          condition:
+            type: character_stat
+            name: strength
+            gte: 15
+          steps:
+            - type: narrative
+              text: "**OR CHOICE 1 SUCCESSFUL** - High strength path taken."
+        - label: blessed
+          text: "Blessed Path (is_blessed = true)"
+          condition:
+            type: character_stat
+            name: is_blessed
+            eq: true
+          steps:
+            - type: narrative
+              text: "**OR CHOICE 2 SUCCESSFUL** - Blessed path taken."
+        - label: default
+          text: "Default Path (no requirements)"
+          steps:
+            - type: narrative
+              text: "**OR CHOICE 3 SUCCESSFUL** - Default path taken (no special requirements)."

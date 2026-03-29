@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-level-gate
+spec:
+  displayName: "Level Gate"
+  description: "Requires level 2."
+  requires:
+    level: 2
+  steps:
+    - type: narrative
+      text: "Passed level gate."

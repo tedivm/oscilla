@@ -1,0 +1,10 @@
+apiVersion: game/v1
+kind: Region
+metadata:
+  name: test-region-deep
+spec:
+  displayName: "Deep Region"
+  description: "A region requiring level 3, nested inside mid."
+  parent: test-region-mid
+  unlock:
+    level: 3

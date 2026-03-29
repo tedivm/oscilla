@@ -52,8 +52,28 @@ class HealEffect(BaseModel):
     amount: int | Literal["full"] = "full"
 
 
+class StatChangeEffect(BaseModel):
+    type: Literal["stat_change"]
+    stat: str = Field(description="Character stat name")
+    amount: int | float = Field(description="Amount to add/subtract from stat; can be negative")
+
+
+class StatSetEffect(BaseModel):
+    type: Literal["stat_set"]
+    stat: str = Field(description="Character stat name")
+    value: int | float | bool | None = Field(description="New value for stat")
+
+
 Effect = Annotated[
-    Union[XpGrantEffect, ItemDropEffect, MilestoneGrantEffect, EndAdventureEffect, HealEffect],
+    Union[
+        XpGrantEffect,
+        ItemDropEffect,
+        MilestoneGrantEffect,
+        EndAdventureEffect,
+        HealEffect,
+        StatChangeEffect,
+        StatSetEffect,
+    ],
     Field(discriminator="type"),
 ]
 

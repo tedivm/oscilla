@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: hard-fight
+spec:
+  displayName: "Hard Combat"
+  description: "Fight iron golem (likely death)."
+  region: combat
+  adventures:
+    - ref: hard-fight
+      weight: 100

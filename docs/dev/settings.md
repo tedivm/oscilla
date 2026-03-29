@@ -120,6 +120,9 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
     debug: bool = False
 
+    # Game Library
+    games_path: Path = Path("content")  # Game library root directory
+
     # Database
     database_url: str = "postgresql+asyncpg://user:pass@localhost/db"
 
@@ -127,6 +130,27 @@ class Settings(BaseSettings):
     cache_backend: str = "memory"
     redis_url: str = "redis://localhost:6379/0"
 ```
+
+### Game Library Settings
+
+Configure the path to your game library:
+
+```python
+# Default: looks for content/ directory at project root
+games_path: Path = Path("content")
+```
+
+Set via environment variable:
+
+```bash
+# Point to a custom game library
+export GAMES_PATH="/path/to/my/game/library"
+
+# Or in .env file
+GAMES_PATH="/path/to/my/game/library"
+```
+
+**Note:** The `CONTENT_PATH` environment variable from earlier versions is no longer recognized. Use `GAMES_PATH` instead.
 
 ## Adding Custom Settings
 
@@ -676,15 +700,15 @@ Database configuration for both the TUI and web contexts is managed by `Database
 
 ### Auto-Derived SQLite URL
 
-When `DATABASE_URL` is not set explicitly, `DatabaseSettings` automatically computes a SQLite path adjacent to the loaded content package:
+When `DATABASE_URL` is not set explicitly, `DatabaseSettings` automatically computes a SQLite path adjacent to the game library root:
 
 ```
-sqlite+aiosqlite:///<content_path.parent>/saves.db
+sqlite+aiosqlite:///<games_path.parent>/saves.db
 ```
 
-For example, if `content_path` is `/home/user/my-game/content`, the database file will be created at `/home/user/my-game/saves.db`.
+For example, if `games_path` is `/home/user/my-games/content`, the database file will be created at `/home/user/my-games/saves.db`.
 
-This means a standalone TUI installation requires no database configuration at all — character data is saved next to the content it was created with.
+This means a standalone TUI installation requires no database configuration at all — character data is saved next to the game library it was created with.
 
 ### DATABASE_URL Override
 
@@ -702,7 +726,7 @@ DATABASE_URL="postgresql+asyncpg://user:password@localhost:5432/oscilla"
 
 | Context | Typical setup |
 |---|---|
-| **TUI (standalone game)** | Leave `DATABASE_URL` unset; SQLite file is auto-derived from `content_path`. |
+| **TUI (standalone game)** | Leave `DATABASE_URL` unset; SQLite file is auto-derived from `games_path`. |
 | **Web (FastAPI server)** | Set `DATABASE_URL` to a PostgreSQL URL via environment variable or Docker secret. |
 
 Both contexts share the same `DatabaseSettings` class and migration path, so schema changes apply identically regardless of the backend.

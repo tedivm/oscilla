@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-any-gate
+spec:
+  displayName: "Any Gate"
+  description: "Requires any one condition to pass."
+  requires:
+    any:
+      - level: 5
+      - milestone: test-milestone
+  steps:
+    - type: narrative
+      text: "Passed any gate."

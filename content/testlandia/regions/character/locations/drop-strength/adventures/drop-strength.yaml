@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: drop-strength
+spec:
+  displayName: "Strength Change -1"
+  description: "Test stat_change with negative value."
+  steps:
+    - type: narrative
+      text: "Strength decreased by 1."
+      effects:
+        - type: stat_change
+          stat: strength
+          amount: -1

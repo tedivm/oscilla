@@ -1,0 +1,7 @@
+apiVersion: game/v1
+kind: Region
+metadata:
+  name: items
+spec:
+  displayName: "Item Testing Realm"
+  description: "A realm for testing item discovery and management mechanics."

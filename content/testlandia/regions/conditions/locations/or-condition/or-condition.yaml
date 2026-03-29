@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: or-condition
+spec:
+  displayName: "OR Condition Test"
+  description: "Test choice with inline conditions."
+  region: conditions
+  adventures:
+    - ref: or-condition
+      weight: 100

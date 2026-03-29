@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-milestone-gate
+spec:
+  displayName: "Milestone Gate"
+  description: "Requires a specific milestone."
+  requires:
+    milestone: test-milestone
+  steps:
+    - type: narrative
+      text: "Passed milestone gate."

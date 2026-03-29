@@ -82,8 +82,8 @@ class CharacterState:
     active_quests: Dict[str, str] = field(default_factory=dict)
     completed_quests: Set[str] = field(default_factory=set)
     active_adventure: AdventurePosition | None = None
-    # Dynamic stats from CharacterConfig; int | float | str | bool | None (not Any).
-    stats: Dict[str, int | float | str | bool | None] = field(default_factory=dict)
+    # Dynamic stats from CharacterConfig; int | float | bool | None (not Any).
+    stats: Dict[str, int | float | bool | None] = field(default_factory=dict)
 
     # --- Factory ---
 
@@ -101,7 +101,7 @@ class CharacterState:
         All collection fields start empty.
         """
         all_stats = character_config.spec.public_stats + character_config.spec.hidden_stats
-        initial_stats: Dict[str, int | float | str | bool | None] = {s.name: s.default for s in all_stats}
+        initial_stats: Dict[str, int | float | bool | None] = {s.name: s.default for s in all_stats}
         base_hp = game_manifest.spec.hp_formula.base_hp
         return cls(
             character_id=uuid4(),
@@ -142,22 +142,50 @@ class CharacterState:
 
     # --- XP / levelling ---
 
-    def add_xp(self, amount: int, xp_thresholds: List[int], hp_per_level: int) -> List[int]:
-        """Add XP and auto-level-up.
+    def add_xp(self, amount: int, xp_thresholds: List[int], hp_per_level: int) -> tuple[List[int], List[int]]:
+        """Add or subtract XP and auto-level-up or level-down.
 
         xp_thresholds[i] is the cumulative XP required to reach level i+2
         (index 0 = XP to reach level 2). hp_per_level is added to max_hp
-        for each level gained.
+        for each level gained, or subtracted for each level lost.
 
-        Returns the list of new level numbers reached (empty if none).
+        For negative XP, supports level-down to level 1 (minimum) and XP floor at 0.
+        HP is capped at the new max_hp after level changes.
+
+        Returns tuple of (levels_gained, levels_lost) as lists of actual level numbers.
         """
         self.xp += amount
+        # Floor XP at 0
+        if self.xp < 0:
+            self.xp = 0
+
         levels_gained: List[int] = []
+        levels_lost: List[int] = []
+
+        # Handle level-up (positive XP)
         while self.level - 1 < len(xp_thresholds) and self.xp >= xp_thresholds[self.level - 1]:
             self.level += 1
             self.max_hp += hp_per_level
             levels_gained.append(self.level)
-        return levels_gained
+
+        # Handle level-down (negative XP or low remaining XP)
+        while self.level > 1:
+            # Check if current level is sustainable
+            required_xp_for_current = xp_thresholds[self.level - 2] if self.level >= 2 else 0
+            if self.xp >= required_xp_for_current:
+                break  # Can sustain current level
+
+            # Must de-level
+            old_level = self.level
+            self.level -= 1
+            self.max_hp -= hp_per_level
+            levels_lost.append(old_level)
+
+        # Cap current HP at new max HP
+        if self.hp > self.max_hp:
+            self.hp = self.max_hp
+
+        return (levels_gained, levels_lost)
 
     # --- Equipment ---
 
@@ -238,10 +266,10 @@ class CharacterState:
         """
         all_stats = character_config.spec.public_stats + character_config.spec.hidden_stats
         stat_defs = {s.name: s for s in all_stats}
-        _type_map = {"int": int, "float": float, "str": str, "bool": bool}
+        _type_map = {"int": int, "float": float, "bool": bool}
 
-        saved_stats: Dict[str, int | float | str | bool | None] = data.get("stats", {})
-        reconciled_stats: Dict[str, int | float | str | bool | None] = {}
+        saved_stats: Dict[str, int | float | bool | None] = data.get("stats", {})
+        reconciled_stats: Dict[str, int | float | bool | None] = {}
 
         # Inject defaults for stats in config but missing from save
         for stat_name, stat_def in stat_defs.items():

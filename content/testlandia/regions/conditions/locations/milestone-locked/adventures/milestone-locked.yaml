@@ -1,0 +1,10 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: milestone-locked
+spec:
+  displayName: "Milestone Lock Test"
+  description: "Confirms milestone unlock worked."
+  steps:
+    - type: narrative
+      text: "**MILESTONE TEST SUCCESSFUL** - You have the dev-badge milestone and can access this location."

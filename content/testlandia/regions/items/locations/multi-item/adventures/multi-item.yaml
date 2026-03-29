@@ -1,0 +1,16 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: multi-item
+spec:
+  displayName: "Multi Item Drop Test"
+  description: "Test multiple count item drop."
+  steps:
+    - type: narrative
+      text: "Found multiple test widgets."
+      effects:
+        - type: item_drop
+          loot:
+            - item: test-widget
+              weight: 100
+              count: 3

@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: binary-choice
+spec:
+  displayName: "Binary Choice Test"
+  description: "Test basic two-option choice."
+  region: choices
+  adventures:
+    - ref: binary-choice
+      weight: 100

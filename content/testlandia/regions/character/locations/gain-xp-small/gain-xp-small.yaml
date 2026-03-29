@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: gain-xp-small
+spec:
+  displayName: "Small XP Gain"
+  description: "Gain 50 XP (level up at 100)."
+  region: character
+  adventures:
+    - ref: gain-xp-small
+      weight: 100

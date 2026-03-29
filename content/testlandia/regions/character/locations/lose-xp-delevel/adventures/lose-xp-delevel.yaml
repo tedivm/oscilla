@@ -1,0 +1,13 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: lose-xp-delevel
+spec:
+  displayName: "XP Loss Test"
+  description: "Direct test of negative XP grant."
+  steps:
+    - type: narrative
+      text: "Lost 9999 XP."
+      effects:
+        - type: xp_grant
+          amount: -9999

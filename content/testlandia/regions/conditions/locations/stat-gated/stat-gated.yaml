@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: stat-gated
+spec:
+  displayName: "Strength Gate"
+  description: "Requires strength >= 15 to access."
+  region: conditions
+  unlock:
+    type: character_stat
+    name: strength
+    gte: 15
+  adventures:
+    - ref: stat-gated
+      weight: 100

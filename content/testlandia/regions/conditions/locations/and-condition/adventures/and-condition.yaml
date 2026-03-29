@@ -1,0 +1,29 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: and-condition
+spec:
+  displayName: "AND Condition Test"
+  description: "Test stat_check with complex AND condition."
+  steps:
+    - type: stat_check
+      condition:
+        type: all
+        conditions:
+          - type: milestone
+            name: dev-badge
+          - type: character_stat
+            name: strength
+            gte: 12
+      on_pass:
+        steps:
+          - type: narrative
+            text: "**AND CONDITION PASSED** - You have both the badge AND strength >= 12."
+            effects:
+              - type: stat_change
+                stat: debug_counter
+                amount: 1
+      on_fail:
+        steps:
+          - type: narrative
+            text: "AND condition failed - need dev-badge AND strength >= 12."

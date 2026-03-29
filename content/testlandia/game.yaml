@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Game
+metadata:
+  name: testlandia
+spec:
+  displayName: "Testlandia"
+  description: "A developer sandbox for manually exercising engine features. No plot, no rules — just levers."
+  xp_thresholds: [100, 250, 500, 900, 1400, 2100, 3000, 4200, 5800, 8000]
+  hp_formula:
+    base_hp: 100
+    hp_per_level: 20
+  base_adventure_count:

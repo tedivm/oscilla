@@ -1,0 +1,7 @@
+apiVersion: game/v1
+kind: Region
+metadata:
+  name: conditions
+spec:
+  displayName: "Condition Testing Realm"
+  description: "A realm for testing stat, level, and other requirement conditions."

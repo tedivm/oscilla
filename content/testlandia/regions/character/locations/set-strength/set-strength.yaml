@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: set-strength
+spec:
+  displayName: "Strength = 15"
+  description: "Test stat_set: assign integer stat."
+  region: character
+  adventures:
+    - ref: set-strength
+      weight: 100

@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-item-gate
+spec:
+  displayName: "Item Gate"
+  description: "Requires holding a specific item."
+  requires:
+    item: test-item
+  steps:
+    - type: narrative
+      text: "Passed item gate."

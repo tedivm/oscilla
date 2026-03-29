@@ -77,7 +77,7 @@ tomlsort_fixes:
 # Testing
 #
 .PHONY: tests
-tests: install pytest ruff_check black_check mypy_check dapperdata_check tomlsort_check paracelsus_check
+tests: install pytest ruff_check black_check mypy_check dapperdata_check tomlsort_check paracelsus_check validate
 
 .PHONY: pytest
 pytest:
@@ -98,6 +98,10 @@ black_check:
 .PHONY: mypy_check
 mypy_check:
 	$(UV) run mypy ${PACKAGE_SLUG}
+
+.PHONY: validate
+validate:
+	$(UV) run oscilla validate
 
 .PHONY: dapperdata_check
 dapperdata_check:

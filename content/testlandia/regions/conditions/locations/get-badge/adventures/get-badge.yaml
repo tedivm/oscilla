@@ -1,0 +1,13 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: get-badge
+spec:
+  displayName: "Badge Grant Test"
+  description: "Direct test of milestone grant."
+  steps:
+    - type: narrative
+      text: "Dev badge granted."
+      effects:
+        - type: milestone_grant
+          milestone: dev-badge

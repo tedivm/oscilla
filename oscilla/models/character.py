@@ -15,11 +15,12 @@ if TYPE_CHECKING:
 
 class CharacterRecord(Base):
     __tablename__ = "characters"
-    # Enforces one name per user — makes --character-name selection unambiguous.
-    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_character_user_name"),)
+    # Enforces one name per user per game — makes --character-name selection unambiguous.
+    __table_args__ = (UniqueConstraint("user_id", "game_name", "name", name="uq_character_user_game_name"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    game_name: Mapped[str] = mapped_column(String, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

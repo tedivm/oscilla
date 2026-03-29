@@ -1,0 +1,29 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: binary-choice
+spec:
+  displayName: "Binary Choice Test"
+  description: "Test basic choice mechanics."
+  steps:
+    - type: choice
+      prompt: "Choose one option:"
+      options:
+        - label: option_a
+          text: "Option A (gain 1 strength)"
+          steps:
+            - type: narrative
+              text: "**CHOICE A SELECTED** - You chose option A."
+              effects:
+                - type: stat_change
+                  stat: strength
+                  amount: 1
+        - label: option_b
+          text: "Option B (gain 25 gold)"
+          steps:
+            - type: narrative
+              text: "**CHOICE B SELECTED** - You chose option B."
+              effects:
+                - type: stat_change
+                  stat: gold
+                  amount: 25

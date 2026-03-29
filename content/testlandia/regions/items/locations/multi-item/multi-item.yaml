@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: multi-item
+spec:
+  displayName: "Multi Item Drop"
+  description: "Test multiple item drop (count 3)."
+  region: items
+  adventures:
+    - ref: multi-item
+      weight: 100

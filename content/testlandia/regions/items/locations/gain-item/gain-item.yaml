@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: gain-item
+spec:
+  displayName: "Single Item Drop"
+  description: "Test single item drop with 100% weight."
+  region: items
+  adventures:
+    - ref: gain-item
+      weight: 100

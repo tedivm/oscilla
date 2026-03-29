@@ -825,6 +825,7 @@ erDiagram
     CHAR(32) id PK
     CHAR(32) user_id FK
     DATETIME created_at
+    VARCHAR game_name
     VARCHAR name
     DATETIME updated_at
   }

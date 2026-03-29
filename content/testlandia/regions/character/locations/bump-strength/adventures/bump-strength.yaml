@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: bump-strength
+spec:
+  displayName: "Strength Change +1"
+  description: "Test stat_change on int stat."
+  steps:
+    - type: narrative
+      text: "Strength increased by 1."
+      effects:
+        - type: stat_change
+          stat: strength
+          amount: 1

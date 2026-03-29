@@ -164,3 +164,7 @@ cython_debug/
 oscilla/_version.py
 
 *.db
+
+# saves.db lives at the project root when using the default SQLite configuration.
+saves.db*
+/content/the-example-kingdom

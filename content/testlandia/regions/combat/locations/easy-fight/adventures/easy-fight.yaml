@@ -1,0 +1,22 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: easy-fight
+spec:
+  displayName: "Easy Combat Test"
+  description: "Guaranteed victory combat test."
+  steps:
+    - type: combat
+      enemy: glass-dummy
+      on_victory:
+        steps:
+          - type: narrative
+            text: "Glass dummy defeated easily."
+      on_defeat:
+        steps:
+          - type: narrative
+            text: "Unexpected defeat."
+      on_flee:
+        steps:
+          - type: narrative
+            text: "Fled from combat."

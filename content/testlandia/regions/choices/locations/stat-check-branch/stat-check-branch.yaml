@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: stat-check-branch
+spec:
+  displayName: "Stat Check Branch Test"
+  description: "Test stat_check pass/fail branching."
+  region: choices
+  adventures:
+    - ref: stat-check-branch
+      weight: 100

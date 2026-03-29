@@ -18,12 +18,16 @@ from oscilla.engine.character import CharacterState
 from oscilla.engine.loader import load
 from oscilla.engine.registry import ContentRegistry
 from oscilla.models.character_iteration import CharacterIterationRecord
-from oscilla.services.character import (acquire_session_lock,
-                                        get_active_iteration_id,
-                                        list_characters_for_user,
-                                        load_all_iterations, load_character,
-                                        prestige_character,
-                                        release_session_lock, save_character)
+from oscilla.services.character import (
+    acquire_session_lock,
+    get_active_iteration_id,
+    list_characters_for_user,
+    load_all_iterations,
+    load_character,
+    prestige_character,
+    release_session_lock,
+    save_character,
+)
 from oscilla.services.user import get_or_create_user
 from tests.engine.conftest import FIXTURES
 
@@ -59,9 +63,9 @@ async def test_save_character_inserts_row(
     """save_character() inserts a new CharacterRecord without error."""
     user = await get_or_create_user(session=async_session, user_key="svc@host")
     player = _make_player(minimal_registry)
-    await save_character(session=async_session, state=player, user_id=user.id)
+    await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
 
-    characters = await list_characters_for_user(session=async_session, user_id=user.id)
+    characters = await list_characters_for_user(session=async_session, user_id=user.id, game_name="test-game")
     assert len(characters) == 1
     assert characters[0].name == player.name
 
@@ -73,10 +77,10 @@ async def test_save_character_duplicate_raises(
     """Saving the same character_id twice raises IntegrityError."""
     user = await get_or_create_user(session=async_session, user_key="dup@host")
     player = _make_player(minimal_registry, name="DupChar")
-    await save_character(session=async_session, state=player, user_id=user.id)
+    await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
 
     with pytest.raises(IntegrityError):
-        await save_character(session=async_session, state=player, user_id=user.id)
+        await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
 
 
 async def test_stale_version_raises_stale_data_error(
@@ -95,7 +99,7 @@ async def test_stale_version_raises_stale_data_error(
 
     user = await get_or_create_user(session=async_session, user_key="stale@host")
     player = _make_player(minimal_registry, name="StaleHero")
-    await save_character(session=async_session, state=player, user_id=user.id)
+    await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
 
     iteration_id = await get_active_iteration_id(session=async_session, character_id=player.character_id)
     assert iteration_id is not None
@@ -152,7 +156,7 @@ async def test_load_character_matches_saved_state(
     player.xp = 90
     player.add_item(ref="test-potion", quantity=2)
     player.grant_milestone("found-sword")
-    await save_character(session=async_session, state=player, user_id=user.id)
+    await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
 
     loaded = await load_character(
         session=async_session,
@@ -180,7 +184,7 @@ async def test_prestige_character_creates_new_iteration(
     assert minimal_registry.character_config is not None
     user = await get_or_create_user(session=async_session, user_key="prestige@host")
     player = _make_player(minimal_registry, name="PrestigeHero")
-    await save_character(session=async_session, state=player, user_id=user.id)
+    await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
 
     new_iter = await prestige_character(
         session=async_session,
@@ -207,7 +211,7 @@ async def test_load_all_iterations_ordered(
     assert minimal_registry.character_config is not None
     user = await get_or_create_user(session=async_session, user_key="alliter@host")
     player = _make_player(minimal_registry, name="IterHero")
-    await save_character(session=async_session, state=player, user_id=user.id)
+    await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
     await prestige_character(
         session=async_session,
         character_id=player.character_id,
@@ -231,7 +235,7 @@ async def test_acquire_lock_on_free_iteration(
     """acquire_session_lock() sets session_token when it is currently NULL."""
     user = await get_or_create_user(session=async_session, user_key="lockfree@host")
     player = _make_player(minimal_registry, name="LockFreeHero")
-    await save_character(session=async_session, state=player, user_id=user.id)
+    await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
 
     iteration_id = await get_active_iteration_id(session=async_session, character_id=player.character_id)
     assert iteration_id is not None
@@ -255,7 +259,7 @@ async def test_acquire_lock_steals_stale_token(
     """acquire_session_lock() steals a non-NULL token and logs a WARNING."""
     user = await get_or_create_user(session=async_session, user_key="locksteal@host")
     player = _make_player(minimal_registry, name="StealLockHero")
-    await save_character(session=async_session, state=player, user_id=user.id)
+    await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
 
     iteration_id = await get_active_iteration_id(session=async_session, character_id=player.character_id)
     assert iteration_id is not None
@@ -284,7 +288,7 @@ async def test_release_lock_matches_token(
     """release_session_lock() clears token when it matches."""
     user = await get_or_create_user(session=async_session, user_key="release@host")
     player = _make_player(minimal_registry, name="ReleaseHero")
-    await save_character(session=async_session, state=player, user_id=user.id)
+    await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
 
     iteration_id = await get_active_iteration_id(session=async_session, character_id=player.character_id)
     assert iteration_id is not None
@@ -308,7 +312,7 @@ async def test_release_lock_noop_wrong_token(
     """release_session_lock() is a no-op when the token doesn't match."""
     user = await get_or_create_user(session=async_session, user_key="noop@host")
     player = _make_player(minimal_registry, name="NoopReleaseHero")
-    await save_character(session=async_session, state=player, user_id=user.id)
+    await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
 
     iteration_id = await get_active_iteration_id(session=async_session, character_id=player.character_id)
     assert iteration_id is not None

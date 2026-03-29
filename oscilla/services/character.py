@@ -26,12 +26,26 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
+def _stat_to_float(value: "int | float | bool | None") -> float | None:
+    """Encode a CharacterState stat value for storage in the Float DB column.
+
+    Booleans are stored as 0.0/1.0. Numeric types are cast directly.
+    NULL is preserved as NULL for unset stats.
+    """
+    if value is None:
+        return None
+    # bool must be checked before int because bool is a subclass of int
+    if isinstance(value, bool):
+        return float(int(value))
+    return float(value)
+
+
 # ---------------------------------------------------------------------------
 # Initial character creation and loading
 # ---------------------------------------------------------------------------
 
 
-async def save_character(session: AsyncSession, state: "CharacterState", user_id: UUID) -> None:
+async def save_character(session: AsyncSession, state: "CharacterState", user_id: UUID, game_name: str) -> None:
     """INSERT a brand-new character — initial creation only.
 
     Creates one CharacterRecord, one CharacterIterationRecord at iteration = 0,
@@ -46,6 +60,7 @@ async def save_character(session: AsyncSession, state: "CharacterState", user_id
     character = CharacterRecord(
         id=state.character_id,
         user_id=user_id,
+        game_name=game_name,
         name=state.name,
     )
     session.add(character)
@@ -73,7 +88,7 @@ async def save_character(session: AsyncSession, state: "CharacterState", user_id
             CharacterIterationStatValue(
                 iteration_id=iteration.id,
                 stat_name=stat_name,
-                stat_value=float(stat_value) if stat_value is not None else None,
+                stat_value=_stat_to_float(stat_value),
             )
         )
     for item_ref, quantity in state.inventory.items():
@@ -249,19 +264,20 @@ async def load_character(
 async def list_characters_for_user(
     session: AsyncSession,
     user_id: UUID,
+    game_name: str,
 ) -> List[CharacterRecord]:
-    """Return all CharacterRecords belonging to user_id, ordered by updated_at DESC."""
+    """Return all CharacterRecords belonging to user_id for game_name, ordered by updated_at DESC."""
     stmt = (
         select(CharacterRecord)
-        .where(and_(CharacterRecord.user_id == user_id))
+        .where(and_(CharacterRecord.user_id == user_id, CharacterRecord.game_name == game_name))
         .order_by(CharacterRecord.updated_at.desc())
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
 
-async def delete_user_characters(session: AsyncSession, user_id: UUID) -> int:
-    """Delete all characters and every iteration row (plus child rows) for a user.
+async def delete_user_characters(session: AsyncSession, user_id: UUID, game_name: str) -> int:
+    """Delete all characters and every iteration row (plus child rows) for a user in a game.
 
     Loads each iteration with its six child table relationships so that
     SQLAlchemy's ORM cascade ("all, delete-orphan") removes the child rows
@@ -269,7 +285,9 @@ async def delete_user_characters(session: AsyncSession, user_id: UUID) -> int:
 
     Returns the number of character records deleted.
     """
-    char_stmt = select(CharacterRecord).where(and_(CharacterRecord.user_id == user_id))
+    char_stmt = select(CharacterRecord).where(
+        and_(CharacterRecord.user_id == user_id, CharacterRecord.game_name == game_name)
+    )
     char_result = await session.execute(char_stmt)
     characters = list(char_result.scalars().all())
 
@@ -298,10 +316,17 @@ async def delete_user_characters(session: AsyncSession, user_id: UUID) -> int:
 async def get_character_by_name(
     session: AsyncSession,
     user_id: UUID,
+    game_name: str,
     name: str,
 ) -> "CharacterRecord | None":
-    """Return the CharacterRecord with the given name for user_id, or None."""
-    stmt = select(CharacterRecord).where(and_(CharacterRecord.user_id == user_id, CharacterRecord.name == name))
+    """Return the CharacterRecord with the given name for user_id and game_name, or None."""
+    stmt = select(CharacterRecord).where(
+        and_(
+            CharacterRecord.user_id == user_id,
+            CharacterRecord.game_name == game_name,
+            CharacterRecord.name == name,
+        )
+    )
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
 
@@ -358,12 +383,11 @@ async def prestige_character(
     await session.flush()
 
     for stat_def in all_stats:
-        raw_value = stat_def.default
         session.add(
             CharacterIterationStatValue(
                 iteration_id=new_iteration.id,
                 stat_name=stat_def.name,
-                stat_value=float(raw_value) if raw_value is not None else None,
+                stat_value=_stat_to_float(stat_def.default),
             )
         )
 
@@ -522,18 +546,18 @@ async def set_stat(
     session: AsyncSession,
     iteration_id: UUID,
     stat_name: str,
-    value: int | float | None,
+    value: int | float | bool | None,
 ) -> None:
     """Upsert one row in character_iteration_stat_values.
 
-    value is stored directly as a REAL column; NULL is used for stats
-    whose value is explicitly unset.
+    value is stored as a REAL column; booleans are stored as 0.0/1.0;
+    NULL is used for stats whose value is explicitly unset.
     """
     merged = await session.merge(
         CharacterIterationStatValue(
             iteration_id=iteration_id,
             stat_name=stat_name,
-            stat_value=float(value) if value is not None else None,
+            stat_value=_stat_to_float(value),
         )
     )
     await session.commit()

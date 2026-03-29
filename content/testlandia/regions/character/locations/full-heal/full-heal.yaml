@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: full-heal
+spec:
+  displayName: "Full Healing Station"
+  description: "Instantly restore all HP."
+  region: character
+  adventures:
+    - ref: full-heal
+      weight: 100

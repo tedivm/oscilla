@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: test-location-deep
+spec:
+  displayName: "Deep Location"
+  description: "In the deepest region."
+  region: test-region-deep
+  adventures:
+    - ref: test-narrative
+      weight: 100

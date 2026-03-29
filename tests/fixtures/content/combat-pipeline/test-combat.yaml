@@ -1,0 +1,26 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-combat
+spec:
+  displayName: "Test Combat"
+  description: "A single-fight combat adventure for pipeline testing."
+  steps:
+    - type: combat
+      enemy: test-enemy
+      on_win:
+        effects:
+          - type: xp_grant
+            amount: 20
+          - type: milestone_grant
+            milestone: test-combat-won
+        steps:
+          - type: narrative
+            text: "You won the test combat."
+      on_defeat:
+        steps:
+          - type: narrative
+            text: "You lost the test combat."
+        effects:
+          - type: end_adventure
+            outcome: defeated

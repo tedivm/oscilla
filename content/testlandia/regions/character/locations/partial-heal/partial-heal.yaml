@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: partial-heal
+spec:
+  displayName: "Partial Healing Station"
+  description: "Restore 10 HP."
+  region: character
+  adventures:
+    - ref: partial-heal
+      weight: 100

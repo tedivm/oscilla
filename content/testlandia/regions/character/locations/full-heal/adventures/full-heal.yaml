@@ -1,0 +1,13 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: full-heal
+spec:
+  displayName: "Full Heal Test"
+  description: "Direct test of full HP recovery."
+  steps:
+    - type: narrative
+      text: "HP fully restored."
+      effects:
+        - type: heal
+          amount: full

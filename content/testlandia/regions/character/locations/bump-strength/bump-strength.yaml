@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: bump-strength
+spec:
+  displayName: "Strength +1"
+  description: "Test stat_change: add to integer stat."
+  region: character
+  adventures:
+    - ref: bump-strength
+      weight: 100

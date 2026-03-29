@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: goto-demo
+spec:
+  displayName: "Goto Label Test"
+  description: "Test goto and label mechanics."
+  region: choices
+  adventures:
+    - ref: goto-demo
+      weight: 100

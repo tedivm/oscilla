@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: get-badge
+spec:
+  displayName: "Badge Issuer"
+  description: "Grants dev-badge milestone."
+  region: conditions
+  adventures:
+    - ref: get-badge
+      weight: 100

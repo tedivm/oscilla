@@ -1,0 +1,7 @@
+apiVersion: game/v1
+kind: Region
+metadata:
+  name: test-region-root
+spec:
+  displayName: "Test Region"
+  description: "Root region."

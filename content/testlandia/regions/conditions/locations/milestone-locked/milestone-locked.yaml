@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: milestone-locked
+spec:
+  displayName: "Milestone Gate"
+  description: "Requires dev-badge to access."
+  region: conditions
+  unlock:
+    type: milestone
+    name: dev-badge
+  adventures:
+    - ref: milestone-locked
+      weight: 100

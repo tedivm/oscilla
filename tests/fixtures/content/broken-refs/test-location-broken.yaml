@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: test-location-broken
+spec:
+  displayName: "Broken Location"
+  description: "References an adventure that does not exist."
+  region: test-region-root
+  adventures:
+    - ref: nonexistent-adventure
+      weight: 100

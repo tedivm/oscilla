@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Enemy
+metadata:
+  name: test-enemy
+spec:
+  displayName: "Test Enemy"
+  description: "A simple enemy for tests."
+  hp: 10
+  attack: 5
+  defense: 0
+  xp_reward: 10
+  loot: []

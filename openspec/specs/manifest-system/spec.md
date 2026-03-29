@@ -40,7 +40,7 @@ The manifest system SHALL support the following `kind` values: `Region`, `Locati
 
 ### Requirement: CharacterConfig defines all player stats
 
-The `CharacterConfig` manifest SHALL declare two lists of stat definitions: `public_stats` (rendered in the player UI) and `hidden_stats` (internal only, never shown to the player). Each stat definition SHALL include a `name` (unique across both lists), a `type` (one of `int`, `float`, `str`, `bool`), and an optional `default` value that defaults to `null` when omitted. The engine SHALL use this manifest to initialise player stat storage at character creation.
+The `CharacterConfig` manifest SHALL declare two lists of stat definitions: `public_stats` (rendered in the player UI) and `hidden_stats` (internal only, never shown to the player). Each stat definition SHALL include a `name` (unique across both lists), a `type` (one of `int`, `float`, `bool`), and an optional `default` value that defaults to `null` when omitted. The engine SHALL use this manifest to initialise player stat storage at character creation.
 
 #### Scenario: Player stat storage matches CharacterConfig
 
@@ -66,22 +66,22 @@ The `CharacterConfig` manifest SHALL declare two lists of stat definitions: `pub
 
 ### Requirement: Content directory scanning
 
-The content loader SHALL accept a configurable root directory path. It SHALL recursively scan all `.yaml` and `.yml` files within that directory and attempt to load each as a manifest.
+The content loader SHALL accept a configurable game *library root* path via the `GAMES_PATH` setting (env var `GAMES_PATH`). The `load_games(library_root: Path)` function SHALL scan immediate subdirectories of `library_root` for game packages (directories containing a `game.yaml`). Subdirectories without a `game.yaml` are silently skipped. The single-game `load(content_dir: Path)` function is retained as an internal helper. The `CONTENT_PATH` / `content_path` setting is removed.
 
-#### Scenario: Configurable path is used
+#### Scenario: GAMES_PATH is used as library root
 
-- **WHEN** the `CONTENT_PATH` setting is set to a custom directory
-- **THEN** the loader scans that directory instead of the default bundled content path
+- **WHEN** the `GAMES_PATH` setting is set to a custom directory
+- **THEN** `load_games()` scans that directory's immediate subdirectories for game packages
 
-#### Scenario: Non-YAML files are ignored
+#### Scenario: Non-YAML files are ignored within a game package
 
-- **WHEN** the content directory contains files with extensions other than `.yaml` or `.yml`
-- **THEN** the loader silently ignores those files
+- **WHEN** a game package directory contains files with extensions other than `.yaml` or `.yml`
+- **THEN** those files are silently ignored during manifest scanning
 
-#### Scenario: Empty directory loads cleanly
+#### Scenario: Game package with no YAML files loads cleanly
 
-- **WHEN** the content directory exists but contains no YAML files
-- **THEN** the loader completes without error and the registry is empty
+- **WHEN** a subdirectory contains a `game.yaml` but no other manifests
+- **THEN** the package loads without error and the registry contains only the `Game` manifest
 
 ---
 
@@ -124,17 +124,27 @@ Regions form a tree via an optional `parent` reference in their spec. Locations 
 
 ### Requirement: Validate CLI command
 
-The system SHALL provide a `validate` CLI command that loads and validates all manifests in the configured content directory and reports all errors without starting the game.
+The system SHALL provide a `validate` CLI command that loads and validates all game packages under `GAMES_PATH`. By default it validates all games and reports errors per-game. An optional `--game GAME_NAME` flag restricts validation to a single named game package.
 
-#### Scenario: Valid content reports success
+#### Scenario: Validate with no flag validates all games
 
-- **WHEN** `oscilla validate` is run against a content directory with no schema or cross-reference errors
-- **THEN** the command exits with code 0 and prints a success summary
+- **WHEN** `oscilla validate` is run against a library root containing two game packages
+- **THEN** both packages are validated and a per-game success or error summary is printed
+
+#### Scenario: Validate with --game validates one game
+
+- **WHEN** `oscilla validate --game testlandia` is run
+- **THEN** only the `testlandia` package is validated; other packages are not loaded
+
+#### Scenario: Valid content reports success per game
+
+- **WHEN** `oscilla validate` is run against a library where all packages have no errors
+- **THEN** the command exits with code 0 and prints a success summary for each game
 
 #### Scenario: Invalid content reports all errors
 
-- **WHEN** `oscilla validate` is run against a content directory that contains one or more invalid manifests
-- **THEN** the command exits with a non-zero code and prints each error with its source file path
+- **WHEN** `oscilla validate` is run and one game contains an invalid manifest
+- **THEN** the command exits with a non-zero code and prints each error with its game package name and source file path
 
 #### Scenario: Validate does not start the game
 

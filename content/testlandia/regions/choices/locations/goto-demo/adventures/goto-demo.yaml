@@ -1,0 +1,29 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: goto-demo
+spec:
+  displayName: "Goto Label Test"
+  description: "Test goto and label mechanics."
+  steps:
+    - type: narrative
+      text: "Starting goto test."
+      label: start
+    - type: choice
+      prompt: "Test goto mechanics:"
+      options:
+        - label: loop_back
+          text: "Loop back to start"
+          steps:
+            - type: narrative
+              text: "**GOTO TRIGGERED** - Looping back to start."
+              goto: start
+        - label: continue
+          text: "Continue to end"
+          steps:
+            - type: narrative
+              text: "**GOTO TEST COMPLETED** - You chose to end the loop."
+              effects:
+                - type: stat_change
+                  stat: debug_counter
+                  amount: 1

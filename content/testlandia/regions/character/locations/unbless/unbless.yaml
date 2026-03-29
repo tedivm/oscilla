@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: unbless
+spec:
+  displayName: "Remove Blessing"
+  description: "Test stat_set: assign bool stat to false."
+  region: character
+  adventures:
+    - ref: unbless
+      weight: 100

@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: unbless
+spec:
+  displayName: "Blessing Set False"
+  description: "Test stat_set on bool stat to false."
+  steps:
+    - type: narrative
+      text: "Your blessing is removed."
+      effects:
+        - type: stat_set
+          stat: is_blessed
+          value: false

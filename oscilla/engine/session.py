@@ -16,8 +16,11 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from oscilla.services.character import (
     acquire_session_lock,
+    add_milestone,
+    equip_item,
     get_active_iteration_id,
     get_character_by_name,
+    increment_statistic,
     list_characters_for_user,
     load_character,
     release_session_lock,
@@ -27,11 +30,8 @@ from oscilla.services.character import (
     set_quest,
     set_stat,
     touch_character_updated_at,
-    update_scalar_fields,
-    add_milestone,
-    equip_item,
     unequip_item,
-    increment_statistic,
+    update_scalar_fields,
 )
 from oscilla.services.user import derive_tui_user_key, get_or_create_user
 
@@ -65,11 +65,13 @@ class GameSession:
         registry: "ContentRegistry",
         tui: "TUICallbacks",
         db_session: "AsyncSession",
+        game_name: str,
         character_name: str | None = None,
     ) -> None:
         self.registry = registry
         self.tui = tui
         self.db_session = db_session
+        self.game_name = game_name
         self.character_name = character_name
         self._character: "CharacterState | None" = None
         # Snapshot of the state as of the last successful DB write; used by
@@ -112,6 +114,7 @@ class GameSession:
             record = await get_character_by_name(
                 session=self.db_session,
                 user_id=user.id,
+                game_name=self.game_name,
                 name=self.character_name,
             )
             if record is not None:
@@ -130,7 +133,9 @@ class GameSession:
             else:
                 state = await self._create_new_character(name=self.character_name, user_id=user.id)
         else:
-            characters = await list_characters_for_user(session=self.db_session, user_id=user.id)
+            characters = await list_characters_for_user(
+                session=self.db_session, user_id=user.id, game_name=self.game_name
+            )
             if len(characters) == 0:
                 state = await self._create_new_character(name=None, user_id=user.id)
             elif len(characters) == 1:
@@ -255,18 +260,11 @@ class GameSession:
         last_stats = last.stats if last is not None else {}
         for stat_name, value in state.stats.items():
             if value != last_stats.get(stat_name):
-                raw: int | float | None
-                if isinstance(value, bool):
-                    raw = int(value)
-                elif isinstance(value, (int, float)):
-                    raw = value
-                else:
-                    raw = None
                 await set_stat(
                     session=self.db_session,
                     iteration_id=iteration_id,
                     stat_name=stat_name,
-                    value=raw,
+                    value=value,
                 )
 
         # --- Inventory ---
@@ -425,6 +423,7 @@ class GameSession:
             session=self.db_session,
             state=state,
             user_id=user_id,
+            game_name=self.game_name,
         )
         return state
 

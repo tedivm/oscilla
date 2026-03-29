@@ -178,6 +178,60 @@ def test_settings_imported() -> None:
     assert hasattr(settings, "project_name")
 
 
+def test_validate_game_flag_help() -> None:
+    """Test that validate command shows --game flag in help."""
+    result = runner.invoke(app, ["validate", "--help"])
+    assert result.exit_code == 0
+    assert "--game" in result.stdout
+    assert "-g" in result.stdout
+
+
+def test_validate_with_game_flag() -> None:
+    """Test that validate command accepts --game flag."""
+    result = runner.invoke(app, ["validate", "--game", "the-kingdom"])
+    # Should either succeed (0) or fail with validation error (1), not crash
+    assert result.exit_code in [0, 1]
+
+
+def test_validate_multi_game_output() -> None:
+    """Test that validate without --game shows per-game output."""
+    result = runner.invoke(app, ["validate"])
+    assert result.exit_code == 0
+    # Should show the game name in output
+    assert "the-kingdom" in result.stdout
+
+
+def test_validate_unknown_game() -> None:
+    """Test that validate with unknown game shows error."""
+    result = runner.invoke(app, ["validate", "--game", "nonexistent-game"])
+    assert result.exit_code == 1
+    assert "not found" in result.stdout.lower()
+
+
+def test_game_command_game_flag_help() -> None:
+    """Test that game command shows --game flag in help."""
+    result = runner.invoke(app, ["game", "--help"])
+    assert result.exit_code == 0
+    assert "--game" in result.stdout
+    assert "-g" in result.stdout
+
+
+def test_game_command_reset_db_help_updated() -> None:
+    """Test that game command --reset-db help mentions game scope."""
+    result = runner.invoke(app, ["game", "--help"])
+    assert result.exit_code == 0
+    assert "--reset-db" in result.stdout
+    # Should mention game scope in help text
+    assert "chosen" in result.stdout
+
+
+def test_game_command_with_unknown_game() -> None:
+    """Test that game command with unknown game shows error."""
+    result = runner.invoke(app, ["game", "--game", "nonexistent-game"])
+    assert result.exit_code == 1
+    # Error may be in stderr or stdout, but should definitely exit with code 1
+
+
 def test_version_uses_settings() -> None:
     """Test that version command uses project_name from settings."""
     from oscilla.settings import settings
@@ -222,3 +276,19 @@ def test_test_data_calls_db_function(db_session: Any, monkeypatch: Any) -> None:
     result = runner.invoke(app, ["test-data"])
     assert result.exit_code == 0
     assert len(called) == 1, "test_data function should be called once"
+
+
+def test_game_command_force_flag_help() -> None:
+    """Test that game command shows --force flag in help."""
+    result = runner.invoke(app, ["game", "--help"])
+    assert result.exit_code == 0
+    assert "--force" in result.stdout
+    assert "-f" in result.stdout
+    assert "confirmation" in result.stdout.lower()
+
+
+def test_game_command_force_flag_without_reset_db() -> None:
+    """Test that --force flag can be used (though it has no effect without --reset-db)."""
+    result = runner.invoke(app, ["game", "--game", "nonexistent-game", "--force"])
+    # Should still fail because the game doesn't exist, but not because of the force flag
+    assert result.exit_code == 1

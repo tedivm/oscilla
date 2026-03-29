@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-all-gate
+spec:
+  displayName: "All Gate"
+  description: "Requires all conditions to pass."
+  requires:
+    all:
+      - level: 2
+      - milestone: test-milestone
+  steps:
+    - type: narrative
+      text: "Passed all gate."

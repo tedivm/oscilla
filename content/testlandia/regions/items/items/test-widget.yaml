@@ -1,0 +1,8 @@
+apiVersion: game/v1
+kind: Item
+metadata:
+  name: test-widget
+spec:
+  displayName: "Test Widget"
+  description: "Minimal test item for drop mechanics."
+  kind: consumable

@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: bless
+spec:
+  displayName: "Blessing Set True"
+  description: "Test stat_set on bool stat to true."
+  steps:
+    - type: narrative
+      text: "You are now blessed."
+      effects:
+        - type: stat_set
+          stat: is_blessed
+          value: true

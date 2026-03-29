@@ -1,0 +1,26 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-stat-effects
+spec:
+  displayName: "Stat Effects Test"
+  description: "An adventure testing various stat effects."
+  steps:
+    - type: narrative
+      text: "Testing stat_change on int stat."
+      effects:
+        - type: stat_change
+          stat: strength
+          amount: 5
+    - type: narrative
+      text: "Testing stat_change on float stat."
+      effects:
+        - type: stat_change
+          stat: speed
+          amount: 1.5
+    - type: narrative
+      text: "Testing stat_set on bool stat."
+      effects:
+        - type: stat_set
+          stat: is_blessed
+          value: true

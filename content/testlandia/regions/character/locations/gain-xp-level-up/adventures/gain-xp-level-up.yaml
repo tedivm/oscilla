@@ -1,0 +1,13 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: gain-xp-level-up
+spec:
+  displayName: "Massive XP Test"
+  description: "Direct test of massive XP grant."
+  steps:
+    - type: narrative
+      text: "Gained 9999 XP!"
+      effects:
+        - type: xp_grant
+          amount: 9999

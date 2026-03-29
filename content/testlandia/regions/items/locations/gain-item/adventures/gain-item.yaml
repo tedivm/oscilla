@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: gain-item
+spec:
+  displayName: "Single Item Drop Test"
+  description: "Test single item drop mechanics."
+  steps:
+    - type: narrative
+      text: "Found a test widget."
+      effects:
+        - type: item_drop
+          loot:
+            - item: test-widget
+              weight: 100

@@ -1,0 +1,22 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: hard-fight
+spec:
+  displayName: "Hard Combat Test"
+  description: "Likely defeat combat test."
+  steps:
+    - type: combat
+      enemy: iron-golem
+      on_victory:
+        steps:
+          - type: narrative
+            text: "Miraculously defeated the iron golem!"
+      on_defeat:
+        steps:
+          - type: narrative
+            text: "Defeated by the iron golem, as expected."
+      on_flee:
+        steps:
+          - type: narrative
+            text: "Wisely fled from the iron golem."

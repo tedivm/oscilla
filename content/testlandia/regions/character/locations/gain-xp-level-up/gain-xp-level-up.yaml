@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: gain-xp-level-up
+spec:
+  displayName: "Massive XP Gain"
+  description: "Gain 9999 XP (multiple level ups)."
+  region: character
+  adventures:
+    - ref: gain-xp-level-up
+      weight: 100

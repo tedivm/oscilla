@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: set-strength
+spec:
+  displayName: "Strength Set 15"
+  description: "Test stat_set on int stat."
+  steps:
+    - type: narrative
+      text: "Strength set to 15."
+      effects:
+        - type: stat_set
+          stat: strength
+          value: 15

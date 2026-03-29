@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: bump-speed
+spec:
+  displayName: "Speed +0.5"
+  description: "Test stat_change: add to float stat."
+  region: character
+  adventures:
+    - ref: bump-speed
+      weight: 100

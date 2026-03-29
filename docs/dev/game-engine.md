@@ -87,6 +87,47 @@ class ContentRegistry:
 
 Content is accessed by reference name (e.g., `registry.items["health-potion"]`).
 
+## Multi-Game Loading
+
+### `load_games()` API
+
+The `load_games(library_root: Path)` function scans a game library directory for multiple game packages:
+
+```python
+from pathlib import Path
+from oscilla.engine.loader import load_games
+
+# Load all games from the default library directory
+games = load_games(Path("content"))
+# Returns: Dict[str, ContentRegistry]
+
+# Access specific games by name
+kingdom_registry = games["the-kingdom"]
+testlandia_registry = games["testlandia"]
+```
+
+**Game Library Structure:**
+
+```
+content/                    ← library root
+├── the-kingdom/           ← game package (name from game.yaml)
+│   ├── game.yaml
+│   ├── character_config.yaml
+│   └── regions/
+├── testlandia/           ← another game package
+│   ├── game.yaml
+│   ├── character_config.yaml
+│   └── regions/
+└── extras/               ← ignored (no game.yaml)
+```
+
+**Loading Rules:**
+
+- Each immediate subdirectory is scanned for a `game.yaml` file
+- Directories without `game.yaml` are silently ignored
+- Game names come from the `metadata.name` field in `game.yaml`, not directory names
+- If any game package fails validation, `ContentLoadError` is raised for the entire library
+
 ## Player State
 
 The `PlayerState` dataclass tracks all mutable game state:
@@ -110,11 +151,46 @@ class PlayerState:
 **Key Methods:**
 
 - `new_player()` - Factory for character creation
-- `add_xp()` - Handle experience and leveling
+- `add_xp()` - Handle experience and leveling (supports level-down)
 - `add_item()` / `remove_item()` - Inventory management
 - `grant_milestone()` / `has_milestone()` - Story progress tracking
 - `equip()` - Equipment slot management
 - Statistics recording: `record_enemy_defeated()`, `record_location_visited()`, `record_adventure_completed()`
+
+### Experience and Level Mechanics
+
+**`add_xp(amount: int)` → `tuple[List[int], List[int]]`**
+
+The `add_xp()` method handles both positive and negative experience changes, returning lists of gained and lost levels:
+
+```python
+# Gain experience and levels
+gained_levels, lost_levels = player.add_xp(75)
+# Returns: ([2, 3], [])  if player leveled from 1 → 3
+
+# Lose experience and de-level
+gained_levels, lost_levels = player.add_xp(-60)
+# Returns: ([], [3, 2])  if player de-leveled from 3 → 1
+```
+
+**Level-Down Rules:**
+
+- Negative XP can reduce player level, but not below level 1
+- XP cannot go below 0 (clamped to zero)
+- HP is capped to new max HP when leveling down
+- Return tuple format: `(gained_levels, lost_levels)` where each list contains the levels traversed
+
+**Example Usage in Effects:**
+
+```python
+gained, lost = self.player_state.add_xp(effect.amount)
+
+for level in gained:
+    self.tui.show_text(f"You reached level {level}!")
+
+for level in lost:
+    self.tui.show_text(f"You lost level {level}.")
+```
 
 ## Condition System
 
@@ -170,9 +246,57 @@ Each step type has a dedicated handler module:
 ### Effects (`oscilla/engine/steps/effects.py`)
 
 - `XpGrantEffect`: Adds experience (may trigger leveling)
+- `DamageEffect`: Reduces player HP
+- `HealEffect`: Restores player HP
+- `ItemGrantEffect`: Adds items to inventory
 - `ItemDropEffect`: Weighted random item distribution
 - `MilestoneGrantEffect`: Unlocks story milestones
+- `StatChangeEffect`: Modifies player stats by amount (addition/subtraction)
+- `StatSetEffect`: Sets player stats to specific values
 - `EndAdventureEffect`: Terminates adventure with outcome
+
+#### Stat Mutation Effects
+
+**StatChangeEffect** modifies player stats by adding/subtracting a numeric amount:
+
+```yaml
+effects:
+  - type: stat_change
+    stat: "strength"         # Must exist in character_config.yaml
+    amount: 2              # int or float; negative values subtract
+
+  - type: stat_change
+    stat: "gold"
+    amount: -25            # Spend gold
+
+  - type: stat_change
+    stat: "speed"
+    amount: 1.5            # Float stats supported
+```
+
+**StatSetEffect** assigns player stats to specific values:
+
+```yaml
+effects:
+  - type: stat_set
+    stat: "title"
+    value: "Hero of the Realm"  # Any type matching the stat
+
+  - type: stat_set
+    stat: "is_blessed"
+    value: true               # Boolean values
+
+  - type: stat_set
+    stat: "strength"
+    value: 20                # Override current value
+```
+
+**Validation Rules:**
+
+- Both effects require the stat name to exist in `CharacterConfig`
+- `StatChangeEffect` requires `int` or `float` stat types (cannot add to `bool` or `str`)
+- `StatSetEffect` value must be type-compatible with the stat definition
+- Load-time validation prevents runtime type errors
 
 ## Testing with MockTUI
 

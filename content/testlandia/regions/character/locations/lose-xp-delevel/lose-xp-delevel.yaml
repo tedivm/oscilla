@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: lose-xp-delevel
+spec:
+  displayName: "XP Loss"
+  description: "Lose 9999 XP (delevel to 1)."
+  region: character
+  adventures:
+    - ref: lose-xp-delevel
+      weight: 100

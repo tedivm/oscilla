@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: CharacterConfig
+metadata:
+  name: test-character-config
+spec:
+  public_stats:
+    - name: strength
+      type: int
+      default: 10
+      description: "Physical power"
+    - name: wisdom
+      type: int
+      default: 10
+      description: "Mental acuity"
+  hidden_stats: []
