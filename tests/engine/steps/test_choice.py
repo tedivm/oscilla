@@ -7,12 +7,12 @@ import pytest
 from oscilla.engine.models.adventure import ChoiceOption, ChoiceStep, OutcomeBranch
 from oscilla.engine.models.base import LevelCondition, MilestoneCondition
 from oscilla.engine.pipeline import AdventureOutcome
-from oscilla.engine.player import PlayerState
+from oscilla.engine.character import CharacterState
 from oscilla.engine.steps.choice import run_choice
 from tests.engine.conftest import MockTUI
 
 
-async def test_choice_step_with_all_options_available(base_player: PlayerState) -> None:
+async def test_choice_step_with_all_options_available(base_player: CharacterState) -> None:
     """Test choice step when all options are available."""
     mock_tui = MockTUI(menu_responses=[1])  # Choose first option
 
@@ -35,7 +35,7 @@ async def test_choice_step_with_all_options_available(base_player: PlayerState) 
     assert len(mock_tui.menus) == 1  # One menu call made
 
 
-async def test_choice_step_with_filtered_options(base_player: PlayerState) -> None:
+async def test_choice_step_with_filtered_options(base_player: CharacterState) -> None:
     """Test choice step with some options filtered out by conditions."""
     mock_tui = MockTUI(menu_responses=[1])  # Choose first available option
 
@@ -73,7 +73,7 @@ async def test_choice_step_with_filtered_options(base_player: PlayerState) -> No
     assert options_shown == ["Available Option"]
 
 
-async def test_choice_step_no_options_available(base_player: PlayerState) -> None:
+async def test_choice_step_no_options_available(base_player: CharacterState) -> None:
     """Test choice step when no options are available."""
     mock_tui = MockTUI()
 
@@ -98,7 +98,7 @@ async def test_choice_step_no_options_available(base_player: PlayerState) -> Non
     assert "(No options are available here.)" in mock_tui.texts
 
 
-async def test_choice_step_with_milestone_condition(base_player: PlayerState) -> None:
+async def test_choice_step_with_milestone_condition(base_player: CharacterState) -> None:
     """Test choice option filtering based on milestone conditions."""
     base_player.grant_milestone("special-flag")
     mock_tui = MockTUI(menu_responses=[2])  # Choose second option
@@ -138,7 +138,7 @@ async def test_choice_step_with_milestone_condition(base_player: PlayerState) ->
     assert options_shown == ["Option A", "Special Option"]
 
 
-async def test_choice_step_creates_outcome_branch_correctly(base_player: PlayerState) -> None:
+async def test_choice_step_creates_outcome_branch_correctly(base_player: CharacterState) -> None:
     """Test that choice step creates OutcomeBranch with correct attributes."""
     from oscilla.engine.models.adventure import MilestoneGrantEffect
 

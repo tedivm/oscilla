@@ -19,78 +19,78 @@ from oscilla.engine.models.base import (
     NotCondition,
     PrestigeCountCondition,
 )
-from oscilla.engine.player import PlayerState
+from oscilla.engine.character import CharacterState
 
 
-def test_none_condition_always_true(base_player: PlayerState) -> None:
+def test_none_condition_always_true(base_player: CharacterState) -> None:
     assert evaluate(condition=None, player=base_player) is True
 
 
-def test_level_condition_pass(base_player: PlayerState) -> None:
+def test_level_condition_pass(base_player: CharacterState) -> None:
     cond = LevelCondition(type="level", value=1)
     assert evaluate(condition=cond, player=base_player) is True
 
 
-def test_level_condition_fail(base_player: PlayerState) -> None:
+def test_level_condition_fail(base_player: CharacterState) -> None:
     cond = LevelCondition(type="level", value=5)
     assert evaluate(condition=cond, player=base_player) is False
 
 
-def test_milestone_condition_pass(base_player: PlayerState) -> None:
+def test_milestone_condition_pass(base_player: CharacterState) -> None:
     base_player.grant_milestone("special-flag")
     cond = MilestoneCondition(type="milestone", name="special-flag")
     assert evaluate(condition=cond, player=base_player) is True
 
 
-def test_milestone_condition_fail(base_player: PlayerState) -> None:
+def test_milestone_condition_fail(base_player: CharacterState) -> None:
     cond = MilestoneCondition(type="milestone", name="not-granted")
     assert evaluate(condition=cond, player=base_player) is False
 
 
-def test_item_condition_pass(base_player: PlayerState) -> None:
+def test_item_condition_pass(base_player: CharacterState) -> None:
     base_player.add_item("test-item", quantity=1)
     cond = ItemCondition(type="item", name="test-item")
     assert evaluate(condition=cond, player=base_player) is True
 
 
-def test_item_condition_fail(base_player: PlayerState) -> None:
+def test_item_condition_fail(base_player: CharacterState) -> None:
     cond = ItemCondition(type="item", name="nonexistent-item")
     assert evaluate(condition=cond, player=base_player) is False
 
 
-def test_character_stat_gte_pass(base_player: PlayerState) -> None:
+def test_character_stat_gte_pass(base_player: CharacterState) -> None:
     # strength defaults to 10 in the minimal fixture
     cond = CharacterStatCondition(type="character_stat", name="strength", gte=10)
     assert evaluate(condition=cond, player=base_player) is True
 
 
-def test_character_stat_gte_fail(base_player: PlayerState) -> None:
+def test_character_stat_gte_fail(base_player: CharacterState) -> None:
     cond = CharacterStatCondition(type="character_stat", name="strength", gte=20)
     assert evaluate(condition=cond, player=base_player) is False
 
 
-def test_character_stat_gt(base_player: PlayerState) -> None:
+def test_character_stat_gt(base_player: CharacterState) -> None:
     cond_pass = CharacterStatCondition(type="character_stat", name="strength", gt=9)
     cond_fail = CharacterStatCondition(type="character_stat", name="strength", gt=10)
     assert evaluate(condition=cond_pass, player=base_player) is True
     assert evaluate(condition=cond_fail, player=base_player) is False
 
 
-def test_character_stat_lt(base_player: PlayerState) -> None:
+def test_character_stat_lt(base_player: CharacterState) -> None:
     cond_pass = CharacterStatCondition(type="character_stat", name="strength", lt=11)
     cond_fail = CharacterStatCondition(type="character_stat", name="strength", lt=10)
     assert evaluate(condition=cond_pass, player=base_player) is True
     assert evaluate(condition=cond_fail, player=base_player) is False
 
 
-def test_character_stat_eq(base_player: PlayerState) -> None:
+def test_character_stat_eq(base_player: CharacterState) -> None:
     cond_pass = CharacterStatCondition(type="character_stat", name="strength", eq=10)
     cond_fail = CharacterStatCondition(type="character_stat", name="strength", eq=5)
     assert evaluate(condition=cond_pass, player=base_player) is True
     assert evaluate(condition=cond_fail, player=base_player) is False
 
 
-def test_all_condition_requires_all(base_player: PlayerState) -> None:
+def test_all_condition_requires_all(base_player: CharacterState) -> None:
     base_player.grant_milestone("m1")
     # Both pass
     cond_pass = AllCondition(
@@ -113,7 +113,7 @@ def test_all_condition_requires_all(base_player: PlayerState) -> None:
     assert evaluate(condition=cond_fail, player=base_player) is False
 
 
-def test_any_condition_requires_at_least_one(base_player: PlayerState) -> None:
+def test_any_condition_requires_at_least_one(base_player: CharacterState) -> None:
     base_player.grant_milestone("any-flag")
     # One of the two passes
     cond_pass = AnyCondition(
@@ -136,7 +136,7 @@ def test_any_condition_requires_at_least_one(base_player: PlayerState) -> None:
     assert evaluate(condition=cond_fail, player=base_player) is False
 
 
-def test_not_condition(base_player: PlayerState) -> None:
+def test_not_condition(base_player: CharacterState) -> None:
     inner = LevelCondition(type="level", value=99)
     cond = NotCondition(type="not", condition=inner)
     assert evaluate(condition=cond, player=base_player) is True
@@ -146,7 +146,7 @@ def test_not_condition(base_player: PlayerState) -> None:
     assert evaluate(condition=cond_false, player=base_player) is False
 
 
-def test_class_condition_always_passes(base_player: PlayerState) -> None:
+def test_class_condition_always_passes(base_player: CharacterState) -> None:
     """Test that ClassCondition always returns True (no-op in v1)."""
     cond = ClassCondition(type="class", name="warrior")
     assert evaluate(condition=cond, player=base_player) is True
@@ -156,7 +156,7 @@ def test_class_condition_always_passes(base_player: PlayerState) -> None:
     assert evaluate(condition=cond2, player=base_player) is True
 
 
-def test_character_stat_non_numeric_warning(base_player: PlayerState, caplog: pytest.LogCaptureFixture) -> None:
+def test_character_stat_non_numeric_warning(base_player: CharacterState, caplog: pytest.LogCaptureFixture) -> None:
     """Test that non-numeric stats trigger a warning and are treated as 0."""
     # Set a string stat
     base_player.stats["text_stat"] = "hello"
@@ -172,22 +172,22 @@ def test_character_stat_non_numeric_warning(base_player: PlayerState, caplog: py
     assert "character_stat condition on non-numeric stat" in caplog.text
 
 
-def test_prestige_count_condition(base_player: PlayerState) -> None:
+def test_iteration_condition(base_player: CharacterState) -> None:
     """Test prestige count conditions."""
     # Default prestige count is 0
-    cond_fail = PrestigeCountCondition(type="prestige_count", gte=1)
+    cond_fail = PrestigeCountCondition(type="iteration", gte=1)
     assert evaluate(condition=cond_fail, player=base_player) is False
 
     # Set prestige count and test
-    base_player.prestige_count = 2
-    cond_pass = PrestigeCountCondition(type="prestige_count", gte=1)
+    base_player.iteration = 2
+    cond_pass = PrestigeCountCondition(type="iteration", gte=1)
     assert evaluate(condition=cond_pass, player=base_player) is True
 
-    cond_exact = PrestigeCountCondition(type="prestige_count", eq=2)
+    cond_exact = PrestigeCountCondition(type="iteration", eq=2)
     assert evaluate(condition=cond_exact, player=base_player) is True
 
 
-def test_enemies_defeated_condition(base_player: PlayerState) -> None:
+def test_enemies_defeated_condition(base_player: CharacterState) -> None:
     """Test enemies defeated condition."""
     # Initially no enemies defeated
     cond = EnemiesDefeatedCondition(type="enemies_defeated", name="goblin", gte=1)
@@ -203,7 +203,7 @@ def test_enemies_defeated_condition(base_player: PlayerState) -> None:
     assert evaluate(condition=cond_exact, player=base_player) is True
 
 
-def test_locations_visited_condition(base_player: PlayerState) -> None:
+def test_locations_visited_condition(base_player: CharacterState) -> None:
     """Test locations visited condition."""
     # Initially no locations visited
     cond = LocationsVisitedCondition(type="locations_visited", name="forest", gte=1)
@@ -219,7 +219,7 @@ def test_locations_visited_condition(base_player: PlayerState) -> None:
     assert evaluate(condition=cond_exact, player=base_player) is True
 
 
-def test_adventures_completed_condition(base_player: PlayerState) -> None:
+def test_adventures_completed_condition(base_player: CharacterState) -> None:
     """Test adventures completed condition."""
     # Initially no adventures completed
     cond = AdventuresCompletedCondition(type="adventures_completed", name="quest-1", gte=1)

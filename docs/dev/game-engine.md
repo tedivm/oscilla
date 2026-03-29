@@ -224,6 +224,59 @@ def test_combat_shows_status(base_player, minimal_registry, mock_tui):
 3. Add parsing logic to `ContentLoader` in `oscilla/engine/loader.py`
 4. Add validation and cross-reference checking as needed
 
+## Character Persistence
+
+### GameSession Orchestrator
+
+`GameSession` (in `oscilla/engine/session.py`) ties together user identity, character selection, and the adventure pipeline for a single TUI session. It is used exclusively by the TUI layer; the web layer accesses the service layer directly.
+
+```python
+async with GameSession(
+    registry=registry,
+    tui=tui,
+    db_session=db_session,
+    character_name=None,  # optional --character-name override
+) as session:
+    await session.start()          # resolve user → select/create character → acquire lock
+    await session.run_adventure("my-adventure")
+```
+
+**`start()` behavior:**
+
+1. Derives the user key from the environment and calls `get_or_create_user()`.
+2. If `--character-name` is set, looks up the character by name; creates it if absent.
+3. If no `--character-name` is set:
+   - Zero characters → prompts for a name and creates a new character.
+   - One character → auto-loads without a menu.
+   - N characters → presents a selection menu (newest first) with a "New Character" option.
+4. Acquires the session soft-lock on the active `CharacterIterationRecord`.
+
+`close()` (called automatically on context exit) releases the soft-lock even if an exception propagates.
+
+### PersistCallback Protocol
+
+`PersistCallback` (in `oscilla/engine/pipeline.py`) is an async callable that `AdventurePipeline` fires at three lifecycle points:
+
+| Event | When fired |
+|---|---|
+| `step_start` | Before each adventure step is dispatched |
+| `combat_round` | After each pair of player/enemy attacks |
+| `adventure_end` | After `active_adventure` is cleared on the player state |
+
+`GameSession._on_state_change()` implements it. At each event it diffs `_character` against `_last_saved_state` and writes only the changed domains (stats, inventory, equipment, milestones, quests, statistics scalars, and adventure progress). Unmodified data is never re-written.
+
+On `StaleDataError` (concurrent write detected), the handler reloads the snapshot from the DB and retries once.
+
+### Content-Drift Resilience
+
+When a character is loaded from the DB, `CharacterState.from_dict()` reconciles stored state against the current `CharacterConfigManifest`:
+
+- **Unknown stat in DB** — a stat that was removed from the manifest is silently dropped with a WARNING log.
+- **Missing stat in DB** — a stat newly added to the manifest is injected with its manifest default.
+- **Stale adventure reference** — an `active_adventure` whose `adventure_ref` no longer exists in the registry is cleared to `None` with a WARNING log.
+
+This ensures that content updates (renaming stats, removing adventures) do not break existing characters.
+
 ## Performance Considerations
 
 - Content is loaded once at startup and cached in memory

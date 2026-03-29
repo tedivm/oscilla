@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from oscilla.engine.pipeline import AdventureOutcome, AdventurePipeline
-from oscilla.engine.player import PlayerState
+from oscilla.engine.character import CharacterState
 from oscilla.engine.registry import ContentRegistry
 from tests.engine.conftest import MockTUI
 
 
 async def test_narrative_adventure_completes(
     minimal_registry: ContentRegistry,
-    base_player: PlayerState,
+    base_player: CharacterState,
     mock_tui: MockTUI,
 ) -> None:
     pipeline = AdventurePipeline(registry=minimal_registry, player=base_player, tui=mock_tui)
@@ -20,7 +20,7 @@ async def test_narrative_adventure_completes(
 
 async def test_narrative_adventure_shows_text(
     minimal_registry: ContentRegistry,
-    base_player: PlayerState,
+    base_player: CharacterState,
     mock_tui: MockTUI,
 ) -> None:
     pipeline = AdventurePipeline(registry=minimal_registry, player=base_player, tui=mock_tui)
@@ -30,7 +30,7 @@ async def test_narrative_adventure_shows_text(
 
 async def test_narrative_grants_xp(
     minimal_registry: ContentRegistry,
-    base_player: PlayerState,
+    base_player: CharacterState,
     mock_tui: MockTUI,
 ) -> None:
     """The test-narrative adventure has an xp_grant effect of 10."""
@@ -43,7 +43,7 @@ async def test_narrative_grants_xp(
 
 async def test_combat_win_outcome(
     combat_registry: ContentRegistry,
-    combat_player: PlayerState,
+    combat_player: CharacterState,
     mock_tui: MockTUI,
 ) -> None:
     """test-combat against test-enemy (hp=1) should always be won in one hit."""
@@ -54,7 +54,7 @@ async def test_combat_win_outcome(
 
 async def test_combat_win_grants_milestone(
     combat_registry: ContentRegistry,
-    combat_player: PlayerState,
+    combat_player: CharacterState,
     mock_tui: MockTUI,
 ) -> None:
     """After winning test-combat, player should hold the test-combat-won milestone."""
@@ -65,7 +65,7 @@ async def test_combat_win_grants_milestone(
 
 async def test_combat_win_grants_xp(
     combat_registry: ContentRegistry,
-    combat_player: PlayerState,
+    combat_player: CharacterState,
     mock_tui: MockTUI,
 ) -> None:
     pipeline = AdventurePipeline(registry=combat_registry, player=combat_player, tui=mock_tui)
@@ -75,7 +75,7 @@ async def test_combat_win_grants_xp(
 
 async def test_combat_win_records_enemy_defeated(
     combat_registry: ContentRegistry,
-    combat_player: PlayerState,
+    combat_player: CharacterState,
     mock_tui: MockTUI,
 ) -> None:
     pipeline = AdventurePipeline(registry=combat_registry, player=combat_player, tui=mock_tui)
@@ -85,7 +85,7 @@ async def test_combat_win_records_enemy_defeated(
 
 async def test_combat_flee_outcome(
     combat_registry: ContentRegistry,
-    combat_player: PlayerState,
+    combat_player: CharacterState,
 ) -> None:
     """MockTUI configured to always choose option 2 (Flee) for the attack menu."""
     tui = MockTUI(menu_responses=[2])  # Flee on first menu prompt
@@ -96,7 +96,7 @@ async def test_combat_flee_outcome(
 
 async def test_active_adventure_cleared_after_run(
     minimal_registry: ContentRegistry,
-    base_player: PlayerState,
+    base_player: CharacterState,
     mock_tui: MockTUI,
 ) -> None:
     pipeline = AdventurePipeline(registry=minimal_registry, player=base_player, tui=mock_tui)
@@ -106,7 +106,7 @@ async def test_active_adventure_cleared_after_run(
 
 async def test_adventure_statistics_recorded(
     minimal_registry: ContentRegistry,
-    base_player: PlayerState,
+    base_player: CharacterState,
     mock_tui: MockTUI,
 ) -> None:
     pipeline = AdventurePipeline(registry=minimal_registry, player=base_player, tui=mock_tui)
@@ -116,7 +116,7 @@ async def test_adventure_statistics_recorded(
 
 async def test_pipeline_tracks_step_index(
     minimal_registry: ContentRegistry,
-    base_player: PlayerState,
+    base_player: CharacterState,
     mock_tui: MockTUI,
 ) -> None:
     """Test that step_index is updated during adventure execution."""

@@ -6,7 +6,7 @@ from oscilla.engine.models.adventure import CombatStep, OutcomeBranch
 from oscilla.engine.models.base import Metadata
 from oscilla.engine.models.enemy import EnemyManifest, EnemySpec
 from oscilla.engine.pipeline import AdventureOutcome
-from oscilla.engine.player import AdventurePosition, PlayerState
+from oscilla.engine.character import AdventurePosition, CharacterState
 from oscilla.engine.registry import ContentRegistry
 from oscilla.engine.steps.combat import run_combat
 from tests.engine.conftest import MockTUI
@@ -37,7 +37,7 @@ def create_test_combat_registry() -> ContentRegistry:
     return registry
 
 
-async def test_combat_win_scenario(base_player: PlayerState) -> None:
+async def test_combat_win_scenario(base_player: CharacterState) -> None:
     """Test winning a combat scenario."""
     registry = create_test_combat_registry()
     mock_tui = MockTUI(menu_responses=[1])  # Always attack
@@ -71,7 +71,7 @@ async def test_combat_win_scenario(base_player: PlayerState) -> None:
     assert base_player.statistics.enemies_defeated.get("weak-enemy", 0) == 1
 
 
-async def test_combat_flee_scenario(base_player: PlayerState) -> None:
+async def test_combat_flee_scenario(base_player: CharacterState) -> None:
     """Test fleeing from combat."""
     registry = create_test_combat_registry()
     mock_tui = MockTUI(menu_responses=[2])  # Choose flee
@@ -100,7 +100,7 @@ async def test_combat_flee_scenario(base_player: PlayerState) -> None:
     assert base_player.statistics.enemies_defeated.get("weak-enemy", 0) == 0  # No kill recorded
 
 
-async def test_combat_defeat_scenario(base_player: PlayerState) -> None:
+async def test_combat_defeat_scenario(base_player: CharacterState) -> None:
     """Test player defeat in combat."""
     registry = create_test_combat_registry()
     mock_tui = MockTUI(menu_responses=[1, 1, 1])  # Keep attacking
@@ -135,7 +135,7 @@ async def test_combat_defeat_scenario(base_player: PlayerState) -> None:
     assert base_player.hp == 0
 
 
-async def test_combat_stat_handling_non_numeric(base_player: PlayerState) -> None:
+async def test_combat_stat_handling_non_numeric(base_player: CharacterState) -> None:
     """Test combat with non-numeric stats falls back to defaults."""
     registry = create_test_combat_registry()
     mock_tui = MockTUI(menu_responses=[1])  # Attack
@@ -167,7 +167,7 @@ async def test_combat_stat_handling_non_numeric(base_player: PlayerState) -> Non
     assert result == AdventureOutcome.COMPLETED
 
 
-async def test_combat_enemy_hp_persistence_fresh_start(base_player: PlayerState) -> None:
+async def test_combat_enemy_hp_persistence_fresh_start(base_player: CharacterState) -> None:
     """Test enemy HP starts fresh when no prior step state."""
     registry = create_test_combat_registry()
     mock_tui = MockTUI(menu_responses=[2])  # Flee immediately
@@ -193,7 +193,7 @@ async def test_combat_enemy_hp_persistence_fresh_start(base_player: PlayerState)
     assert result == AdventureOutcome.FLED
 
 
-async def test_combat_enemy_hp_persistence_restored_state(base_player: PlayerState) -> None:
+async def test_combat_enemy_hp_persistence_restored_state(base_player: CharacterState) -> None:
     """Test enemy HP is restored from step state."""
     registry = create_test_combat_registry()
     mock_tui = MockTUI(menu_responses=[2])  # Flee
@@ -225,7 +225,7 @@ async def test_combat_enemy_hp_persistence_restored_state(base_player: PlayerSta
     assert base_player.active_adventure.step_state["enemy_hp"] == 2
 
 
-async def test_combat_damage_calculation_with_defense(base_player: PlayerState) -> None:
+async def test_combat_damage_calculation_with_defense(base_player: CharacterState) -> None:
     """Test damage calculation respects enemy defense (player deals 0 damage when strength < defense)."""
     registry = ContentRegistry()
 
@@ -268,7 +268,7 @@ async def test_combat_damage_calculation_with_defense(base_player: PlayerState) 
     assert base_player.hp == 0
 
 
-async def test_combat_dexterity_damage_mitigation(base_player: PlayerState) -> None:
+async def test_combat_dexterity_damage_mitigation(base_player: CharacterState) -> None:
     """Test dexterity provides damage mitigation."""
     registry = create_test_combat_registry()
     mock_tui = MockTUI(menu_responses=[1, 2])  # Attack then flee

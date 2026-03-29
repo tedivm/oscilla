@@ -9,12 +9,12 @@ from oscilla.engine.models.adventure import OutcomeBranch, StatCheckStep
 from oscilla.engine.pipeline import AdventureOutcome
 
 if TYPE_CHECKING:
-    from oscilla.engine.player import PlayerState
+    from oscilla.engine.character import CharacterState
 
 
 async def run_stat_check(
     step: StatCheckStep,
-    player: "PlayerState",
+    player: "CharacterState",
     run_outcome_branch: Callable[[OutcomeBranch], Awaitable[AdventureOutcome]],
 ) -> AdventureOutcome:
     """Evaluate the step's condition against the player and branch accordingly.

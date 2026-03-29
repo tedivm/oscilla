@@ -539,6 +539,48 @@ oscilla --help
 python -m oscilla.cli --help
 ```
 
+## Game Command
+
+The `game` command launches the interactive text adventure TUI:
+
+```bash
+oscilla game
+```
+
+### Character Name Option
+
+```bash
+oscilla game --character-name "Aria"
+oscilla game -c "Aria"
+```
+
+When `--character-name` is supplied:
+
+- If a character with that name already exists for the current user, it is loaded directly.
+- If no match is found, a new character is created with that name immediately — no interactive prompt.
+
+When omitted, the character selection flow depends on how many characters the user has:
+
+| Characters | Behavior |
+|---|---|
+| 0 | Prompts for a name and creates a new character |
+| 1 | Auto-loads the only character |
+| N | Presents a numbered menu (newest first) with a "New Character" option |
+
+### User Identity
+
+The TUI derives a stable user key from the operating system environment — no login is required:
+
+1. Uses the `USER` environment variable if set.
+2. Falls back to `LOGNAME` if available.
+3. Falls back to `"unknown-user"` if neither is set.
+
+The key is stored in the `users` table under `user_key`. All characters belong to this user record. Multiple characters per user are supported.
+
+### Session Locking
+
+Each `game` invocation acquires a soft-lock on the active `character_iterations` row. The lock is released automatically when the TUI exits. If a previous session crashed without releasing its lock, the next session detects the stale token, logs a WARNING, clears any orphaned adventure state, and takes over the lock.
+
 ## References
 
 - [Typer Documentation](https://typer.tiangolo.com/)

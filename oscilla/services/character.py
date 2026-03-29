@@ -1,0 +1,716 @@
+from datetime import datetime, timezone
+from logging import getLogger
+from typing import TYPE_CHECKING, Any, Dict, List, Literal
+from uuid import UUID
+
+from sqlalchemy import and_, func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from oscilla.models.character import CharacterRecord
+from oscilla.models.character_iteration import (
+    CharacterIterationEquipment,
+    CharacterIterationInventory,
+    CharacterIterationMilestone,
+    CharacterIterationQuest,
+    CharacterIterationRecord,
+    CharacterIterationStatistic,
+    CharacterIterationStatValue,
+)
+
+if TYPE_CHECKING:
+    from oscilla.engine.character import CharacterState
+    from oscilla.engine.models.character_config import CharacterConfigManifest
+    from oscilla.engine.registry import ContentRegistry
+
+logger = getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Initial character creation and loading
+# ---------------------------------------------------------------------------
+
+
+async def save_character(session: AsyncSession, state: "CharacterState", user_id: UUID) -> None:
+    """INSERT a brand-new character — initial creation only.
+
+    Creates one CharacterRecord, one CharacterIterationRecord at iteration = 0,
+    and seeds all child rows (stat_values, inventory, equipment, milestones,
+    quests, statistics) from the state's current values.
+
+    Call this exactly once per character.  All subsequent state changes go
+    through the targeted update functions below.
+
+    Raises IntegrityError if state.character_id already exists in the DB.
+    """
+    character = CharacterRecord(
+        id=state.character_id,
+        user_id=user_id,
+        name=state.name,
+    )
+    session.add(character)
+
+    iteration = CharacterIterationRecord(
+        character_id=state.character_id,
+        iteration=state.iteration,
+        is_active=True,
+        level=state.level,
+        xp=state.xp,
+        hp=state.hp,
+        max_hp=state.max_hp,
+        character_class=state.character_class,
+        current_location=state.current_location,
+        adventure_ref=state.active_adventure.adventure_ref if state.active_adventure else None,
+        adventure_step_index=state.active_adventure.step_index if state.active_adventure else None,
+        adventure_step_state=state.active_adventure.step_state if state.active_adventure else None,
+    )
+    session.add(iteration)
+    await session.flush()  # populate iteration.id before adding children
+
+    # Seed child rows from state
+    for stat_name, stat_value in state.stats.items():
+        session.add(
+            CharacterIterationStatValue(
+                iteration_id=iteration.id,
+                stat_name=stat_name,
+                stat_value=float(stat_value) if stat_value is not None else None,
+            )
+        )
+    for item_ref, quantity in state.inventory.items():
+        session.add(
+            CharacterIterationInventory(
+                iteration_id=iteration.id,
+                item_ref=item_ref,
+                quantity=quantity,
+            )
+        )
+    for slot, item_ref in state.equipment.items():
+        session.add(
+            CharacterIterationEquipment(
+                iteration_id=iteration.id,
+                slot=slot,
+                item_ref=item_ref,
+            )
+        )
+    for milestone_ref in state.milestones:
+        session.add(CharacterIterationMilestone(iteration_id=iteration.id, milestone_ref=milestone_ref))
+    for quest_ref, stage in state.active_quests.items():
+        session.add(
+            CharacterIterationQuest(
+                iteration_id=iteration.id,
+                quest_ref=quest_ref,
+                status="active",
+                stage=stage,
+            )
+        )
+    for quest_ref in state.completed_quests:
+        session.add(
+            CharacterIterationQuest(
+                iteration_id=iteration.id,
+                quest_ref=quest_ref,
+                status="completed",
+                stage=None,
+            )
+        )
+    for entity_ref, count in state.statistics.enemies_defeated.items():
+        session.add(
+            CharacterIterationStatistic(
+                iteration_id=iteration.id,
+                stat_type="enemies_defeated",
+                entity_ref=entity_ref,
+                count=count,
+            )
+        )
+    for entity_ref, count in state.statistics.locations_visited.items():
+        session.add(
+            CharacterIterationStatistic(
+                iteration_id=iteration.id,
+                stat_type="locations_visited",
+                entity_ref=entity_ref,
+                count=count,
+            )
+        )
+    for entity_ref, count in state.statistics.adventures_completed.items():
+        session.add(
+            CharacterIterationStatistic(
+                iteration_id=iteration.id,
+                stat_type="adventures_completed",
+                entity_ref=entity_ref,
+                count=count,
+            )
+        )
+
+    await session.commit()
+
+
+async def load_character(
+    session: AsyncSession,
+    character_id: UUID,
+    character_config: "CharacterConfigManifest",
+    registry: "ContentRegistry | None" = None,
+) -> "CharacterState | None":
+    """Load the active iteration and reconstruct a CharacterState.
+
+    Selects CharacterIterationRecord WHERE is_active = TRUE, then eagerly
+    loads all six child table relationships using selectinload to avoid N+1
+    queries.  Delegates content-drift resolution to CharacterState.from_dict().
+
+    Returns None if no CharacterRecord exists with the given id.
+    """
+    from oscilla.engine.character import CharacterState
+
+    # Verify the character exists
+    char_stmt = select(CharacterRecord).where(and_(CharacterRecord.id == character_id))
+    char_result = await session.execute(char_stmt)
+    character = char_result.scalar_one_or_none()
+    if character is None:
+        return None
+
+    # Load the active iteration with all child relationships
+    iter_stmt = (
+        select(CharacterIterationRecord)
+        .where(
+            and_(
+                CharacterIterationRecord.character_id == character_id,
+                CharacterIterationRecord.is_active == True,  # noqa: E712
+            )
+        )
+        .options(
+            selectinload(CharacterIterationRecord.stat_values),
+            selectinload(CharacterIterationRecord.inventory_rows),
+            selectinload(CharacterIterationRecord.equipment_rows),
+            selectinload(CharacterIterationRecord.milestone_rows),
+            selectinload(CharacterIterationRecord.quest_rows),
+            selectinload(CharacterIterationRecord.statistic_rows),
+        )
+    )
+    iter_result = await session.execute(iter_stmt)
+    iteration = iter_result.scalar_one_or_none()
+    if iteration is None:
+        logger.warning("No active iteration found for character_id=%s", character_id)
+        return None
+
+    # Build a dict matching to_dict() output from ORM rows
+    active_adventure = None
+    if iteration.adventure_ref is not None and iteration.adventure_step_index is not None:
+        active_adventure = {
+            "adventure_ref": iteration.adventure_ref,
+            "step_index": iteration.adventure_step_index,
+            "step_state": iteration.adventure_step_state or {},
+        }
+
+    stats: Dict[str, Any] = {row.stat_name: row.stat_value for row in iteration.stat_values}
+    inventory: Dict[str, int] = {row.item_ref: row.quantity for row in iteration.inventory_rows}
+    equipment: Dict[str, str] = {row.slot: row.item_ref for row in iteration.equipment_rows}
+    milestones: List[str] = [row.milestone_ref for row in iteration.milestone_rows]
+    active_quests: Dict[str, str] = {
+        row.quest_ref: row.stage or "" for row in iteration.quest_rows if row.status == "active"
+    }
+    completed_quests: List[str] = [row.quest_ref for row in iteration.quest_rows if row.status == "completed"]
+
+    enemies_defeated: Dict[str, int] = {}
+    locations_visited: Dict[str, int] = {}
+    adventures_completed: Dict[str, int] = {}
+    for stat_row in iteration.statistic_rows:
+        if stat_row.stat_type == "enemies_defeated":
+            enemies_defeated[stat_row.entity_ref] = stat_row.count
+        elif stat_row.stat_type == "locations_visited":
+            locations_visited[stat_row.entity_ref] = stat_row.count
+        elif stat_row.stat_type == "adventures_completed":
+            adventures_completed[stat_row.entity_ref] = stat_row.count
+
+    data: Dict[str, Any] = {
+        "character_id": str(character_id),
+        "iteration": iteration.iteration,
+        "name": character.name,
+        "character_class": iteration.character_class,
+        "level": iteration.level,
+        "xp": iteration.xp,
+        "hp": iteration.hp,
+        "max_hp": iteration.max_hp,
+        "current_location": iteration.current_location,
+        "milestones": milestones,
+        "inventory": inventory,
+        "equipment": equipment,
+        "active_quests": active_quests,
+        "completed_quests": completed_quests,
+        "stats": stats,
+        "statistics": {
+            "enemies_defeated": enemies_defeated,
+            "locations_visited": locations_visited,
+            "adventures_completed": adventures_completed,
+        },
+        "active_adventure": active_adventure,
+    }
+
+    return CharacterState.from_dict(data=data, character_config=character_config, registry=registry)
+
+
+async def list_characters_for_user(
+    session: AsyncSession,
+    user_id: UUID,
+) -> List[CharacterRecord]:
+    """Return all CharacterRecords belonging to user_id, ordered by updated_at DESC."""
+    stmt = (
+        select(CharacterRecord)
+        .where(and_(CharacterRecord.user_id == user_id))
+        .order_by(CharacterRecord.updated_at.desc())
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def delete_user_characters(session: AsyncSession, user_id: UUID) -> int:
+    """Delete all characters and every iteration row (plus child rows) for a user.
+
+    Loads each iteration with its six child table relationships so that
+    SQLAlchemy's ORM cascade ("all, delete-orphan") removes the child rows
+    before deleting the iteration itself.  Then deletes the character row.
+
+    Returns the number of character records deleted.
+    """
+    char_stmt = select(CharacterRecord).where(and_(CharacterRecord.user_id == user_id))
+    char_result = await session.execute(char_stmt)
+    characters = list(char_result.scalars().all())
+
+    for character in characters:
+        iter_stmt = (
+            select(CharacterIterationRecord)
+            .where(and_(CharacterIterationRecord.character_id == character.id))
+            .options(
+                selectinload(CharacterIterationRecord.stat_values),
+                selectinload(CharacterIterationRecord.inventory_rows),
+                selectinload(CharacterIterationRecord.equipment_rows),
+                selectinload(CharacterIterationRecord.milestone_rows),
+                selectinload(CharacterIterationRecord.quest_rows),
+                selectinload(CharacterIterationRecord.statistic_rows),
+            )
+        )
+        iter_result = await session.execute(iter_stmt)
+        for iteration in iter_result.scalars().all():
+            await session.delete(iteration)
+        await session.delete(character)
+
+    await session.commit()
+    return len(characters)
+
+
+async def get_character_by_name(
+    session: AsyncSession,
+    user_id: UUID,
+    name: str,
+) -> "CharacterRecord | None":
+    """Return the CharacterRecord with the given name for user_id, or None."""
+    stmt = select(CharacterRecord).where(and_(CharacterRecord.user_id == user_id, CharacterRecord.name == name))
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def prestige_character(
+    session: AsyncSession,
+    character_id: UUID,
+    character_config: "CharacterConfigManifest",
+) -> CharacterIterationRecord:
+    """Close the active iteration and open a new one.
+
+    Steps:
+    1. SELECT the iteration WHERE character_id = X AND is_active = TRUE.
+    2. SET is_active = FALSE, completed_at = now() on that row.
+    3. COUNT existing character_iterations for character_id to derive the new ordinal.
+    4. INSERT a new CharacterIterationRecord with iteration = count,
+       is_active = TRUE, completed_at = NULL, and all child rows seeded from character_config defaults.
+
+    Returns the newly inserted CharacterIterationRecord.
+    """
+    # 1. Find the active iteration
+    active_stmt = select(CharacterIterationRecord).where(
+        and_(
+            CharacterIterationRecord.character_id == character_id,
+            CharacterIterationRecord.is_active == True,  # noqa: E712
+        )
+    )
+    active_result = await session.execute(active_stmt)
+    active_iteration = active_result.scalar_one()
+
+    # 2. Close it
+    active_iteration.is_active = False
+    active_iteration.completed_at = datetime.now(tz=timezone.utc)
+
+    # 3. Derive the new ordinal
+    count_stmt = select(func.count()).where(and_(CharacterIterationRecord.character_id == character_id))
+    count_result = await session.execute(count_stmt)
+    new_ordinal = count_result.scalar_one()
+
+    # 4. Create the new iteration with fresh defaults from character_config
+    all_stats = character_config.spec.public_stats + character_config.spec.hidden_stats
+    base_hp = 10  # default; caller should use GameManifest.spec.hp_formula.base_hp for the real value
+
+    new_iteration = CharacterIterationRecord(
+        character_id=character_id,
+        iteration=new_ordinal,
+        is_active=True,
+        level=1,
+        xp=0,
+        hp=base_hp,
+        max_hp=base_hp,
+    )
+    session.add(new_iteration)
+    await session.flush()
+
+    for stat_def in all_stats:
+        raw_value = stat_def.default
+        session.add(
+            CharacterIterationStatValue(
+                iteration_id=new_iteration.id,
+                stat_name=stat_def.name,
+                stat_value=float(raw_value) if raw_value is not None else None,
+            )
+        )
+
+    # Update the character's updated_at timestamp
+    await touch_character_updated_at(session=session, character_id=character_id)
+    await session.commit()
+    return new_iteration
+
+
+async def load_all_iterations(
+    session: AsyncSession,
+    character_id: UUID,
+) -> List[CharacterIterationRecord]:
+    """Return all iteration rows for character_id ordered by iteration ASC.
+
+    Includes both completed runs (non-null completed_at) and the active run.
+    """
+    stmt = (
+        select(CharacterIterationRecord)
+        .where(and_(CharacterIterationRecord.character_id == character_id))
+        .order_by(CharacterIterationRecord.iteration.asc())
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def get_active_iteration_id(
+    session: AsyncSession,
+    character_id: UUID,
+) -> UUID | None:
+    """Return the UUID of the active character_iterations row, or None.
+
+    Used by GameSession to obtain iteration_id after load_character()
+    without repeating the full iteration query.
+    """
+    stmt = select(CharacterIterationRecord.id).where(
+        and_(
+            CharacterIterationRecord.character_id == character_id,
+            CharacterIterationRecord.is_active == True,  # noqa: E712
+        )
+    )
+    result = await session.execute(stmt)
+    row = result.scalar_one_or_none()
+    return row if row is None else UUID(str(row))
+
+
+# ---------------------------------------------------------------------------
+# Session soft-lock functions (see design D11)
+# ---------------------------------------------------------------------------
+
+
+async def acquire_session_lock(
+    session: AsyncSession,
+    iteration_id: UUID,
+    token: str,
+) -> None:
+    """Acquire the session soft-lock on the active iteration row.
+
+    Always succeeds — a new session is never blocked.
+
+    Decision tree:
+      - session_token is NULL     → lock is free; take it.
+      - session_token is non-NULL → previous process died without releasing.
+          Log WARNING naming the old token, clear adventure state, take the lock.
+    """
+    stmt = select(CharacterIterationRecord).where(and_(CharacterIterationRecord.id == iteration_id))
+    result = await session.execute(stmt)
+    iteration = result.scalar_one()
+
+    if iteration.session_token is not None:
+        logger.warning(
+            "Stealing session lock from prior token %r on iteration %s — "
+            "previous process likely died without releasing the lock.",
+            iteration.session_token,
+            iteration_id,
+        )
+        # Clear orphaned adventure state — prevents double-applying outcome effects
+        # that may have been partially written before the process died.
+        iteration.adventure_ref = None
+        iteration.adventure_step_index = None
+        iteration.adventure_step_state = None
+
+    iteration.session_token = token
+    await session.commit()
+
+
+async def release_session_lock(
+    session: AsyncSession,
+    iteration_id: UUID,
+    token: str,
+) -> None:
+    """Clear session_token on the iteration row.
+
+    Only clears the lock if session_token still matches token, so a release
+    from a zombie process after a new session has taken over is harmless.
+    """
+    # Use a raw UPDATE so this operation does not touch version_id_col.
+    stmt = (
+        update(CharacterIterationRecord)
+        .where(
+            and_(
+                CharacterIterationRecord.id == iteration_id,
+                CharacterIterationRecord.session_token == token,
+            )
+        )
+        .values(session_token=None)
+        .execution_options(synchronize_session="fetch")
+    )
+    await session.execute(stmt)
+    await session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Targeted update functions
+# ---------------------------------------------------------------------------
+
+
+async def update_scalar_fields(
+    session: AsyncSession,
+    iteration_id: UUID,
+    fields: Dict[str, Any],
+) -> None:
+    """Update named scalar columns on the character_iterations row.
+
+    Only keys present in fields are written; omitted columns are unchanged.
+    Adventure fields go through save_adventure_progress() instead.
+
+    Updating the ORM object triggers the version_id_col increment automatically,
+    so StaleDataError detection continues to work correctly.
+    """
+    stmt = select(CharacterIterationRecord).where(and_(CharacterIterationRecord.id == iteration_id))
+    result = await session.execute(stmt)
+    iteration = result.scalar_one()
+    for key, value in fields.items():
+        setattr(iteration, key, value)
+    await session.commit()
+
+
+async def touch_character_updated_at(session: AsyncSession, character_id: UUID) -> None:
+    """Refresh characters.updated_at without clearing other fields.
+
+    Called at adventure_end and on prestige so list_characters_for_user()
+    shows the most-recently-played character first.
+    """
+    stmt = (
+        update(CharacterRecord)
+        .where(and_(CharacterRecord.id == character_id))
+        .values(updated_at=datetime.now(tz=timezone.utc))
+        .execution_options(synchronize_session="fetch")
+    )
+    await session.execute(stmt)
+    # Caller is responsible for commit
+
+
+async def set_stat(
+    session: AsyncSession,
+    iteration_id: UUID,
+    stat_name: str,
+    value: int | float | None,
+) -> None:
+    """Upsert one row in character_iteration_stat_values.
+
+    value is stored directly as a REAL column; NULL is used for stats
+    whose value is explicitly unset.
+    """
+    merged = await session.merge(
+        CharacterIterationStatValue(
+            iteration_id=iteration_id,
+            stat_name=stat_name,
+            stat_value=float(value) if value is not None else None,
+        )
+    )
+    await session.commit()
+    logger.debug("set_stat: %s=%s on iteration %s (merged=%s)", stat_name, value, iteration_id, merged)
+
+
+async def set_inventory_item(
+    session: AsyncSession,
+    iteration_id: UUID,
+    item_ref: str,
+    quantity: int,
+) -> None:
+    """Upsert (quantity > 0) or delete (quantity == 0) one inventory row."""
+    if quantity == 0:
+        stmt = select(CharacterIterationInventory).where(
+            and_(
+                CharacterIterationInventory.iteration_id == iteration_id,
+                CharacterIterationInventory.item_ref == item_ref,
+            )
+        )
+        result = await session.execute(stmt)
+        existing = result.scalar_one_or_none()
+        if existing is not None:
+            await session.delete(existing)
+    else:
+        await session.merge(
+            CharacterIterationInventory(
+                iteration_id=iteration_id,
+                item_ref=item_ref,
+                quantity=quantity,
+            )
+        )
+    await session.commit()
+
+
+async def equip_item(
+    session: AsyncSession,
+    iteration_id: UUID,
+    slot: str,
+    item_ref: str,
+) -> None:
+    """Upsert one character_iteration_equipment row (insert or replace slot)."""
+    await session.merge(
+        CharacterIterationEquipment(
+            iteration_id=iteration_id,
+            slot=slot,
+            item_ref=item_ref,
+        )
+    )
+    await session.commit()
+
+
+async def unequip_item(
+    session: AsyncSession,
+    iteration_id: UUID,
+    slot: str,
+) -> None:
+    """Delete the character_iteration_equipment row for slot, if it exists."""
+    stmt = select(CharacterIterationEquipment).where(
+        and_(
+            CharacterIterationEquipment.iteration_id == iteration_id,
+            CharacterIterationEquipment.slot == slot,
+        )
+    )
+    result = await session.execute(stmt)
+    existing = result.scalar_one_or_none()
+    if existing is not None:
+        await session.delete(existing)
+        await session.commit()
+
+
+async def add_milestone(
+    session: AsyncSession,
+    iteration_id: UUID,
+    milestone_ref: str,
+) -> None:
+    """Insert one character_iteration_milestones row.
+
+    Idempotent — uses merge() so calling this twice for the same milestone_ref
+    is safe.
+    """
+    await session.merge(
+        CharacterIterationMilestone(
+            iteration_id=iteration_id,
+            milestone_ref=milestone_ref,
+        )
+    )
+    await session.commit()
+
+
+async def set_quest(
+    session: AsyncSession,
+    iteration_id: UUID,
+    quest_ref: str,
+    status: Literal["active", "completed"],
+    stage: "str | None" = None,
+) -> None:
+    """Upsert one character_iteration_quests row.
+
+    status must be "active" or "completed".  stage should be None for completed quests.
+    """
+    await session.merge(
+        CharacterIterationQuest(
+            iteration_id=iteration_id,
+            quest_ref=quest_ref,
+            status=status,
+            stage=stage,
+        )
+    )
+    await session.commit()
+
+
+async def increment_statistic(
+    session: AsyncSession,
+    iteration_id: UUID,
+    stat_type: Literal["enemies_defeated", "locations_visited", "adventures_completed"],
+    entity_ref: str,
+    delta: int = 1,
+) -> None:
+    """Upsert-increment one character_iteration_statistics row.
+
+    If the row doesn't exist it is created with count = delta.
+    If it exists, count is incremented by delta.
+    """
+    stmt = select(CharacterIterationStatistic).where(
+        and_(
+            CharacterIterationStatistic.iteration_id == iteration_id,
+            CharacterIterationStatistic.stat_type == stat_type,
+            CharacterIterationStatistic.entity_ref == entity_ref,
+        )
+    )
+    result = await session.execute(stmt)
+    existing = result.scalar_one_or_none()
+    if existing is None:
+        session.add(
+            CharacterIterationStatistic(
+                iteration_id=iteration_id,
+                stat_type=stat_type,
+                entity_ref=entity_ref,
+                count=delta,
+            )
+        )
+    else:
+        existing.count += delta
+    await session.commit()
+
+
+async def save_adventure_progress(
+    session: AsyncSession,
+    iteration_id: UUID,
+    adventure_ref: "str | None",
+    step_index: "int | None",
+    step_state: "Dict[str, Any] | None",
+) -> None:
+    """Update the three adventure columns on character_iterations.
+
+    This is the ONLY service function that writes adventure_step_state (JSON).
+    Pass all three as None to clear the active adventure at adventure_end.
+
+    Called by GameSession._on_state_change() on:
+      "step_start"    — adventure_ref and step_index advance; step_state is {}.
+      "combat_round"  — step_state is updated with round scratch values.
+      "adventure_end" — all three set to NULL.
+    """
+    # Use a raw UPDATE to avoid triggering version_id_col increment on every
+    # combat round — adventure progress writes are high-frequency and should not
+    # count as character state mutations for optimistic locking purposes.
+    # Only update_scalar_fields() touches player-visible stats and triggers versioning.
+    stmt = (
+        update(CharacterIterationRecord)
+        .where(and_(CharacterIterationRecord.id == iteration_id))
+        .values(
+            adventure_ref=adventure_ref,
+            adventure_step_index=step_index,
+            adventure_step_state=step_state,
+        )
+        .execution_options(synchronize_session="fetch")
+    )
+    await session.execute(stmt)
+    await session.commit()

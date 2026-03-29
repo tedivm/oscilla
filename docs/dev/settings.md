@@ -670,6 +670,47 @@ LOG_LEVEL="INFO"
 API_KEY="${SECRET_API_KEY}"  # Loaded from secure vault
 ```
 
+## Database Settings
+
+Database configuration for both the TUI and web contexts is managed by `DatabaseSettings` in `oscilla/conf/db.py`.
+
+### Auto-Derived SQLite URL
+
+When `DATABASE_URL` is not set explicitly, `DatabaseSettings` automatically computes a SQLite path adjacent to the loaded content package:
+
+```
+sqlite+aiosqlite:///<content_path.parent>/saves.db
+```
+
+For example, if `content_path` is `/home/user/my-game/content`, the database file will be created at `/home/user/my-game/saves.db`.
+
+This means a standalone TUI installation requires no database configuration at all — character data is saved next to the content it was created with.
+
+### DATABASE_URL Override
+
+Set `DATABASE_URL` in your `.env` file (or shell environment) to use any supported database. The auto-derive logic is skipped whenever this variable is present:
+
+```bash
+# SQLite — explicit path
+DATABASE_URL="sqlite+aiosqlite:////home/user/custom-location/game.db"
+
+# PostgreSQL — for production or multi-user web deployments
+DATABASE_URL="postgresql+asyncpg://user:password@localhost:5432/oscilla"
+```
+
+### TUI vs Web Configuration
+
+| Context | Typical setup |
+|---|---|
+| **TUI (standalone game)** | Leave `DATABASE_URL` unset; SQLite file is auto-derived from `content_path`. |
+| **Web (FastAPI server)** | Set `DATABASE_URL` to a PostgreSQL URL via environment variable or Docker secret. |
+
+Both contexts share the same `DatabaseSettings` class and migration path, so schema changes apply identically regardless of the backend.
+
+### WAL Mode (SQLite only)
+
+When the engine connects to a SQLite database, it enables WAL (Write-Ahead Logging) mode via a `connect` event listener. WAL mode significantly improves concurrent read performance and is important when both the TUI and a background process (e.g., a web API serving character data) access the same file.
+
 ## References
 
 - [Pydantic Settings Documentation](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)

@@ -8,12 +8,12 @@ from oscilla.engine.models.adventure import Effect, NarrativeStep
 from oscilla.engine.pipeline import AdventureOutcome, TUICallbacks
 
 if TYPE_CHECKING:
-    from oscilla.engine.player import PlayerState
+    from oscilla.engine.character import CharacterState
 
 
 async def run_narrative(
     step: NarrativeStep,
-    player: "PlayerState",
+    player: "CharacterState",
     tui: TUICallbacks,
     run_effects: Callable[[List[Effect]], Awaitable[None]],
 ) -> AdventureOutcome:

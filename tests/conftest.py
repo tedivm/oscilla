@@ -5,9 +5,28 @@ import pytest_asyncio
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+# Import all ORM models so that Base.metadata.create_all() sees every table.
+import oscilla.models  # noqa: F401
 from oscilla.models.base import Base
 from oscilla.services.db import get_session_depends, test_data
 from oscilla.www import app
+
+
+@pytest_asyncio.fixture
+async def async_session() -> AsyncGenerator[AsyncSession, None]:
+    """Provides an AsyncSession backed by a fresh in-memory SQLite database.
+
+    All ORM tables are created before each test and disposed afterwards.
+    Use this fixture for service-layer unit tests that need a DB but should
+    not touch the filesystem or real migrations.
+    """
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True, echo=False)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with session_maker() as session:
+        yield session
+    await engine.dispose()
 
 
 @pytest_asyncio.fixture

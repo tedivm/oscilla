@@ -162,3 +162,5 @@ cython_debug/
 
 # scm-version file
 oscilla/_version.py
+
+*.db

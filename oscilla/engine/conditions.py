@@ -22,12 +22,12 @@ from oscilla.engine.models.base import (
 )
 
 if TYPE_CHECKING:
-    from oscilla.engine.player import PlayerState
+    from oscilla.engine.character import CharacterState
 
 logger = getLogger(__name__)
 
 
-def evaluate(condition: Condition | None, player: "PlayerState") -> bool:
+def evaluate(condition: Condition | None, player: "CharacterState") -> bool:
     """Evaluate a condition tree against the given player state.
 
     Returns True if condition is None (no gate) or every node evaluates to True.
@@ -55,7 +55,7 @@ def evaluate(condition: Condition | None, player: "PlayerState") -> bool:
             # No-op in v1: class mechanics are a placeholder; every class always passes.
             return True
         case PrestigeCountCondition() as c:
-            return _numeric_compare(player.prestige_count, c)
+            return _numeric_compare(player.iteration, c)
 
         # --- CharacterConfig stat leaves ---
         case CharacterStatCondition(name=n) as c:

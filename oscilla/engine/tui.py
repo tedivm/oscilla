@@ -25,7 +25,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Footer, Input, OptionList, RichLog, Static
 
 if TYPE_CHECKING:
-    from oscilla.engine.player import PlayerState
+    from oscilla.engine.character import CharacterState
     from oscilla.engine.registry import ContentRegistry
 
 logger = getLogger(__name__)
@@ -107,7 +107,7 @@ class ChoiceMenu(OptionList):
 class StatusPanel(Static):
     """Right-panel widget displaying live player stats.
 
-    refresh_player() re-renders the panel from a PlayerState snapshot.
+    refresh_player() re-renders the panel from a CharacterState snapshot.
     Only stats declared in public_stats of CharacterConfig are shown;
     hidden stats are never displayed.
     """
@@ -128,8 +128,8 @@ class StatusPanel(Static):
     def set_registry(self, registry: ContentRegistry) -> None:
         self._registry = registry
 
-    def refresh_player(self, player: PlayerState) -> None:
-        """Re-render the status panel from the current PlayerState."""
+    def refresh_player(self, player: CharacterState) -> None:
+        """Re-render the status panel from the current CharacterState."""
         if self._registry is None:
             self.update("(status unavailable)")
             return
@@ -268,9 +268,10 @@ class OscillaApp(App[None]):
         Binding("question_mark", "toggle_help", "Help", show=True),
     ]
 
-    def __init__(self, registry: ContentRegistry) -> None:
+    def __init__(self, registry: ContentRegistry, character_name: str | None = None) -> None:
         super().__init__()
         self._content_registry = registry
+        self._character_name = character_name
         self._name_event: asyncio.Event | None = None
         self._player_name: str = ""
 
@@ -324,10 +325,10 @@ class OscillaApp(App[None]):
 
     @work(exclusive=True)
     async def _game_loop(self) -> None:
-        """Drive the full game session — region/location selection and pipeline."""
+        """Drive the full game session — character setup, region/location selection, and pipeline."""
         from oscilla.engine.conditions import evaluate
-        from oscilla.engine.pipeline import AdventurePipeline
-        from oscilla.engine.player import PlayerState
+        from oscilla.engine.session import GameSession
+        from oscilla.services.db import get_session
 
         registry = self._content_registry
 
@@ -335,86 +336,104 @@ class OscillaApp(App[None]):
             self.query_one(NarrativeLog).append_text("[red]Error: content not loaded properly.[/red]")
             return
 
-        # ── Character setup ──────────────────────────────────────────────────
-        name = await self._prompt_name()
-        player = PlayerState.new_player(
-            name=name,
-            game_manifest=registry.game,
-            character_config=registry.character_config,
-        )
-
         status_panel = self.query_one(StatusPanel)
         status_panel.set_registry(registry)
-        status_panel.refresh_player(player)
 
         tui = TextualTUI(self)
 
-        # ── Main adventure loop ──────────────────────────────────────────────
-        while True:
-            # Region selection
-            accessible_regions = [
-                region for region in registry.regions.all() if evaluate(region.spec.effective_unlock, player)
-            ]
-            if not accessible_regions:
-                self.query_one(NarrativeLog).append_text(
-                    "[red]Error: no accessible regions found.[/red] Ensure your root region has no unlock condition."
-                )
-                break
+        # Track whether the player explicitly quit so self.exit() is called only
+        # after both async-with blocks have exited cleanly.  Calling self.exit()
+        # inside the context managers can cause Textual to cancel the worker
+        # before SQLAlchemy's connection-pool rollback completes, producing a
+        # spurious CancelledError on shutdown.
+        user_quit = False
 
-            region_options = [r.spec.displayName for r in accessible_regions] + ["Quit"]
-            region_choice = await tui.show_menu("Where would you like to go?", region_options)
-            if region_choice == len(region_options):
-                self.query_one(NarrativeLog).append_text("\n[bold]Goodbye![/bold]")
-                self.exit()
-                return
-
-            region_ref = accessible_regions[region_choice - 1].metadata.name
-            region = registry.regions.require(region_ref, "Region")
-            self.query_one(RegionPanel).set_region(
-                name=region.spec.displayName,
-                description=region.spec.description,
-            )
-
-            # Location selection — inner loop keeps player in region after adventures
-            while True:
-                accessible_locs = [
-                    loc
-                    for loc in registry.locations.all()
-                    if loc.spec.region == region_ref and evaluate(loc.spec.effective_unlock, player)
-                ]
-
-                if not accessible_locs:
-                    await tui.show_text(f"There are no accessible locations in {region.spec.displayName} yet.")
-                    break
-
-                loc_options = [loc.spec.displayName for loc in accessible_locs] + ["Back"]
-                loc_choice = await tui.show_menu("Location:", loc_options)
-                if loc_choice == len(loc_options):
-                    # Player chose Back → return to region selection
-                    break
-
-                location_ref = accessible_locs[loc_choice - 1].metadata.name
-                location = registry.locations.require(location_ref, "Location")
-
-                # Adventure selection (weighted random from eligible pool)
-                eligible = [entry for entry in location.spec.adventures if evaluate(entry.requires, player)]
-                if not eligible:
-                    await tui.show_text("No adventures are available here right now.")
-                    continue
-
-                weights = [entry.weight for entry in eligible]
-                (chosen_entry,) = random.choices(population=eligible, weights=weights, k=1)
-                adventure_ref = chosen_entry.ref
-
-                player.statistics.record_location_visited(location_ref)
-
-                pipeline = AdventurePipeline(registry=registry, player=player, tui=tui)
-                outcome = await pipeline.run(adventure_ref)
-
-                message = _OUTCOME_MESSAGES.get(outcome.value, f"Adventure ended: {outcome.value}")
-                await tui.show_text(message)
+        async with get_session() as db_session:
+            async with GameSession(
+                registry=registry,
+                tui=tui,
+                db_session=db_session,
+                character_name=self._character_name,
+            ) as session:
+                await session.start()
+                player = session._character
+                if player is None:
+                    self.query_one(NarrativeLog).append_text("[red]Error: character setup failed.[/red]")
+                    return
 
                 status_panel.refresh_player(player)
+
+                # ── Main adventure loop ──────────────────────────────────────
+                while True:
+                    # Region selection
+                    accessible_regions = [
+                        region for region in registry.regions.all() if evaluate(region.spec.effective_unlock, player)
+                    ]
+                    if not accessible_regions:
+                        self.query_one(NarrativeLog).append_text(
+                            "[red]Error: no accessible regions found.[/red] "
+                            "Ensure your root region has no unlock condition."
+                        )
+                        break
+
+                    region_options = [r.spec.displayName for r in accessible_regions] + ["Quit"]
+                    region_choice = await tui.show_menu("Where would you like to go?", region_options)
+                    if region_choice == len(region_options):
+                        self.query_one(NarrativeLog).append_text("\n[bold]Goodbye![/bold]")
+                        user_quit = True
+                        break
+
+                    region_ref = accessible_regions[region_choice - 1].metadata.name
+                    region = registry.regions.require(region_ref, "Region")
+                    self.query_one(RegionPanel).set_region(
+                        name=region.spec.displayName,
+                        description=region.spec.description,
+                    )
+
+                    # Location selection — inner loop keeps player in region after adventures
+                    while True:
+                        accessible_locs = [
+                            loc
+                            for loc in registry.locations.all()
+                            if loc.spec.region == region_ref and evaluate(loc.spec.effective_unlock, player)
+                        ]
+
+                        if not accessible_locs:
+                            await tui.show_text(f"There are no accessible locations in {region.spec.displayName} yet.")
+                            break
+
+                        loc_options = [loc.spec.displayName for loc in accessible_locs] + ["Back"]
+                        loc_choice = await tui.show_menu("Location:", loc_options)
+                        if loc_choice == len(loc_options):
+                            # Player chose Back → return to region selection
+                            break
+
+                        location_ref = accessible_locs[loc_choice - 1].metadata.name
+                        location = registry.locations.require(location_ref, "Location")
+
+                        # Adventure selection (weighted random from eligible pool)
+                        eligible = [entry for entry in location.spec.adventures if evaluate(entry.requires, player)]
+                        if not eligible:
+                            await tui.show_text("No adventures are available here right now.")
+                            continue
+
+                        weights = [entry.weight for entry in eligible]
+                        (chosen_entry,) = random.choices(population=eligible, weights=weights, k=1)
+                        adventure_ref = chosen_entry.ref
+
+                        player.statistics.record_location_visited(location_ref)
+
+                        outcome = await session.run_adventure(adventure_ref)
+
+                        message = _OUTCOME_MESSAGES.get(outcome.value, f"Adventure ended: {outcome.value}")
+                        await tui.show_text(message)
+
+                        status_panel.refresh_player(player)
+
+        # Both async-with blocks have now exited and their cleanup (session
+        # commit/rollback, connection-pool reset) has completed successfully.
+        if user_quit:
+            self.exit()
 
 
 # ─── TextualTUI protocol implementation ──────────────────────────────────────
@@ -467,3 +486,12 @@ class TextualTUI:
     async def wait_for_ack(self) -> None:
         """Show a Continue option in the choice widget and wait for confirmation."""
         await self._app.query_one(ChoiceMenu).wait_for_selection(["▶  Press Enter to continue"])
+
+    async def input_text(self, prompt: str) -> str:
+        """Show the prompt in the narrative log then collect a single-line text response.
+
+        Delegates to OscillaApp._prompt_name() which shows the Input widget
+        and waits for the player to type and press Enter.
+        """
+        await self.show_text(prompt)
+        return await self._app._prompt_name()

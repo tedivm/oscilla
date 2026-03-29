@@ -5,11 +5,11 @@ from __future__ import annotations
 from oscilla.engine.models.adventure import OutcomeBranch, StatCheckStep
 from oscilla.engine.models.base import CharacterStatCondition, LevelCondition, MilestoneCondition
 from oscilla.engine.pipeline import AdventureOutcome
-from oscilla.engine.player import PlayerState
+from oscilla.engine.character import CharacterState
 from oscilla.engine.steps.stat_check import run_stat_check
 
 
-async def test_stat_check_condition_passes(base_player: PlayerState) -> None:
+async def test_stat_check_condition_passes(base_player: CharacterState) -> None:
     """Test stat check when condition passes."""
     # Player is level 1, so level >= 1 should pass
     condition = LevelCondition(type="level", value=1)
@@ -32,7 +32,7 @@ async def test_stat_check_condition_passes(base_player: PlayerState) -> None:
     assert branch_calls[0] == on_pass
 
 
-async def test_stat_check_condition_fails(base_player: PlayerState) -> None:
+async def test_stat_check_condition_fails(base_player: CharacterState) -> None:
     """Test stat check when condition fails."""
     # Player is level 1, so level >= 5 should fail
     condition = LevelCondition(type="level", value=5)
@@ -55,7 +55,7 @@ async def test_stat_check_condition_fails(base_player: PlayerState) -> None:
     assert branch_calls[0] == on_fail
 
 
-async def test_stat_check_character_stat_condition(base_player: PlayerState) -> None:
+async def test_stat_check_character_stat_condition(base_player: CharacterState) -> None:
     """Test stat check with character stat condition."""
     # Base player has strength = 10
     condition = CharacterStatCondition(type="character_stat", name="strength", gte=10)
@@ -78,7 +78,7 @@ async def test_stat_check_character_stat_condition(base_player: PlayerState) -> 
     assert branch_calls[0] == on_pass
 
 
-async def test_stat_check_milestone_condition(base_player: PlayerState) -> None:
+async def test_stat_check_milestone_condition(base_player: CharacterState) -> None:
     """Test stat check with milestone condition."""
     # Grant a milestone to test against
     base_player.grant_milestone("test-milestone")
@@ -103,7 +103,7 @@ async def test_stat_check_milestone_condition(base_player: PlayerState) -> None:
     assert branch_calls[0] == on_pass
 
 
-async def test_stat_check_propagates_branch_outcome(base_player: PlayerState) -> None:
+async def test_stat_check_propagates_branch_outcome(base_player: CharacterState) -> None:
     """Test that stat check propagates the outcome from the branch."""
     condition = LevelCondition(type="level", value=1)  # Will pass
 
@@ -121,7 +121,7 @@ async def test_stat_check_propagates_branch_outcome(base_player: PlayerState) ->
     assert result == AdventureOutcome.FLED
 
 
-async def test_stat_check_fail_branch_outcome(base_player: PlayerState) -> None:
+async def test_stat_check_fail_branch_outcome(base_player: CharacterState) -> None:
     """Test stat check fail branch can return different outcomes."""
     condition = LevelCondition(type="level", value=10)  # Will fail
 

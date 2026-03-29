@@ -8,10 +8,10 @@ functions in oscilla/engine/steps/.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Dict, List, Protocol
+from typing import Dict, List, Literal, Protocol
 
+from oscilla.engine.character import AdventurePosition, CharacterState
 from oscilla.engine.models.adventure import Effect, OutcomeBranch, Step
-from oscilla.engine.player import AdventurePosition, PlayerState
 from oscilla.engine.registry import ContentRegistry
 from oscilla.engine.signals import _EndSignal, _GotoSignal
 
@@ -49,6 +49,32 @@ class TUICallbacks(Protocol):
         """Pause for the player to acknowledge before advancing to the next step."""
         ...
 
+    async def input_text(self, prompt: str) -> str:
+        """Display a prompt and wait for the player to type and submit a string.
+
+        The concrete implementation determines how input is collected
+        (e.g. a Textual Input widget in the TUI, a readline prompt in tests).
+        Must return a non-empty string.
+        """
+        ...
+
+
+class PersistCallback(Protocol):
+    """Called by AdventurePipeline at key checkpoints to persist character state.
+
+    event values:
+      "step_start"    — fired before each step is dispatched.
+      "combat_round"  — fired after each combat round resolves.
+      "adventure_end" — fired after all outcome effects are applied and
+                        active_adventure is set to None, before run() returns.
+    """
+
+    async def __call__(
+        self,
+        state: CharacterState,
+        event: Literal["step_start", "combat_round", "adventure_end"],
+    ) -> None: ...
+
 
 class AdventureOutcome(str, Enum):
     COMPLETED = "completed"
@@ -70,14 +96,21 @@ class AdventurePipeline:
     def __init__(
         self,
         registry: ContentRegistry,
-        player: PlayerState,
+        player: CharacterState,
         tui: TUICallbacks,
+        on_state_change: PersistCallback | None = None,
     ) -> None:
         self._registry = registry
         self._player = player
         self._tui = tui
+        self._on_state_change = on_state_change
         self._root_steps: List[Step] = []
         self._label_index: Dict[str, int] = {}
+
+    async def _checkpoint(self, event: Literal["step_start", "combat_round", "adventure_end"]) -> None:
+        """Fire the persist callback if one is registered."""
+        if self._on_state_change is not None:
+            await self._on_state_change(self._player, event)
 
     async def run(self, adventure_ref: str) -> AdventureOutcome:
         """Execute the adventure from step 0.
@@ -121,6 +154,7 @@ class AdventurePipeline:
         self._player.active_adventure = None
         if outcome == AdventureOutcome.COMPLETED:
             self._player.statistics.record_adventure_completed(adventure_ref)
+        await self._checkpoint("adventure_end")
         return outcome
 
     # --- Internal step execution ---
@@ -131,6 +165,7 @@ class AdventurePipeline:
             step = self._root_steps[i]
             if self._player.active_adventure:
                 self._player.active_adventure.step_index = i
+            await self._checkpoint("step_start")
             outcome = await self._dispatch(step)
             if outcome != AdventureOutcome.COMPLETED:
                 return outcome
@@ -170,6 +205,7 @@ class AdventurePipeline:
                     registry=self._registry,
                     tui=self._tui,
                     run_outcome_branch=self._run_outcome_branch,
+                    on_round_complete=lambda: self._checkpoint("combat_round"),
                 )
             case ChoiceStep():
                 return await run_choice(

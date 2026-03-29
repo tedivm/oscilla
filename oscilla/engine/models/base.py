@@ -78,7 +78,7 @@ class CharacterStatCondition(BaseModel):
 
 
 class PrestigeCountCondition(BaseModel):
-    type: Literal["prestige_count"]
+    type: Literal["iteration"]
     gt: int | None = None
     gte: int | None = None
     lt: int | None = None
@@ -89,7 +89,7 @@ class PrestigeCountCondition(BaseModel):
     @model_validator(mode="after")
     def require_comparator(self) -> "PrestigeCountCondition":
         if all(v is None for v in [self.gt, self.gte, self.lt, self.lte, self.eq, self.mod]):
-            raise ValueError("prestige_count condition must specify at least one of: gt, gte, lt, lte, eq, mod")
+            raise ValueError("iteration condition must specify at least one of: gt, gte, lt, lte, eq, mod")
         return self
 
 
@@ -209,7 +209,7 @@ _LEAF_MAPPINGS: dict[str, tuple[str, str]] = {
 # Keys whose value is already the full sub-dict (not a scalar)
 _DICT_LEAVES: set[str] = {
     "character_stat",
-    "prestige_count",
+    "iteration",
     "enemies_defeated",
     "locations_visited",
     "adventures_completed",

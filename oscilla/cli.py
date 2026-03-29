@@ -1,6 +1,6 @@
 import asyncio
 from functools import wraps
-from typing import Callable, Coroutine, ParamSpec, TypeVar
+from typing import Annotated, Callable, Coroutine, ParamSpec, TypeVar
 
 import typer
 
@@ -78,9 +78,24 @@ def _load_content() -> "ContentRegistry":
 
 
 @app.command(help="Start the interactive game loop.")
-def game() -> None:
-    """Load content and launch the full-screen Textual game application."""
+@syncify
+async def game(
+    character_name: Annotated[
+        str | None, typer.Option("--character-name", "-c", help="Character name to load or create.")
+    ] = None,
+    reset_db: Annotated[
+        bool,
+        typer.Option(
+            "--reset-db/--no-reset-db",
+            help="Delete all saved characters for the current user before starting.",
+        ),
+    ] = False,
+) -> None:
+    """Load content, resolve user identity, select or create a character, and launch the game."""
     from oscilla.engine.tui import OscillaApp
+    from oscilla.services.character import delete_user_characters
+    from oscilla.services.db import get_session
+    from oscilla.services.user import derive_tui_user_key, get_or_create_user
 
     registry = _load_content()
 
@@ -91,8 +106,26 @@ def game() -> None:
         typer.echo("Error: no CharacterConfig manifest found in content.", err=True)
         raise SystemExit(1)
 
-    # app.run() is the synchronous Textual entry point — no @syncify needed.
-    OscillaApp(registry=registry).run()
+    if reset_db:
+        typer.confirm(
+            "This will permanently delete all saved characters for the current user. Continue?",
+            abort=True,
+        )
+        async with get_session() as session:
+            user_key = derive_tui_user_key()
+            user = await get_or_create_user(session=session, user_key=user_key)
+            count = await delete_user_characters(session=session, user_id=user.id)
+        typer.echo(f"Deleted {count} character(s).")
+
+    await OscillaApp(registry=registry, character_name=character_name).run_async()
+
+    # Explicitly dispose the connection pool after the TUI exits so that any
+    # remaining aiosqlite connections are closed while the event loop is still
+    # running cleanly.  Without this, garbage-collected pool connections can
+    # trigger a CancelledError during their async rollback.
+    from oscilla.services.db import engine
+
+    await engine.dispose()
 
 
 @app.command(help="Validate the content package and report any errors.")

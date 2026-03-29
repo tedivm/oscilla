@@ -7,8 +7,8 @@ from typing import List
 
 import pytest
 
+from oscilla.engine.character import CharacterState
 from oscilla.engine.loader import load
-from oscilla.engine.player import PlayerState
 from oscilla.engine.registry import ContentRegistry
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "content"
@@ -25,12 +25,18 @@ class MockTUI:
     is exhausted.
     """
 
-    def __init__(self, menu_responses: List[int] | None = None) -> None:
+    def __init__(
+        self,
+        menu_responses: List[int] | None = None,
+        text_responses: List[str] | None = None,
+    ) -> None:
         self.texts: List[str] = []
         self.menus: List[tuple[str, List[str]]] = []
         self.combat_rounds: List[tuple[int, int, str, str]] = []
         self.acks: int = 0
+        self.input_prompts: List[str] = []
         self._menu_responses: List[int] = list(menu_responses or [])
+        self._text_responses: List[str] = list(text_responses or [])
 
     async def show_text(self, text: str) -> None:
         self.texts.append(text)
@@ -50,6 +56,10 @@ class MockTUI:
 
     async def wait_for_ack(self) -> None:
         self.acks += 1
+
+    async def input_text(self, prompt: str) -> str:
+        self.input_prompts.append(prompt)
+        return self._text_responses.pop(0) if self._text_responses else "TestCharacter"
 
 
 # ---------------------------------------------------------------------------
@@ -83,11 +93,11 @@ def region_chain_registry() -> ContentRegistry:
 
 
 @pytest.fixture
-def base_player(minimal_registry: ContentRegistry) -> PlayerState:
+def base_player(minimal_registry: ContentRegistry) -> CharacterState:
     """Level-1 player built from the minimal fixture set."""
     assert minimal_registry.game is not None
     assert minimal_registry.character_config is not None
-    return PlayerState.new_player(
+    return CharacterState.new_character(
         name="Tester",
         game_manifest=minimal_registry.game,
         character_config=minimal_registry.character_config,
@@ -95,11 +105,11 @@ def base_player(minimal_registry: ContentRegistry) -> PlayerState:
 
 
 @pytest.fixture
-def combat_player(combat_registry: ContentRegistry) -> PlayerState:
+def combat_player(combat_registry: ContentRegistry) -> CharacterState:
     """Level-1 player built from the combat-pipeline fixture set."""
     assert combat_registry.game is not None
     assert combat_registry.character_config is not None
-    return PlayerState.new_player(
+    return CharacterState.new_character(
         name="Fighter",
         game_manifest=combat_registry.game,
         character_config=combat_registry.character_config,

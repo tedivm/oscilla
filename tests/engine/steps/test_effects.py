@@ -16,7 +16,7 @@ from oscilla.engine.models.adventure import (
 )
 from oscilla.engine.models.base import Metadata
 from oscilla.engine.models.game import GameManifest, GameSpec, HpFormula
-from oscilla.engine.player import PlayerState
+from oscilla.engine.character import CharacterState
 from oscilla.engine.registry import ContentRegistry
 from oscilla.engine.signals import _EndSignal
 from oscilla.engine.steps.effects import run_effect
@@ -42,7 +42,7 @@ def create_test_game_registry() -> ContentRegistry:
     return registry
 
 
-async def test_xp_grant_effect_with_game_config(base_player: PlayerState) -> None:
+async def test_xp_grant_effect_with_game_config(base_player: CharacterState) -> None:
     """Test XP grant effect with game configuration."""
     registry = create_test_game_registry()
     tui = MockTUI()
@@ -56,7 +56,7 @@ async def test_xp_grant_effect_with_game_config(base_player: PlayerState) -> Non
     assert base_player.level == 2  # Leveled up
 
 
-async def test_xp_grant_effect_no_game_config(base_player: PlayerState) -> None:
+async def test_xp_grant_effect_no_game_config(base_player: CharacterState) -> None:
     """Test XP grant effect when no game config is available."""
     registry = ContentRegistry()  # No game config
     tui = MockTUI()
@@ -70,7 +70,7 @@ async def test_xp_grant_effect_no_game_config(base_player: PlayerState) -> None:
     assert base_player.level == 1  # No level up without thresholds
 
 
-async def test_milestone_grant_effect(base_player: PlayerState) -> None:
+async def test_milestone_grant_effect(base_player: CharacterState) -> None:
     """Test milestone grant effect."""
     registry = ContentRegistry()
     tui = MockTUI()
@@ -82,7 +82,7 @@ async def test_milestone_grant_effect(base_player: PlayerState) -> None:
     assert base_player.has_milestone("test-milestone")
 
 
-async def test_item_drop_effect_single_item(base_player: PlayerState) -> None:
+async def test_item_drop_effect_single_item(base_player: CharacterState) -> None:
     """Test item drop effect with single item type."""
     registry = ContentRegistry()
     tui = MockTUI()
@@ -101,7 +101,7 @@ async def test_item_drop_effect_single_item(base_player: PlayerState) -> None:
     assert base_player.inventory.get("test-sword", 0) == 3
 
 
-async def test_item_drop_effect_multiple_items(base_player: PlayerState) -> None:
+async def test_item_drop_effect_multiple_items(base_player: CharacterState) -> None:
     """Test item drop effect with multiple item types and weights."""
     registry = ContentRegistry()
     tui = MockTUI()
@@ -124,7 +124,7 @@ async def test_item_drop_effect_multiple_items(base_player: PlayerState) -> None
     assert base_player.inventory.get("rare-item", 0) == 1
 
 
-async def test_end_adventure_effect_completed(base_player: PlayerState) -> None:
+async def test_end_adventure_effect_completed(base_player: CharacterState) -> None:
     """Test end adventure effect with completed outcome."""
     registry = ContentRegistry()
 
@@ -137,7 +137,7 @@ async def test_end_adventure_effect_completed(base_player: PlayerState) -> None:
     assert exc_info.value.outcome == "completed"
 
 
-async def test_end_adventure_effect_fled(base_player: PlayerState) -> None:
+async def test_end_adventure_effect_fled(base_player: CharacterState) -> None:
     """Test end adventure effect with fled outcome."""
     registry = ContentRegistry()
     tui = MockTUI()
@@ -150,7 +150,7 @@ async def test_end_adventure_effect_fled(base_player: PlayerState) -> None:
     assert exc_info.value.outcome == "fled"
 
 
-async def test_end_adventure_effect_defeated(base_player: PlayerState) -> None:
+async def test_end_adventure_effect_defeated(base_player: CharacterState) -> None:
     """Test end adventure effect with defeated outcome."""
     registry = ContentRegistry()
     tui = MockTUI()
@@ -163,7 +163,7 @@ async def test_end_adventure_effect_defeated(base_player: PlayerState) -> None:
     assert exc_info.value.outcome == "defeated"
 
 
-async def test_multiple_effects_sequence(base_player: PlayerState) -> None:
+async def test_multiple_effects_sequence(base_player: CharacterState) -> None:
     """Test applying multiple effects in sequence."""
     registry = create_test_game_registry()
 
@@ -190,7 +190,7 @@ async def test_multiple_effects_sequence(base_player: PlayerState) -> None:
     assert base_player.inventory.get("reward", 0) == 1
 
 
-async def test_item_drop_effect_accumulates_inventory(base_player: PlayerState) -> None:
+async def test_item_drop_effect_accumulates_inventory(base_player: CharacterState) -> None:
     """Test that item drops accumulate with existing inventory."""
     registry = ContentRegistry()
     tui = MockTUI()
@@ -209,7 +209,7 @@ async def test_item_drop_effect_accumulates_inventory(base_player: PlayerState) 
     assert base_player.inventory.get("test-item", 0) == 5
 
 
-async def test_heal_effect_full_restores_to_max(base_player: PlayerState) -> None:
+async def test_heal_effect_full_restores_to_max(base_player: CharacterState) -> None:
     """Test that heal with amount='full' restores HP to max_hp."""
     registry = ContentRegistry()
 
@@ -223,7 +223,7 @@ async def test_heal_effect_full_restores_to_max(base_player: PlayerState) -> Non
     assert base_player.hp == max_hp
 
 
-async def test_heal_effect_partial_heals_by_amount(base_player: PlayerState) -> None:
+async def test_heal_effect_partial_heals_by_amount(base_player: CharacterState) -> None:
     """Test that a numeric heal amount restores exactly that many HP."""
     registry = ContentRegistry()
 
@@ -237,7 +237,7 @@ async def test_heal_effect_partial_heals_by_amount(base_player: PlayerState) -> 
     assert base_player.hp == 13
 
 
-async def test_heal_effect_cannot_exceed_max_hp(base_player: PlayerState) -> None:
+async def test_heal_effect_cannot_exceed_max_hp(base_player: CharacterState) -> None:
     """Test that healing is capped at max_hp."""
     registry = ContentRegistry()
 

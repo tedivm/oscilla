@@ -18,13 +18,13 @@ from oscilla.engine.signals import _EndSignal
 
 if TYPE_CHECKING:
     from oscilla.engine.pipeline import TUICallbacks
-    from oscilla.engine.player import PlayerState
+    from oscilla.engine.character import CharacterState
     from oscilla.engine.registry import ContentRegistry
 
 
 async def run_effect(
     effect: Effect,
-    player: "PlayerState",
+    player: "CharacterState",
     registry: "ContentRegistry",
     tui: "TUICallbacks",
 ) -> None:

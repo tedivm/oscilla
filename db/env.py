@@ -3,11 +3,25 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-# This has to be a wildcard in order to pull in all models for alembic.
-from oscilla.models import *  # noqa: F403
 from oscilla.conf.db import DatabaseSettings
 
+# This has to be a wildcard in order to pull in all models for alembic.
+from oscilla.models import *  # noqa: F403
+
 settings = DatabaseSettings()
+
+# The auto-derived URL uses async drivers (sqlite+aiosqlite, postgresql+asyncpg).
+# Alembic uses a synchronous engine for migration generation, so we strip the
+# async driver variant back to the plain (synchronous) driver name.
+_async_to_sync = {
+    "sqlite+aiosqlite://": "sqlite://",
+    "postgresql+asyncpg://": "postgresql://",
+}
+_sync_url = settings.database_url
+for async_prefix, sync_prefix in _async_to_sync.items():
+    if _sync_url.startswith(async_prefix):
+        _sync_url = sync_prefix + _sync_url[len(async_prefix) :]
+        break
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -43,7 +57,7 @@ def run_migrations_offline() -> None:
 
     """
     context.configure(
-        url=settings.database_url,
+        url=_sync_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -61,7 +75,7 @@ def run_migrations_online() -> None:
 
     """
     connectable = engine_from_config(
-        {"db.url": settings.database_url, "db.echo": "True"},
+        {"db.url": _sync_url, "db.echo": "True"},
         prefix="db.",
         poolclass=pool.NullPool,
     )

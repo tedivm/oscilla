@@ -764,9 +764,143 @@ make document_schema
 <!-- BEGIN_SQLALCHEMY_DOCS -->
 ```mermaid
 erDiagram
+  character_iteration_equipment {
+    CHAR(32) iteration_id PK,FK
+    VARCHAR slot PK
+    VARCHAR item_ref
+  }
+
+  character_iteration_inventory {
+    VARCHAR item_ref PK
+    CHAR(32) iteration_id PK,FK
+    INTEGER quantity
+  }
+
+  character_iteration_milestones {
+    CHAR(32) iteration_id PK,FK
+    VARCHAR milestone_ref PK
+  }
+
+  character_iteration_quests {
+    CHAR(32) iteration_id PK,FK
+    VARCHAR quest_ref PK
+    VARCHAR stage "nullable"
+    VARCHAR status
+  }
+
+  character_iteration_stat_values {
+    CHAR(32) iteration_id PK,FK
+    VARCHAR stat_name PK
+    FLOAT stat_value "nullable"
+  }
+
+  character_iteration_statistics {
+    VARCHAR entity_ref PK
+    CHAR(32) iteration_id PK,FK
+    VARCHAR stat_type PK
+    INTEGER count
+  }
+
+  character_iterations {
+    CHAR(32) id PK
+    CHAR(32) character_id FK
+    VARCHAR adventure_ref "nullable"
+    INTEGER adventure_step_index "nullable"
+    JSON adventure_step_state "nullable"
+    VARCHAR character_class "nullable"
+    DATETIME completed_at "nullable"
+    VARCHAR current_location "nullable"
+    INTEGER hp
+    BOOLEAN is_active
+    INTEGER iteration
+    INTEGER level
+    INTEGER max_hp
+    VARCHAR session_token "nullable"
+    DATETIME started_at
+    INTEGER version
+    INTEGER xp
+  }
+
+  characters {
+    CHAR(32) id PK
+    CHAR(32) user_id FK
+    DATETIME created_at
+    VARCHAR name
+    DATETIME updated_at
+  }
+
+  users {
+    CHAR(32) id PK
+    DATETIME created_at
+    VARCHAR user_key UK
+  }
+
+  character_iterations ||--o| character_iteration_equipment : iteration_id
+  character_iterations ||--o| character_iteration_inventory : iteration_id
+  character_iterations ||--o| character_iteration_milestones : iteration_id
+  character_iterations ||--o| character_iteration_quests : iteration_id
+  character_iterations ||--o| character_iteration_stat_values : iteration_id
+  character_iterations ||--o| character_iteration_statistics : iteration_id
+  characters ||--o{ character_iterations : character_id
+  users ||--o{ characters : user_id
 
 ```
 <!-- END_SQLALCHEMY_DOCS -->
+
+## Character Persistence Schema
+
+The character persistence layer uses nine tables. Three are the core identity tables and six are child tables that store per-iteration run state.
+
+### Table Overview
+
+| Table | Purpose |
+|---|---|
+| `users` | One row per unique TUI identity; keyed by `user_key` (derived from OS `USER`/`LOGNAME`). |
+| `characters` | One row per character name; identity survives across prestige resets. |
+| `character_iterations` | One row per prestige run. Scalar stats (`level`, `xp`, `hp`, `max_hp`, etc.), current adventure progress, and the session soft-lock live here. |
+| `character_iteration_stat_values` | EAV table; one row per content-defined stat per iteration. `stat_value` is REAL (nullable for unset optional stats). |
+| `character_iteration_inventory` | One row per item held; `(iteration_id, item_ref)` composite PK with `quantity`. |
+| `character_iteration_equipment` | One row per equipment slot; `(iteration_id, slot)` composite PK with `item_ref`. |
+| `character_iteration_milestones` | One row per milestone held; `(iteration_id, milestone_ref)` composite PK. |
+| `character_iteration_quests` | One row per quest; `(iteration_id, quest_ref)` composite PK; `status` is "active" or "completed". |
+| `character_iteration_statistics` | Aggregate counters; `(iteration_id, stat_type, entity_ref)` composite PK. `stat_type` is one of `enemies_defeated`, `locations_visited`, or `adventures_completed`. |
+
+### Iteration Model and Prestige Lifecycle
+
+```
+users  →  characters  →  character_iterations (is_active=TRUE)  →  child tables
+                      ↓
+                      character_iterations (is_active=FALSE)  →  archived child tables
+```
+
+Every character has exactly one active iteration (`is_active = TRUE`), enforced by a partial unique index on `(character_id) WHERE is_active = TRUE`. The six child tables are always scoped to a single iteration, so a prestige operation is non-destructive:
+
+1. Set `is_active = FALSE, completed_at = now()` on the current iteration.
+2. Insert a new `character_iterations` row with `is_active = TRUE` and fresh defaults.
+3. Seed only the child rows for the new iteration.
+
+Archived iteration rows and their child rows remain intact, enabling lifetime aggregate statistics queries across all prestige runs.
+
+### Optimistic Locking
+
+`character_iterations` has a `version` integer column managed by SQLAlchemy's `version_id_col`. Every `UPDATE` to the row via `update_scalar_fields()` increments `version` automatically. If two concurrent writers (e.g., a TUI session and a web API request) both read the same `version` and then try to write, the second commit raises `StaleDataError`.
+
+`GameSession._on_state_change()` handles this by reloading the snapshot from the DB and retrying once:
+
+```python
+try:
+    await self._persist_diff(state=state, event=event)
+except StaleDataError:
+    reloaded = await load_character(...)  # re-read current DB state
+    self._last_saved_state = reloaded
+    await self._persist_diff(state=state, event=event)  # retry
+```
+
+Adventure progress columns (`adventure_ref`, `adventure_step_index`, `adventure_step_state`) are updated via raw SQL `UPDATE` statements in `save_adventure_progress()` — they bypass the version increment because combat-round writes are high-frequency and do not represent player-visible stat mutations.
+
+### SQLite WAL Mode
+
+When the async engine connects to a SQLite database, a `connect` event listener sets `PRAGMA journal_mode=WAL`. WAL mode allows multiple readers to coexist with a single writer without blocking, which matters when both the TUI and a background process need concurrent access to the same `saves.db` file.
 
 ## References
 
