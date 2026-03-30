@@ -7,7 +7,10 @@ from typer.testing import CliRunner
 
 from oscilla.cli import app, syncify
 
-runner = CliRunner()
+# TERM=dumb prevents Rich from emitting ANSI escape codes in CI environments
+# (e.g. GitHub Actions sets GITHUB_ACTIONS=true which causes Rich to force color
+# output, splitting "--flag" across ANSI resets so literal string checks fail).
+runner = CliRunner(env={"TERM": "dumb"})
 
 
 def test_cli_app_exists() -> None:
