@@ -171,4 +171,23 @@ create_migration:
 check_ungenerated_migrations:
 	$(UV) run alembic check
 
+#
+# Cleanup
+#
+
+.PHONY: clean_logs
+clean_logs:
+	rm -f *.log
+
+.PHONY: clean_saves
+clean_saves:
+	rm -f saves.db saves.db-wal saves.db-shm
+
+.PHONY: clean_scripts
+clean_scripts:
+	rm -f *.py
+
+.PHONY: clean
+clean: clean_logs clean_saves clean_scripts
+
 
