@@ -1,0 +1,16 @@
+apiVersion: game/v1
+kind: Item
+metadata:
+  name: test-shield
+spec:
+  displayName: "Test Shield"
+  description: "A plain wooden buckler used to verify multi-slot displacement mechanics."
+  category: shield
+  stackable: false
+  equip:
+    slots:
+      - off_hand
+    stat_modifiers:
+      - stat: strength
+        amount: 2
+  value: 0

@@ -154,6 +154,60 @@ spec:
 
 **Stat Types**: `int`, `float`, `str`, `bool`
 
+#### Equipment Slots
+
+Define the equipment slots available to players using `equipment_slots` in the spec. If no slots are defined the inventory still works, but players cannot equip items.
+
+```yaml
+apiVersion: game/v1
+kind: CharacterConfig
+metadata:
+  name: default-character
+spec:
+  public_stats:
+    - name: strength
+      type: int
+      default: 10
+      description: "Physical power."
+
+  equipment_slots:
+    - name: main_hand
+      displayName: "Main Hand"
+      accepts:               # Optional: only allow these categories (empty = accept all)
+        - weapon
+      show_when_locked: false
+
+    - name: off_hand
+      displayName: "Off Hand"
+      accepts:
+        - weapon
+        - shield
+      show_when_locked: false
+
+    - name: armor
+      displayName: "Armor"
+      accepts:
+        - armor
+      show_when_locked: false
+
+    - name: head
+      displayName: "Head"
+      requires:              # Optional: condition to unlock this slot
+        type: level
+        value: 5
+      show_when_locked: true # Show slot in UI even when locked (so player knows it exists)
+```
+
+**SlotDefinition Fields**:
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `name` | `str` | required | Unique identifier used in item `equip.slots` lists |
+| `displayName` | `str` | required | Player-facing label |
+| `accepts` | list of `str` | `[]` | Item `category` values allowed in this slot; empty = no restriction |
+| `requires` | Condition \| null | `null` | Condition that must pass before slot is usable |
+| `show_when_locked` | `bool` | `false` | Whether to display the slot in the UI when it is locked |
+
 ### Regions (`regions/`)
 
 Geographic areas that contain locations:
@@ -244,7 +298,30 @@ spec:
 
 ### Items (`items/`)
 
-Equipment, consumables, and other objects:
+Equipment, consumables, and other objects. Items can be stackable consumables, equippable gear, or passive materials.
+
+#### Stackable Consumable (e.g., potion)
+
+```yaml
+apiVersion: game/v1
+kind: Item
+metadata:
+  name: healing-potion
+spec:
+  displayName: "Healing Potion"
+  description: "A bright red potion that restores health."
+
+  category: consumable      # Required: free-form category label (weapon, armor, consumable, material, etc.)
+  stackable: true           # Multiple copies share one inventory slot (default: true)
+  consumed_on_use: true     # Removes one unit from the stack after use (default: true)
+  value: 50                 # Optional: base gold value (default: 0)
+
+  use_effects:              # Effects applied when the player uses this item
+    - type: heal
+      amount: 30
+```
+
+#### Equippable Gear (e.g., sword)
 
 ```yaml
 apiVersion: game/v1
@@ -255,21 +332,57 @@ spec:
   displayName: "Iron Sword"
   description: "A well-made blade with a leather grip."
 
-  kind: weapon              # Required: weapon, armor, consumable, quest, material, prestige
-  stackable: false          # Can multiple copies share one inventory slot?
+  category: weapon
+  stackable: false          # Equippable items must NOT be stackable
+  value: 150
 
-  equipment_slot: weapon    # Optional: slot name for equippable items
-  value: 150                # Optional: base gold value
+  equip:                    # Equipment specification
+    slots:                  # Required: one or more slot names (must match equipment_slots in character_config.yaml)
+      - main_hand
+    stat_modifiers:         # Optional: passive stat bonuses while equipped
+      - stat: strength
+        amount: 2
 ```
 
-**Item Kinds**:
+**Two-handed / multi-slot items** occupy multiple slots simultaneously by listing them all:
 
-- `weapon`: Combat equipment
-- `armor`: Protective gear
-- `consumable`: Usable items (potions, food)
-- `quest`: Story-related items
-- `material`: Crafting components
-- `prestige`: Special achievement items
+```yaml
+equip:
+  slots:
+    - main_hand
+    - off_hand             # Blocks both slots when equipped
+  stat_modifiers:
+    - stat: strength
+      amount: 5
+```
+
+**Item Spec Fields**:
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `category` | `str` | required | Free-form label used for `accepts` filtering on slots |
+| `displayName` | `str` | required | Player-facing name |
+| `description` | `str` | `""` | Flavor text |
+| `stackable` | `bool` | `true` | Multiple copies share one slot; must be `false` for equippable items |
+| `droppable` | `bool` | `true` | Whether the item can be dropped |
+| `value` | `int` | `0` | Base gold value (non-negative) |
+| `use_effects` | list of Effects | `[]` | Effects applied when the player uses the item |
+| `consumed_on_use` | `bool` | `true` | Removes the item after use (stack decremented or instance removed) |
+| `equip` | EquipSpec \| null | `null` | If present, item is equippable rather than stackable |
+
+**EquipSpec Fields**:
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `slots` | list of `str` | required (min 1) | Slot names the item occupies when equipped |
+| `stat_modifiers` | list of StatModifier | `[]` | Passive stat bonuses while equipped |
+
+**StatModifier Fields**:
+
+| Field | Type | Description |
+|---|---|---|
+| `stat` | `str` | Stat name from `CharacterConfig` |
+| `amount` | `int` or `float` | Bonus amount (positive or negative) |
 
 ### Enemies (`enemies/`)
 
@@ -658,7 +771,19 @@ effects:
         weight: 10
 ```
 
-**Drop Mechanics**: Each roll selects one item based on relative weights. Higher weights = higher chance.
+**Drop Mechanics**: Each roll selects one item based on relative weights. Higher weights = higher chance. Equippable items (non-stackable) are added as individual instances; stackable items increment the player's stack count.
+
+### Use Item
+
+Trigger a specific item's `use_effects` directly from an adventure step:
+
+```yaml
+effects:
+  - type: use_item
+    item: healing-potion    # Item reference; the item must exist in the content package
+```
+
+The item's effects execute exactly as if the player pressed "Use" in the inventory. If the item has `consumed_on_use: true` the item is removed after use. Note that the player must already have the item in their inventory for this to do anything meaningful; for automated drops followed by instant use, pair this with an `item_drop` effect on the same step.
 
 ### Milestone Grants
 
@@ -917,7 +1042,7 @@ uv run oscilla game
 
 ### All Effect Types
 
-**State Changes**: `xp_grant`, `item_drop`, `milestone_grant`
+**State Changes**: `xp_grant`, `item_drop`, `use_item`, `milestone_grant`, `stat_change`, `stat_set`
 **Flow Control**: `end_adventure`, `goto`
 
 ---

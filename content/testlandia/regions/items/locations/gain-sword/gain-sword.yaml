@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: gain-sword
+spec:
+  displayName: "Weapon Drop"
+  description: "Test dropping a non-stackable equippable weapon instance."
+  region: items
+  adventures:
+    - ref: gain-sword
+      weight: 100

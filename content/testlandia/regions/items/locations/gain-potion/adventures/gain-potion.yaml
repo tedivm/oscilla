@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: gain-potion
+spec:
+  displayName: "Potion Drop Test"
+  description: "Awards a test-potion to verify stackable healing item drop and heal use_effects."
+  steps:
+    - type: narrative
+      text: "A glowing vial sits on a pedestal, waiting to be claimed."
+      effects:
+        - type: item_drop
+          loot:
+            - item: test-potion
+              weight: 100

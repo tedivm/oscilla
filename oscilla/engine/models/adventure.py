@@ -64,6 +64,11 @@ class StatSetEffect(BaseModel):
     value: int | float | bool | None = Field(description="New value for stat")
 
 
+class UseItemEffect(BaseModel):
+    type: Literal["use_item"]
+    item: str = Field(description="Item manifest name to use")
+
+
 Effect = Annotated[
     Union[
         XpGrantEffect,
@@ -73,6 +78,7 @@ Effect = Annotated[
         HealEffect,
         StatChangeEffect,
         StatSetEffect,
+        UseItemEffect,
     ],
     Field(discriminator="type"),
 ]

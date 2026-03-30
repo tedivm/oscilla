@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: gain-shield
+spec:
+  displayName: "Shield Drop Test"
+  description: "Awards a test-shield instance to verify off-hand slot routing."
+  steps:
+    - type: narrative
+      text: "A small wooden buckler leans against the wall."
+      effects:
+        - type: item_drop
+          loot:
+            - item: test-shield
+              weight: 100

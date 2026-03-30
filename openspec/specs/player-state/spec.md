@@ -8,14 +8,14 @@ The player state system manages all persistent player data including stats, inve
 
 ### Requirement: Player state fields
 
-The player state model SHALL include the following fixed fields: `player_id` (UUID), `name` (string), `character_class` (string, nullable), `level` (int, default 1), `xp` (int, default 0), `hp` (int), `max_hp` (int), `prestige_count` (int, default 0), `current_location` (string reference, nullable), `milestones` (set of strings), `statistics` (PlayerStatistics dataclass with enemy/location/adventure counters), `inventory` (mapping of item ref to quantity), `equipment` (mapping of slot name to item ref), `active_quests` (mapping of quest ref to stage name), `completed_quests` (set of quest refs), and `active_adventure` (nullable adventure position struct).
+The player state model SHALL include the following fixed fields: `player_id` (UUID), `name` (string), `character_class` (string, nullable), `level` (int, default 1), `xp` (int, default 0), `hp` (int), `max_hp` (int), `prestige_count` (int, default 0), `current_location` (string reference, nullable), `milestones` (set of strings), `statistics` (PlayerStatistics dataclass with enemy/location/adventure counters), `stacks` (mapping of item ref to quantity for stackable items), `instances` (list of `ItemInstance` objects for non-stackable items, each with `instance_id: UUID`, `item_ref: str`, and `modifiers: Dict`), `equipment` (mapping of slot name to `instance_id: UUID`), `active_quests` (mapping of quest ref to stage name), `completed_quests` (set of quest refs), and `active_adventure` (nullable adventure position struct).
 
 In addition to fixed fields, the player state SHALL contain a `stats` mapping (stat name → value) populated dynamically from the `CharacterConfig` manifest at character creation. Both `public_stats` and `hidden_stats` are stored in this single mapping; the distinction is only presentational. Stat values SHALL be typed according to the `CharacterConfig` definition and SHALL default to the declared default, or `null` if no default is set.
 
 #### Scenario: New player starts with default values
 
 - **WHEN** a new player state is created with only a name
-- **THEN** level is 1, XP is 0, prestige_count is 0, milestones is empty, statistics has all counters at zero, inventory is empty, equipment is empty, active_adventure is None, and the stats map contains every stat from CharacterConfig initialised to its declared default
+- **THEN** level is 1, XP is 0, prestige_count is 0, milestones is empty, statistics has all counters at zero, stacks is empty, instances is empty, equipment is empty, active_adventure is None, and the stats map contains every stat from CharacterConfig initialised to its declared default
 
 #### Scenario: Public stats are visible, hidden stats are not
 
@@ -26,22 +26,27 @@ In addition to fixed fields, the player state SHALL contain a `stats` mapping (s
 
 ### Requirement: Inventory management
 
-The player state SHALL support adding items (incrementing quantity), removing items (decrementing quantity), and querying whether a specific item is present (quantity > 0). Removing an item when quantity would go below zero SHALL raise an error.
+The player state SHALL maintain two separate inventory collections: `stacks: Dict[str, int]` for stackable items (item_ref → quantity) and `instances: List[ItemInstance]` for non-stackable items tracked by UUID. `add_item()` routes to the appropriate collection based on the item's `stackable` flag in the registry. Removing a stackable item when quantity would go below zero SHALL raise an error. Attempting to add a non-stackable item with quantity != 1 SHALL raise an error.
 
-#### Scenario: Adding an item
+#### Scenario: Adding a stackable item
 
-- **WHEN** `add_item("iron-sword", 1)` is called on a player who has no iron-sword
-- **THEN** inventory contains `{"iron-sword": 1}`
+- **WHEN** `add_item("healing-potion", 1)` is called and `healing-potion` has `stackable: true`
+- **THEN** `stacks["healing-potion"]` increases by 1
 
-#### Scenario: Removing an item
+#### Scenario: Adding a non-stackable item
 
-- **WHEN** `remove_item("iron-sword", 1)` is called on a player who has 2 iron-swords
-- **THEN** inventory contains `{"iron-sword": 1}`
+- **WHEN** `add_item("iron-sword", 1)` is called and `iron-sword` has `stackable: false`
+- **THEN** a new `ItemInstance` with a fresh UUID is appended to `instances`
+
+#### Scenario: Removing a stackable item
+
+- **WHEN** `remove_item("healing-potion", 1)` is called on a player who has 2 healing-potions
+- **THEN** `stacks["healing-potion"]` is 1
 
 #### Scenario: Removing more than available raises error
 
-- **WHEN** `remove_item("iron-sword", 5)` is called on a player who has only 1
-- **THEN** a ValueError is raised and inventory is unchanged
+- **WHEN** `remove_item("healing-potion", 5)` is called on a player who has only 1
+- **THEN** a ValueError is raised and stacks is unchanged
 
 ---
 
@@ -129,14 +134,21 @@ The player state SHALL include an `active_adventure` field that stores the curre
 
 ### Requirement: Equipment slots
 
-The player state SHALL support equipping an item to a named slot (e.g., `weapon`, `armor`, `accessory`). Equipping an item to an occupied slot SHALL replace the previous item (returning it to inventory). Equipping requires the item to be in inventory.
+The player state SHALL support equipping a non-stackable item instance to one or more named slots. Equipment is tracked as `equipment: Dict[str, UUID]` mapping slot name to `instance_id`. Equipping an item instance to a slot already occupied by a different instance SHALL displace the existing instance (returning it to `instances`). Equipment slot definitions (names, accepted categories, unlock conditions) live in `CharacterConfig.equipment_slots`.
 
-#### Scenario: Equip an item
+Equipping is only available outside adventures. Inside adventures, only item consumption (via `UseItemEffect`) is permitted.
 
-- **WHEN** `equip("iron-sword", slot="weapon")` is called and the player has iron-sword in inventory
-- **THEN** the weapon slot contains iron-sword and iron-sword is removed from inventory
+#### Scenario: Equip an item instance
 
-#### Scenario: Equip replaces existing item
+- **WHEN** `equip_instance(instance_id, slots=["main_hand"])` is called and the instance is in `instances`
+- **THEN** `equipment["main_hand"]` is set to `instance_id` and the instance remains in `instances` (equipped items stay in `instances`; `equipment` is an index into `instances`)
 
-- **WHEN** a weapon is already equipped and a new weapon is equipped to the same slot
-- **THEN** the old weapon is returned to inventory and the slot contains the new weapon
+#### Scenario: Equip displaces existing item
+
+- **WHEN** a new weapon instance is equipped to `main_hand` while another instance already occupies `main_hand`
+- **THEN** the displaced instance remains in `instances` (unequipped) and `equipment["main_hand"]` points to the new instance
+
+#### Scenario: Multi-slot item occupies all declared slots
+
+- **WHEN** a two-handed sword with `slots: [main_hand, off_hand]` is equipped
+- **THEN** both `equipment["main_hand"]` and `equipment["off_hand"]` point to the same `instance_id`

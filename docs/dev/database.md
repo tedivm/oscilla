@@ -767,13 +767,26 @@ erDiagram
   character_iteration_equipment {
     CHAR(32) iteration_id PK,FK
     VARCHAR slot PK
-    VARCHAR item_ref
+    VARCHAR instance_id
   }
 
   character_iteration_inventory {
     VARCHAR item_ref PK
     CHAR(32) iteration_id PK,FK
     INTEGER quantity
+  }
+
+  character_iteration_item_instance_modifiers {
+    VARCHAR instance_id PK,FK
+    VARCHAR iteration_id PK,FK
+    VARCHAR stat PK
+    REAL amount
+  }
+
+  character_iteration_item_instances {
+    VARCHAR instance_id PK
+    CHAR(32) iteration_id PK,FK
+    VARCHAR item_ref
   }
 
   character_iteration_milestones {
@@ -838,6 +851,9 @@ erDiagram
 
   character_iterations ||--o| character_iteration_equipment : iteration_id
   character_iterations ||--o| character_iteration_inventory : iteration_id
+  character_iteration_item_instances ||--o| character_iteration_item_instance_modifiers : iteration_id
+  character_iteration_item_instances ||--o| character_iteration_item_instance_modifiers : instance_id
+  character_iterations ||--o| character_iteration_item_instances : iteration_id
   character_iterations ||--o| character_iteration_milestones : iteration_id
   character_iterations ||--o| character_iteration_quests : iteration_id
   character_iterations ||--o| character_iteration_stat_values : iteration_id

@@ -54,6 +54,21 @@ class CharacterStatistics:
 
 
 @dataclass
+class ItemInstance:
+    """An individual, non-stackable item owned by the character.
+
+    Each instance has a unique UUID so the service layer can persist it
+    separately from the item manifest reference.  Per-instance modifiers
+    support future enchanting / crafting systems.
+    """
+
+    instance_id: UUID
+    item_ref: str
+    # Per-instance stat delta applied on top of the item's equip stat_modifiers
+    modifiers: Dict[str, int | float] = field(default_factory=dict)
+
+
+@dataclass
 class CharacterState:
     """Complete in-memory state for a single character.
 
@@ -61,6 +76,11 @@ class CharacterState:
     The `stats` dict is populated from CharacterConfig at character creation —
     its values are typed narrowly (not Any) so Phase 3 JSON serialization is
     unambiguous.
+
+    Inventory model:
+    - ``stacks``: quantity-counted map for stackable items (potions, currency, etc.)
+    - ``instances``: list of individual non-stackable item instances (weapons, armour, etc.)
+    - ``equipment``: slot_name → instance_id for currently equipped non-stackable items
     """
 
     character_id: UUID
@@ -75,9 +95,12 @@ class CharacterState:
     current_location: str | None
     milestones: Set[str] = field(default_factory=set)
     statistics: CharacterStatistics = field(default_factory=CharacterStatistics)
-    inventory: Dict[str, int] = field(default_factory=dict)
-    # slot_name → item_ref
-    equipment: Dict[str, str] = field(default_factory=dict)
+    # Stackable items: item_ref → quantity
+    stacks: Dict[str, int] = field(default_factory=dict)
+    # Non-stackable item instances
+    instances: List[ItemInstance] = field(default_factory=list)
+    # slot_name → instance_id (UUID) of the currently equipped item
+    equipment: Dict[str, UUID] = field(default_factory=dict)
     # quest_ref → current stage name
     active_quests: Dict[str, str] = field(default_factory=dict)
     completed_quests: Set[str] = field(default_factory=set)
@@ -118,18 +141,132 @@ class CharacterState:
 
     # --- Inventory ---
 
-    def add_item(self, ref: str, quantity: int = 1) -> None:
-        self.inventory[ref] = self.inventory.get(ref, 0) + quantity
+    def add_item(self, ref: str, quantity: int = 1, registry: "ContentRegistry | None" = None) -> None:
+        """Add items to the character's inventory.
+
+        If a registry is provided and the item is non-stackable, creates
+        individual ItemInstance objects (one per call; quantity must be 1).
+        Without a registry, or when the item is stackable, increments stacks.
+        """
+        item = registry.items.get(ref) if registry is not None else None
+        if item is not None and not item.spec.stackable:
+            if quantity != 1:
+                raise ValueError(f"Cannot add {quantity}x non-stackable item {ref!r}; add one at a time")
+            self.instances.append(ItemInstance(instance_id=uuid4(), item_ref=ref))
+        else:
+            self.stacks[ref] = self.stacks.get(ref, 0) + quantity
 
     def remove_item(self, ref: str, quantity: int = 1) -> None:
-        current = self.inventory.get(ref, 0)
+        """Remove stackable items from stacks. Raises ValueError if insufficient quantity."""
+        current = self.stacks.get(ref, 0)
         if current < quantity:
-            raise ValueError(f"Cannot remove {quantity}x {ref!r}: only {current} in inventory")
+            raise ValueError(f"Cannot remove {quantity}x {ref!r}: only {current} in stacks")
         new_qty = current - quantity
         if new_qty == 0:
-            del self.inventory[ref]
+            del self.stacks[ref]
         else:
-            self.inventory[ref] = new_qty
+            self.stacks[ref] = new_qty
+
+    def remove_instance(self, instance_id: UUID) -> ItemInstance:
+        """Remove and return a non-stackable item instance by its UUID.
+
+        Also unequips the instance from any slots that reference it.
+        Raises ValueError if the instance is not found.
+        """
+        for i, inst in enumerate(self.instances):
+            if inst.instance_id == instance_id:
+                self.instances.pop(i)
+                # Unequip from any slots referencing this instance
+                for slot in [s for s, iid in self.equipment.items() if iid == instance_id]:
+                    del self.equipment[slot]
+                return inst
+        raise ValueError(f"Instance {instance_id} not found in instances list")
+
+    # --- Equipment ---
+
+    def check_displacement(self, instance_id: UUID, slots: List[str]) -> List[UUID]:
+        """Return instance_ids that would be displaced by equipping to the given slots."""
+        displaced: List[UUID] = []
+        for slot in slots:
+            current = self.equipment.get(slot)
+            if current is not None and current != instance_id and current not in displaced:
+                displaced.append(current)
+        return displaced
+
+    def equip_instance(self, instance_id: UUID, slots: List[str]) -> List[ItemInstance]:
+        """Equip a non-stackable item instance into the given slot(s).
+
+        Any instance already occupying a slot is unequipped from all its slots
+        (an item can occupy multiple slots, e.g. two-handed weapons).
+
+        Returns the list of displaced instances that were unequipped.
+        Raises ValueError if the instance_id is not found in self.instances.
+        """
+        if not any(inst.instance_id == instance_id for inst in self.instances):
+            raise ValueError(f"Instance {instance_id} not found in instances list")
+
+        displaced_ids = self.check_displacement(instance_id=instance_id, slots=slots)
+        displaced: List[ItemInstance] = []
+        for displaced_id in displaced_ids:
+            # Remove displaced instance from all slots
+            for slot in [s for s, iid in self.equipment.items() if iid == displaced_id]:
+                del self.equipment[slot]
+            displaced_inst = next((inst for inst in self.instances if inst.instance_id == displaced_id), None)
+            if displaced_inst is not None:
+                displaced.append(displaced_inst)
+
+        for slot in slots:
+            self.equipment[slot] = instance_id
+        return displaced
+
+    def unequip_slot(self, slot: str) -> ItemInstance | None:
+        """Remove the equipped item from slot. Returns the instance, or None if empty."""
+        instance_id = self.equipment.pop(slot, None)
+        if instance_id is None:
+            return None
+        # Also remove this instance_id from any other slots (multi-slot items)
+        for s in [s for s, iid in self.equipment.items() if iid == instance_id]:
+            del self.equipment[s]
+        return next((inst for inst in self.instances if inst.instance_id == instance_id), None)
+
+    # --- Stat computation ---
+
+    def effective_stats(self, registry: "ContentRegistry | None" = None) -> Dict[str, int | float | bool | None]:
+        """Return base stats augmented by equipped item stat_modifiers.
+
+        Iterates over unique equipped instance_ids, looks up each item's equip
+        spec, and accumulates stat_modifiers.  Per-instance modifiers from
+        ItemInstance.modifiers are also applied.  Non-numeric stats are not
+        modified by equipment.
+        """
+        result: Dict[str, int | float | bool | None] = dict(self.stats)
+        if registry is None:
+            return result
+
+        applied: Set[UUID] = set()
+        for instance_id in self.equipment.values():
+            if instance_id in applied:
+                continue
+            applied.add(instance_id)
+
+            instance = next((inst for inst in self.instances if inst.instance_id == instance_id), None)
+            if instance is None:
+                continue
+
+            item = registry.items.get(instance.item_ref)
+            if item is not None and item.spec.equip is not None:
+                for modifier in item.spec.equip.stat_modifiers:
+                    current = result.get(modifier.stat, 0)
+                    if isinstance(current, (int, float)):
+                        result[modifier.stat] = current + modifier.amount
+
+            # Apply per-instance modifiers on top
+            for stat, amount in instance.modifiers.items():
+                current = result.get(stat, 0)
+                if isinstance(current, (int, float)):
+                    result[stat] = current + amount
+
+        return result
 
     # --- Milestones ---
 
@@ -187,22 +324,6 @@ class CharacterState:
 
         return (levels_gained, levels_lost)
 
-    # --- Equipment ---
-
-    def equip(self, item_ref: str, slot: str) -> None:
-        """Move item_ref from inventory into the given equipment slot.
-
-        Any item already in the slot is returned to inventory. Raises
-        ValueError if item_ref is not in inventory.
-        """
-        if self.inventory.get(item_ref, 0) == 0:
-            raise ValueError(f"Cannot equip {item_ref!r}: not in inventory")
-        displaced = self.equipment.get(slot)
-        if displaced:
-            self.add_item(displaced)
-        self.remove_item(item_ref)
-        self.equipment[slot] = item_ref
-
     # --- Serialization ---
 
     def to_dict(self) -> Dict[str, Any]:
@@ -230,8 +351,16 @@ class CharacterState:
             "max_hp": self.max_hp,
             "current_location": self.current_location,
             "milestones": sorted(self.milestones),
-            "inventory": dict(self.inventory),
-            "equipment": dict(self.equipment),
+            "stacks": dict(self.stacks),
+            "instances": [
+                {
+                    "instance_id": str(inst.instance_id),
+                    "item_ref": inst.item_ref,
+                    "modifiers": dict(inst.modifiers),
+                }
+                for inst in self.instances
+            ],
+            "equipment": {slot: str(iid) for slot, iid in self.equipment.items()},
             "active_quests": dict(self.active_quests),
             "completed_quests": sorted(self.completed_quests),
             "stats": dict(self.stats),
@@ -317,6 +446,21 @@ class CharacterState:
             adventures_completed=dict(raw_stats.get("adventures_completed", {})),
         )
 
+        # Deserialize instances
+        raw_instances: List[Dict[str, Any]] = data.get("instances", [])
+        instances: List[ItemInstance] = [
+            ItemInstance(
+                instance_id=UUID(inst["instance_id"]),
+                item_ref=inst["item_ref"],
+                modifiers=dict(inst.get("modifiers", {})),
+            )
+            for inst in raw_instances
+        ]
+
+        # Deserialize equipment: slot → UUID string in the dict
+        raw_equipment: Dict[str, str] = data.get("equipment", {})
+        equipment: Dict[str, UUID] = {slot: UUID(iid_str) for slot, iid_str in raw_equipment.items()}
+
         return cls(
             character_id=UUID(data["character_id"]),
             iteration=data["iteration"],
@@ -328,8 +472,9 @@ class CharacterState:
             max_hp=data["max_hp"],
             current_location=data.get("current_location"),
             milestones=set(data.get("milestones", [])),
-            inventory=dict(data.get("inventory", {})),
-            equipment=dict(data.get("equipment", {})),
+            stacks=dict(data.get("stacks", {})),
+            instances=instances,
+            equipment=equipment,
             active_quests=dict(data.get("active_quests", {})),
             completed_quests=set(data.get("completed_quests", [])),
             stats=reconciled_stats,

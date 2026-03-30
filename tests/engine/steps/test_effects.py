@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
+from oscilla.engine.character import CharacterState
 from oscilla.engine.models.adventure import (
     EndAdventureEffect,
     HealEffect,
@@ -16,7 +17,6 @@ from oscilla.engine.models.adventure import (
 )
 from oscilla.engine.models.base import Metadata
 from oscilla.engine.models.game import GameManifest, GameSpec, HpFormula
-from oscilla.engine.character import CharacterState
 from oscilla.engine.registry import ContentRegistry
 from oscilla.engine.signals import _EndSignal
 from oscilla.engine.steps.effects import run_effect
@@ -98,7 +98,7 @@ async def test_item_drop_effect_single_item(base_player: CharacterState) -> None
 
         mock_choices.assert_called_once_with(population=["test-sword"], weights=[100], k=3)
 
-    assert base_player.inventory.get("test-sword", 0) == 3
+    assert base_player.stacks.get("test-sword", 0) == 3
 
 
 async def test_item_drop_effect_multiple_items(base_player: CharacterState) -> None:
@@ -120,8 +120,8 @@ async def test_item_drop_effect_multiple_items(base_player: CharacterState) -> N
 
         mock_choices.assert_called_once_with(population=["common-item", "rare-item"], weights=[80, 20], k=2)
 
-    assert base_player.inventory.get("common-item", 0) == 1
-    assert base_player.inventory.get("rare-item", 0) == 1
+    assert base_player.stacks.get("common-item", 0) == 1
+    assert base_player.stacks.get("rare-item", 0) == 1
 
 
 async def test_end_adventure_effect_completed(base_player: CharacterState) -> None:
@@ -187,7 +187,7 @@ async def test_multiple_effects_sequence(base_player: CharacterState) -> None:
     # Verify all effects applied
     assert base_player.xp == 50
     assert base_player.has_milestone("progress")
-    assert base_player.inventory.get("reward", 0) == 1
+    assert base_player.stacks.get("reward", 0) == 1
 
 
 async def test_item_drop_effect_accumulates_inventory(base_player: CharacterState) -> None:
@@ -206,7 +206,7 @@ async def test_item_drop_effect_accumulates_inventory(base_player: CharacterStat
         await run_effect(effect=effect, player=base_player, registry=registry, tui=tui)
 
     # Should accumulate: 2 + 3 = 5
-    assert base_player.inventory.get("test-item", 0) == 5
+    assert base_player.stacks.get("test-item", 0) == 5
 
 
 async def test_heal_effect_full_restores_to_max(base_player: CharacterState) -> None:

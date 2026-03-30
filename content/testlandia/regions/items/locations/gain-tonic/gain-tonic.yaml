@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: gain-tonic
+spec:
+  displayName: "Tonic Drop"
+  description: "Test dropping a stackable consumable item."
+  region: items
+  adventures:
+    - ref: gain-tonic
+      weight: 100

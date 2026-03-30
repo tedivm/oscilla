@@ -14,6 +14,7 @@ from oscilla.engine.models.adventure import (
     MilestoneGrantEffect,
     StatChangeEffect,
     StatSetEffect,
+    UseItemEffect,
     XpGrantEffect,
 )
 from oscilla.engine.signals import _EndSignal
@@ -62,7 +63,7 @@ async def run_effect(
             # Roll independently count times with replacement.
             chosen_items = random.choices(population=items, weights=weights, k=count)
             for item_ref in chosen_items:
-                player.add_item(ref=item_ref, quantity=1)
+                player.add_item(ref=item_ref, quantity=1, registry=registry)
             # Announce what was found, grouping identical items.
             item_counts: Counter[str] = Counter(chosen_items)
             parts = []
@@ -107,3 +108,35 @@ async def run_effect(
             old_value = player.stats[stat]
             player.stats[stat] = value
             await tui.show_text(f"Set {stat}: {old_value} → {value}")
+
+        case UseItemEffect(item=item_ref):
+            item = registry.items.get(item_ref)
+            if item is None:
+                await tui.show_text(f"[red]Error: item {item_ref!r} not found[/red]")
+                return
+
+            # Verify the player has the item (stackable) or an instance of it
+            if item.spec.stackable:
+                if player.stacks.get(item_ref, 0) == 0:
+                    await tui.show_text(f"[red]You do not have {item.spec.displayName}.[/red]")
+                    return
+            else:
+                instance = next((inst for inst in player.instances if inst.item_ref == item_ref), None)
+                if instance is None:
+                    await tui.show_text(f"[red]You do not have {item.spec.displayName}.[/red]")
+                    return
+
+            await tui.show_text(f"You use {item.spec.displayName}.")
+
+            # Apply use_effects
+            for sub_effect in item.spec.use_effects:
+                await run_effect(effect=sub_effect, player=player, registry=registry, tui=tui)
+
+            # Consume the item if configured
+            if item.spec.consumed_on_use:
+                if item.spec.stackable:
+                    player.remove_item(ref=item_ref, quantity=1)
+                else:
+                    instance = next((inst for inst in player.instances if inst.item_ref == item_ref), None)
+                    if instance is not None:
+                        player.remove_instance(instance_id=instance.instance_id)

@@ -10,6 +10,7 @@ from oscilla.engine.pipeline import AdventureOutcome, TUICallbacks
 
 if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
+    from oscilla.engine.registry import ContentRegistry
 
 
 async def run_choice(
@@ -17,6 +18,7 @@ async def run_choice(
     player: "CharacterState",
     tui: TUICallbacks,
     run_outcome_branch: Callable[[OutcomeBranch], Awaitable[AdventureOutcome]],
+    registry: "ContentRegistry | None" = None,
 ) -> AdventureOutcome:
     """Filter eligible options, present a menu, then execute the chosen branch.
 
@@ -24,7 +26,7 @@ async def run_choice(
     never sees them. If all options are gated (empty eligible list), a fallback
     message is shown and the step completes without branching.
     """
-    eligible = [opt for opt in step.options if evaluate(opt.requires, player)]
+    eligible = [opt for opt in step.options if evaluate(opt.requires, player, registry)]
 
     if not eligible:
         # No options available; show a notice and continue the adventure.

@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: Item
+metadata:
+  name: test-tonic
+spec:
+  displayName: "Test Tonic"
+  description: "A fizzy blue liquid used to verify use_effects and consumed_on_use mechanics."
+  category: consumable
+  stackable: true
+  use_effects:
+    - type: stat_change
+      stat: strength
+      amount: 1
+  consumed_on_use: true
+  value: 0

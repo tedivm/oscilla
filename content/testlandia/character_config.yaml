@@ -25,3 +25,20 @@ spec:
       type: int
       default: 0
       description: "Hidden int. Incremented by condition-lab adventures."
+
+  equipment_slots:
+    - name: weapon
+      displayName: "Weapon"
+      accepts:
+        - weapon
+
+    - name: off_hand
+      displayName: "Off Hand"
+      accepts:
+        - weapon
+        - shield
+
+    - name: armor
+      displayName: "Armor"
+      accepts:
+        - armor

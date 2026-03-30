@@ -1,12 +1,55 @@
 import asyncio
+import logging
+import sys
 from functools import wraps
 from typing import Annotated, Callable, Coroutine, Dict, ParamSpec, TypeVar
 
 import typer
+from rich.console import Console
+from rich.panel import Panel
 
+from .services.crash import _GITHUB_ISSUES_URL, write_crash_report
 from .settings import settings
 
 app = typer.Typer()
+
+
+def _configure_logging() -> None:
+    """Enable file-based debug logging when settings.debug is True.
+
+    Logging is off by default so that distributed builds do not create log
+    files without the user opting in.  Enable it by setting DEBUG=true in
+    your .env file (see .env.example).
+    """
+    if not settings.debug:
+        return
+    log_path = settings.games_path.parent / "oscilla.log"
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+        filename=str(log_path),
+        encoding="utf-8",
+    )
+
+
+def _handle_crash(exc: BaseException) -> None:
+    """Write a crash report and display a summary to the user.
+
+    Must be called after the TUI has already restored the terminal so that
+    Rich console output is visible to the user.
+    """
+    crash_path = write_crash_report(exc)
+    console = Console(stderr=True)
+    console.print(
+        Panel(
+            f"[bold]{type(exc).__name__}:[/bold] {exc}\n\n"
+            f"Crash report saved to: [bold]{crash_path}[/bold]\n"
+            f"Please include this file when reporting the bug at "
+            f"[link={_GITHUB_ISSUES_URL}]{_GITHUB_ISSUES_URL}[/link]",
+            title="[bold red]Oscilla crashed unexpectedly[/bold red]",
+            border_style="red",
+        )
+    )
 
 
 P = ParamSpec("P")
@@ -100,8 +143,11 @@ async def game(
     """Load games, resolve user identity, select or create a character, and launch the game."""
     from oscilla.engine.tui import OscillaApp
     from oscilla.services.character import delete_user_characters
-    from oscilla.services.db import get_session
+    from oscilla.services.db import get_session, migrate_database
     from oscilla.services.user import derive_tui_user_key, get_or_create_user
+
+    migrate_database()
+    _configure_logging()
 
     games = _load_games()
 
@@ -114,19 +160,28 @@ async def game(
             game_name = next(iter(games))
         else:
             # Let TUI handle game selection
+            tui_crashed = False
             try:
                 await OscillaApp(games=games, game_name=None, character_name=character_name).run_async()
+            except Exception as exc:
+                tui_crashed = True
+                _handle_crash(exc)
             finally:
                 # Force terminal state cleanup even on abnormal exit
-                import sys
-
                 sys.stdout.write("\033[?1049l")  # rmcup - exit alternate screen
                 sys.stdout.flush()
+
+            if tui_crashed:
+                raise SystemExit(1)
 
             # Dispose the connection pool after TUI exits
             from oscilla.services.db import engine
 
-            await engine.dispose()
+            try:
+                await engine.dispose()
+            except asyncio.CancelledError:
+                # Suppress CancelledError during shutdown cleanup
+                pass
             return
 
     if game_name not in games:
@@ -154,14 +209,19 @@ async def game(
             count = await delete_user_characters(session=session, user_id=user.id, game_name=game_name)
         typer.echo(f"Deleted {count} character(s).")
 
+    tui_crashed = False
     try:
         await OscillaApp(games={game_name: registry}, game_name=game_name, character_name=character_name).run_async()
+    except Exception as exc:
+        tui_crashed = True
+        _handle_crash(exc)
     finally:
         # Force terminal state cleanup even on abnormal exit
-        import sys
-
         sys.stdout.write("\033[?1049l")  # rmcup - exit alternate screen
         sys.stdout.flush()
+
+    if tui_crashed:
+        raise SystemExit(1)
 
     # Explicitly dispose the connection pool after the TUI exits so that any
     # remaining aiosqlite connections are closed while the event loop is still
@@ -169,7 +229,13 @@ async def game(
     # trigger a CancelledError during their async rollback.
     from oscilla.services.db import engine
 
-    await engine.dispose()
+    try:
+        await engine.dispose()
+    except asyncio.CancelledError:
+        # If the event loop is being cancelled during shutdown, suppress the
+        # CancelledError from SQLAlchemy connection cleanup to avoid showing
+        # a spurious error to the user.
+        pass
 
 
 @app.command(help="Validate all game packages and report any errors.")

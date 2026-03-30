@@ -5,6 +5,6 @@ metadata:
 spec:
   displayName: "Test Item"
   description: "Gates adventures by presence."
-  kind: material
+  category: material
   stackable: true
   value: 1

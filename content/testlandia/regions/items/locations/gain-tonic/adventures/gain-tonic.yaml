@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: gain-tonic
+spec:
+  displayName: "Tonic Drop Test"
+  description: "Awards test-tonic to verify stackable consumable drop and stacks routing."
+  steps:
+    - type: narrative
+      text: "You find a crate of fizzy blue tonics."
+      effects:
+        - type: item_drop
+          loot:
+            - item: test-tonic
+              weight: 100

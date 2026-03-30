@@ -11,6 +11,8 @@ from oscilla.models.character import CharacterRecord
 from oscilla.models.character_iteration import (
     CharacterIterationEquipment,
     CharacterIterationInventory,
+    CharacterIterationItemInstance,
+    CharacterIterationItemInstanceModifier,
     CharacterIterationMilestone,
     CharacterIterationQuest,
     CharacterIterationRecord,
@@ -91,7 +93,7 @@ async def save_character(session: AsyncSession, state: "CharacterState", user_id
                 stat_value=_stat_to_float(stat_value),
             )
         )
-    for item_ref, quantity in state.inventory.items():
+    for item_ref, quantity in state.stacks.items():
         session.add(
             CharacterIterationInventory(
                 iteration_id=iteration.id,
@@ -99,12 +101,30 @@ async def save_character(session: AsyncSession, state: "CharacterState", user_id
                 quantity=quantity,
             )
         )
-    for slot, item_ref in state.equipment.items():
+    # Build a set of instance_ids that appear in equipment to track which
+    # instances to persist (all instances are persisted regardless).
+    for inst in state.instances:
+        instance_row = CharacterIterationItemInstance(
+            iteration_id=iteration.id,
+            instance_id=str(inst.instance_id),
+            item_ref=inst.item_ref,
+        )
+        session.add(instance_row)
+        for stat, amount in inst.modifiers.items():
+            session.add(
+                CharacterIterationItemInstanceModifier(
+                    iteration_id=str(iteration.id),
+                    instance_id=str(inst.instance_id),
+                    stat=stat,
+                    amount=amount,
+                )
+            )
+    for slot, instance_id in state.equipment.items():
         session.add(
             CharacterIterationEquipment(
                 iteration_id=iteration.id,
                 slot=slot,
-                item_ref=item_ref,
+                instance_id=str(instance_id),
             )
         )
     for milestone_ref in state.milestones:
@@ -194,6 +214,9 @@ async def load_character(
             selectinload(CharacterIterationRecord.stat_values),
             selectinload(CharacterIterationRecord.inventory_rows),
             selectinload(CharacterIterationRecord.equipment_rows),
+            selectinload(CharacterIterationRecord.item_instance_rows).selectinload(
+                CharacterIterationItemInstance.modifier_rows
+            ),
             selectinload(CharacterIterationRecord.milestone_rows),
             selectinload(CharacterIterationRecord.quest_rows),
             selectinload(CharacterIterationRecord.statistic_rows),
@@ -215,8 +238,16 @@ async def load_character(
         }
 
     stats: Dict[str, Any] = {row.stat_name: row.stat_value for row in iteration.stat_values}
-    inventory: Dict[str, int] = {row.item_ref: row.quantity for row in iteration.inventory_rows}
-    equipment: Dict[str, str] = {row.slot: row.item_ref for row in iteration.equipment_rows}
+    stacks: Dict[str, int] = {row.item_ref: row.quantity for row in iteration.inventory_rows}
+    instances: List[Dict[str, Any]] = [
+        {
+            "instance_id": row.instance_id,
+            "item_ref": row.item_ref,
+            "modifiers": {mod.stat: mod.amount for mod in row.modifier_rows},
+        }
+        for row in iteration.item_instance_rows
+    ]
+    equipment: Dict[str, str] = {row.slot: row.instance_id for row in iteration.equipment_rows}
     milestones: List[str] = [row.milestone_ref for row in iteration.milestone_rows]
     active_quests: Dict[str, str] = {
         row.quest_ref: row.stage or "" for row in iteration.quest_rows if row.status == "active"
@@ -245,7 +276,8 @@ async def load_character(
         "max_hp": iteration.max_hp,
         "current_location": iteration.current_location,
         "milestones": milestones,
-        "inventory": inventory,
+        "stacks": stacks,
+        "instances": instances,
         "equipment": equipment,
         "active_quests": active_quests,
         "completed_quests": completed_quests,
@@ -299,6 +331,9 @@ async def delete_user_characters(session: AsyncSession, user_id: UUID, game_name
                 selectinload(CharacterIterationRecord.stat_values),
                 selectinload(CharacterIterationRecord.inventory_rows),
                 selectinload(CharacterIterationRecord.equipment_rows),
+                selectinload(CharacterIterationRecord.item_instance_rows).selectinload(
+                    CharacterIterationItemInstance.modifier_rows
+                ),
                 selectinload(CharacterIterationRecord.milestone_rows),
                 selectinload(CharacterIterationRecord.quest_rows),
                 selectinload(CharacterIterationRecord.statistic_rows),
@@ -597,14 +632,14 @@ async def equip_item(
     session: AsyncSession,
     iteration_id: UUID,
     slot: str,
-    item_ref: str,
+    instance_id: str,
 ) -> None:
     """Upsert one character_iteration_equipment row (insert or replace slot)."""
     await session.merge(
         CharacterIterationEquipment(
             iteration_id=iteration_id,
             slot=slot,
-            item_ref=item_ref,
+            instance_id=instance_id,
         )
     )
     await session.commit()
@@ -620,6 +655,52 @@ async def unequip_item(
         and_(
             CharacterIterationEquipment.iteration_id == iteration_id,
             CharacterIterationEquipment.slot == slot,
+        )
+    )
+    result = await session.execute(stmt)
+    existing = result.scalar_one_or_none()
+    if existing is not None:
+        await session.delete(existing)
+        await session.commit()
+
+
+async def add_item_instance(
+    session: AsyncSession,
+    iteration_id: UUID,
+    instance_id: str,
+    item_ref: str,
+    modifiers: "Dict[str, int | float]",
+) -> None:
+    """Insert a CharacterIterationItemInstance row and its modifier rows."""
+    session.add(
+        CharacterIterationItemInstance(
+            iteration_id=iteration_id,
+            instance_id=instance_id,
+            item_ref=item_ref,
+        )
+    )
+    for stat, amount in modifiers.items():
+        session.add(
+            CharacterIterationItemInstanceModifier(
+                iteration_id=str(iteration_id),
+                instance_id=instance_id,
+                stat=stat,
+                amount=amount,
+            )
+        )
+    await session.commit()
+
+
+async def remove_item_instance(
+    session: AsyncSession,
+    iteration_id: UUID,
+    instance_id: str,
+) -> None:
+    """Delete a CharacterIterationItemInstance row (modifiers cascade)."""
+    stmt = select(CharacterIterationItemInstance).where(
+        and_(
+            CharacterIterationItemInstance.iteration_id == iteration_id,
+            CharacterIterationItemInstance.instance_id == instance_id,
         )
     )
     result = await session.execute(stmt)

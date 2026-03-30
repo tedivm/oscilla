@@ -23,9 +23,11 @@ from oscilla.engine.models.adventure import (
     OutcomeBranch,
     StatCheckStep,
     Step,
+    UseItemEffect,
 )
 from oscilla.engine.models.base import AllCondition, Condition, ManifestEnvelope, normalise_condition
 from oscilla.engine.models.character_config import CharacterConfigManifest
+from oscilla.engine.models.item import ItemManifest
 from oscilla.engine.models.location import LocationManifest
 from oscilla.engine.models.recipe import RecipeManifest
 from oscilla.engine.models.region import RegionManifest
@@ -220,6 +222,40 @@ def _collect_stat_effect_refs(effects: List[Effect], stat_refs: Set[str]) -> Non
             stat_refs.add(effect.stat)
 
 
+def _collect_use_item_refs(effects: List[Effect], item_refs: Set[str]) -> None:
+    """Collect item references from UseItemEffect."""
+    for effect in effects:
+        if isinstance(effect, UseItemEffect):
+            item_refs.add(effect.item)
+
+
+def _collect_branch_use_item_refs(branch: OutcomeBranch, item_refs: Set[str]) -> None:
+    """Collect use_item refs from effects and sub-steps in an OutcomeBranch."""
+    _collect_use_item_refs(branch.effects, item_refs)
+    for sub in branch.steps:
+        _collect_step_use_item_refs(sub, item_refs)
+
+
+def _collect_step_use_item_refs(step: Step, item_refs: Set[str]) -> None:
+    """Collect use_item refs from all effects in a Step."""
+    match step:
+        case NarrativeStep():
+            _collect_use_item_refs(step.effects, item_refs)
+        case CombatStep():
+            for branch in [step.on_win, step.on_defeat, step.on_flee]:
+                _collect_branch_use_item_refs(branch, item_refs)
+        case ChoiceStep():
+            for opt in step.options:
+                _collect_use_item_refs(opt.effects, item_refs)
+                for sub in opt.steps:
+                    _collect_step_use_item_refs(sub, item_refs)
+        case StatCheckStep():
+            for branch in [step.on_pass, step.on_fail]:
+                _collect_branch_use_item_refs(branch, item_refs)
+        case _:
+            pass
+
+
 def _collect_branch_stat_refs(branch: OutcomeBranch, stat_refs: Set[str]) -> None:
     """Collect stat references from effects and sub-steps in an OutcomeBranch."""
     _collect_stat_effect_refs(branch.effects, stat_refs)
@@ -272,16 +308,41 @@ def validate_references(manifests: List[ManifestEnvelope]) -> List[LoadError]:
             )
         )
 
-    # Collect stat names for character_stat condition validation
+    # Collect stat names and slot names for item and adventure validation
     stat_names: Set[str] = set()
+    slot_names: Set[str] = set()
     for m in manifests:
         if m.kind == "CharacterConfig":
             cc = cast(CharacterConfigManifest, m)
             for s in cc.spec.public_stats + cc.spec.hidden_stats:
                 stat_names.add(s.name)
+            for slot in cc.spec.equipment_slots:
+                slot_names.add(slot.name)
 
     for m in manifests:
         match m.kind:
+            case "Item":
+                item = cast(ItemManifest, m)
+                if item.spec.equip is not None:
+                    # Validate equip slot names against CharacterConfig equipment_slots
+                    for slot_name in item.spec.equip.slots:
+                        if slot_names and slot_name not in slot_names:
+                            errors.append(
+                                LoadError(
+                                    file=Path(f"<{m.metadata.name}>"),
+                                    message=f"equip slot {slot_name!r} is not defined in CharacterConfig equipment_slots",
+                                )
+                            )
+                    # Validate stat_modifier stat names
+                    for modifier in item.spec.equip.stat_modifiers:
+                        if stat_names and modifier.stat not in stat_names:
+                            errors.append(
+                                LoadError(
+                                    file=Path(f"<{m.metadata.name}>"),
+                                    message=f"equip stat_modifier references unknown stat {modifier.stat!r}",
+                                )
+                            )
+
             case "Location":
                 loc = cast(LocationManifest, m)
                 if loc.spec.region not in names_by_kind["Region"]:
@@ -408,6 +469,19 @@ def validate_references(manifests: List[ManifestEnvelope]) -> List[LoadError]:
                     if ref not in label_set:
                         errors.append(
                             LoadError(file=Path(f"<{m.metadata.name}>"), message=f"Unresolved goto label: {ref!r}")
+                        )
+
+                # Validate UseItemEffect.item references exist in Item registry
+                use_item_refs: Set[str] = set()
+                for step in adv.spec.steps:
+                    _collect_step_use_item_refs(step, use_item_refs)
+                for ref in use_item_refs:
+                    if ref not in names_by_kind["Item"]:
+                        errors.append(
+                            LoadError(
+                                file=Path(f"<{m.metadata.name}>"),
+                                message=f"use_item effect references unknown item: {ref!r}",
+                            )
                         )
 
             case "Recipe":

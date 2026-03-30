@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: gain-shield
+spec:
+  displayName: "Shield Drop"
+  description: "Test dropping a non-stackable off-hand shield instance."
+  region: items
+  adventures:
+    - ref: gain-shield
+      weight: 100

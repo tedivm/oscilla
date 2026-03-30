@@ -8,7 +8,7 @@ from oscilla.engine.models.character_config import CharacterConfigManifest
 from oscilla.engine.models.enemy import EnemyManifest
 from oscilla.engine.models.game import GameManifest
 from oscilla.engine.models.game_class import ClassManifest
-from oscilla.engine.models.item import ItemManifest
+from oscilla.engine.models.item import EquipSpec, ItemManifest, StatModifier
 from oscilla.engine.models.location import LocationManifest
 from oscilla.engine.models.quest import QuestManifest
 from oscilla.engine.models.recipe import RecipeManifest
@@ -32,6 +32,7 @@ __all__ = [
     "AdventureManifest",
     "CharacterConfigManifest",
     "ClassManifest",
+    "EquipSpec",
     "EnemyManifest",
     "GameManifest",
     "ItemManifest",
@@ -40,4 +41,5 @@ __all__ = [
     "QuestManifest",
     "RecipeManifest",
     "RegionManifest",
+    "StatModifier",
 ]

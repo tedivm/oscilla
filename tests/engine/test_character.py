@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 import pytest
 
-from oscilla.engine.character import CharacterState
+from oscilla.engine.character import CharacterState, ItemInstance
 from oscilla.engine.registry import ContentRegistry
 
 
@@ -13,7 +15,8 @@ def test_new_player_defaults(base_player: CharacterState) -> None:
     assert base_player.xp == 0
     assert base_player.hp == 20
     assert base_player.max_hp == 20
-    assert base_player.inventory == {}
+    assert base_player.stacks == {}
+    assert base_player.instances == []
     assert base_player.milestones == set()
     assert base_player.active_adventure is None
 
@@ -77,11 +80,11 @@ def test_grant_milestone_idempotent(base_player: CharacterState) -> None:
 
 def test_add_and_remove_item(base_player: CharacterState) -> None:
     base_player.add_item(ref="potion", quantity=3)
-    assert base_player.inventory["potion"] == 3
+    assert base_player.stacks["potion"] == 3
     base_player.remove_item(ref="potion", quantity=2)
-    assert base_player.inventory["potion"] == 1
+    assert base_player.stacks["potion"] == 1
     base_player.remove_item(ref="potion", quantity=1)
-    assert "potion" not in base_player.inventory
+    assert "potion" not in base_player.stacks
 
 
 def test_remove_item_raises_on_insufficient(base_player: CharacterState) -> None:
@@ -90,25 +93,28 @@ def test_remove_item_raises_on_insufficient(base_player: CharacterState) -> None
 
 
 def test_equip_item(base_player: CharacterState) -> None:
-    base_player.add_item(ref="iron-sword", quantity=1)
-    base_player.equip(item_ref="iron-sword", slot="weapon")
-    assert base_player.equipment["weapon"] == "iron-sword"
-    assert "iron-sword" not in base_player.inventory
+    inst = ItemInstance(instance_id=UUID("00000000-0000-0000-0000-000000000001"), item_ref="iron-sword")
+    base_player.instances.append(inst)
+    base_player.equip_instance(instance_id=inst.instance_id, slots=["weapon"])
+    assert base_player.equipment["weapon"] == inst.instance_id
+    # Instance stays in instances list — equipment dict records the slot mapping
+    assert inst in base_player.instances
 
 
 def test_equip_displaces_existing(base_player: CharacterState) -> None:
-    base_player.add_item(ref="iron-sword", quantity=1)
-    base_player.add_item(ref="golden-sword", quantity=1)
-    base_player.equip(item_ref="iron-sword", slot="weapon")
-    base_player.equip(item_ref="golden-sword", slot="weapon")
-    assert base_player.equipment["weapon"] == "golden-sword"
-    # displaced item returned to inventory
-    assert base_player.inventory.get("iron-sword", 0) == 1
+    inst1 = ItemInstance(instance_id=UUID("00000000-0000-0000-0000-000000000001"), item_ref="iron-sword")
+    inst2 = ItemInstance(instance_id=UUID("00000000-0000-0000-0000-000000000002"), item_ref="golden-sword")
+    base_player.instances.extend([inst1, inst2])
+    base_player.equip_instance(instance_id=inst1.instance_id, slots=["weapon"])
+    base_player.equip_instance(instance_id=inst2.instance_id, slots=["weapon"])
+    assert base_player.equipment["weapon"] == inst2.instance_id
+    # displaced item returned to instances
+    assert inst1 in base_player.instances
 
 
-def test_equip_raises_if_not_in_inventory(base_player: CharacterState) -> None:
-    with pytest.raises(ValueError, match="Cannot equip"):
-        base_player.equip(item_ref="imaginary-sword", slot="weapon")
+def test_equip_raises_if_not_in_instances(base_player: CharacterState) -> None:
+    with pytest.raises(ValueError, match="not found"):
+        base_player.equip_instance(instance_id=UUID("00000000-0000-0000-0000-000000000099"), slots=["weapon"])
 
 
 def test_record_tracking_methods(base_player: CharacterState) -> None:

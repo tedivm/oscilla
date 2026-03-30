@@ -16,6 +16,7 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from oscilla.services.character import (
     acquire_session_lock,
+    add_item_instance,
     add_milestone,
     equip_item,
     get_active_iteration_id,
@@ -24,6 +25,7 @@ from oscilla.services.character import (
     list_characters_for_user,
     load_character,
     release_session_lock,
+    remove_item_instance,
     save_adventure_progress,
     save_character,
     set_inventory_item,
@@ -267,19 +269,19 @@ class GameSession:
                     value=value,
                 )
 
-        # --- Inventory ---
-        last_inv = last.inventory if last is not None else {}
-        for item_ref, qty in state.inventory.items():
-            if qty != last_inv.get(item_ref):
+        # --- Stacks (stackable inventory) ---
+        last_stacks = last.stacks if last is not None else {}
+        for item_ref, qty in state.stacks.items():
+            if qty != last_stacks.get(item_ref):
                 await set_inventory_item(
                     session=self.db_session,
                     iteration_id=iteration_id,
                     item_ref=item_ref,
                     quantity=qty,
                 )
-        # Items removed entirely
-        for item_ref in last_inv:
-            if item_ref not in state.inventory:
+        # Items removed entirely from stacks
+        for item_ref in last_stacks:
+            if item_ref not in state.stacks:
                 await set_inventory_item(
                     session=self.db_session,
                     iteration_id=iteration_id,
@@ -287,15 +289,36 @@ class GameSession:
                     quantity=0,
                 )
 
-        # --- Equipment ---
+        # --- Item instances (non-stackable) ---
+        last_instance_ids: set[str] = {str(i.instance_id) for i in last.instances} if last is not None else set()
+        current_instance_ids: set[str] = {str(i.instance_id) for i in state.instances}
+        for inst in state.instances:
+            inst_id_str = str(inst.instance_id)
+            if inst_id_str not in last_instance_ids:
+                await add_item_instance(
+                    session=self.db_session,
+                    iteration_id=iteration_id,
+                    instance_id=inst_id_str,
+                    item_ref=inst.item_ref,
+                    modifiers=inst.modifiers,
+                )
+        for inst_id_str in last_instance_ids:
+            if inst_id_str not in current_instance_ids:
+                await remove_item_instance(
+                    session=self.db_session,
+                    iteration_id=iteration_id,
+                    instance_id=inst_id_str,
+                )
+
+        # --- Equipment (slot → instance_id UUID) ---
         last_equip = last.equipment if last is not None else {}
-        for slot, item_ref in state.equipment.items():
-            if item_ref != last_equip.get(slot):
+        for slot, instance_id in state.equipment.items():
+            if instance_id != last_equip.get(slot):
                 await equip_item(
                     session=self.db_session,
                     iteration_id=iteration_id,
                     slot=slot,
-                    item_ref=item_ref,
+                    instance_id=str(instance_id),
                 )
         for slot in last_equip:
             if slot not in state.equipment:

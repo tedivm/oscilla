@@ -10,12 +10,14 @@ from oscilla.engine.pipeline import AdventureOutcome
 
 if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
+    from oscilla.engine.registry import ContentRegistry
 
 
 async def run_stat_check(
     step: StatCheckStep,
     player: "CharacterState",
     run_outcome_branch: Callable[[OutcomeBranch], Awaitable[AdventureOutcome]],
+    registry: "ContentRegistry | None" = None,
 ) -> AdventureOutcome:
     """Evaluate the step's condition against the player and branch accordingly.
 
@@ -23,7 +25,7 @@ async def run_stat_check(
     lives inside the on_pass / on_fail branch steps authored by the content
     creator.
     """
-    if evaluate(step.condition, player):
+    if evaluate(step.condition, player, registry):
         return await run_outcome_branch(step.on_pass)
     else:
         return await run_outcome_branch(step.on_fail)

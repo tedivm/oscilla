@@ -23,14 +23,20 @@ from oscilla.engine.models.base import (
 
 if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
+    from oscilla.engine.registry import ContentRegistry
 
 logger = getLogger(__name__)
 
 
-def evaluate(condition: Condition | None, player: "CharacterState") -> bool:
+def evaluate(
+    condition: Condition | None,
+    player: "CharacterState",
+    registry: "ContentRegistry | None" = None,
+) -> bool:
     """Evaluate a condition tree against the given player state.
 
     Returns True if condition is None (no gate) or every node evaluates to True.
+    Pass registry to enable equipment-aware stat evaluation via effective_stats().
     """
     if condition is None:
         return True
@@ -38,11 +44,11 @@ def evaluate(condition: Condition | None, player: "CharacterState") -> bool:
     match condition:
         # --- Branch nodes ---
         case AllCondition(conditions=children):
-            return all(evaluate(c, player) for c in children)
+            return all(evaluate(c, player, registry) for c in children)
         case AnyCondition(conditions=children):
-            return any(evaluate(c, player) for c in children)
+            return any(evaluate(c, player, registry) for c in children)
         case NotCondition(condition=child):
-            return not evaluate(child, player)
+            return not evaluate(child, player, registry)
 
         # --- Player attribute leaves ---
         case LevelCondition(value=v):
@@ -50,7 +56,7 @@ def evaluate(condition: Condition | None, player: "CharacterState") -> bool:
         case MilestoneCondition(name=n):
             return n in player.milestones
         case ItemCondition(name=n):
-            return player.inventory.get(n, 0) > 0
+            return player.stacks.get(n, 0) > 0
         case ClassCondition():
             # No-op in v1: class mechanics are a placeholder; every class always passes.
             return True
@@ -59,7 +65,9 @@ def evaluate(condition: Condition | None, player: "CharacterState") -> bool:
 
         # --- CharacterConfig stat leaves ---
         case CharacterStatCondition(name=n) as c:
-            value = player.stats.get(n, 0)
+            # Use effective_stats when registry available to include equipment bonuses
+            stats = player.effective_stats(registry=registry) if registry is not None else player.stats
+            value = stats.get(n, 0)
             # Stats may be str/bool; only numeric stats are comparable.
             if not isinstance(value, (int, float)):
                 logger.warning(

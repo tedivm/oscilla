@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: use-item-effect
+spec:
+  displayName: "Use Item Effect"
+  description: "Test the use_item adventure effect: drop a tonic then consume it in the same adventure."
+  region: items
+  adventures:
+    - ref: use-item-effect
+      weight: 100

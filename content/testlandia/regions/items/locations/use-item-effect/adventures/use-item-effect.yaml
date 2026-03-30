@@ -1,0 +1,17 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: use-item-effect
+spec:
+  displayName: "Use Item Effect Test"
+  description: "Drops a test-tonic then fires use_item to consume it, verifying the effect dispatches and the stack decrements."
+  steps:
+    - type: narrative
+      text: "A vendor hands you a tonic and immediately insists you drink it."
+      effects:
+        - type: item_drop
+          loot:
+            - item: test-tonic
+              weight: 100
+        - type: use_item
+          item: test-tonic

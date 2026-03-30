@@ -5,4 +5,4 @@ metadata:
 spec:
   displayName: "Test Widget"
   description: "Minimal test item for drop mechanics."
-  kind: consumable
+  category: consumable

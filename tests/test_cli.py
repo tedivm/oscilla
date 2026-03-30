@@ -198,7 +198,7 @@ def test_validate_multi_game_output() -> None:
     result = runner.invoke(app, ["validate"])
     assert result.exit_code == 0
     # Should show the game name in output
-    assert "the-kingdom" in result.stdout
+    assert "the-example-kingdom" in result.stdout
 
 
 def test_validate_unknown_game() -> None:

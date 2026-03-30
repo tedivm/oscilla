@@ -1,0 +1,16 @@
+apiVersion: game/v1
+kind: Item
+metadata:
+  name: test-sword
+spec:
+  displayName: "Test Sword"
+  description: "A bare-metal blade used to verify equip mechanics and stat modifiers."
+  category: weapon
+  stackable: false
+  equip:
+    slots:
+      - weapon
+    stat_modifiers:
+      - stat: strength
+        amount: 5
+  value: 0

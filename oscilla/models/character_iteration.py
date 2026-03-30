@@ -4,7 +4,20 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Dict, List
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, JSON, String, UniqueConstraint, text
+from sqlalchemy import (
+    JSON,
+    REAL,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    ForeignKeyConstraint,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from oscilla.models.base import Base
@@ -77,6 +90,9 @@ class CharacterIterationRecord(Base):
     equipment_rows: Mapped[List["CharacterIterationEquipment"]] = relationship(
         "CharacterIterationEquipment", back_populates="iteration", cascade="all, delete-orphan"
     )
+    item_instance_rows: Mapped[List["CharacterIterationItemInstance"]] = relationship(
+        "CharacterIterationItemInstance", back_populates="iteration", cascade="all, delete-orphan"
+    )
     milestone_rows: Mapped[List["CharacterIterationMilestone"]] = relationship(
         "CharacterIterationMilestone", back_populates="iteration", cascade="all, delete-orphan"
     )
@@ -130,16 +146,71 @@ class CharacterIterationInventory(Base):
 
 
 class CharacterIterationEquipment(Base):
-    """One row per filled equipment slot."""
+    """One row per filled equipment slot, referencing a non-stackable item instance by UUID."""
 
     __tablename__ = "character_iteration_equipment"
 
     iteration_id: Mapped[UUID] = mapped_column(ForeignKey("character_iterations.id"), primary_key=True, nullable=False)
     slot: Mapped[str] = mapped_column(String, primary_key=True)
-    item_ref: Mapped[str] = mapped_column(String, nullable=False)
+    # UUID of the ItemInstance that occupies this slot (stored as string for SQLite compatibility)
+    instance_id: Mapped[str] = mapped_column(String, nullable=False)
 
     iteration: Mapped["CharacterIterationRecord"] = relationship(
         "CharacterIterationRecord", back_populates="equipment_rows"
+    )
+
+
+class CharacterIterationItemInstance(Base):
+    """One row per non-stackable item instance owned by the character.
+
+    instance_id is a UUID generated at item drop time and persisted across
+    saves so the service layer can correlate equipment slots to instances.
+    """
+
+    __tablename__ = "character_iteration_item_instances"
+
+    iteration_id: Mapped[UUID] = mapped_column(ForeignKey("character_iterations.id"), primary_key=True, nullable=False)
+    # UUID stored as string for SQLite/PostgreSQL compatibility
+    instance_id: Mapped[str] = mapped_column(String, primary_key=True)
+    item_ref: Mapped[str] = mapped_column(String, nullable=False)
+
+    iteration: Mapped["CharacterIterationRecord"] = relationship(
+        "CharacterIterationRecord", back_populates="item_instance_rows"
+    )
+    modifier_rows: Mapped[List["CharacterIterationItemInstanceModifier"]] = relationship(
+        "CharacterIterationItemInstanceModifier",
+        back_populates="item_instance",
+        cascade="all, delete-orphan",
+    )
+
+
+class CharacterIterationItemInstanceModifier(Base):
+    """Per-instance stat modifiers for enchanted or otherwise modified item instances.
+
+    Deleted automatically (ON DELETE CASCADE) when the parent item instance row
+    is removed.  The composite FK (iteration_id, instance_id) references
+    character_iteration_item_instances.
+    """
+
+    __tablename__ = "character_iteration_item_instance_modifiers"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["iteration_id", "instance_id"],
+            [
+                "character_iteration_item_instances.iteration_id",
+                "character_iteration_item_instances.instance_id",
+            ],
+            ondelete="CASCADE",
+        ),
+    )
+
+    iteration_id: Mapped[UUID] = mapped_column(String, primary_key=True, nullable=False)
+    instance_id: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    stat: Mapped[str] = mapped_column(String, primary_key=True, nullable=False)
+    amount: Mapped[float] = mapped_column(REAL, nullable=False)
+
+    item_instance: Mapped["CharacterIterationItemInstance"] = relationship(
+        "CharacterIterationItemInstance", back_populates="modifier_rows"
     )
 
 

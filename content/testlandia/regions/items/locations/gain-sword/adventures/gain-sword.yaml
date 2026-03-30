@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: gain-sword
+spec:
+  displayName: "Sword Drop Test"
+  description: "Awards a test-sword instance to verify non-stackable item drop and inventory routing."
+  steps:
+    - type: narrative
+      text: "You find a plain iron blade on the ground."
+      effects:
+        - type: item_drop
+          loot:
+            - item: test-sword
+              weight: 100

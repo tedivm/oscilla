@@ -213,12 +213,14 @@ class AdventurePipeline:
                     player=self._player,
                     tui=self._tui,
                     run_outcome_branch=self._run_outcome_branch,
+                    registry=self._registry,
                 )
             case StatCheckStep():
                 return await run_stat_check(
                     step=step,
                     player=self._player,
                     run_outcome_branch=self._run_outcome_branch,
+                    registry=self._registry,
                 )
         # Unreachable with a complete match; guards against future extension.
         raise ValueError(f"Unhandled step type: {step!r}")  # pragma: no cover

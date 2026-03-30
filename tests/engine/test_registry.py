@@ -10,7 +10,7 @@ from oscilla.engine.models.game import GameManifest, GameSpec, HpFormula
 from oscilla.engine.models.item import ItemManifest, ItemSpec
 from oscilla.engine.models.location import LocationManifest, LocationSpec
 from oscilla.engine.models.quest import QuestManifest, QuestSpec, QuestStage
-from oscilla.engine.models.recipe import RecipeManifest, RecipeSpec, RecipeIngredient, RecipeOutput
+from oscilla.engine.models.recipe import RecipeIngredient, RecipeManifest, RecipeOutput, RecipeSpec
 from oscilla.engine.models.region import RegionManifest, RegionSpec
 from oscilla.engine.registry import ContentRegistry, KindRegistry
 
@@ -24,7 +24,7 @@ def test_kind_registry_basic_operations() -> None:
         apiVersion="game/v1",
         kind="Item",
         metadata=Metadata(name="test-item"),
-        spec=ItemSpec(displayName="Test Item", kind="consumable"),
+        spec=ItemSpec(displayName="Test Item", category="consumable"),
     )
 
     # Test empty registry
@@ -53,7 +53,7 @@ def test_kind_registry_require_success() -> None:
         apiVersion="game/v1",
         kind="Item",
         metadata=Metadata(name="test-item"),
-        spec=ItemSpec(displayName="Test Item", kind="consumable"),
+        spec=ItemSpec(displayName="Test Item", category="consumable"),
     )
     registry.register(item)
 
@@ -116,7 +116,7 @@ def test_content_registry_build_with_all_kinds() -> None:
             apiVersion="game/v1",
             kind="Item",
             metadata=Metadata(name="test-item"),
-            spec=ItemSpec(displayName="Test Item", kind="consumable"),
+            spec=ItemSpec(displayName="Test Item", category="consumable"),
         ),
         RecipeManifest(
             apiVersion="game/v1",

@@ -167,7 +167,7 @@ async def test_load_character_matches_saved_state(
     assert loaded.name == player.name
     assert loaded.level == player.level
     assert loaded.xp == player.xp
-    assert loaded.inventory == player.inventory
+    assert loaded.stacks == player.stacks
     assert loaded.milestones == player.milestones
 
 

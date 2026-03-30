@@ -30,8 +30,8 @@ def test_to_dict_round_trips_all_fields(base_player: CharacterState) -> None:
     )
 
     data = base_player.to_dict()
-    from tests.engine.conftest import FIXTURES
     from oscilla.engine.loader import load
+    from tests.engine.conftest import FIXTURES
 
     minimal = load(FIXTURES / "minimal")
     assert minimal.character_config is not None
@@ -47,7 +47,7 @@ def test_to_dict_round_trips_all_fields(base_player: CharacterState) -> None:
     assert restored.xp == base_player.xp
     assert restored.hp == base_player.hp
     assert restored.max_hp == base_player.max_hp
-    assert restored.inventory == base_player.inventory
+    assert restored.stacks == base_player.stacks
     assert restored.milestones == base_player.milestones
     assert restored.active_quests == base_player.active_quests
     assert restored.completed_quests == base_player.completed_quests

@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: gain-potion
+spec:
+  displayName: "Potion Drop"
+  description: "Test dropping a stackable healing potion with heal use_effects."
+  region: items
+  adventures:
+    - ref: gain-potion
+      weight: 100
