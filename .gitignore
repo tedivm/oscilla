@@ -165,6 +165,8 @@ oscilla/_version.py
 
 *.db
 
-# saves.db lives at the project root when using the default SQLite configuration.
+# Legacy saves.db — the database now lives in the platform data directory.
+# These patterns guard against any stale project-root artifacts.
 saves.db*
+saves.bak.*
 /content/the-example-kingdom

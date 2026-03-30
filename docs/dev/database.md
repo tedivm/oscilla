@@ -6,9 +6,21 @@ This project uses [SQLAlchemy](https://www.sqlalchemy.org/) as its ORM (Object-R
 
 Database configuration is managed through Pydantic settings with the following environment variable:
 
-- **DATABASE_URL**: Database connection string (default: `sqlite:///./test.db`)
-  - SQLite: `sqlite:///./database.db` (local file) or `sqlite:///:memory:` (in-memory)
-  - PostgreSQL: `postgresql://user:password@localhost:5432/dbname`
+- **DATABASE_URL**: Database connection string. When unset, the default SQLite path is automatically derived using [`platformdirs`](https://platformdirs.readthedocs.io/):
+  - macOS: `~/Library/Application Support/oscilla/oscilla.db`
+  - Linux (XDG): `~/.local/share/oscilla/oscilla.db`
+
+  The data directory is created automatically on first run — no manual setup is required.
+
+  To use an explicit path, set `DATABASE_URL` in your `.env` file:
+  - SQLite: `sqlite+aiosqlite:///path/to/oscilla.db` (local file) or `sqlite+aiosqlite:///:memory:` (in-memory)
+  - PostgreSQL: `postgresql+asyncpg://user:password@localhost:5432/dbname`
+
+To find the current data directory path, use the CLI:
+
+```bash
+uv run oscilla data-path
+```
 
 The database service automatically transforms the connection string for async operations:
 

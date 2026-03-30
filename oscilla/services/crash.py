@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from logging import getLogger
 from pathlib import Path
 
-from oscilla.settings import settings
+import platformdirs
 
 logger = getLogger(__name__)
 
@@ -23,7 +23,7 @@ def write_crash_report(exc: BaseException) -> Path:
     not only from inside an active except block.
     """
     timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    crash_path = settings.games_path.parent / f"oscilla-crash-{timestamp}.log"
+    crash_path = platformdirs.user_data_path("oscilla") / f"oscilla-crash-{timestamp}.log"
     tb_text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
 
     # Add extra details for CSS parse errors

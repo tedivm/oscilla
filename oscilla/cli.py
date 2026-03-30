@@ -4,6 +4,7 @@ import sys
 from functools import wraps
 from typing import Annotated, Callable, Coroutine, Dict, ParamSpec, TypeVar
 
+import platformdirs
 import typer
 from rich.console import Console
 from rich.panel import Panel
@@ -23,7 +24,7 @@ def _configure_logging() -> None:
     """
     if not settings.debug:
         return
-    log_path = settings.games_path.parent / "oscilla.log"
+    log_path = platformdirs.user_data_path("oscilla") / "oscilla.log"
     logging.basicConfig(
         level=logging.DEBUG,
         format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
@@ -92,6 +93,11 @@ def version() -> None:
 @app.command(help="Display a friendly greeting.")
 def hello() -> None:
     typer.echo(f"Hello from {settings.project_name}!")
+
+
+@app.command(help="Print the path to the user data directory used by Oscilla.")
+def data_path() -> None:
+    typer.echo(str(platformdirs.user_data_path("oscilla")))
 
 
 # ---------------------------------------------------------------------------

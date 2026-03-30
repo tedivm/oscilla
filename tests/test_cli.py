@@ -295,3 +295,55 @@ def test_game_command_force_flag_without_reset_db() -> None:
     result = runner.invoke(app, ["game", "--game", "nonexistent-game", "--force"])
     # Should still fail because the game doesn't exist, but not because of the force flag
     assert result.exit_code == 1
+
+
+def test_log_path_uses_data_dir(tmp_path: Any, monkeypatch: Any) -> None:
+    """_configure_logging() writes oscilla.log inside the platform data directory."""
+    import logging
+    from unittest.mock import patch
+
+    from oscilla.cli import _configure_logging
+
+    # Ensure debug is enabled so the logging path is actually exercised
+    monkeypatch.setattr("oscilla.cli.settings.debug", True)
+
+    # Reset the root logger so basicConfig isn't a no-op
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+        handler.close()
+
+    with patch("oscilla.cli.platformdirs.user_data_path", return_value=tmp_path):
+        _configure_logging()
+
+    # Clean up handlers after the test
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+        handler.close()
+
+    expected_log = tmp_path / "oscilla.log"
+    assert expected_log.exists()
+
+
+def test_data_path_exits_zero() -> None:
+    """oscilla data-path exits with code 0."""
+    result = runner.invoke(app, ["data-path"])
+    assert result.exit_code == 0
+
+
+def test_data_path_output_matches_platformdirs() -> None:
+    """The printed path matches str(platformdirs.user_data_path('oscilla'))."""
+    import platformdirs
+
+    result = runner.invoke(app, ["data-path"])
+    assert result.exit_code == 0
+    assert result.output.strip() == str(platformdirs.user_data_path("oscilla"))
+
+
+def test_data_path_output_is_parseable_as_path() -> None:
+    """Path(result.output.strip()) does not raise."""
+    from pathlib import Path
+
+    result = runner.invoke(app, ["data-path"])
+    assert result.exit_code == 0
+    Path(result.output.strip())  # must not raise

@@ -15,6 +15,7 @@ dependencies = [
   "asyncpg",
   "fastapi",
   "jinja2",
+  "platformdirs>=4.9.4",
   "psycopg2-binary",
   "pydantic~=2.0",
   "pydantic-settings",

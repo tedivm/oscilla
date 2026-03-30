@@ -99,12 +99,36 @@ Prints the installed version of Oscilla.
 uv run oscilla version
 ```
 
+### `data-path` — Show Data Directory
+
+Prints the platform data directory where Oscilla stores its database, log file, and crash reports. Useful for backup, reset, or inspection scripts.
+
+```bash
+uv run oscilla data-path
+```
+
+**Example** (macOS):
+
+```
+/Users/alice/Library/Application Support/oscilla
+```
+
+Use it in shell pipelines to work with the files directly:
+
+```bash
+# List all files in the data directory
+ls $(uv run oscilla data-path)
+
+# Back up the database
+cp $(uv run oscilla data-path)/oscilla.db ~/Desktop/oscilla-backup.db
+```
+
 ### Environment Variables
 
 | Variable | Default | Description |
 |---|---|---|
 | `GAMES_PATH` | `content/` | Path to the game library root directory. Each immediate subdirectory with a `game.yaml` is treated as a game package. |
-| `DATABASE_URL` | auto-derived SQLite path | SQLAlchemy async database URL for character persistence. |
+| `DATABASE_URL` | auto-derived: `<platform data dir>/oscilla.db` | SQLAlchemy async database URL for character persistence. See [docs/dev/database.md](./docs/dev/database.md) for the per-OS default path. |
 
 ## Developer Documentation
 

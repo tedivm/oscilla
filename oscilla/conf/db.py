@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import platformdirs
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -10,8 +11,8 @@ class DatabaseSettings(BaseSettings):
     database_url: str | None = Field(
         default=None,
         description=(
-            "Full async-driver database URL. When unset, auto-derived from games_path "
-            "as sqlite+aiosqlite:///<games_path.parent>/saves.db."
+            "Full async-driver database URL. When unset, auto-derived as "
+            "sqlite+aiosqlite:///<user_data_path('oscilla')>/oscilla.db."
         ),
     )
     games_path: Path = Field(
@@ -22,6 +23,7 @@ class DatabaseSettings(BaseSettings):
     @model_validator(mode="after")
     def derive_sqlite_url(self) -> "DatabaseSettings":
         if self.database_url is None:
-            db_path = self.games_path.parent / "saves.db"
-            self.database_url = f"sqlite+aiosqlite:///{db_path.resolve()}"
+            data_dir = platformdirs.user_data_path("oscilla")
+            data_dir.mkdir(parents=True, exist_ok=True)
+            self.database_url = f"sqlite+aiosqlite:///{data_dir / 'oscilla.db'}"
         return self

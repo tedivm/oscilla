@@ -125,6 +125,9 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "postgresql+asyncpg://user:pass@localhost/db"
+    # Default when DATABASE_URL is unset:
+    #   macOS : ~/Library/Application Support/oscilla/oscilla.db
+    #   Linux : ~/.local/share/oscilla/oscilla.db
 
     # Cache
     cache_backend: str = "memory"
