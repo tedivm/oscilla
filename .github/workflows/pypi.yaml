@@ -9,7 +9,7 @@ on:
   pull_request:
 
 env:
-  PUBLISH_TO_PYPI: true
+  PUBLISH_TO_PYPI: false
 
 jobs:
   pypi:
