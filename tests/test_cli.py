@@ -188,7 +188,7 @@ def test_validate_game_flag_help() -> None:
 
 def test_validate_with_game_flag() -> None:
     """Test that validate command accepts --game flag."""
-    result = runner.invoke(app, ["validate", "--game", "the-kingdom"])
+    result = runner.invoke(app, ["validate", "--game", "testlandia"])
     # Should either succeed (0) or fail with validation error (1), not crash
     assert result.exit_code in [0, 1]
 
@@ -198,7 +198,7 @@ def test_validate_multi_game_output() -> None:
     result = runner.invoke(app, ["validate"])
     assert result.exit_code == 0
     # Should show the game name in output
-    assert "the-example-kingdom" in result.stdout
+    assert "testlandia" in result.stdout
 
 
 def test_validate_unknown_game() -> None:
