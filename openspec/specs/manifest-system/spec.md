@@ -38,19 +38,29 @@ The manifest system SHALL support the following `kind` values: `Region`, `Locati
 
 ---
 
-### Requirement: CharacterConfig defines all player stats
+### Requirement: CharacterConfig manifest defines player stats
 
-The `CharacterConfig` manifest SHALL declare two lists of stat definitions: `public_stats` (rendered in the player UI) and `hidden_stats` (internal only, never shown to the player). Each stat definition SHALL include a `name` (unique across both lists), a `type` (one of `int`, `float`, `bool`), and an optional `default` value that defaults to `null` when omitted. The engine SHALL use this manifest to initialise player stat storage at character creation.
+The `CharacterConfig` manifest SHALL define `public_stats` and `hidden_stats` as lists of `StatDefinition`. Each `StatDefinition` SHALL have a `name` (string), `type` (`"int"` or `"bool"` — `"float"` is not a valid type), `default` (`int | bool | None`), and `description` (string, optional). Each `StatDefinition` for an `int` stat MAY include an optional `bounds: StatBounds` object with `min: int | None` and `max: int | None` fields. Setting `bounds` on a `bool` stat is a content load error. Stat names SHALL be unique across `public_stats` and `hidden_stats` within the same `CharacterConfig`; duplicate names SHALL be a content load error.
+
+#### Scenario: Valid character config with int and bool stats loads successfully
+
+- **WHEN** a `CharacterConfig` manifest declares `int` and `bool` stats with valid names and defaults
+- **THEN** the manifest loads without error and the stat definitions are accessible via `CharacterConfigSpec`
+
+#### Scenario: Float stat type is rejected
+
+- **WHEN** a `CharacterConfig` manifest declares a stat with `type: float`
+- **THEN** the content loader raises a `ValidationError` identifying the invalid stat type
 
 #### Scenario: Player stat storage matches CharacterConfig
 
 - **WHEN** a new player is created and a `CharacterConfig` manifest is present
 - **THEN** the player's stat map contains every stat defined in both `public_stats` and `hidden_stats`, initialised to each stat's declared default (or `null` if no default is set)
 
-#### Scenario: Stat name collision is rejected
+#### Scenario: Duplicate stat names are a load error
 
-- **WHEN** a `CharacterConfig` manifest declares the same stat name in both `public_stats` and `hidden_stats`
-- **THEN** the content loader raises a validation error identifying the duplicate name
+- **WHEN** a `CharacterConfig` manifest declares two stats with the same name (even if one is public and one hidden)
+- **THEN** the content loader raises a `ValidationError` listing the duplicate names
 
 #### Scenario: Unknown stat reference is rejected
 
@@ -61,6 +71,16 @@ The `CharacterConfig` manifest SHALL declare two lists of stat definitions: `pub
 
 - **WHEN** a stat's `default` value is not compatible with its declared `type`
 - **THEN** the content loader raises a validation error at parse time
+
+#### Scenario: CharacterConfig with bounds on int stat loads successfully
+
+- **WHEN** a `CharacterConfig` declares an `int` stat with `bounds: { min: 0, max: 1000000 }`
+- **THEN** the manifest loads without error and the stat's bounds are accessible
+
+#### Scenario: CharacterConfig with bounds on bool stat is a load error
+
+- **WHEN** a `CharacterConfig` declares a `bool` stat with any `bounds` value
+- **THEN** the content loader raises a `ValidationError` identifying the stat name and invalid field
 
 ---
 
