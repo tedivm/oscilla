@@ -3,8 +3,8 @@ kind: Location
 metadata:
   name: bump-speed
 spec:
-  displayName: "Speed +0.5"
-  description: "Test stat_change: add to float stat."
+  displayName: "Speed +1"
+  description: "Test stat_change: add 1 to int stat."
   region: character
   adventures:
     - ref: bump-speed

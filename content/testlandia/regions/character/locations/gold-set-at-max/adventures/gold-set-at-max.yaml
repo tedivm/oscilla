@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: gold-set-at-max
+spec:
+  displayName: "Gold Set to Max (1000)"
+  description: "Test stat_set exactly at bounds.max. Value equals max so no clipping occurs."
+  steps:
+    - type: narrative
+      text: "You carefully fill your coin purse to exactly 1000 gold — the maximum you can carry."
+      effects:
+        - type: stat_set
+          stat: gold
+          value: 1000

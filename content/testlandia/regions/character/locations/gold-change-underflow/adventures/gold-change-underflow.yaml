@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: gold-change-underflow
+spec:
+  displayName: "Gold Underflow (clips to min)"
+  description: "Test stat_change that drops below bounds.min. Subtracts 500 from gold — result is clipped to 0 with a warning
+    notification."
+  steps:
+    - type: narrative
+      text: "A thief demands 500 gold. You cannot go into debt — your gold is floored at 0!"
+      effects:
+        - type: stat_change
+          stat: gold
+          amount: -500

@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: gold-change-underflow
+spec:
+  displayName: "Gold Underflow (clips to min)"
+  description: "Test stat_change that goes below bounds.min — value is clipped and player is notified."
+  region: character
+  adventures:
+    - ref: gold-change-underflow
+      weight: 100

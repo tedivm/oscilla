@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import random
 from collections import Counter
+from logging import getLogger
 from typing import TYPE_CHECKING
 
+from oscilla.engine.character import _INT64_MAX, _INT64_MIN
 from oscilla.engine.models.adventure import (
     Effect,
     EndAdventureEffect,
@@ -23,6 +25,28 @@ if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
     from oscilla.engine.pipeline import TUICallbacks
     from oscilla.engine.registry import ContentRegistry
+
+logger = getLogger(__name__)
+
+
+def _resolve_stat_bounds(stat: str, registry: "ContentRegistry") -> tuple[int, int]:
+    """Return the effective (min, max) bounds for a named stat.
+
+    Looks up the stat in the registry's CharacterConfig.  If no CharacterConfig
+    is loaded, or the stat has no explicit bounds, defaults to INT64_MIN/MAX.
+    """
+    char_config = registry.character_config
+    if char_config is None:
+        return _INT64_MIN, _INT64_MAX
+    all_stats = char_config.spec.public_stats + char_config.spec.hidden_stats
+    for stat_def in all_stats:
+        if stat_def.name == stat:
+            if stat_def.bounds is None:
+                return _INT64_MIN, _INT64_MAX
+            lo = stat_def.bounds.min if stat_def.bounds.min is not None else _INT64_MIN
+            hi = stat_def.bounds.max if stat_def.bounds.max is not None else _INT64_MAX
+            return lo, hi
+    return _INT64_MIN, _INT64_MAX
 
 
 async def run_effect(
@@ -94,20 +118,58 @@ async def run_effect(
                 await tui.show_text(f"[red]Error: stat {stat!r} not found[/red]")
                 return
             old_value = player.stats[stat]
-            if isinstance(old_value, (int, float)) and isinstance(amount, (int, float)):
-                new_value = old_value + amount
-                player.stats[stat] = new_value
-                await tui.show_text(f"Changed {stat}: {old_value} → {new_value}")
-            else:
+            # bool is a subclass of int; the isinstance guard keeps bool stats blocked.
+            if not isinstance(old_value, int) or isinstance(old_value, bool):
                 await tui.show_text(f"[red]Error: cannot change non-numeric stat {stat!r}[/red]")
+                return
+            raw_new = old_value + amount
+            lo, hi = _resolve_stat_bounds(stat=stat, registry=registry)
+            new_value = max(lo, min(hi, raw_new))
+            if new_value != raw_new:
+                logger.warning(
+                    "stat_change on %r: attempted %d, clamped to %d (bounds %d..%d).",
+                    stat,
+                    raw_new,
+                    new_value,
+                    lo,
+                    hi,
+                )
+                await tui.show_text(
+                    f"[yellow]Warning: stat {stat!r} clamped to {new_value} (attempted {raw_new}).[/yellow]"
+                )
+            player.set_stat(name=stat, value=new_value)
+            await tui.show_text(f"Changed {stat}: {old_value} → {new_value}")
 
         case StatSetEffect(stat=stat, value=value):
             if stat not in player.stats:
                 await tui.show_text(f"[red]Error: stat {stat!r} not found[/red]")
                 return
             old_value = player.stats[stat]
-            player.stats[stat] = value
-            await tui.show_text(f"Set {stat}: {old_value} → {value}")
+            # bool set — bypass integer bounds entirely; True/False are always valid.
+            if isinstance(value, bool):
+                player.stats[stat] = value
+                await tui.show_text(f"Set {stat}: {old_value} → {value}")
+                return
+            if value is None:
+                player.stats[stat] = None
+                await tui.show_text(f"Set {stat}: {old_value} → None")
+                return
+            lo, hi = _resolve_stat_bounds(stat=stat, registry=registry)
+            clamped = max(lo, min(hi, value))
+            if clamped != value:
+                logger.warning(
+                    "stat_set on %r: attempted %d, clamped to %d (bounds %d..%d).",
+                    stat,
+                    value,
+                    clamped,
+                    lo,
+                    hi,
+                )
+                await tui.show_text(
+                    f"[yellow]Warning: stat {stat!r} clamped to {clamped} (attempted {value}).[/yellow]"
+                )
+            player.set_stat(name=stat, value=clamped)
+            await tui.show_text(f"Set {stat}: {old_value} → {clamped}")
 
         case UseItemEffect(item=item_ref):
             item = registry.items.get(item_ref)

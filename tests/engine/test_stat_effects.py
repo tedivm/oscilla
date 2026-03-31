@@ -44,27 +44,6 @@ def test_stat_change_int_positive() -> None:
     assert player.stats["strength"] == 15
 
 
-def test_stat_change_float_negative() -> None:
-    """stat_change with negative float amount on float stat should work."""
-    registry = load(STAT_EFFECTS_FIXTURE)
-    player = CharacterState.new_character(
-        name="TestHero", game_manifest=registry.game, character_config=registry.character_config
-    )
-
-    # Initial speed should be 5.0 (default)
-    assert player.stats["speed"] == 5.0
-
-    from oscilla.engine.models.adventure import StatChangeEffect
-
-    effect = StatChangeEffect(type="stat_change", stat="speed", amount=-2.5)
-
-    old_value = player.stats["speed"]
-    new_value = old_value + effect.amount
-    player.stats["speed"] = new_value
-
-    assert player.stats["speed"] == 2.5
-
-
 def test_stat_set_bool() -> None:
     """stat_set with bool value on bool stat should work."""
     registry = load(STAT_EFFECTS_FIXTURE)

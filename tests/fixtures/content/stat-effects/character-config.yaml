@@ -9,9 +9,9 @@ spec:
       default: 10
       description: "Physical power"
     - name: speed
-      type: float
-      default: 5.0
-      description: "Movement speed"
+      type: int
+      default: 5
+      description: "Movement speed (integer)"
     - name: is_blessed
       type: bool
       default: false

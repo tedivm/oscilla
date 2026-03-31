@@ -152,7 +152,20 @@ spec:
       description: "Standing with various factions."
 ```
 
-**Stat Types**: `int`, `float`, `str`, `bool`
+**Stat Types**: `int`, `bool`
+
+**Stat Bounds** (optional, `int` stats only): Add a `bounds` key with `min` and/or `max` to restrict the range of an integer stat. The engine clamps out-of-range values automatically and notifies the player when this happens.
+
+```yaml
+- name: gold
+  type: int
+  default: 0
+  bounds:
+    min: 0       # gold cannot go below zero
+    max: 999999  # gold cap
+```
+
+Omitting `bounds` (or omitting `min`/`max` individually) defaults to the full 64-bit signed integer range.
 
 #### Equipment Slots
 
@@ -710,7 +723,7 @@ effects:
 
 #### Stat Change
 
-Modify player stats by adding or subtracting amounts. Only works with numeric stat types (`int`, `float`):
+Modify player stats by adding or subtracting integer amounts. Only works with `int` stats:
 
 ```yaml
 effects:
@@ -721,38 +734,30 @@ effects:
   - type: stat_change
     stat: "gold"
     amount: -25           # Spend 25 gold
-
-  - type: stat_change
-    stat: "speed"
-    amount: 1.5           # Add 1.5 to float stat
 ```
 
-**Validation**: The stat must exist in `CharacterConfig` and be of type `int` or `float`. Attempting to use `stat_change` on `bool` or `str` stats will cause validation errors.
+**Validation**: The stat must exist in `CharacterConfig` and be of type `int`. Attempting to use `stat_change` on `bool` stats will cause a content load error. The `amount` must be an integer.
+
+**Bounds clamping**: If the stat has `bounds` defined, the result is clamped to `[min, max]` automatically. The player is notified via the TUI when clamping occurs.
 
 #### Stat Set
 
-Set player stats to specific values. Works with any stat type:
+Set player stats to specific values:
 
 ```yaml
 effects:
-  - type: stat_set
-    stat: "title"
-    value: "Hero of the Realm"    # String assignment
-
   - type: stat_set
     stat: "is_blessed"
     value: true                   # Boolean assignment
 
   - type: stat_set
     stat: "strength"
-    value: 20                     # Numeric override
-
-  - type: stat_set
-    stat: "nickname"
-    value: ""                     # Clear string stat
+    value: 20                     # Integer override
 ```
 
-**Validation**: The value must be type-compatible with the stat definition in `CharacterConfig`. The stat must exist and be visible (not hidden) unless the effect is in engine-internal content.
+**Validation**: The value must match the stat type (`int` or `bool`). The stat must exist in `CharacterConfig`. String values are not accepted.
+
+**Bounds clamping**: For `int` stats with `bounds` defined, the value is clamped to `[min, max]`. The player is notified via the TUI when clamping occurs.
 
 ### Item Drops
 

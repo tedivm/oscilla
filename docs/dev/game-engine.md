@@ -140,7 +140,7 @@ class PlayerState:
     xp: int
     hp: int
     max_hp: int
-    stats: Dict[str, int | float | str | bool | None]
+    stats: Dict[str, int | bool | None]
     inventory: Dict[str, int]
     equipment: Dict[str, str]
     milestones: Set[str]
@@ -257,21 +257,17 @@ Each step type has a dedicated handler module:
 
 #### Stat Mutation Effects
 
-**StatChangeEffect** modifies player stats by adding/subtracting a numeric amount:
+**StatChangeEffect** modifies player stats by adding/subtracting an integer amount:
 
 ```yaml
 effects:
   - type: stat_change
     stat: "strength"         # Must exist in character_config.yaml
-    amount: 2              # int or float; negative values subtract
+    amount: 2              # Integer; negative values subtract
 
   - type: stat_change
     stat: "gold"
     amount: -25            # Spend gold
-
-  - type: stat_change
-    stat: "speed"
-    amount: 1.5            # Float stats supported
 ```
 
 **StatSetEffect** assigns player stats to specific values:
@@ -279,23 +275,27 @@ effects:
 ```yaml
 effects:
   - type: stat_set
-    stat: "title"
-    value: "Hero of the Realm"  # Any type matching the stat
-
-  - type: stat_set
     stat: "is_blessed"
-    value: true               # Boolean values
+    value: true               # Boolean assignment
 
   - type: stat_set
     stat: "strength"
     value: 20                # Override current value
 ```
 
+**Stat Bounds** — `StatDefinition` accepts an optional `bounds` field with `min` and/or `max` integer constraints. The engine enforces these at effect application time in `effects.py` (first-line enforcement) and inside `CharacterState.set_stat()` (INT64 backstop):
+
+- When a computed value exceeds the bounds, it is clamped silently to the allowed range.
+- A `logger.warning` is emitted and the player is shown a TUI notification.
+- The clamping in `set_stat()` uses INT64 limits (`-(2**63)` to `(2**63) - 1`) matching the PostgreSQL `BIGINT` column.
+
 **Validation Rules:**
 
 - Both effects require the stat name to exist in `CharacterConfig`
-- `StatChangeEffect` requires `int` or `float` stat types (cannot add to `bool` or `str`)
-- `StatSetEffect` value must be type-compatible with the stat definition
+- Stat types are `int` and `bool` only — `float` and `str` are not supported and cause a `ContentLoadError` at load time
+- `StatChangeEffect` cannot be applied to `bool` stats (load-time validation error)
+- `StatSetEffect` value must match the stat type (`int` or `bool`)
+- `bounds` cannot be specified on `bool` stats (load-time validation error)
 - Load-time validation prevents runtime type errors
 
 ## Testing with MockTUI

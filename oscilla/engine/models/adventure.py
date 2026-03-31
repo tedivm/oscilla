@@ -55,13 +55,13 @@ class HealEffect(BaseModel):
 class StatChangeEffect(BaseModel):
     type: Literal["stat_change"]
     stat: str = Field(description="Character stat name")
-    amount: int | float = Field(description="Amount to add/subtract from stat; can be negative")
+    amount: int = Field(description="Amount to add/subtract from stat; can be negative")
 
 
 class StatSetEffect(BaseModel):
     type: Literal["stat_set"]
     stat: str = Field(description="Character stat name")
-    value: int | float | bool | None = Field(description="New value for stat")
+    value: int | bool | None = Field(description="New value for stat")
 
 
 class UseItemEffect(BaseModel):

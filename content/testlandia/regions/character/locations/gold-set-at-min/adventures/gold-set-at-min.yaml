@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: gold-set-at-min
+spec:
+  displayName: "Gold Set to Min (0)"
+  description: "Test stat_set exactly at bounds.min. Value equals min so no clipping occurs."
+  steps:
+    - type: narrative
+      text: "You spend every last coin. Your purse is completely empty — exactly 0 gold."
+      effects:
+        - type: stat_set
+          stat: gold
+          value: 0

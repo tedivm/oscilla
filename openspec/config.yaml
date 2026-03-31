@@ -26,3 +26,18 @@ rules:
       required fixtures, and which behaviours each tier verifies.
     - Documentation and testing sections must be as detailed and specific as the implementation sections. Vague entries 
       like "write tests" or "update the docs" are not acceptable.
+    - Every changed or new function, method, and class must be shown as a complete Python code block — not a summary, 
+      not a signature stub, not pseudocode. Include the full implementation with all logic. This includes private helper
+      functions and utilities introduced to support the change, not just the primary entry points.
+    - For each modified file, show a "before" code block (the existing code) and an "after" code block (the 
+      replacement). Do not describe what to change in prose alone; always include the actual code.
+    - When a function's signature or contract changes, identify every call site in the codebase and show each updated 
+      call in a code block. A change is not fully specified if callers are only mentioned in prose.
+    - Edge cases and exceptional conditions must be explicitly enumerated per section — list each case and the exact 
+      handling (what the code does, what the user sees, what is logged). Do not bury edge cases in prose.
+    - Test examples in the Testing Philosophy section must be complete runnable test functions with setup, assertions, 
+      and any required fixtures — not just a table of test names or one-line descriptions.
+    - If the tests require a stub or mock (e.g. MockTUI, a fake registry), show the complete stub class implementation 
+      alongside the test functions, not just a reference to it by name.
+    - Use inline code comments to document language gotchas, design tradeoffs, and non-obvious implementation decisions 
+      at the point in the code where they matter — not only in surrounding prose.

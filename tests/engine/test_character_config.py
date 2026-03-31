@@ -3,7 +3,12 @@
 import pytest
 from pydantic import ValidationError
 
-from oscilla.engine.models.character_config import CharacterConfigManifest, CharacterConfigSpec, StatDefinition
+from oscilla.engine.models.character_config import (
+    CharacterConfigManifest,
+    CharacterConfigSpec,
+    StatBounds,
+    StatDefinition,
+)
 
 
 def test_stat_definition_basic() -> None:
@@ -83,3 +88,55 @@ def test_character_config_manifest_complete() -> None:
     )
     assert manifest.kind == "CharacterConfig"
     assert manifest.spec.public_stats[0].name == "strength"
+
+
+# ---------------------------------------------------------------------------
+# StatBounds tests
+# ---------------------------------------------------------------------------
+
+
+def test_stat_bounds_min_gt_max_raises() -> None:
+    """StatBounds with min > max should raise ValidationError."""
+    with pytest.raises(ValidationError, match="min"):
+        StatBounds(min=100, max=10)
+
+
+def test_stat_bounds_on_bool_stat_raises() -> None:
+    """StatDefinition with type=bool and bounds set should raise ValidationError."""
+    with pytest.raises(ValidationError, match="bool"):
+        StatDefinition(name="flag", type="bool", bounds=StatBounds(min=0, max=1))
+
+
+def test_stat_bounds_absent_is_valid() -> None:
+    """StatDefinition with no bounds field should parse without error."""
+    stat = StatDefinition(name="gold", type="int", default=0)
+    assert stat.bounds is None
+
+
+def test_stat_bounds_min_only_is_valid() -> None:
+    """StatBounds with only min set (no max) should be valid."""
+    stat = StatDefinition(name="reputation", type="int", default=0, bounds=StatBounds(min=0))
+    assert stat.bounds is not None
+    assert stat.bounds.min == 0
+    assert stat.bounds.max is None
+
+
+def test_stat_bounds_max_only_is_valid() -> None:
+    """StatBounds with only max set (no min) should be valid."""
+    stat = StatDefinition(name="stress", type="int", default=0, bounds=StatBounds(max=100))
+    assert stat.bounds is not None
+    assert stat.bounds.min is None
+    assert stat.bounds.max == 100
+
+
+def test_float_stat_type_rejected() -> None:
+    """StatDefinition with type='float' should raise ValidationError."""
+    with pytest.raises(ValidationError):
+        StatDefinition.model_validate({"name": "speed", "type": "float", "default": 1.0})
+
+
+def test_stat_bounds_min_eq_max_is_valid() -> None:
+    """StatBounds with min == max (a fixed value) should be valid."""
+    bounds = StatBounds(min=50, max=50)
+    assert bounds.min == 50
+    assert bounds.max == 50

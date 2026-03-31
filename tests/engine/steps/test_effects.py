@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from unittest.mock import patch
+from uuid import uuid4
 
 import pytest
 
@@ -13,9 +14,17 @@ from oscilla.engine.models.adventure import (
     ItemDropEffect,
     ItemDropEntry,
     MilestoneGrantEffect,
+    StatChangeEffect,
+    StatSetEffect,
     XpGrantEffect,
 )
 from oscilla.engine.models.base import Metadata
+from oscilla.engine.models.character_config import (
+    CharacterConfigManifest,
+    CharacterConfigSpec,
+    StatBounds,
+    StatDefinition,
+)
 from oscilla.engine.models.game import GameManifest, GameSpec, HpFormula
 from oscilla.engine.registry import ContentRegistry
 from oscilla.engine.signals import _EndSignal
@@ -249,3 +258,86 @@ async def test_heal_effect_cannot_exceed_max_hp(base_player: CharacterState) -> 
     await run_effect(effect=effect, player=base_player, registry=registry, tui=tui)
 
     assert base_player.hp == 20
+
+
+# ---------------------------------------------------------------------------
+# Stat bounds enforcement tests — content-defined min/max clamping
+# ---------------------------------------------------------------------------
+
+
+def _make_bounded_registry(bounds: StatBounds | None = None) -> ContentRegistry:
+    """Build a registry with a single 'gold' int stat, optionally with bounds."""
+    stat = StatDefinition(name="gold", type="int", default=100, bounds=bounds)
+    spec = CharacterConfigSpec(public_stats=[stat])
+    config = CharacterConfigManifest(
+        apiVersion="game/v1",
+        kind="CharacterConfig",
+        metadata=Metadata(name="test-config"),
+        spec=spec,
+    )
+    registry = ContentRegistry()
+    registry.character_config = config
+    return registry
+
+
+def _make_gold_player(gold: int = 100) -> CharacterState:
+    return CharacterState(
+        character_id=uuid4(),
+        name="TestHero",
+        character_class=None,
+        level=1,
+        xp=0,
+        hp=20,
+        max_hp=20,
+        iteration=0,
+        current_location=None,
+        stats={"gold": gold},
+    )
+
+
+@pytest.mark.asyncio
+async def test_stat_change_within_bounds_is_unchanged() -> None:
+    """A delta that keeps the stat in range is applied without clamping."""
+    registry = _make_bounded_registry(bounds=StatBounds(min=0, max=1000))
+    player = _make_gold_player(gold=100)
+    tui = MockTUI()
+    effect = StatChangeEffect(type="stat_change", stat="gold", amount=50)
+    await run_effect(effect=effect, player=player, registry=registry, tui=tui)
+    assert player.stats["gold"] == 150
+    assert not any("clamped" in msg.lower() for msg in tui.texts)
+
+
+@pytest.mark.asyncio
+async def test_stat_change_clamps_to_content_max() -> None:
+    """A delta that exceeds bounds.max clamps to the max and shows a TUI warning."""
+    registry = _make_bounded_registry(bounds=StatBounds(min=0, max=1000))
+    player = _make_gold_player(gold=900)
+    tui = MockTUI()
+    effect = StatChangeEffect(type="stat_change", stat="gold", amount=500)
+    await run_effect(effect=effect, player=player, registry=registry, tui=tui)
+    assert player.stats["gold"] == 1000
+    assert any("clamped" in msg.lower() for msg in tui.texts)
+
+
+@pytest.mark.asyncio
+async def test_stat_change_clamps_to_content_min() -> None:
+    """A delta that goes below bounds.min clamps to min with a TUI warning."""
+    registry = _make_bounded_registry(bounds=StatBounds(min=0, max=1000))
+    player = _make_gold_player(gold=50)
+    tui = MockTUI()
+    effect = StatChangeEffect(type="stat_change", stat="gold", amount=-200)
+    await run_effect(effect=effect, player=player, registry=registry, tui=tui)
+    assert player.stats["gold"] == 0
+    assert any("clamped" in msg.lower() for msg in tui.texts)
+
+
+@pytest.mark.asyncio
+async def test_stat_set_clamps_to_content_max() -> None:
+    """stat_set with a value exceeding bounds.max clamps and shows TUI warning."""
+    registry = _make_bounded_registry(bounds=StatBounds(min=0, max=1000))
+    player = _make_gold_player(gold=100)
+    tui = MockTUI()
+    effect = StatSetEffect(type="stat_set", stat="gold", value=999_999)
+    await run_effect(effect=effect, player=player, registry=registry, tui=tui)
+    assert player.stats["gold"] == 1000
+    assert any("clamped" in msg.lower() for msg in tui.texts)

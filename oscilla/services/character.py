@@ -28,18 +28,18 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
-def _stat_to_float(value: "int | float | bool | None") -> float | None:
-    """Encode a CharacterState stat value for storage in the Float DB column.
+def _stat_to_int(value: "int | bool | None") -> int | None:
+    """Encode a CharacterState stat value for storage in the BigInteger DB column.
 
-    Booleans are stored as 0.0/1.0. Numeric types are cast directly.
+    Booleans are stored as 0/1. Integer values are stored as-is.
     NULL is preserved as NULL for unset stats.
     """
     if value is None:
         return None
     # bool must be checked before int because bool is a subclass of int
     if isinstance(value, bool):
-        return float(int(value))
-    return float(value)
+        return int(value)
+    return value
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ async def save_character(session: AsyncSession, state: "CharacterState", user_id
             CharacterIterationStatValue(
                 iteration_id=iteration.id,
                 stat_name=stat_name,
-                stat_value=_stat_to_float(stat_value),
+                stat_value=_stat_to_int(stat_value),
             )
         )
     for item_ref, quantity in state.stacks.items():
@@ -422,7 +422,7 @@ async def prestige_character(
             CharacterIterationStatValue(
                 iteration_id=new_iteration.id,
                 stat_name=stat_def.name,
-                stat_value=_stat_to_float(stat_def.default),
+                stat_value=_stat_to_int(stat_def.default),
             )
         )
 
@@ -581,18 +581,18 @@ async def set_stat(
     session: AsyncSession,
     iteration_id: UUID,
     stat_name: str,
-    value: int | float | bool | None,
+    value: int | bool | None,
 ) -> None:
     """Upsert one row in character_iteration_stat_values.
 
-    value is stored as a REAL column; booleans are stored as 0.0/1.0;
+    value is stored as a BIGINT column; booleans are stored as 0/1;
     NULL is used for stats whose value is explicitly unset.
     """
     merged = await session.merge(
         CharacterIterationStatValue(
             iteration_id=iteration_id,
             stat_name=stat_name,
-            stat_value=_stat_to_float(value),
+            stat_value=_stat_to_int(value),
         )
     )
     await session.commit()

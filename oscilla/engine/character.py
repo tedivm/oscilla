@@ -19,6 +19,11 @@ if TYPE_CHECKING:
 
 logger = getLogger(__name__)
 
+# Hard INT64 floor/ceiling used as an absolute backstop in set_stat().
+# Bounds from StatDefinition are enforced in the effect handlers before this point.
+_INT64_MIN: int = -(2**63)
+_INT64_MAX: int = (2**63) - 1
+
 
 @dataclass
 class AdventurePosition:
@@ -105,8 +110,8 @@ class CharacterState:
     active_quests: Dict[str, str] = field(default_factory=dict)
     completed_quests: Set[str] = field(default_factory=set)
     active_adventure: AdventurePosition | None = None
-    # Dynamic stats from CharacterConfig; int | float | bool | None (not Any).
-    stats: Dict[str, int | float | bool | None] = field(default_factory=dict)
+    # Dynamic stats from CharacterConfig; int | bool | None (not Any).
+    stats: Dict[str, int | bool | None] = field(default_factory=dict)
 
     # --- Factory ---
 
@@ -124,7 +129,7 @@ class CharacterState:
         All collection fields start empty.
         """
         all_stats = character_config.spec.public_stats + character_config.spec.hidden_stats
-        initial_stats: Dict[str, int | float | bool | None] = {s.name: s.default for s in all_stats}
+        initial_stats: Dict[str, int | bool | None] = {s.name: s.default for s in all_stats}
         base_hp = game_manifest.spec.hp_formula.base_hp
         return cls(
             character_id=uuid4(),
@@ -138,6 +143,24 @@ class CharacterState:
             current_location=None,
             stats=initial_stats,
         )
+
+    # --- Stat mutation ---
+
+    def set_stat(self, name: str, value: int) -> None:
+        """Set an integer stat, clamping to INT64 range as an absolute backstop.
+
+        Effect handlers should clamp to StatBounds before calling this method.
+        This backstop prevents silent integer overflow from reaching the DB.
+        """
+        clamped = max(_INT64_MIN, min(_INT64_MAX, value))
+        if clamped != value:
+            logger.warning(
+                "set_stat(%r): value %d clamped to INT64 range %d.",
+                name,
+                value,
+                clamped,
+            )
+        self.stats[name] = clamped
 
     # --- Inventory ---
 
@@ -231,7 +254,7 @@ class CharacterState:
 
     # --- Stat computation ---
 
-    def effective_stats(self, registry: "ContentRegistry | None" = None) -> Dict[str, int | float | bool | None]:
+    def effective_stats(self, registry: "ContentRegistry | None" = None) -> Dict[str, int | bool | None]:
         """Return base stats augmented by equipped item stat_modifiers.
 
         Iterates over unique equipped instance_ids, looks up each item's equip
@@ -239,7 +262,7 @@ class CharacterState:
         ItemInstance.modifiers are also applied.  Non-numeric stats are not
         modified by equipment.
         """
-        result: Dict[str, int | float | bool | None] = dict(self.stats)
+        result: Dict[str, int | bool | None] = dict(self.stats)
         if registry is None:
             return result
 
@@ -257,14 +280,14 @@ class CharacterState:
             if item is not None and item.spec.equip is not None:
                 for modifier in item.spec.equip.stat_modifiers:
                     current = result.get(modifier.stat, 0)
-                    if isinstance(current, (int, float)):
-                        result[modifier.stat] = current + modifier.amount
+                    if isinstance(current, int) and not isinstance(current, bool):
+                        result[modifier.stat] = int(current + modifier.amount)
 
             # Apply per-instance modifiers on top
             for stat, amount in instance.modifiers.items():
                 current = result.get(stat, 0)
-                if isinstance(current, (int, float)):
-                    result[stat] = current + amount
+                if isinstance(current, int) and not isinstance(current, bool):
+                    result[stat] = int(current + amount)
 
         return result
 
@@ -395,10 +418,10 @@ class CharacterState:
         """
         all_stats = character_config.spec.public_stats + character_config.spec.hidden_stats
         stat_defs = {s.name: s for s in all_stats}
-        _type_map = {"int": int, "float": float, "bool": bool}
+        _type_map = {"int": int, "bool": bool}
 
-        saved_stats: Dict[str, int | float | bool | None] = data.get("stats", {})
-        reconciled_stats: Dict[str, int | float | bool | None] = {}
+        saved_stats: Dict[str, int | bool | None] = data.get("stats", {})
+        reconciled_stats: Dict[str, int | bool | None] = {}
 
         # Inject defaults for stats in config but missing from save
         for stat_name, stat_def in stat_defs.items():

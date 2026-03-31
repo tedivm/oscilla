@@ -74,3 +74,62 @@ def test_region_root_has_no_effective_unlock(
 ) -> None:
     root = region_chain_registry.regions.require("test-region-root", "Region")
     assert root.spec.effective_unlock is None
+
+
+_MINIMAL_GAME_YAML = """\
+apiVersion: game/v1
+kind: Game
+metadata:
+  name: test-game
+spec:
+  displayName: "Test"
+  xp_thresholds: [100]
+  hp_formula:
+    base_hp: 20
+    hp_per_level: 5
+"""
+
+
+def test_loader_rejects_float_stat_type(tmp_path: Path) -> None:
+    """A CharacterConfig with type: float is rejected at parse/load time."""
+    (tmp_path / "game.yaml").write_text(_MINIMAL_GAME_YAML, encoding="utf-8")
+    (tmp_path / "char.yaml").write_text(
+        """\
+apiVersion: game/v1
+kind: CharacterConfig
+metadata:
+  name: test-config
+spec:
+  public_stats:
+    - name: speed
+      type: float
+      default: 1.0
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ContentLoadError):
+        load(tmp_path)
+
+
+def test_loader_rejects_bounds_on_bool_stat(tmp_path: Path) -> None:
+    """A CharacterConfig with bounds on a bool stat is rejected at load time."""
+    (tmp_path / "game.yaml").write_text(_MINIMAL_GAME_YAML, encoding="utf-8")
+    (tmp_path / "char.yaml").write_text(
+        """\
+apiVersion: game/v1
+kind: CharacterConfig
+metadata:
+  name: test-config
+spec:
+  public_stats:
+    - name: is_blessed
+      type: bool
+      default: false
+      bounds:
+        min: 0
+        max: 1
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ContentLoadError):
+        load(tmp_path)

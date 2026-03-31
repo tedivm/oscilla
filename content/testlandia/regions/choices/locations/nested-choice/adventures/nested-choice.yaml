@@ -23,7 +23,7 @@ spec:
                       effects:
                         - type: stat_change
                           stat: speed
-                          amount: 0.5
+                          amount: 1
                 - label: a2
                   text: "A2 (gain gold)"
                   steps:

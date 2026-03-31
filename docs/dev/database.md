@@ -816,7 +816,7 @@ erDiagram
   character_iteration_stat_values {
     CHAR(32) iteration_id PK,FK
     VARCHAR stat_name PK
-    FLOAT stat_value "nullable"
+    BIGINT stat_value "nullable"
   }
 
   character_iteration_statistics {

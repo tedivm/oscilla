@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: gold-set-at-max
+spec:
+  displayName: "Gold Set to Max (1000)"
+  description: "Test stat_set exactly at bounds.max — no clipping expected."
+  region: character
+  adventures:
+    - ref: gold-set-at-max
+      weight: 100

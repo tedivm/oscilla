@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: gold-set-at-min
+spec:
+  displayName: "Gold Set to Min (0)"
+  description: "Test stat_set exactly at bounds.min — no clipping expected."
+  region: character
+  adventures:
+    - ref: gold-set-at-min
+      weight: 100

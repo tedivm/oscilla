@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: gold-change-overflow
+spec:
+  displayName: "Gold Overflow (clips to max)"
+  description: "Test stat_change that exceeds bounds.max — value is clipped and player is notified."
+  region: character
+  adventures:
+    - ref: gold-change-overflow
+      weight: 100

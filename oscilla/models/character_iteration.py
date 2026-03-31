@@ -6,14 +6,14 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     JSON,
-    REAL,
+    BigInteger,
     Boolean,
     DateTime,
-    Float,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
     Integer,
+    REAL,
     String,
     UniqueConstraint,
     text,
@@ -110,11 +110,11 @@ class CharacterIterationRecord(Base):
 
 
 class CharacterIterationStatValue(Base):
-    """Content-defined character stat stored as a native REAL column.
+    """Content-defined character stat stored as a BIGINT column.
 
     stat_value is NULL for stats whose default is explicitly unset (e.g.
     relationship scores before first interaction). int values are stored and
-    returned as-is; float values likewise. No encoding or decoding is needed.
+    returned as-is. No encoding or decoding is needed.
     Keys and their expected types come from the content package's CharacterConfig
     — content-drift handling (add missing / drop removed) happens in
     CharacterState.from_dict().
@@ -124,7 +124,7 @@ class CharacterIterationStatValue(Base):
 
     iteration_id: Mapped[UUID] = mapped_column(ForeignKey("character_iterations.id"), primary_key=True, nullable=False)
     stat_name: Mapped[str] = mapped_column(String, primary_key=True)
-    stat_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    stat_value: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     iteration: Mapped["CharacterIterationRecord"] = relationship(
         "CharacterIterationRecord", back_populates="stat_values"

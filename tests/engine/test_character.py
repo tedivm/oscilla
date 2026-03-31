@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
-from oscilla.engine.character import CharacterState, ItemInstance
+from oscilla.engine.character import CharacterState, ItemInstance, _INT64_MAX, _INT64_MIN
 from oscilla.engine.registry import ContentRegistry
 
 
@@ -282,3 +282,55 @@ def test_add_xp_return_tuple_structure(minimal_registry: ContentRegistry) -> Non
     levels_gained, levels_lost = result
     assert levels_gained == []
     assert levels_lost == [3, 2]  # lost levels 3→2→1
+
+
+# ---------------------------------------------------------------------------
+# CharacterState.set_stat() — INT64 clamp backstop tests
+# ---------------------------------------------------------------------------
+
+
+def _make_bare_player() -> CharacterState:
+    return CharacterState(
+        character_id=uuid4(),
+        name="T",
+        character_class=None,
+        level=1,
+        xp=0,
+        hp=20,
+        max_hp=20,
+        iteration=0,
+        current_location=None,
+        stats={"gold": 100},
+    )
+
+
+def test_set_stat_within_range_is_unchanged() -> None:
+    player = _make_bare_player()
+    player.set_stat(name="gold", value=500)
+    assert player.stats["gold"] == 500
+
+
+def test_set_stat_clamps_above_int64_max(caplog: pytest.LogCaptureFixture) -> None:
+    player = _make_bare_player()
+    over = _INT64_MAX + 1
+    with caplog.at_level("WARNING"):
+        player.set_stat(name="gold", value=over)
+    assert player.stats["gold"] == _INT64_MAX
+    assert "clamped" in caplog.text
+
+
+def test_set_stat_clamps_below_int64_min(caplog: pytest.LogCaptureFixture) -> None:
+    player = _make_bare_player()
+    under = _INT64_MIN - 1
+    with caplog.at_level("WARNING"):
+        player.set_stat(name="gold", value=under)
+    assert player.stats["gold"] == _INT64_MIN
+    assert "clamped" in caplog.text
+
+
+def test_set_stat_at_int64_boundary_is_not_clamped() -> None:
+    player = _make_bare_player()
+    player.set_stat(name="gold", value=_INT64_MAX)
+    assert player.stats["gold"] == _INT64_MAX
+    player.set_stat(name="gold", value=_INT64_MIN)
+    assert player.stats["gold"] == _INT64_MIN

@@ -9,9 +9,9 @@ spec:
       default: 10
       description: "Standard int stat. Target for stat_change and stat_set tests."
     - name: speed
-      type: float
-      default: 1.0
-      description: "Float stat. Tests float delta and set operations."
+      type: int
+      default: 1
+      description: "Int stat. Tests integer delta and set operations."
     - name: is_blessed
       type: bool
       default: false
@@ -19,7 +19,10 @@ spec:
     - name: gold
       type: int
       default: 0
-      description: "Standard int currency stat."
+      description: "Standard int currency stat. Has bounds [0, 1000] for clipping tests."
+      bounds:
+        min: 0
+        max: 1000
   hidden_stats:
     - name: debug_counter
       type: int

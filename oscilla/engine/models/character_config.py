@@ -6,14 +6,34 @@ from pydantic import BaseModel, model_validator
 
 from oscilla.engine.models.base import Condition, ManifestEnvelope
 
-StatType = Literal["int", "float", "bool"]
+StatType = Literal["int", "bool"]
+
+
+class StatBounds(BaseModel):
+    """Inclusive bounds for an integer stat. Either bound may be omitted (defaults to INT64 range)."""
+
+    min: int | None = None
+    max: int | None = None
+
+    @model_validator(mode="after")
+    def validate_min_lte_max(self) -> "StatBounds":
+        if self.min is not None and self.max is not None and self.min > self.max:
+            raise ValueError(f"StatBounds.min ({self.min}) must be less than or equal to StatBounds.max ({self.max})")
+        return self
 
 
 class StatDefinition(BaseModel):
     name: str
     type: StatType
-    default: int | float | bool | None = None
+    default: int | bool | None = None
     description: str = ""
+    bounds: StatBounds | None = None
+
+    @model_validator(mode="after")
+    def validate_bounds_not_on_bool(self) -> "StatDefinition":
+        if self.type == "bool" and self.bounds is not None:
+            raise ValueError(f"StatBounds cannot be set on a bool stat (stat name: {self.name!r})")
+        return self
 
 
 class SlotDefinition(BaseModel):

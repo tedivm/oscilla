@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: gold-change-overflow
+spec:
+  displayName: "Gold Overflow (clips to max)"
+  description: "Test stat_change that exceeds bounds.max. Adds 5000 to gold — result is clipped to 1000 with a warning notification."
+  steps:
+    - type: narrative
+      text: "You discover an enormous treasure chest. You try to take 5000 gold, but your purse can only hold 1000!"
+      effects:
+        - type: stat_change
+          stat: gold
+          amount: 5000

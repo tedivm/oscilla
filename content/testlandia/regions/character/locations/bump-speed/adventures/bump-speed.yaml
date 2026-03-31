@@ -3,12 +3,12 @@ kind: Adventure
 metadata:
   name: bump-speed
 spec:
-  displayName: "Speed Change +0.5"
-  description: "Test stat_change on float stat."
+  displayName: "Speed Change +1"
+  description: "Test stat_change on int stat."
   steps:
     - type: narrative
-      text: "Speed increased by 0.5."
+      text: "Speed increased by 1."
       effects:
         - type: stat_change
           stat: speed
-          amount: 0.5
+          amount: 1

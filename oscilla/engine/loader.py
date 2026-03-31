@@ -390,15 +390,9 @@ def validate_references(manifests: List[ManifestEnvelope]) -> List[LoadError]:
                         for effect in effects_list:
                             if isinstance(effect, StatChangeEffect):
                                 stat_type = stat_types.get(effect.stat)
-                                if stat_type in ("int", "float") and isinstance(effect.amount, (int, float)):
-                                    continue  # Valid numeric change
-                                elif stat_type in ("int", "float"):
-                                    errors.append(
-                                        LoadError(
-                                            file=Path(f"<{m.metadata.name}>"),
-                                            message=f"stat_change on {effect.stat!r} requires numeric amount, got {type(effect.amount).__name__}",
-                                        )
-                                    )
+                                if stat_type == "int":
+                                    # amount type is already validated as int by Pydantic; no further check needed
+                                    pass
                                 elif stat_type == "bool":
                                     errors.append(
                                         LoadError(
@@ -413,13 +407,6 @@ def validate_references(manifests: List[ManifestEnvelope]) -> List[LoadError]:
                                         LoadError(
                                             file=Path(f"<{m.metadata.name}>"),
                                             message=f"stat_set on int stat {effect.stat!r} requires int value, got {type(effect.value).__name__}",
-                                        )
-                                    )
-                                elif stat_type == "float" and not isinstance(effect.value, (int, float)):
-                                    errors.append(
-                                        LoadError(
-                                            file=Path(f"<{m.metadata.name}>"),
-                                            message=f"stat_set on float stat {effect.stat!r} requires numeric value, got {type(effect.value).__name__}",
                                         )
                                     )
                                 elif stat_type == "bool" and not isinstance(effect.value, bool):

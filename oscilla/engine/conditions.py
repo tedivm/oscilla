@@ -68,8 +68,8 @@ def evaluate(
             # Use effective_stats when registry available to include equipment bonuses
             stats = player.effective_stats(registry=registry) if registry is not None else player.stats
             value = stats.get(n, 0)
-            # Stats may be str/bool; only numeric stats are comparable.
-            if not isinstance(value, (int, float)):
+            # Stats may be bool; only numeric stats are comparable.
+            if not isinstance(value, int):
                 logger.warning(
                     "character_stat condition on non-numeric stat %r (value=%r); treating as 0",
                     n,
@@ -91,7 +91,7 @@ def evaluate(
     raise ValueError(f"Unhandled condition type: {condition!r}")  # pragma: no cover
 
 
-def _numeric_compare(value: int | float, condition: object) -> bool:
+def _numeric_compare(value: int, condition: object) -> bool:
     """Apply gt / gte / lt / lte / eq / mod comparisons from a condition object.
 
     All comparators that are set must pass (logical AND).
