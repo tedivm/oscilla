@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from oscilla.engine.character import CharacterState, ItemInstance, _INT64_MAX, _INT64_MIN
+from oscilla.engine.character import _INT64_MAX, _INT64_MIN, CharacterState, ItemInstance
 from oscilla.engine.registry import ContentRegistry
 
 

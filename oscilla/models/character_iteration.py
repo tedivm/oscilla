@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     JSON,
+    REAL,
     BigInteger,
     Boolean,
     DateTime,
@@ -13,7 +14,6 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Integer,
-    REAL,
     String,
     UniqueConstraint,
     text,
