@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: overworld-skill-test
+spec:
+  displayName: "Overworld Skill Test"
+  description: "Grants regen and dispel skills. Test overworld-only skills and dispel functionality."
+  region: skills
+  adventures:
+    - ref: overworld-skill-test
+      weight: 100

@@ -1,0 +1,20 @@
+apiVersion: game/v1
+kind: Skill
+metadata:
+  name: iron-skin
+spec:
+  displayName: "Iron Skin"
+  description: "Wrap yourself in hardened earth, reducing incoming damage by 30% for 3 turns."
+  contexts:
+    - combat
+  cost:
+    stat: mana
+    amount: 10
+  cooldown:
+    scope: turn
+    count: 2
+  use_effects:
+    - type: apply_buff
+      buff_ref: shield-buff
+      target: player
+      variables: {}

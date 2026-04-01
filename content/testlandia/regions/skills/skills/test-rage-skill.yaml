@@ -1,0 +1,21 @@
+apiVersion: game/v1
+kind: Skill
+metadata:
+  name: test-rage-skill
+spec:
+  displayName: "Test Rage Skill"
+  description: "Grants rage buff for testing damage amplification."
+  contexts:
+    - combat
+    - overworld
+  cost:
+    stat: mana
+    amount: 15
+  cooldown:
+    scope: turn
+    count: 4
+  use_effects:
+    - type: apply_buff
+      buff_ref: rage-buff
+      target: player
+      variables: {}

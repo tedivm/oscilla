@@ -5,15 +5,19 @@ from __future__ import annotations
 import random
 from collections import Counter
 from logging import getLogger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict
 
 from oscilla.engine.character import _INT64_MAX, _INT64_MIN
+from oscilla.engine.combat_context import ActiveCombatEffect, CombatContext
 from oscilla.engine.models.adventure import (
+    ApplyBuffEffect,
+    DispelEffect,
     Effect,
     EndAdventureEffect,
     HealEffect,
     ItemDropEffect,
     MilestoneGrantEffect,
+    SkillGrantEffect,
     StatChangeEffect,
     StatSetEffect,
     UseItemEffect,
@@ -54,13 +58,14 @@ async def run_effect(
     player: "CharacterState",
     registry: "ContentRegistry",
     tui: "TUICallbacks",
+    combat: "CombatContext | None" = None,
 ) -> None:
     """Dispatch a single effect to its handler.
 
-    Each effect mutates player state and emits a summary message via tui so
-    the player sees XP gains, item finds, and heals in the narrative log.
-    EndAdventureEffect raises _EndSignal which propagates up to the pipeline's
-    run() loop; it never escapes AdventurePipeline.
+    combat must be provided for any effect with target="enemy". When absent and
+    target="enemy" is requested, a warning is logged and the effect is skipped
+    rather than crashing — this can occur if a skill with combat-only effects is
+    somehow invoked outside combat.
     """
     match effect:
         case XpGrantEffect(amount=amount):
@@ -103,7 +108,19 @@ async def run_effect(
         case EndAdventureEffect(outcome=outcome):
             raise _EndSignal(outcome)
 
-        case HealEffect(amount=amount):
+        case HealEffect(amount=amount, target=target):
+            if target == "enemy":
+                if combat is None:
+                    logger.warning("heal with target='enemy' called outside combat — skipping effect.")
+                    return
+                if amount == "full":
+                    # Enemy max_hp is not tracked; log warning and skip.
+                    logger.warning("heal target='enemy' with amount='full' is not supported — skipping.")
+                    return
+                combat.enemy_hp = max(0, combat.enemy_hp + int(amount))
+                await tui.show_text(f"Enemy healed for {amount}. (Enemy HP: {combat.enemy_hp})")
+                return
+            # — player target (original logic) —
             before_hp = player.hp
             if amount == "full":
                 player.hp = player.max_hp
@@ -113,7 +130,18 @@ async def run_effect(
             if healed > 0:
                 await tui.show_text(f"Restored {healed} HP. (HP: {player.hp} / {player.max_hp})")
 
-        case StatChangeEffect(stat=stat, amount=amount):
+        case StatChangeEffect(stat=stat, amount=amount, target=target):
+            if target == "enemy":
+                if combat is None:
+                    logger.warning("stat_change with target='enemy' called outside combat — skipping effect.")
+                    return
+                combat.enemy_hp += amount
+                # Enemy HP floor is 0.
+                combat.enemy_hp = max(0, combat.enemy_hp)
+                action = "damaged" if amount < 0 else "healed"
+                await tui.show_text(f"Enemy {action} for {abs(amount)}. (Enemy HP: {combat.enemy_hp})")
+                return
+            # — player target (original logic) —
             if stat not in player.stats:
                 await tui.show_text(f"[red]Error: stat {stat!r} not found[/red]")
                 return
@@ -192,7 +220,7 @@ async def run_effect(
 
             # Apply use_effects
             for sub_effect in item.spec.use_effects:
-                await run_effect(effect=sub_effect, player=player, registry=registry, tui=tui)
+                await run_effect(effect=sub_effect, player=player, registry=registry, tui=tui, combat=combat)
 
             # Consume the item if configured
             if item.spec.consumed_on_use:
@@ -202,3 +230,68 @@ async def run_effect(
                     instance = next((inst for inst in player.instances if inst.item_ref == item_ref), None)
                     if instance is not None:
                         player.remove_instance(instance_id=instance.instance_id)
+
+        case SkillGrantEffect(skill=skill_ref):
+            granted = player.grant_skill(skill_ref=skill_ref, registry=registry)
+            if granted:
+                skill = registry.skills.get(skill_ref)
+                name = skill.spec.displayName if skill is not None else skill_ref
+                await tui.show_text(f"You learned: {name}!")
+            # Already-known — silent no-op (grant_skill returns False)
+
+        case DispelEffect(label=label, target=target):
+            if combat is None:
+                # Outside combat there are no active effects to remove.
+                logger.debug("dispel(%r) called outside combat — no-op.", label)
+                return
+            before = len(combat.active_effects)
+            combat.active_effects = [
+                ae for ae in combat.active_effects if not (ae.label == label and ae.target == target)
+            ]
+            removed = before - len(combat.active_effects)
+            if removed > 0:
+                await tui.show_text(f"[green]{removed} effect(s) with label {label!r} dispelled.[/green]")
+            else:
+                logger.debug("dispel(%r): no matching active effects found.", label)
+
+        case ApplyBuffEffect(buff_ref=buff_ref, target=buff_target, variables=call_vars):
+            if combat is None:
+                # Buffs only make sense inside the combat turn loop.
+                logger.warning("apply_buff(%r) called outside combat — skipping.", buff_ref)
+                return
+            buff_manifest = registry.buffs.get(buff_ref)
+            if buff_manifest is None:
+                logger.error("apply_buff: buff ref %r not found in registry — skipping.", buff_ref)
+                await tui.show_text(f"[red]Error: buff {buff_ref!r} not found.[/red]")
+                return
+            spec = buff_manifest.spec
+            # Merge manifest variable defaults with call-site overrides.
+            resolved_vars: Dict[str, int] = {**spec.variables, **call_vars}
+
+            def _resolve_percent(v: int | str) -> int:
+                """Resolve a modifier percent — either a literal int or a variable name."""
+                if isinstance(v, int):
+                    return v
+                if v in resolved_vars:
+                    return resolved_vars[v]
+                # Should never reach here when load-time validation passes.
+                logger.error("apply_buff: variable %r not in resolved_vars — using 0.", v)
+                return 0
+
+            # Build resolved modifier copies with concrete int percent values.
+            resolved_modifiers = [
+                mod.model_copy(update={"percent": _resolve_percent(mod.percent)}) for mod in spec.modifiers
+            ]
+
+            # Buff manifest name is used as the stable label for DispelEffect matching.
+            combat.active_effects.append(
+                ActiveCombatEffect(
+                    source_skill=buff_manifest.metadata.name,
+                    target=buff_target,
+                    remaining_turns=spec.duration_turns,
+                    per_turn_effects=list(spec.per_turn_effects),
+                    modifiers=resolved_modifiers,
+                    label=buff_manifest.metadata.name,
+                )
+            )
+            await tui.show_text(f"[bold]{spec.displayName}[/bold] applied for {spec.duration_turns} turn(s).")

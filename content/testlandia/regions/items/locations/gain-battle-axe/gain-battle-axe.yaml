@@ -1,0 +1,8 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: gain-battle-axe
+spec:
+  displayName: "Battle Axe Cache"
+  description: "Obtain the Battle Axe — a weapon that grants War Rage while equipped."
+  region: items

@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: gain-battle-axe
+spec:
+  displayName: "Battle Axe Drop Test"
+  description: "Awards a battle-axe instance. The axe grants War Rage while equipped."
+  steps:
+    - type: narrative
+      text: "You pull a heavy double-headed axe from an ancient weapon rack. Its weight feels familiar in your hands."
+      effects:
+        - type: item_drop
+          loot:
+            - item: battle-axe
+              weight: 100

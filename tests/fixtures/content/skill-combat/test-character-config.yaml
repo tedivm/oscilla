@@ -1,0 +1,27 @@
+apiVersion: game/v1
+kind: CharacterConfig
+metadata:
+  name: test-character-config
+spec:
+  public_stats:
+    - name: strength
+      type: int
+      default: 10
+      description: "Physical power"
+    - name: dexterity
+      type: int
+      default: 10
+      description: "Agility"
+    - name: mana
+      type: int
+      default: 20
+      description: "Mana resource for skills"
+    - name: max_mana
+      type: int
+      default: 20
+      description: "Maximum mana"
+  hidden_stats: []
+  skill_resources:
+    - name: mana
+      stat: mana
+      max_stat: max_mana

@@ -17,6 +17,7 @@ from sqlalchemy.orm.exc import StaleDataError
 from oscilla.services.character import (
     acquire_session_lock,
     add_item_instance,
+    add_known_skill,
     add_milestone,
     equip_item,
     get_active_iteration_id,
@@ -30,6 +31,7 @@ from oscilla.services.character import (
     save_character,
     set_inventory_item,
     set_quest,
+    set_skill_cooldown,
     set_stat,
     touch_character_updated_at,
     unequip_item,
@@ -393,6 +395,34 @@ class GameSession:
                     stat_type="adventures_completed",
                     entity_ref=entity_ref,
                     delta=delta,
+                )
+
+        # --- Known skills (additive only — skills are never removed mid-iteration) ---
+        last_skills = last.known_skills if last is not None else set()
+        for skill_ref in state.known_skills - last_skills:
+            await add_known_skill(
+                session=self.db_session,
+                iteration_id=iteration_id,
+                skill_ref=skill_ref,
+            )
+
+        # --- Skill cooldowns (upsert/delete) ---
+        last_cooldowns = last.skill_cooldowns if last is not None else {}
+        for skill_ref, remaining in state.skill_cooldowns.items():
+            if remaining != last_cooldowns.get(skill_ref):
+                await set_skill_cooldown(
+                    session=self.db_session,
+                    iteration_id=iteration_id,
+                    skill_ref=skill_ref,
+                    cooldown_remaining=remaining,
+                )
+        for skill_ref in last_cooldowns:
+            if skill_ref not in state.skill_cooldowns:
+                await set_skill_cooldown(
+                    session=self.db_session,
+                    iteration_id=iteration_id,
+                    skill_ref=skill_ref,
+                    cooldown_remaining=0,
                 )
 
         # --- Adventure progress ---

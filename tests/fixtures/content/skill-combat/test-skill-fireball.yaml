@@ -1,0 +1,17 @@
+apiVersion: game/v1
+kind: Skill
+metadata:
+  name: test-skill-fireball
+spec:
+  displayName: "Fireball"
+  description: "Apply a damage-over-time buff to the enemy."
+  contexts:
+    - combat
+  cost:
+    stat: mana
+    amount: 5
+  use_effects:
+    - type: apply_buff
+      buff_ref: test-buff-dot
+      target: enemy
+      variables: {}

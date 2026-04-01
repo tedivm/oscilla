@@ -401,6 +401,99 @@ When a character is loaded from the DB, `CharacterState.from_dict()` reconciles 
 
 This ensures that content updates (renaming stats, removing adventures) do not break existing characters.
 
+## Skill and Buff System
+
+### Overview
+
+Skills and buffs are first-class manifest kinds processed by the content loader alongside enemies, items, and adventures. The runtime objects that hold live combat state (`CombatContext`, `ActiveCombatEffect`) are ephemeral dataclasses — they exist only for the duration of a single `run_combat()` call and are never persisted.
+
+### `CombatContext` Lifecycle
+
+`CombatContext` (`oscilla/engine/combat_context.py`) is constructed at the start of `run_combat()` and torn down when combat ends (win, defeat, or flee). It carries all per-combat state that is too transient for `CharacterState`:
+
+| Field | Type | Purpose |
+|---|---|---|
+| `enemy_hp` | `int` | Current enemy HP; mirrored back to `step_state` each round |
+| `turn` | `int` | Current turn number (1-indexed, incremented after each round) |
+| `active_effects` | `List[ActiveCombatEffect]` | Active buffs on player and enemy |
+| `skill_uses_this_combat` | `Dict[str, int]` | Turn-scope cooldown tracking: skill_ref → last turn used |
+| `enemy_resources` | `Dict[str, int]` | Live resource values for enemy skill costs (initialized from `EnemySpec.skill_resources`) |
+
+On combat exit, `CombatContext` is discarded. Only `CharacterState.skill_cooldowns` (adventure-scope cooldowns) is written back to the player state.
+
+### `ActiveCombatEffect`
+
+Each active buff is represented as an `ActiveCombatEffect`:
+
+| Field | Type | Purpose |
+|---|---|---|
+| `label` | `str` | Buff manifest `name` — stable identity used by `DispelEffect` |
+| `target` | `"player"` \| `"enemy"` | Who the buff is applied to |
+| `turns_remaining` | `int` | Decremented at round start; removed when 0 |
+| `per_turn_effects` | `List[Effect]` | Dispatched through `run_effect()` each round |
+| `modifiers` | `List[CombatModifier]` | Passive damage-arithmetic modifiers queried during attack/defence |
+
+### `available_skills()` Contract
+
+`CharacterState.available_skills(registry)` returns the complete set of skill refs the character can currently activate. It combines three sources:
+
+1. `known_skills` — permanently learned skills.
+2. Skills from `ItemSpec.grants_skills_equipped` — only for items that are in an active equipment slot.
+3. Skills from `ItemSpec.grants_skills_held` — for any item present in inventory (stacks or instances), equipped or not.
+
+Without a registry, only `known_skills` is returned. This makes the method safe to call from contexts where items cannot be resolved (e.g., offline condition checks).
+
+### Cooldown Tracking
+
+Two cooldown scopes exist:
+
+**Turn-scope** (`CombatContext.skill_uses_this_combat`): stored as `skill_ref → turn_last_used`. A skill with `scope: turn, count: 1` can be used at most once per turn. The check is `current_turn - last_used < cooldown.count`. Turn-scope cooldowns reset at the start of every combat.
+
+**Adventure-scope** (`CharacterState.skill_cooldowns`): stored as `skill_ref → adventures_remaining`. Decremented at adventure start by `tick_skill_cooldowns()`. Removed when the count reaches 0. These values are persisted to the database and survive between play sessions.
+
+### `SkillCondition` Modes
+
+`SkillCondition` (in `oscilla/engine/models/base.py`, evaluated in `oscilla/engine/conditions.py`) supports two modes:
+
+- **`learned`** (default): checks `CharacterState.known_skills` directly. No registry required; always fast.
+- **`available`**: calls `CharacterState.available_skills(registry)` which includes item-granted skills. Requires a registry.
+
+### `run_effect()` `combat` Parameter
+
+`run_effect()` (in `oscilla/engine/steps/effects.py`) accepts an optional `combat: CombatContext | None` parameter. When `None`:
+
+- `ApplyBuffEffect` logs a WARNING and is skipped — buffs only exist in combat.
+- `DispelEffect` logs DEBUG and is skipped — nothing to dispel outside combat.
+- `StatChangeEffect` and `HealEffect` with `target="enemy"` log a WARNING and are skipped.
+
+This design means items and skills with both combat and non-combat effects (e.g., a potion that dispels a burn and also heals HP) work correctly in overworld contexts without special-casing in content.
+
+### Damage Modifier Helpers
+
+Three pure helper functions in `oscilla/engine/steps/combat.py` apply modifier arithmetic:
+
+- **`_apply_damage_amplify(base, target, ctx)`** — scans `ctx.active_effects` for `DamageAmplifyModifier` on `target`; sums all `percent` values and scales `base` by `(1 + total/100)`.
+- **`_apply_incoming_modifiers(base, target, ctx)`** — reduces damage by `damage_reduction` modifiers and additively increases it by `damage_vulnerability` modifiers. Final formula: `base * max(0.0, 1.0 - reduction/100 + vulnerability/100)`.
+- **`_apply_reflect(base, target, ctx, apply_reflect_damage)`** — sums `damage_reflect` modifiers on `target` and calls `apply_reflect_damage(reflected_amount)` if non-zero.
+
+### Equipment Buff Grants at Combat Start
+
+At the start of every `run_combat()` call, before the first round, the engine:
+
+1. Iterates all items currently in an equipment slot → applies each `grants_buffs_equipped` `BuffGrant` via `ApplyBuffEffect`.
+2. Iterates all items in inventory (stacks + instances) → applies each `grants_buffs_held` `BuffGrant` via `ApplyBuffEffect`.
+
+Each `BuffGrant.variables` dict is merged with the buff manifest's own `variables` defaults at apply time. The resulting resolved `percent` values are substituted into the modifier's `ActiveCombatEffect`.
+
+### Loader Validation
+
+The content loader (`oscilla/engine/loader.py`) validates skill and buff cross-references at load time:
+
+- All `skill_ref` values in items and enemies must name known `Skill` manifests.
+- All `buff_ref` values in `apply_buff` effects and `grants_buffs_*` must name known `Buff` manifests.
+- All variable override keys in `ApplyBuffEffect.variables` and `BuffGrant.variables` must be declared in the target buff's `variables` block.
+- `CharacterConfig.skill_resources` bindings: both `stat` and `max_stat` must reference declared stats.
+
 ## Performance Considerations
 
 - Content is loaded once at startup and cached in memory

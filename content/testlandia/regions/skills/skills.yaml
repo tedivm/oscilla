@@ -1,0 +1,7 @@
+apiVersion: game/v1
+kind: Region
+metadata:
+  name: skills
+spec:
+  displayName: "Skills Testing"
+  description: "Test skill system functionality: buff effects, overworld skills, cooldowns, and skill granting."

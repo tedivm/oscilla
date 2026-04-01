@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List
 
 import pytest
 
@@ -29,14 +29,17 @@ class MockTUI:
         self,
         menu_responses: List[int] | None = None,
         text_responses: List[str] | None = None,
+        skill_menu_responses: List[int | None] | None = None,
     ) -> None:
         self.texts: List[str] = []
         self.menus: List[tuple[str, List[str]]] = []
         self.combat_rounds: List[tuple[int, int, str, str]] = []
         self.acks: int = 0
         self.input_prompts: List[str] = []
+        self.skill_menus: List[List[Dict[str, Any]]] = []
         self._menu_responses: List[int] = list(menu_responses or [])
         self._text_responses: List[str] = list(text_responses or [])
+        self._skill_menu_responses: List[int | None] = list(skill_menu_responses or [])
 
     async def show_text(self, text: str) -> None:
         self.texts.append(text)
@@ -60,6 +63,16 @@ class MockTUI:
     async def input_text(self, prompt: str) -> str:
         self.input_prompts.append(prompt)
         return self._text_responses.pop(0) if self._text_responses else "TestCharacter"
+
+    async def show_skill_menu(self, skills: List[Dict[str, Any]]) -> int | None:
+        self.skill_menus.append(skills)
+        if self._skill_menu_responses:
+            return self._skill_menu_responses.pop(0)
+        # Fall back to _menu_responses for backward compatibility.
+        if self._menu_responses:
+            choice = self._menu_responses.pop(0)
+            return choice if choice > 0 else None
+        return None
 
 
 # ---------------------------------------------------------------------------

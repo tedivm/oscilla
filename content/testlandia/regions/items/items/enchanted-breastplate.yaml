@@ -1,0 +1,19 @@
+apiVersion: game/v1
+kind: Item
+metadata:
+  name: enchanted-breastplate
+spec:
+  displayName: "Enchanted Breastplate"
+  description: "Armor woven with protective runes. Automatically casts Iron Skin at the start of every combat while held in inventory."
+  category: armor
+  stackable: false
+  equip:
+    slots:
+      - armor
+    stat_modifiers:
+      - stat: strength
+        amount: 5
+  grants_buffs_held:
+    - buff_ref: shield-buff
+      variables: {}
+  value: 0

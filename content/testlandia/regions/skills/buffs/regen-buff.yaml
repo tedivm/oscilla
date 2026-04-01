@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Buff
+metadata:
+  name: regen-buff
+spec:
+  displayName: "Regeneration"
+  description: "Restores 15 HP each turn for 3 turns."
+  duration_turns: 3
+  per_turn_effects:
+    - type: heal
+      amount: 15

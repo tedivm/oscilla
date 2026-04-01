@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Buff
+metadata:
+  name: shield-buff
+spec:
+  displayName: "Iron Skin"
+  description: "Reduces incoming damage by 30% for 3 turns."
+  duration_turns: 3
+  modifiers:
+    - type: damage_reduction
+      target: player
+      percent: 30

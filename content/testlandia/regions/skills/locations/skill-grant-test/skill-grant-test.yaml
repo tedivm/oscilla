@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: skill-grant-test
+spec:
+  displayName: "Skill Grant Test"
+  description: "Grants test shield and rage skills. Check skills menu to verify they were added."
+  region: skills
+  adventures:
+    - ref: skill-grant-test
+      weight: 100

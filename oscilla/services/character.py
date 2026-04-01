@@ -16,6 +16,8 @@ from oscilla.models.character_iteration import (
     CharacterIterationMilestone,
     CharacterIterationQuest,
     CharacterIterationRecord,
+    CharacterIterationSkill,
+    CharacterIterationSkillCooldown,
     CharacterIterationStatistic,
     CharacterIterationStatValue,
 )
@@ -174,6 +176,16 @@ async def save_character(session: AsyncSession, state: "CharacterState", user_id
                 count=count,
             )
         )
+    for skill_ref in state.known_skills:
+        session.add(CharacterIterationSkill(iteration_id=iteration.id, skill_ref=skill_ref))
+    for skill_ref, cooldown in state.skill_cooldowns.items():
+        session.add(
+            CharacterIterationSkillCooldown(
+                iteration_id=iteration.id,
+                skill_ref=skill_ref,
+                cooldown_remaining=cooldown,
+            )
+        )
 
     await session.commit()
 
@@ -220,6 +232,8 @@ async def load_character(
             selectinload(CharacterIterationRecord.milestone_rows),
             selectinload(CharacterIterationRecord.quest_rows),
             selectinload(CharacterIterationRecord.statistic_rows),
+            selectinload(CharacterIterationRecord.skill_rows),
+            selectinload(CharacterIterationRecord.skill_cooldown_rows),
         )
     )
     iter_result = await session.execute(iter_stmt)
@@ -265,6 +279,9 @@ async def load_character(
         elif stat_row.stat_type == "adventures_completed":
             adventures_completed[stat_row.entity_ref] = stat_row.count
 
+    known_skills: List[str] = [row.skill_ref for row in iteration.skill_rows]
+    skill_cooldowns: Dict[str, int] = {row.skill_ref: row.cooldown_remaining for row in iteration.skill_cooldown_rows}
+
     data: Dict[str, Any] = {
         "character_id": str(character_id),
         "iteration": iteration.iteration,
@@ -288,6 +305,8 @@ async def load_character(
             "adventures_completed": adventures_completed,
         },
         "active_adventure": active_adventure,
+        "known_skills": known_skills,
+        "skill_cooldowns": skill_cooldowns,
     }
 
     return CharacterState.from_dict(data=data, character_config=character_config, registry=registry)
@@ -337,6 +356,8 @@ async def delete_user_characters(session: AsyncSession, user_id: UUID, game_name
                 selectinload(CharacterIterationRecord.milestone_rows),
                 selectinload(CharacterIterationRecord.quest_rows),
                 selectinload(CharacterIterationRecord.statistic_rows),
+                selectinload(CharacterIterationRecord.skill_rows),
+                selectinload(CharacterIterationRecord.skill_cooldown_rows),
             )
         )
         iter_result = await session.execute(iter_stmt)
@@ -818,4 +839,54 @@ async def save_adventure_progress(
         .execution_options(synchronize_session="fetch")
     )
     await session.execute(stmt)
+    await session.commit()
+
+
+async def add_known_skill(
+    session: AsyncSession,
+    iteration_id: UUID,
+    skill_ref: str,
+) -> None:
+    """Idempotent insert of a known skill row.
+
+    Uses merge() so calling this twice for the same skill_ref is safe.
+    """
+    await session.merge(
+        CharacterIterationSkill(
+            iteration_id=iteration_id,
+            skill_ref=skill_ref,
+        )
+    )
+    await session.commit()
+
+
+async def set_skill_cooldown(
+    session: AsyncSession,
+    iteration_id: UUID,
+    skill_ref: str,
+    cooldown_remaining: int,
+) -> None:
+    """Upsert (cooldown > 0) or delete (cooldown == 0) one skill cooldown row.
+
+    A cooldown of 0 means the skill is no longer on cooldown; the row is removed.
+    """
+    if cooldown_remaining <= 0:
+        stmt = select(CharacterIterationSkillCooldown).where(
+            and_(
+                CharacterIterationSkillCooldown.iteration_id == iteration_id,
+                CharacterIterationSkillCooldown.skill_ref == skill_ref,
+            )
+        )
+        result = await session.execute(stmt)
+        existing = result.scalar_one_or_none()
+        if existing is not None:
+            await session.delete(existing)
+    else:
+        await session.merge(
+            CharacterIterationSkillCooldown(
+                iteration_id=iteration_id,
+                skill_ref=skill_ref,
+                cooldown_remaining=cooldown_remaining,
+            )
+        )
     await session.commit()

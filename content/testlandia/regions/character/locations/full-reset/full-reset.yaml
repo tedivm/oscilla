@@ -1,0 +1,8 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: full-reset
+spec:
+  displayName: "Full Reset Station"
+  description: "Clears all buffs, skills, and items. Resets mana and all stats to defaults. Use when you want a fresh start."
+  region: character

@@ -1,6 +1,6 @@
 """Enemy manifest model."""
 
-from typing import List, Literal
+from typing import Dict, List, Literal
 
 from pydantic import BaseModel, Field
 
@@ -12,6 +12,18 @@ class LootEntry(BaseModel):
     weight: int = Field(ge=1)
 
 
+class EnemySkillEntry(BaseModel):
+    """Declares a skill the enemy knows and when to auto-use it."""
+
+    skill_ref: str = Field(description="Skill manifest name.")
+    # 0 means the skill is never triggered automatically — only by future AI logic.
+    use_every_n_turns: int = Field(
+        default=0,
+        ge=0,
+        description="Trigger the skill every N turns (starting turn 1). 0 = AI-only.",
+    )
+
+
 class EnemySpec(BaseModel):
     displayName: str
     description: str = ""
@@ -20,6 +32,11 @@ class EnemySpec(BaseModel):
     defense: int = Field(ge=0)
     xp_reward: int = Field(ge=0)
     loot: List[LootEntry] = []
+    # Fixed skill list — enemies never acquire new skills.
+    skills: List[EnemySkillEntry] = []
+    # Initial resource values for skill costs (resource_name → starting value).
+    # These are NOT persisted; reset at the start of each combat.
+    skill_resources: Dict[str, int] = Field(default_factory=dict)
 
 
 class EnemyManifest(ManifestEnvelope):

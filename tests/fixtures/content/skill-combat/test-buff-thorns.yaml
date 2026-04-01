@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Buff
+metadata:
+  name: test-buff-thorns
+spec:
+  displayName: "Thorns"
+  description: "Reflects a configurable percent of incoming damage back to the attacker."
+  duration_turns: 2
+  variables:
+    reflect_percent: 30
+  modifiers:
+    - type: damage_reflect
+      target: player
+      percent: reflect_percent

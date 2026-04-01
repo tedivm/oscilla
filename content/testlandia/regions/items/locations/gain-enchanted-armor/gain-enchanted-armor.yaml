@@ -1,0 +1,8 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: gain-enchanted-armor
+spec:
+  displayName: "Enchanted Armor Vault"
+  description: "Obtain the Enchanted Breastplate — armor that automatically applies Iron Skin buff when held."
+  region: items

@@ -4,6 +4,7 @@ from typing import Dict, Type
 
 from oscilla.engine.models.adventure import AdventureManifest
 from oscilla.engine.models.base import ManifestEnvelope
+from oscilla.engine.models.buff import BuffManifest
 from oscilla.engine.models.character_config import CharacterConfigManifest
 from oscilla.engine.models.enemy import EnemyManifest
 from oscilla.engine.models.game import GameManifest
@@ -13,6 +14,7 @@ from oscilla.engine.models.location import LocationManifest
 from oscilla.engine.models.quest import QuestManifest
 from oscilla.engine.models.recipe import RecipeManifest
 from oscilla.engine.models.region import RegionManifest
+from oscilla.engine.models.skill import SkillManifest
 
 MANIFEST_REGISTRY: Dict[str, Type[ManifestEnvelope]] = {
     "Region": RegionManifest,
@@ -25,11 +27,14 @@ MANIFEST_REGISTRY: Dict[str, Type[ManifestEnvelope]] = {
     "Class": ClassManifest,
     "Game": GameManifest,
     "CharacterConfig": CharacterConfigManifest,
+    "Skill": SkillManifest,
+    "Buff": BuffManifest,
 }
 
 __all__ = [
     "MANIFEST_REGISTRY",
     "AdventureManifest",
+    "BuffManifest",
     "CharacterConfigManifest",
     "ClassManifest",
     "EquipSpec",
@@ -41,5 +46,6 @@ __all__ = [
     "QuestManifest",
     "RecipeManifest",
     "RegionManifest",
+    "SkillManifest",
     "StatModifier",
 ]

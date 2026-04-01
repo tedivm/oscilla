@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Buff
+metadata:
+  name: test-buff-dot
+spec:
+  displayName: "Poison Dot"
+  description: "Deals 3 damage per turn."
+  duration_turns: 3
+  variables: {}
+  per_turn_effects:
+    - type: stat_change
+      stat: hp
+      amount: -3
+      target: enemy

@@ -23,11 +23,27 @@ spec:
       bounds:
         min: 0
         max: 1000
+    - name: mana
+      type: int
+      default: 50
+      description: "Mana resource for skill costs. Bounded [0, 50]."
+      bounds:
+        min: 0
+        max: 50
+    - name: max_mana
+      type: int
+      default: 50
+      description: "Maximum mana. Used by skill_resources."
   hidden_stats:
     - name: debug_counter
       type: int
       default: 0
       description: "Hidden int. Incremented by condition-lab adventures."
+
+  skill_resources:
+    - name: mana
+      stat: mana
+      max_stat: max_mana
 
   equipment_slots:
     - name: weapon

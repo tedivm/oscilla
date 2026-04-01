@@ -1,0 +1,23 @@
+apiVersion: game/v1
+kind: Skill
+metadata:
+  name: test-dispel
+spec:
+  displayName: "Test Dispel"
+  description: "Dispels player buffs. Tests dispel functionality."
+  contexts:
+    - combat
+    - overworld
+  cost:
+    stat: mana
+    amount: 5
+  cooldown:
+    scope: turn
+    count: 2
+  use_effects:
+    - type: dispel
+      label: shield-buff
+      target: player
+    - type: dispel
+      label: rage-buff
+      target: player

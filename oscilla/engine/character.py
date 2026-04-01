@@ -112,6 +112,11 @@ class CharacterState:
     active_adventure: AdventurePosition | None = None
     # Dynamic stats from CharacterConfig; int | bool | None (not Any).
     stats: Dict[str, int | bool | None] = field(default_factory=dict)
+    # Skill refs permanently learned by the player.
+    known_skills: Set[str] = field(default_factory=set)
+    # Adventure-scope cooldowns: skill_ref → adventures remaining before reuse.
+    # Decremented at adventure start; removed when value reaches 0.
+    skill_cooldowns: Dict[str, int] = field(default_factory=dict)
 
     # --- Factory ---
 
@@ -300,6 +305,113 @@ class CharacterState:
     def has_milestone(self, name: str) -> bool:
         return name in self.milestones
 
+    # --- Skills ---
+
+    def available_skills(self, registry: "ContentRegistry | None" = None) -> Set[str]:
+        """Return the full set of skill refs the player can currently activate.
+
+        Combines:
+        1. Permanently learned skills (known_skills).
+        2. Skills granted by currently equipped item instances (grants_skills_equipped).
+        3. Skills granted by any held item — stacks or instances (grants_skills_held).
+
+        Requires registry to resolve item specs. Without a registry only known_skills
+        is returned, which is correct for context where items cannot be looked up.
+        """
+        result: Set[str] = set(self.known_skills)
+        if registry is None:
+            return result
+
+        # Equipped-item skills: only items actually in an equipment slot.
+        equipped_refs: Set[str] = {
+            inst.item_ref for inst in self.instances if inst.instance_id in self.equipment.values()
+        }
+        for item_ref in equipped_refs:
+            item = registry.items.get(item_ref)
+            if item is not None:
+                result.update(item.spec.grants_skills_equipped)
+
+        # Held-item skills: any item in stacks or instances (equipped or not).
+        for item_ref in self.stacks:
+            item = registry.items.get(item_ref)
+            if item is not None:
+                result.update(item.spec.grants_skills_held)
+        for inst in self.instances:
+            item = registry.items.get(inst.item_ref)
+            if item is not None:
+                result.update(item.spec.grants_skills_held)
+
+        return result
+
+    def grant_skill(self, skill_ref: str, registry: "ContentRegistry | None" = None) -> bool:
+        """Attempt to grant the player a skill. Returns True if the skill was newly learned.
+
+        Enforces SkillCategoryRule restrictions (max_known, exclusive_with) when
+        a registry with CharacterConfig is provided. If a rule blocks the grant,
+        logs a warning and returns False without mutating state.
+
+        Already-known skills are a no-op (returns False).
+        """
+        if skill_ref in self.known_skills:
+            return False
+
+        if registry is not None and registry.character_config is not None:
+            skill = registry.skills.get(skill_ref)
+            if skill is not None:
+                category = skill.spec.category
+                rules = {r.category: r for r in registry.character_config.spec.skill_category_rules}
+                rule = rules.get(category)
+                if rule is not None:
+                    # Check exclusive_with: if the player already knows any skill from
+                    # an exclusive category, block the grant.
+                    for excl_cat in rule.exclusive_with:
+                        for known in self.known_skills:
+                            known_skill = registry.skills.get(known)
+                            if known_skill is not None and known_skill.spec.category == excl_cat:
+                                logger.warning(
+                                    "grant_skill(%r) blocked: category %r is exclusive with %r "
+                                    "and player already knows a %r skill.",
+                                    skill_ref,
+                                    category,
+                                    excl_cat,
+                                    excl_cat,
+                                )
+                                return False
+                    # Check max_known: count existing skills in this category.
+                    if rule.max_known is not None:
+                        count = sum(
+                            1
+                            for known in self.known_skills
+                            if (s := registry.skills.get(known)) is not None and s.spec.category == category
+                        )
+                        if count >= rule.max_known:
+                            logger.warning(
+                                "grant_skill(%r) blocked: category %r already has %d/%d skills.",
+                                skill_ref,
+                                category,
+                                count,
+                                rule.max_known,
+                            )
+                            return False
+
+        self.known_skills.add(skill_ref)
+        return True
+
+    def tick_skill_cooldowns(self) -> None:
+        """Decrement adventure-scoped cooldowns by one. Called at the start of each adventure.
+
+        Removes entries that reach 0 so that skill_cooldowns only contains active cooldowns.
+        """
+        spent: List[str] = []
+        for skill_ref, remaining in self.skill_cooldowns.items():
+            new_val = remaining - 1
+            if new_val <= 0:
+                spent.append(skill_ref)
+            else:
+                self.skill_cooldowns[skill_ref] = new_val
+        for skill_ref in spent:
+            del self.skill_cooldowns[skill_ref]
+
     # --- XP / levelling ---
 
     def add_xp(self, amount: int, xp_thresholds: List[int], hp_per_level: int) -> tuple[List[int], List[int]]:
@@ -393,6 +505,8 @@ class CharacterState:
                 "adventures_completed": dict(self.statistics.adventures_completed),
             },
             "active_adventure": active_adventure,
+            "known_skills": sorted(self.known_skills),
+            "skill_cooldowns": dict(self.skill_cooldowns),
         }
 
     @classmethod
@@ -503,4 +617,6 @@ class CharacterState:
             stats=reconciled_stats,
             statistics=statistics,
             active_adventure=active_adventure,
+            known_skills=set(data.get("known_skills", [])),
+            skill_cooldowns=dict(data.get("skill_cooldowns", {})),
         )

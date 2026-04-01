@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Skill
+metadata:
+  name: test-skill-curse
+spec:
+  displayName: "Curse"
+  description: "Grants the player the fireball skill."
+  contexts:
+    - overworld
+  use_effects:
+    - type: skill_grant
+      skill: test-skill-fireball

@@ -16,21 +16,25 @@ from ruamel.yaml.error import YAMLError
 from oscilla.engine.models import MANIFEST_REGISTRY
 from oscilla.engine.models.adventure import (
     AdventureManifest,
+    ApplyBuffEffect,
     ChoiceStep,
     CombatStep,
     Effect,
     NarrativeStep,
     OutcomeBranch,
+    SkillGrantEffect,
     StatCheckStep,
     Step,
     UseItemEffect,
 )
 from oscilla.engine.models.base import AllCondition, Condition, ManifestEnvelope, normalise_condition
+from oscilla.engine.models.buff import BuffManifest
 from oscilla.engine.models.character_config import CharacterConfigManifest
 from oscilla.engine.models.item import ItemManifest
 from oscilla.engine.models.location import LocationManifest
 from oscilla.engine.models.recipe import RecipeManifest
 from oscilla.engine.models.region import RegionManifest
+from oscilla.engine.models.skill import SkillManifest
 from oscilla.engine.registry import ContentRegistry
 
 logger = getLogger(__name__)
@@ -283,6 +287,188 @@ def _collect_step_stat_refs(step: Step, stat_refs: Set[str]) -> None:
             pass
 
 
+def _collect_apply_buff_effects(effects: List[Effect], refs: List[ApplyBuffEffect]) -> None:
+    """Collect all ApplyBuffEffect instances from an effect list."""
+    for eff in effects:
+        if isinstance(eff, ApplyBuffEffect):
+            refs.append(eff)
+
+
+def _collect_skill_grant_effects(effects: List[Effect], refs: Set[str]) -> None:
+    """Collect skill_grant effect skill name refs from an effect list."""
+    for eff in effects:
+        if isinstance(eff, SkillGrantEffect):
+            refs.add(eff.skill)
+
+
+def _collect_branch_skill_refs(
+    branch: OutcomeBranch, skill_refs: Set[str], buff_effects: List[ApplyBuffEffect]
+) -> None:
+    _collect_skill_grant_effects(branch.effects, skill_refs)
+    _collect_apply_buff_effects(branch.effects, buff_effects)
+    for sub in branch.steps:
+        _collect_step_skill_and_buff_refs(sub, skill_refs, buff_effects)
+
+
+def _collect_step_skill_and_buff_refs(step: Step, skill_refs: Set[str], buff_effects: List[ApplyBuffEffect]) -> None:
+    match step:
+        case NarrativeStep():
+            _collect_skill_grant_effects(step.effects, skill_refs)
+            _collect_apply_buff_effects(step.effects, buff_effects)
+        case CombatStep():
+            for branch in [step.on_win, step.on_defeat, step.on_flee]:
+                _collect_branch_skill_refs(branch, skill_refs, buff_effects)
+        case ChoiceStep():
+            for opt in step.options:
+                _collect_skill_grant_effects(opt.effects, skill_refs)
+                _collect_apply_buff_effects(opt.effects, buff_effects)
+                for sub in opt.steps:
+                    _collect_step_skill_and_buff_refs(sub, skill_refs, buff_effects)
+        case StatCheckStep():
+            for branch in [step.on_pass, step.on_fail]:
+                _collect_branch_skill_refs(branch, skill_refs, buff_effects)
+        case _:
+            pass
+
+
+def _validate_skill_refs(manifests: List[ManifestEnvelope]) -> List[LoadError]:
+    """Validate that skill_ref fields in items, enemies, and effects point to known Skill manifests."""
+    errors: List[LoadError] = []
+    skill_names: Set[str] = {m.metadata.name for m in manifests if m.kind == "Skill"}
+
+    for m in manifests:
+        if m.kind == "Item":
+            item = cast(ItemManifest, m)
+            for skill_ref in item.spec.grants_skills_equipped + item.spec.grants_skills_held:
+                if skill_ref not in skill_names:
+                    errors.append(
+                        LoadError(
+                            file=Path(f"<{m.metadata.name}>"),
+                            message=f"grants_skills_* references unknown skill: {skill_ref!r}",
+                        )
+                    )
+
+        elif m.kind == "Enemy":
+            from oscilla.engine.models.enemy import EnemyManifest
+
+            enemy = cast(EnemyManifest, m)
+            for entry in enemy.spec.skills:
+                if entry.skill_ref not in skill_names:
+                    errors.append(
+                        LoadError(
+                            file=Path(f"<{m.metadata.name}>"),
+                            message=f"enemy skill entry references unknown skill: {entry.skill_ref!r}",
+                        )
+                    )
+
+        elif m.kind == "Adventure":
+            adv = cast(AdventureManifest, m)
+            skill_grant_refs: Set[str] = set()
+            buff_effects_adv: List[ApplyBuffEffect] = []
+            for step in adv.spec.steps:
+                _collect_step_skill_and_buff_refs(step, skill_grant_refs, buff_effects_adv)
+            for ref in skill_grant_refs:
+                if ref not in skill_names:
+                    errors.append(
+                        LoadError(
+                            file=Path(f"<{m.metadata.name}>"),
+                            message=f"skill_grant effect references unknown skill: {ref!r}",
+                        )
+                    )
+
+        elif m.kind == "Skill":
+            skill = cast(SkillManifest, m)
+            skill_grant_refs_s: Set[str] = set()
+            buff_effects_s: List[ApplyBuffEffect] = []
+            for eff in skill.spec.use_effects:
+                _collect_skill_grant_effects([eff], skill_grant_refs_s)
+                _collect_apply_buff_effects([eff], buff_effects_s)
+            for ref in skill_grant_refs_s:
+                if ref not in skill_names:
+                    errors.append(
+                        LoadError(
+                            file=Path(f"<{m.metadata.name}>"),
+                            message=f"skill_grant in use_effects references unknown skill: {ref!r}",
+                        )
+                    )
+
+    return errors
+
+
+def _validate_buff_refs(manifests: List[ManifestEnvelope]) -> List[LoadError]:
+    """Validate that buff_ref fields and variable override keys are consistent."""
+    errors: List[LoadError] = []
+    buff_names: Set[str] = {m.metadata.name for m in manifests if m.kind == "Buff"}
+
+    # Build a map of buff name → declared variables for variable override key checks.
+    buff_variables: Dict[str, Set[str]] = {}
+    for m in manifests:
+        if m.kind == "Buff":
+            buff_m = cast(BuffManifest, m)
+            buff_variables[m.metadata.name] = set(buff_m.spec.variables.keys())
+
+    def _check_apply_buff(manifest_name: str, eff: ApplyBuffEffect) -> List[LoadError]:
+        errs: List[LoadError] = []
+        if eff.buff_ref not in buff_names:
+            errs.append(
+                LoadError(
+                    file=Path(f"<{manifest_name}>"),
+                    message=f"apply_buff references unknown buff: {eff.buff_ref!r}",
+                )
+            )
+        elif eff.variables:
+            # Validate variable override keys are declared in the buff spec.
+            declared = buff_variables.get(eff.buff_ref, set())
+            for key in eff.variables:
+                if key not in declared:
+                    errs.append(
+                        LoadError(
+                            file=Path(f"<{manifest_name}>"),
+                            message=f"apply_buff {eff.buff_ref!r} variable override key {key!r} not declared in buff variables",
+                        )
+                    )
+        return errs
+
+    for m in manifests:
+        if m.kind == "Item":
+            item = cast(ItemManifest, m)
+            for grant in item.spec.grants_buffs_equipped + item.spec.grants_buffs_held:
+                if grant.buff_ref not in buff_names:
+                    errors.append(
+                        LoadError(
+                            file=Path(f"<{m.metadata.name}>"),
+                            message=f"grants_buffs_* references unknown buff: {grant.buff_ref!r}",
+                        )
+                    )
+                elif grant.variables:
+                    declared = buff_variables.get(grant.buff_ref, set())
+                    for key in grant.variables:
+                        if key not in declared:
+                            errors.append(
+                                LoadError(
+                                    file=Path(f"<{m.metadata.name}>"),
+                                    message=f"grants_buffs_* {grant.buff_ref!r} variable override key {key!r} not declared in buff variables",
+                                )
+                            )
+
+        elif m.kind == "Skill":
+            skill = cast(SkillManifest, m)
+            for eff in skill.spec.use_effects:
+                if isinstance(eff, ApplyBuffEffect):
+                    errors.extend(_check_apply_buff(m.metadata.name, eff))
+
+        elif m.kind == "Adventure":
+            adv = cast(AdventureManifest, m)
+            _: Set[str] = set()
+            buff_effects_adv: List[ApplyBuffEffect] = []
+            for step in adv.spec.steps:
+                _collect_step_skill_and_buff_refs(step, _, buff_effects_adv)
+            for eff in buff_effects_adv:
+                errors.extend(_check_apply_buff(m.metadata.name, eff))
+
+    return errors
+
+
 def validate_references(manifests: List[ManifestEnvelope]) -> List[LoadError]:
     """Check all cross-references across manifests. Accumulates all errors."""
     names_by_kind: Dict[str, Set[str]] = defaultdict(set)
@@ -496,6 +682,29 @@ def validate_references(manifests: List[ManifestEnvelope]) -> List[LoadError]:
                             file=Path(f"<{m.metadata.name}>"), message=f"Unknown parent region: {region.spec.parent!r}"
                         )
                     )
+
+            case "CharacterConfig":
+                cc_m = cast(CharacterConfigManifest, m)
+                # Validate skill_resource binding stat references.
+                for binding in cc_m.spec.skill_resources:
+                    if binding.stat not in stat_names:
+                        errors.append(
+                            LoadError(
+                                file=Path(f"<{m.metadata.name}>"),
+                                message=f"skill_resources binding references unknown stat: {binding.stat!r}",
+                            )
+                        )
+                    if binding.max_stat not in stat_names:
+                        errors.append(
+                            LoadError(
+                                file=Path(f"<{m.metadata.name}>"),
+                                message=f"skill_resources binding max_stat references unknown stat: {binding.max_stat!r}",
+                            )
+                        )
+
+    # Cross-manifest skill and buff reference validation.
+    errors.extend(_validate_skill_refs(manifests))
+    errors.extend(_validate_buff_refs(manifests))
 
     return errors
 

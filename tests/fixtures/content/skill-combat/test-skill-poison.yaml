@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Skill
+metadata:
+  name: test-skill-poison
+spec:
+  displayName: "Poison Strike"
+  description: "Applies a poison dot (used by enemies)."
+  contexts:
+    - combat
+  use_effects:
+    - type: apply_buff
+      buff_ref: test-buff-dot
+      target: player
+      variables: {}

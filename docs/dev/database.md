@@ -813,6 +813,17 @@ erDiagram
     VARCHAR status
   }
 
+  character_iteration_skill_cooldowns {
+    CHAR(32) iteration_id PK,FK
+    VARCHAR skill_ref PK
+    INTEGER cooldown_remaining
+  }
+
+  character_iteration_skills {
+    CHAR(32) iteration_id PK,FK
+    VARCHAR skill_ref PK
+  }
+
   character_iteration_stat_values {
     CHAR(32) iteration_id PK,FK
     VARCHAR stat_name PK
@@ -868,6 +879,8 @@ erDiagram
   character_iterations ||--o| character_iteration_item_instances : iteration_id
   character_iterations ||--o| character_iteration_milestones : iteration_id
   character_iterations ||--o| character_iteration_quests : iteration_id
+  character_iterations ||--o| character_iteration_skill_cooldowns : iteration_id
+  character_iterations ||--o| character_iteration_skills : iteration_id
   character_iterations ||--o| character_iteration_stat_values : iteration_id
   character_iterations ||--o| character_iteration_statistics : iteration_id
   characters ||--o{ character_iterations : character_id

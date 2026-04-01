@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: gain-enchanted-armor
+spec:
+  displayName: "Enchanted Armor Drop Test"
+  description: "Awards an enchanted-breastplate instance. The armor grants a shield buff at combat start while held."
+  steps:
+    - type: narrative
+      text: "You find a gleaming breastplate inscribed with protective runes. Even unequipped, it radiates magical protection."
+      effects:
+        - type: item_drop
+          loot:
+            - item: enchanted-breastplate
+              weight: 100

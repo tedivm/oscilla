@@ -19,6 +19,7 @@ from oscilla.engine.models.base import (
     MilestoneCondition,
     NotCondition,
     PrestigeCountCondition,
+    SkillCondition,
 )
 
 if TYPE_CHECKING:
@@ -85,6 +86,16 @@ def evaluate(
             return _numeric_compare(player.statistics.locations_visited.get(n, 0), c)
         case AdventuresCompletedCondition(name=n) as c:
             return _numeric_compare(player.statistics.adventures_completed.get(n, 0), c)
+
+        # --- Skill leaves ---
+        case SkillCondition(name=n, mode=mode):
+            if mode == "learned":
+                # Only permanently learned skills — registry not required.
+                return n in player.known_skills
+            else:
+                # mode == "available": includes item-granted skills; requires registry.
+                # Without a registry (e.g. some test contexts) falls back to known_skills only.
+                return n in player.available_skills(registry)
 
     # Unreachable if all Condition subtypes are handled above; guards against
     # extending the union without adding a case branch.

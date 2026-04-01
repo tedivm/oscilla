@@ -1,0 +1,16 @@
+apiVersion: game/v1
+kind: Skill
+metadata:
+  name: focused-training
+spec:
+  displayName: "Focused Training"
+  description: "A short burst of focused exercise — permanently increases Strength by 2. Costs mana but has no cooldown."
+  contexts:
+    - overworld
+  cost:
+    stat: mana
+    amount: 10
+  use_effects:
+    - type: stat_change
+      stat: strength
+      amount: 2

@@ -8,6 +8,10 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from oscilla.engine.models.base import Condition, ManifestEnvelope
 
+# NOTE: Dict is imported for use in ApplyBuffEffect and DispelEffect.
+
+
+
 # ---------------------------------------------------------------------------
 # Effects — silent mechanical outcomes (no screen produced)
 # ---------------------------------------------------------------------------
@@ -50,23 +54,84 @@ class HealEffect(BaseModel):
     type: Literal["heal"]
     # "full" restores the player to max_hp; a positive integer heals that exact amount.
     amount: int | Literal["full"] = "full"
+    # When target is "enemy", requires CombatContext; heal amount is capped at enemy's max_hp
+    # which is not tracked — so "full" on an enemy target is treated as a no-op with a warning.
+    target: Literal["player", "enemy"] = "player"
 
 
 class StatChangeEffect(BaseModel):
     type: Literal["stat_change"]
-    stat: str = Field(description="Character stat name")
-    amount: int = Field(description="Amount to add/subtract from stat; can be negative")
+    stat: str = Field(description="Character stat name (player) or ignored when target is 'enemy'.")
+    amount: int = Field(description="Amount to add/subtract; can be negative.")
+    # When target is "enemy", stat is ignored and amount is applied directly to enemy_hp.
+    target: Literal["player", "enemy"] = "player"
 
 
 class StatSetEffect(BaseModel):
     type: Literal["stat_set"]
     stat: str = Field(description="Character stat name")
     value: int | bool | None = Field(description="New value for stat")
+    # target "enemy" is not supported for stat_set — enemies have no named stats.
+    target: Literal["player"] = "player"
 
 
 class UseItemEffect(BaseModel):
     type: Literal["use_item"]
     item: str = Field(description="Item manifest name to use")
+
+
+class SkillGrantEffect(BaseModel):
+    """Permanently teaches a named skill to the player."""
+
+    type: Literal["skill_grant"]
+    skill: str = Field(description="Skill manifest name to grant.")
+
+
+class DispelEffect(BaseModel):
+    """Remove all active periodic combat effects matching a given label.
+
+    Matches against ActiveCombatEffect.label. Effects with an empty label are
+    never matched (the empty string is explicitly not a wildcard).
+    Outside of combat (combat=None) this effect is silently ignored.
+    """
+
+    type: Literal["dispel"]
+    label: str = Field(min_length=1, description="Label string declared on the PeriodicEffect to remove.")
+    target: Literal["player", "enemy"] = Field(
+        default="player",
+        description="Only effects targeting this participant are removed.",
+    )
+
+
+class ApplyBuffEffect(BaseModel):
+    """Apply a named buff from the registry to a combat participant.
+
+    Looks up `buff_ref` in `registry.buffs`, creates an `ActiveCombatEffect` from the
+    `BuffSpec`, and appends it to `CombatContext.active_effects`. The buff manifest name
+    becomes `ActiveCombatEffect.label` — the same identifier that `DispelEffect` targets.
+
+    Outside of combat (`combat=None`) this effect is silently skipped with a log warning;
+    buffs only make sense within the combat turn loop.
+    """
+
+    type: Literal["apply_buff"]
+    buff_ref: str = Field(description="Buff manifest name to apply.")
+    target: Literal["player", "enemy"] = Field(
+        default="player",
+        description=(
+            "Combat participant this buff is applied to. "
+            "Defaults to 'player' for self-buffs and enemy-inflicted debuffs; "
+            "set to 'enemy' to apply a debuff to the enemy."
+        ),
+    )
+    variables: Dict[str, int] = Field(
+        default_factory=dict,
+        description=(
+            "Per-call overrides for the buff's declared variables. "
+            "Merged on top of BuffSpec.variables defaults at apply time. "
+            "Unknown keys (not declared in the buff) raise a load-time validation error."
+        ),
+    )
 
 
 Effect = Annotated[
@@ -79,6 +144,9 @@ Effect = Annotated[
         StatChangeEffect,
         StatSetEffect,
         UseItemEffect,
+        SkillGrantEffect,
+        DispelEffect,
+        ApplyBuffEffect,
     ],
     Field(discriminator="type"),
 ]

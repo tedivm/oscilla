@@ -4,6 +4,7 @@ from typing import Dict, Generic, Iterator, List, Type, TypeVar, cast
 
 from oscilla.engine.models.adventure import AdventureManifest
 from oscilla.engine.models.base import ManifestEnvelope
+from oscilla.engine.models.buff import BuffManifest
 from oscilla.engine.models.character_config import CharacterConfigManifest
 from oscilla.engine.models.enemy import EnemyManifest
 from oscilla.engine.models.game import GameManifest
@@ -13,6 +14,7 @@ from oscilla.engine.models.location import LocationManifest
 from oscilla.engine.models.quest import QuestManifest
 from oscilla.engine.models.recipe import RecipeManifest
 from oscilla.engine.models.region import RegionManifest
+from oscilla.engine.models.skill import SkillManifest
 
 T = TypeVar("T", bound=ManifestEnvelope)
 
@@ -61,6 +63,8 @@ class ContentRegistry:
         self.recipes: KindRegistry[RecipeManifest] = KindRegistry()
         self.quests: KindRegistry[QuestManifest] = KindRegistry()
         self.classes: KindRegistry[ClassManifest] = KindRegistry()
+        self.buffs: KindRegistry[BuffManifest] = KindRegistry()
+        self.skills: KindRegistry[SkillManifest] = KindRegistry()
         self.game: GameManifest | None = None
         self.character_config: CharacterConfigManifest | None = None
 
@@ -85,6 +89,10 @@ class ContentRegistry:
                     registry.quests.register(cast(QuestManifest, m))
                 case "Class":
                     registry.classes.register(cast(ClassManifest, m))
+                case "Skill":
+                    registry.skills.register(cast(SkillManifest, m))
+                case "Buff":
+                    registry.buffs.register(cast(BuffManifest, m))
                 case "Game":
                     registry.game = cast(GameManifest, m)
                 case "CharacterConfig":

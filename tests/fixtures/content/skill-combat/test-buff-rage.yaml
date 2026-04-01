@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Buff
+metadata:
+  name: test-buff-rage
+spec:
+  displayName: "Rage"
+  description: "Amplifies outgoing player damage by a configurable percent."
+  duration_turns: 2
+  variables:
+    rage_percent: 50
+  modifiers:
+    - type: damage_amplify
+      target: player
+      percent: rage_percent

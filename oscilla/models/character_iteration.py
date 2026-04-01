@@ -102,6 +102,12 @@ class CharacterIterationRecord(Base):
     statistic_rows: Mapped[List["CharacterIterationStatistic"]] = relationship(
         "CharacterIterationStatistic", back_populates="iteration", cascade="all, delete-orphan"
     )
+    skill_rows: Mapped[List["CharacterIterationSkill"]] = relationship(
+        "CharacterIterationSkill", back_populates="iteration", cascade="all, delete-orphan"
+    )
+    skill_cooldown_rows: Mapped[List["CharacterIterationSkillCooldown"]] = relationship(
+        "CharacterIterationSkillCooldown", back_populates="iteration", cascade="all, delete-orphan"
+    )
     character: Mapped["CharacterRecord"] = relationship(  # noqa: F821
         "CharacterRecord", back_populates="iterations"
     )
@@ -267,4 +273,40 @@ class CharacterIterationStatistic(Base):
 
     iteration: Mapped["CharacterIterationRecord"] = relationship(
         "CharacterIterationRecord", back_populates="statistic_rows"
+    )
+
+
+class CharacterIterationSkill(Base):
+    """One row per skill known by the character in this iteration.
+
+    skill_ref is the content-defined Skill manifest name
+    (e.g., ``"fireball"`` not the display name).
+    """
+
+    __tablename__ = "character_iteration_skills"
+
+    iteration_id: Mapped[UUID] = mapped_column(ForeignKey("character_iterations.id"), primary_key=True, nullable=False)
+    skill_ref: Mapped[str] = mapped_column(String, primary_key=True)
+
+    iteration: Mapped["CharacterIterationRecord"] = relationship(
+        "CharacterIterationRecord", back_populates="skill_rows"
+    )
+
+
+class CharacterIterationSkillCooldown(Base):
+    """One row per skill that is on an adventure-scope cooldown.
+
+    cooldown_remaining is the number of *adventures* remaining until the skill
+    can be used again.  Turn-scope cooldowns are not persisted — they reset
+    every combat encounter.
+    """
+
+    __tablename__ = "character_iteration_skill_cooldowns"
+
+    iteration_id: Mapped[UUID] = mapped_column(ForeignKey("character_iterations.id"), primary_key=True, nullable=False)
+    skill_ref: Mapped[str] = mapped_column(String, primary_key=True)
+    cooldown_remaining: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    iteration: Mapped["CharacterIterationRecord"] = relationship(
+        "CharacterIterationRecord", back_populates="skill_cooldown_rows"
     )

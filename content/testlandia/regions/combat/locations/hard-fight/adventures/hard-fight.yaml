@@ -8,7 +8,7 @@ spec:
   steps:
     - type: combat
       enemy: iron-golem
-      on_victory:
+      on_win:
         steps:
           - type: narrative
             text: "Miraculously defeated the iron golem!"

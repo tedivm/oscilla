@@ -1,0 +1,20 @@
+apiVersion: game/v1
+kind: Skill
+metadata:
+  name: war-rage
+spec:
+  displayName: "War Rage"
+  description: "Channel battle fury, amplifying your damage by 50% for 2 turns."
+  contexts:
+    - combat
+  cost:
+    stat: mana
+    amount: 15
+  cooldown:
+    scope: turn
+    count: 3
+  use_effects:
+    - type: apply_buff
+      buff_ref: rage-buff
+      target: player
+      variables: {}

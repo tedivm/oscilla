@@ -1,0 +1,30 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-combat
+spec:
+  displayName: "Skill Combat Test"
+  description: "A combat adventure used to test the skill system."
+  steps:
+    - type: combat
+      enemy: test-enemy
+      on_win:
+        effects:
+          - type: xp_grant
+            amount: 20
+          - type: milestone_grant
+            milestone: test-combat-won
+        steps:
+          - type: narrative
+            text: "You defeated the enemy!"
+      on_defeat:
+        effects:
+          - type: end_adventure
+            outcome: defeated
+        steps:
+          - type: narrative
+            text: "You were defeated."
+      on_flee:
+        steps:
+          - type: narrative
+            text: "You fled the battle."

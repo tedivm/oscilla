@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: skill-grant-test
+spec:
+  displayName: "Skill Grant Test"
+  description: "Grants shield and rage skills for testing."
+  steps:
+    - type: narrative
+      text: "Knowledge flows into your mind. You learn new combat techniques."
+      effects:
+        - type: skill_grant
+          skill: test-shield-skill
+        - type: skill_grant
+          skill: test-rage-skill

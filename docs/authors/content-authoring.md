@@ -421,6 +421,51 @@ spec:
       weight: 20
 ```
 
+### Skills (`skills/`)
+
+Skills are learnable, activatable abilities. They can be awarded by adventures, items, or created directly in character config. Full reference: [Skills and Buffs](./skills.md).
+
+```yaml
+apiVersion: game/v1
+kind: Skill
+metadata:
+  name: arcane-shield
+spec:
+  displayName: Arcane Shield
+  description: "Conjure a barrier absorbing 40% of incoming damage."
+  contexts:
+    - combat
+  cost:
+    stat: mana
+    amount: 10
+  use_effects:
+    - type: apply_buff
+      buff_ref: shielded
+```
+
+See [Skills and Buffs](./skills.md) for the complete field reference, cooldown options, and context rules.
+
+### Buffs (`buffs/`)
+
+Buffs are named, reusable timed combat effects. They are never granted directly — always through an `apply_buff` effect in a skill, item, or equipment grant. Full reference: [Skills and Buffs](./skills.md).
+
+```yaml
+apiVersion: game/v1
+kind: Buff
+metadata:
+  name: shielded
+spec:
+  displayName: Arcane Shield
+  description: "A shimmering barrier that absorbs 40% of incoming damage."
+  duration_turns: 3
+  modifiers:
+    - type: damage_reduction
+      percent: 40
+      target: player
+```
+
+Buffs can have `per_turn_effects` (damage/heal each round), `modifiers` (passive damage arithmetic), or both. At least one must be non-empty. See [Skills and Buffs](./skills.md) for all modifier types and the buff variables system.
+
 ### Recipes (`recipes/`)
 
 Crafting formulas that transform ingredients:
@@ -551,6 +596,20 @@ requires:
   type: class
   name: warrior           # Always passes (no-op condition)
 ```
+
+#### Skill Requirements
+
+Check whether the player has learned a skill or has a skill currently available (including from equipped items):
+
+```yaml
+requires:
+  type: skill
+  skill_ref: arcane-shield    # Skill manifest name
+  mode: learned               # "learned" (default) or "available"
+```
+
+- **`learned`**: checks `known_skills` only — skills permanently owned by the player.
+- **`available`**: checks the full set including skills granted by equipped or held items.
 
 ### Logical Operators
 
@@ -1031,13 +1090,15 @@ uv run oscilla game
 - `Adventure`: Interactive scenarios
 - `Enemy`: Combat opponents
 - `Item`: Equipment and consumables
+- `Skill`: Learnable, activatable abilities
+- `Buff`: Named, reusable timed combat effects
 - `Recipe`: Crafting formulas
 - `Quest`: Multi-stage storylines
 - `Class`: Character classes (placeholder)
 
 ### All Condition Types
 
-**Leaf Conditions**: `level`, `milestone`, `item`, `character_stat`, `prestige_count`, `class`, `enemies_defeated`, `locations_visited`, `adventures_completed`
+**Leaf Conditions**: `level`, `milestone`, `item`, `character_stat`, `prestige_count`, `class`, `enemies_defeated`, `locations_visited`, `adventures_completed`, `skill`
 
 **Logical Operators**: `all`, `any`, `not`
 
@@ -1047,7 +1108,8 @@ uv run oscilla game
 
 ### All Effect Types
 
-**State Changes**: `xp_grant`, `item_drop`, `use_item`, `milestone_grant`, `stat_change`, `stat_set`
+**State Changes**: `xp_grant`, `item_drop`, `use_item`, `milestone_grant`, `stat_change`, `stat_set`, `skill_grant`
+**Combat Effects**: `apply_buff`, `dispel`
 **Flow Control**: `end_adventure`, `goto`
 
 ---

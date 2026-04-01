@@ -8,7 +8,7 @@ spec:
   steps:
     - type: combat
       enemy: glass-dummy
-      on_victory:
+      on_win:
         steps:
           - type: narrative
             text: "Glass dummy defeated easily."

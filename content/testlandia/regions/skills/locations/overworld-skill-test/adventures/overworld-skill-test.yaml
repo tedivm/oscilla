@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: overworld-skill-test
+spec:
+  displayName: "Overworld Skill Test"
+  description: "Grants regen (overworld-only) and dispel skills for testing."
+  steps:
+    - type: narrative
+      text: "You learn restorative arts and dispelling techniques."
+      effects:
+        - type: skill_grant
+          skill: test-regen-skill
+        - type: skill_grant
+          skill: test-dispel

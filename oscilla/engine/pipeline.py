@@ -8,7 +8,7 @@ functions in oscilla/engine/steps/.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Dict, List, Literal, Protocol
+from typing import Any, Dict, List, Literal, Protocol
 
 from oscilla.engine.character import AdventurePosition, CharacterState
 from oscilla.engine.models.adventure import Effect, OutcomeBranch, Step
@@ -55,6 +55,14 @@ class TUICallbacks(Protocol):
         The concrete implementation determines how input is collected
         (e.g. a Textual Input widget in the TUI, a readline prompt in tests).
         Must return a non-empty string.
+        """
+        ...
+
+    async def show_skill_menu(self, skills: List[Dict[str, Any]]) -> int | None:
+        """Display a list of skills (overworld/out-of-combat) and return a 1-based index.
+
+        Each dict must contain at least ``"name"`` and ``"description"`` keys.
+        Returns ``None`` if the player cancels without selecting a skill.
         """
         ...
 

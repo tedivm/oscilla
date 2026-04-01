@@ -1,15 +1,231 @@
-"""Combat step handler — turn-based fight loop."""
+"""Combat step handler — turn-based fight loop with skill support."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Awaitable, Callable
+from logging import getLogger
+from typing import TYPE_CHECKING, Awaitable, Callable, List, Literal, Set
 
-from oscilla.engine.models.adventure import CombatStep, OutcomeBranch
+from oscilla.engine.combat_context import CombatContext
+from oscilla.engine.models.adventure import ApplyBuffEffect, CombatStep, OutcomeBranch
 from oscilla.engine.pipeline import AdventureOutcome, TUICallbacks
+from oscilla.engine.steps.effects import run_effect
 
 if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
     from oscilla.engine.registry import ContentRegistry
+
+logger = getLogger(__name__)
+
+
+async def _tick_active_effects(
+    ctx: CombatContext,
+    player: "CharacterState",
+    registry: "ContentRegistry",
+    tui: TUICallbacks,
+) -> None:
+    """Fire per-turn effects for all active periodic effects, then expire finished ones.
+
+    Called at the top of each combat round before the player acts.
+    """
+    expired: List[int] = []
+    for i, ae in enumerate(ctx.active_effects):
+        if ae.per_turn_effects:
+            await tui.show_text(f"[italic]{ae.source_skill}[/italic] ticks ({ae.remaining_turns} turn(s) left).")
+            for eff in ae.per_turn_effects:
+                await run_effect(effect=eff, player=player, registry=registry, tui=tui, combat=ctx)
+        ae.remaining_turns -= 1
+        if ae.remaining_turns <= 0:
+            expired.append(i)
+    # Remove expired in reverse order to preserve indices.
+    for i in reversed(expired):
+        ctx.active_effects.pop(i)
+
+
+def _apply_damage_amplify(base: int, target: Literal["player", "enemy"], ctx: CombatContext) -> int:
+    """Scale outgoing damage by any damage_amplify modifiers active for target.
+
+    All active damage_amplify modifiers for the named target are summed and applied
+    as a single multiplicative bonus: base * (1 + total_percent / 100).
+    """
+    total = sum(
+        m.percent
+        for ae in ctx.active_effects
+        for m in ae.modifiers
+        if m.type == "damage_amplify" and m.target == target
+        if isinstance(m.percent, int)
+    )
+    if total <= 0:
+        return base
+    return int(base * (1 + total / 100))
+
+
+def _apply_incoming_modifiers(base: int, target: Literal["player", "enemy"], ctx: CombatContext) -> int:
+    """Apply damage_reduction and damage_vulnerability modifiers to incoming damage for target.
+
+    Reductions and vulnerabilities are summed independently, then combined:
+        factor = max(0.0, 1.0 - (total_reduction / 100) + (total_vulnerability / 100))
+    If base > 0 the result is at minimum 1 (no hit is silently absorbed unless base was 0).
+    """
+    net_reduction = sum(
+        m.percent
+        for ae in ctx.active_effects
+        for m in ae.modifiers
+        if m.type == "damage_reduction" and m.target == target
+        if isinstance(m.percent, int)
+    )
+    net_vuln = sum(
+        m.percent
+        for ae in ctx.active_effects
+        for m in ae.modifiers
+        if m.type == "damage_vulnerability" and m.target == target
+        if isinstance(m.percent, int)
+    )
+    factor = max(0.0, 1.0 - net_reduction / 100 + net_vuln / 100)
+    if base <= 0:
+        return 0
+    return max(1, int(base * factor))
+
+
+async def _apply_reflect(
+    taken: int,
+    target: Literal["player", "enemy"],
+    ctx: CombatContext,
+    player: "CharacterState",
+    tui: TUICallbacks,
+) -> None:
+    """Reflect a portion of damage taken back to the attacker.
+
+    Sums all damage_reflect modifiers active for target and reflects that
+    percentage of `taken` damage onto the opposing side.
+    """
+    total_reflect = sum(
+        m.percent
+        for ae in ctx.active_effects
+        for m in ae.modifiers
+        if m.type == "damage_reflect" and m.target == target
+        if isinstance(m.percent, int)
+    )
+    if total_reflect <= 0 or taken <= 0:
+        return
+    reflected = max(1, int(taken * total_reflect / 100))
+    if target == "player":
+        # Player has thorns — attacker (enemy) takes the reflected damage.
+        ctx.enemy_hp = max(0, ctx.enemy_hp - reflected)
+        await tui.show_text(f"[yellow]Thorns! {reflected} damage reflected to the enemy.[/yellow]")
+    else:
+        # Enemy has thorns — attacker (player) takes the reflected damage.
+        player.hp = max(0, player.hp - reflected)
+        await tui.show_text(f"[yellow]{reflected} damage reflected back at you![/yellow]")
+
+
+async def _use_skill_in_combat(
+    skill_ref: str,
+    ctx: CombatContext,
+    player: "CharacterState",
+    registry: "ContentRegistry",
+    tui: TUICallbacks,
+) -> bool:
+    """Attempt to activate a skill during combat. Returns True if the skill fired.
+
+    Validates cooldown, resource cost, and activation condition before firing.
+    """
+    skill = registry.skills.get(skill_ref)
+    if skill is None:
+        await tui.show_text(f"[red]Error: skill {skill_ref!r} not found in registry.[/red]")
+        return False
+
+    spec = skill.spec
+
+    # Turn-scope cooldown check.
+    if spec.cooldown is not None and spec.cooldown.scope == "turn":
+        last_used = ctx.skill_uses_this_combat.get(skill_ref, 0)
+        if last_used > 0 and (ctx.turn_number - last_used) < spec.cooldown.count:
+            remaining = spec.cooldown.count - (ctx.turn_number - last_used)
+            await tui.show_text(f"[yellow]{spec.displayName} is on cooldown ({remaining} turn(s) remaining).[/yellow]")
+            return False
+
+    # Adventure-scope cooldown check.
+    if spec.cooldown is not None and spec.cooldown.scope == "adventure":
+        remaining_adv = player.skill_cooldowns.get(skill_ref, 0)
+        if remaining_adv > 0:
+            await tui.show_text(
+                f"[yellow]{spec.displayName} is on cooldown ({remaining_adv} adventure(s) remaining).[/yellow]"
+            )
+            return False
+
+    # Resource cost check.
+    if spec.cost is not None:
+        current = player.stats.get(spec.cost.stat, 0)
+        if not isinstance(current, int) or isinstance(current, bool):
+            await tui.show_text(f"[red]Error: resource stat {spec.cost.stat!r} is not numeric.[/red]")
+            return False
+        if current < spec.cost.amount:
+            await tui.show_text(
+                f"[red]Not enough {spec.cost.stat} to use {spec.displayName} "
+                f"(need {spec.cost.amount}, have {current}).[/red]"
+            )
+            return False
+
+    # Activation condition check.
+    from oscilla.engine.conditions import evaluate
+
+    if not evaluate(condition=spec.requires, player=player, registry=registry):
+        await tui.show_text(f"[red]You cannot use {spec.displayName} right now.[/red]")
+        return False
+
+    # All checks passed — deduct resource cost.
+    if spec.cost is not None:
+        old = int(player.stats.get(spec.cost.stat) or 0)
+        player.set_stat(name=spec.cost.stat, value=old - spec.cost.amount)
+
+    # Record use for cooldown tracking.
+    if spec.cooldown is not None:
+        if spec.cooldown.scope == "turn":
+            ctx.skill_uses_this_combat[skill_ref] = ctx.turn_number
+        else:  # adventure
+            player.skill_cooldowns[skill_ref] = spec.cooldown.count
+
+    # Dispatch immediate use_effects (including any apply_buff effects).
+    await tui.show_text(f"You use [bold]{spec.displayName}[/bold]!")
+    for eff in spec.use_effects:
+        await run_effect(effect=eff, player=player, registry=registry, tui=tui, combat=ctx)
+
+    return True
+
+
+async def _enemy_skill_phase(
+    ctx: CombatContext,
+    player: "CharacterState",
+    registry: "ContentRegistry",
+    tui: TUICallbacks,
+) -> None:
+    """Check and fire any enemy skills whose use_every_n_turns threshold is met.
+
+    Called at the end of each round, after the enemy's basic attack.
+    Skills with use_every_n_turns=0 are never auto-fired.
+    """
+    enemy = registry.enemies.require(ctx.enemy_ref, "Enemy")
+    for skill_entry in enemy.spec.skills:
+        n = skill_entry.use_every_n_turns
+        if n == 0:
+            continue
+        if ctx.turn_number % n == 0:
+            skill = registry.skills.get(skill_entry.skill_ref)
+            if skill is None:
+                logger.warning("Enemy skill ref %r not found in registry — skipping.", skill_entry.skill_ref)
+                continue
+            spec = skill.spec
+
+            # Resource check for enemy.
+            if spec.cost is not None:
+                available = ctx.enemy_resources.get(spec.cost.stat, 0)
+                if available < spec.cost.amount:
+                    continue  # Not enough resource; skip silently.
+                ctx.enemy_resources[spec.cost.stat] = available - spec.cost.amount
+
+            await tui.show_text(f"[bold]{enemy.spec.displayName}[/bold] uses [italic]{spec.displayName}[/italic]!")
+            for eff in spec.use_effects:
+                await run_effect(effect=eff, player=player, registry=registry, tui=tui, combat=ctx)
 
 
 async def run_combat(
@@ -20,63 +236,147 @@ async def run_combat(
     run_outcome_branch: Callable[[OutcomeBranch], Awaitable[AdventureOutcome]],
     on_round_complete: Callable[[], Awaitable[None]] | None = None,
 ) -> AdventureOutcome:
-    """Execute the turn-based combat loop.
+    """Execute the turn-based combat loop with skill support.
 
-    Player attacks first each round. Fleeing hands control to the on_flee branch
-    immediately. If the enemy is defeated, the kill counter is incremented and
-    on_win fires. If the player is reduced to 0 HP, on_defeat fires.
+    Player acts first each round. Fleeing hands control to on_flee immediately.
+    CombatContext is constructed here and passed to all sub-functions — it is
+    never serialized. Enemy HP is still mirrored to step_state each round for
+    persistence compatibility with the existing save/restore path.
 
-    Enemy HP is persisted in active_adventure.step_state so mid-combat state
-    survives if Phase 3 needs to checkpoint a session between rounds.
-
-    on_round_complete is called after both the player and enemy have resolved
-    their attacks for the round (but before checking defeat / win conditions on
-    the next iteration). This is the persistence hook used by GameSession.
+    on_round_complete is called after all HP changes for the round are committed.
+    This is the persistence hook used by GameSession.
     """
     enemy = registry.enemies.require(step.enemy, "Enemy")
 
-    # Restore persisted enemy HP (e.g. after a save/restore) or start fresh.
+    # Restore or initialize enemy HP.
     if player.active_adventure and "enemy_hp" in player.active_adventure.step_state:
-        enemy_hp: int = int(player.active_adventure.step_state["enemy_hp"] or 0)
+        initial_hp: int = int(player.active_adventure.step_state["enemy_hp"] or 0)
     else:
-        enemy_hp = enemy.spec.hp
+        initial_hp = enemy.spec.hp
         if player.active_adventure:
-            player.active_adventure.step_state["enemy_hp"] = enemy_hp
+            player.active_adventure.step_state["enemy_hp"] = initial_hp
+
+    ctx = CombatContext(
+        enemy_hp=initial_hp,
+        enemy_ref=step.enemy,
+        enemy_resources=dict(enemy.spec.skill_resources),
+    )
+
+    # Apply combat-entry buffs granted by equipped and held items.
+    equipped_refs: Set[str] = {
+        inst.item_ref for inst in player.instances if inst.instance_id in player.equipment.values()
+    }
+    for item_ref in equipped_refs:
+        item_m = registry.items.get(item_ref)
+        if item_m is not None:
+            for grant in item_m.spec.grants_buffs_equipped:
+                await run_effect(
+                    effect=ApplyBuffEffect(
+                        type="apply_buff",
+                        buff_ref=grant.buff_ref,
+                        target="player",
+                        variables=grant.variables,
+                    ),
+                    player=player,
+                    registry=registry,
+                    tui=tui,
+                    combat=ctx,
+                )
+    held_refs: Set[str] = {inst.item_ref for inst in player.instances} | set(player.stacks.keys())
+    for item_ref in held_refs:
+        item_m = registry.items.get(item_ref)
+        if item_m is not None:
+            for grant in item_m.spec.grants_buffs_held:
+                await run_effect(
+                    effect=ApplyBuffEffect(
+                        type="apply_buff",
+                        buff_ref=grant.buff_ref,
+                        target="player",
+                        variables=grant.variables,
+                    ),
+                    player=player,
+                    registry=registry,
+                    tui=tui,
+                    combat=ctx,
+                )
+
+    # Determine which skills the player can use in combat.
+    combat_skills: List[str] = [
+        skill_ref
+        for skill_ref in player.available_skills(registry=registry)
+        if (s := registry.skills.get(skill_ref)) is not None and "combat" in s.spec.contexts
+    ]
 
     while True:
+        # Tick periodic effects at the top of each round.
+        await _tick_active_effects(ctx=ctx, player=player, registry=registry, tui=tui)
+
         await tui.show_combat_round(
             player_hp=player.hp,
-            enemy_hp=enemy_hp,
+            enemy_hp=ctx.enemy_hp,
             player_name=player.name,
             enemy_name=enemy.spec.displayName,
         )
-        action = await tui.show_menu("Your move:", ["Attack", "Flee"])
 
-        if action == 2:  # Flee
+        # Build action menu: Attack always first, then skills, then Flee last.
+        menu_options: List[str] = ["Attack"]
+        skill_indices: List[str] = []  # parallel to skill menu slots
+        if combat_skills:
+            for skill_ref in combat_skills:
+                skill = registry.skills.get(skill_ref)
+                if skill is not None:
+                    menu_options.append(f"Skill: {skill.spec.displayName}")
+                    skill_indices.append(skill_ref)
+        menu_options.append("Flee")
+        flee_index = len(menu_options)  # 1-based
+
+        action = await tui.show_menu("Your move:", menu_options)
+
+        if action == flee_index:
             await run_outcome_branch(step.on_flee)
             return AdventureOutcome.FLED
 
-        # Player attacks — strength reduces enemy defence
-        strength = player.stats.get("strength", 10)
-        player_damage = max(0, int(strength if isinstance(strength, (int, float)) else 10) - enemy.spec.defense)
-        enemy_hp -= player_damage
-        if player.active_adventure:
-            player.active_adventure.step_state["enemy_hp"] = enemy_hp
+        if action == 1:
+            # Standard attack — strength reduces enemy defence.
+            strength = player.stats.get("strength", 10)
+            base_damage = max(0, int(strength if isinstance(strength, (int, float)) else 10) - enemy.spec.defense)
+            # Apply any damage_amplify modifiers active on the player.
+            player_damage = _apply_damage_amplify(base=base_damage, target="player", ctx=ctx)
+            if player_damage > 0:
+                await tui.show_text(f"You attack for {player_damage} damage!")
+            ctx.enemy_hp = max(0, ctx.enemy_hp - player_damage)
+        elif 2 <= action < flee_index:
+            # Skill use: action 2 → skill_indices[0], etc.
+            skill_ref = skill_indices[action - 2]
+            await _use_skill_in_combat(skill_ref=skill_ref, ctx=ctx, player=player, registry=registry, tui=tui)
 
-        # Enemy attacks — player dexterity reduces incoming damage
-        # (skip enemy retaliation when already dead so we don't subtract HP
-        # from an enemy that the player just defeated this turn)
-        if enemy_hp > 0:
+        # Persist enemy HP in step_state for save/restore.
+        if player.active_adventure:
+            player.active_adventure.step_state["enemy_hp"] = ctx.enemy_hp
+
+        # Enemy retaliation — only when still alive.
+        if ctx.enemy_hp > 0:
             dexterity = player.stats.get("dexterity", 10)
             mitigation = int(dexterity if isinstance(dexterity, (int, float)) else 10) // 5
-            incoming = max(0, enemy.spec.attack - mitigation)
+            raw_incoming = max(0, enemy.spec.attack - mitigation)
+            # Apply damage_reduction and damage_vulnerability modifiers active on the player.
+            incoming = _apply_incoming_modifiers(base=raw_incoming, target="player", ctx=ctx)
+            if incoming > 0:
+                await tui.show_text(f"{enemy.spec.displayName} attacks for {incoming} damage!")
             player.hp = max(0, player.hp - incoming)
+            # Reflect a portion of incoming damage back to the enemy if player has thorns.
+            await _apply_reflect(taken=incoming, target="player", ctx=ctx, player=player, tui=tui)
+
+        # Enemy skill phase (periodic / scheduled skill use).
+        await _enemy_skill_phase(ctx=ctx, player=player, registry=registry, tui=tui)
+
+        ctx.turn_number += 1
 
         # Checkpoint after all HP changes for this round are committed.
         if on_round_complete is not None:
             await on_round_complete()
 
-        if enemy_hp <= 0:
+        if ctx.enemy_hp <= 0:
             player.statistics.record_enemy_defeated(step.enemy)
             await run_outcome_branch(step.on_win)
             return AdventureOutcome.COMPLETED

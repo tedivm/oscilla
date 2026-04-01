@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import random
 from logging import getLogger
-from typing import TYPE_CHECKING, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List
 from uuid import UUID
 
 from rich.panel import Panel
@@ -941,3 +941,17 @@ class TextualTUI:
         """
         await self.show_text(prompt)
         return await self._app._prompt_name()
+
+    async def show_skill_menu(self, skills: List[Dict[str, Any]]) -> int | None:
+        """Display a skill selection menu and return the 1-based index of the chosen skill.
+
+        Returns None if the player cancels without selecting.
+        """
+        if not skills:
+            return None
+        options = [f"{s['name']} — {s.get('description', '')}" for s in skills]
+        options.append("Cancel")
+        choice = await self.show_menu(prompt="Choose a skill:", options=options)
+        if choice == len(options):
+            return None
+        return choice

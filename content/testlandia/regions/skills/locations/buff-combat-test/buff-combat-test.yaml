@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: buff-combat-test
+spec:
+  displayName: "Buff Combat Test"
+  description: "Combat against iron-golem to test buff effects. Use shield/rage skills before fighting."
+  region: skills
+  adventures:
+    - ref: buff-combat-test
+      weight: 100

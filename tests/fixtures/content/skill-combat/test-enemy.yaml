@@ -1,0 +1,17 @@
+apiVersion: game/v1
+kind: Enemy
+metadata:
+  name: test-enemy
+spec:
+  displayName: "Test Enemy"
+  description: "A sturdy enemy that uses poison every 3 turns."
+  hp: 20
+  attack: 5
+  defense: 0
+  xp_reward: 20
+  loot: []
+  skills:
+    - skill_ref: test-skill-poison
+      use_every_n_turns: 3
+  skill_resources:
+    mana: 10

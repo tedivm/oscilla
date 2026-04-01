@@ -149,6 +149,18 @@ class AdventuresCompletedCondition(BaseModel):
         return self
 
 
+class SkillCondition(BaseModel):
+    type: Literal["skill"]
+    name: str = Field(description="Skill manifest name to check.")
+    mode: Literal["available", "learned"] = Field(
+        default="available",
+        description=(
+            "'available' — checks known_skills ∪ item-granted skills (requires registry). "
+            "'learned' — checks known_skills only (registry not required)."
+        ),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Condition branch nodes (forward-referenced via model_rebuild)
 # ---------------------------------------------------------------------------
@@ -183,6 +195,7 @@ Condition = Annotated[
         EnemiesDefeatedCondition,
         LocationsVisitedCondition,
         AdventuresCompletedCondition,
+        SkillCondition,
     ],
     Field(discriminator="type"),
 ]
@@ -213,6 +226,7 @@ _DICT_LEAVES: set[str] = {
     "enemies_defeated",
     "locations_visited",
     "adventures_completed",
+    "skill",
 }
 
 # Branch keys whose sub-conditions need recursive normalisation

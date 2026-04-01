@@ -1,0 +1,16 @@
+apiVersion: game/v1
+kind: Skill
+metadata:
+  name: dispel-curse
+spec:
+  displayName: "Dispel Curse"
+  description: "Strip the Berserker Rage buff from the enemy, ending their fury early."
+  contexts:
+    - combat
+  cost:
+    stat: mana
+    amount: 5
+  use_effects:
+    - type: dispel
+      label: berserker-rage
+      target: enemy

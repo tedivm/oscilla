@@ -1,0 +1,18 @@
+apiVersion: game/v1
+kind: Skill
+metadata:
+  name: arcane-mend
+spec:
+  displayName: "Arcane Mend"
+  description: "Channel arcane energy into your wounds, restoring 30 HP. Usable while exploring."
+  contexts:
+    - overworld
+  cost:
+    stat: mana
+    amount: 20
+  cooldown:
+    scope: adventure
+    count: 1
+  use_effects:
+    - type: heal
+      amount: 30

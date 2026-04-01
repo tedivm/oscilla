@@ -1,0 +1,22 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: buff-combat-test
+spec:
+  displayName: "Buff Combat Test"
+  description: "Combat test with iron-golem. Buff effects should be visible in damage calculations."
+  steps:
+    - type: combat
+      enemy: iron-golem
+      on_win:
+        steps:
+          - type: narrative
+            text: "Iron golem defeated. Check damage dealt/taken to verify buff effects worked."
+      on_defeat:
+        steps:
+          - type: narrative
+            text: "Defeated by iron golem. Try using shield/rage skills before fighting."
+      on_flee:
+        steps:
+          - type: narrative
+            text: "Fled from iron golem."

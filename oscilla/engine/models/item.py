@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Literal
+from typing import Dict, List, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -20,6 +20,21 @@ class EquipSpec(BaseModel):
     stat_modifiers: List[StatModifier] = []
 
 
+class BuffGrant(BaseModel):
+    """A reference to a Buff manifest with optional per-call variable overrides.
+
+    Used in ItemSpec.grants_buffs_equipped and grants_buffs_held to allow the
+    same buff manifest to be applied with item-specific parameters (e.g. a
+    master-thorns-sword that reflects 60% instead of the default 30%).
+    """
+
+    buff_ref: str = Field(description="Buff manifest name to apply.")
+    variables: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Variable overrides applied on top of the buff's declared defaults.",
+    )
+
+
 class ItemSpec(BaseModel):
     category: str
     displayName: str
@@ -30,6 +45,14 @@ class ItemSpec(BaseModel):
     stackable: bool = True
     droppable: bool = True
     value: int = Field(default=0, ge=0)
+    # Skills granted only while this item occupies an equipment slot.
+    grants_skills_equipped: List[str] = []
+    # Skills granted while this item is anywhere in inventory (stacks or instances).
+    grants_skills_held: List[str] = []
+    # Buff grants applied at the start of each combat while this item occupies an equipment slot.
+    grants_buffs_equipped: List[BuffGrant] = []
+    # Buff grants applied at the start of each combat while this item is anywhere in inventory.
+    grants_buffs_held: List[BuffGrant] = []
 
     @model_validator(mode="after")
     def validate_stackable_equip(self) -> "ItemSpec":

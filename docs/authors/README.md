@@ -9,3 +9,4 @@ If you are looking to work on the engine itself, see the [Developer Documentatio
 New to content authoring? Start here:
 
 1. **[Content Authoring Guide](./content-authoring.md)** — Manifest format, every kind with field reference and examples, conditions, steps, effects, the `validate` command, and common mistakes
+2. **[Skills and Buffs](./skills.md)** — Skill and Buff manifest reference, equipment skill/buff grants, enemy skills, CharacterConfig skill resources, and the buff variables system

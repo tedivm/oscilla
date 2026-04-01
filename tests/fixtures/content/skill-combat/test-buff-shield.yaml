@@ -1,0 +1,13 @@
+apiVersion: game/v1
+kind: Buff
+metadata:
+  name: test-buff-shield
+spec:
+  displayName: "Shield"
+  description: "Reduces incoming damage by 50%."
+  duration_turns: 3
+  variables: {}
+  modifiers:
+    - type: damage_reduction
+      target: player
+      percent: 50

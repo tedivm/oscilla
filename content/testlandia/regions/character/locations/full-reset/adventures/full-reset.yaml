@@ -1,0 +1,35 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: full-reset
+spec:
+  displayName: "Full Character Reset"
+  description: "WARNING: Completely resets character to starting state — clears all skills, dispels all buffs, removes all items, and resets stats to defaults."
+  steps:
+    - type: narrative
+      text: "A strange mystical energy washes over you. When it clears, everything feels... different. You are as you were when you first arrived in Testlandia."
+      effects:
+        - type: dispel
+          label: shield-buff
+          target: player
+        - type: dispel
+          label: rage-buff
+          target: player
+        - type: dispel
+          label: regen-buff
+          target: player
+        - type: stat_set
+          stat: strength
+          value: 10
+        - type: stat_set
+          stat: speed
+          value: 1
+        - type: stat_set
+          stat: is_blessed
+          value: false
+        - type: stat_set
+          stat: gold
+          value: 0
+        - type: stat_set
+          stat: mana
+          value: 50

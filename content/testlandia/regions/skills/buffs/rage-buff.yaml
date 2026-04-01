@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Buff
+metadata:
+  name: rage-buff
+spec:
+  displayName: "Battle Rage"
+  description: "Amplifies player outgoing damage by 50% for 2 turns."
+  duration_turns: 2
+  modifiers:
+    - type: damage_amplify
+      target: player
+      percent: 50

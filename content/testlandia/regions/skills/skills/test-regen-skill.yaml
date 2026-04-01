@@ -1,0 +1,20 @@
+apiVersion: game/v1
+kind: Skill
+metadata:
+  name: test-regen-skill
+spec:
+  displayName: "Test Regen Skill"
+  description: "Grants regen buff. Overworld-only skill for testing."
+  contexts:
+    - overworld
+  cost:
+    stat: mana
+    amount: 20
+  cooldown:
+    scope: adventure
+    count: 1
+  use_effects:
+    - type: apply_buff
+      buff_ref: regen-buff
+      target: player
+      variables: {}

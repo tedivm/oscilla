@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: test-location
+spec:
+  displayName: "Test Location"
+  description: "Single location for skill-combat tests."
+  region: test-region-root
+  adventures:
+    - ref: test-combat
+      weight: 100

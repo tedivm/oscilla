@@ -2,7 +2,7 @@
 
 from typing import List, Literal, Set
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from oscilla.engine.models.base import Condition, ManifestEnvelope
 
@@ -50,6 +50,11 @@ class CharacterConfigSpec(BaseModel):
     public_stats: List[StatDefinition] = []
     hidden_stats: List[StatDefinition] = []
     equipment_slots: List[SlotDefinition] = []
+    # Maps resource names used by SkillCost to stat names in public/hidden_stats.
+    # Validated at load time: stat and max_stat must reference declared stats.
+    skill_resources: List["SkillResourceBinding"] = []
+    # Optional category governance — absent means no restrictions enforced.
+    skill_category_rules: List["SkillCategoryRule"] = []
 
     @model_validator(mode="after")
     def validate_unique_stat_names(self) -> "CharacterConfigSpec":
@@ -85,3 +90,30 @@ class CharacterConfigSpec(BaseModel):
 class CharacterConfigManifest(ManifestEnvelope):
     kind: Literal["CharacterConfig"]
     spec: CharacterConfigSpec
+
+
+class SkillResourceBinding(BaseModel):
+    """Maps a human-readable resource name to a character stat and its max stat."""
+
+    name: str = Field(description="Resource name used by SkillCost (e.g. 'mana', 'psi').")
+    stat: str = Field(description="Stat name holding the current resource value.")
+    max_stat: str = Field(description="Stat name holding the resource maximum.")
+
+
+class SkillCategoryRule(BaseModel):
+    """Optional engine-side governance for a skill category."""
+
+    category: str
+    max_known: int | None = Field(
+        default=None,
+        ge=1,
+        description="Maximum number of skills in this category a character may learn. None = unlimited.",
+    )
+    exclusive_with: List[str] = Field(
+        default=[],
+        description="Category names whose known skills conflict with this category.",
+    )
+
+
+# Update CharacterConfigSpec forward references now that the classes are defined.
+CharacterConfigSpec.model_rebuild()
