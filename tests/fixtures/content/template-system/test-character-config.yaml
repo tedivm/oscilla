@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: CharacterConfig
+metadata:
+  name: test-character-config
+spec:
+  public_stats:
+    - name: strength
+      type: int
+      default: 10
+      description: "Physical power"
+    - name: luck
+      type: int
+      default: 5
+      description: "Fortune stat for template roll tests"
+  hidden_stats: []

@@ -13,6 +13,10 @@ New to this project? Start here:
 
 ## Core Features
 
+### [Design Philosophy](./design-philosophy.md)
+
+The recurring ideas that guide engine and feature design: author-defined vocabulary, composable effects, the condition evaluator as a universal gate, and the separation of content from engine.
+
 ### [Database](./database.md)
 
 SQLAlchemy ORM integration, models, migrations with Alembic, and database patterns.

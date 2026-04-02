@@ -27,6 +27,8 @@ if TYPE_CHECKING:
     from oscilla.engine.models.character_config import CharacterConfigManifest
     from oscilla.engine.registry import ContentRegistry
 
+from oscilla.engine.templates import PRONOUN_SETS
+
 logger = getLogger(__name__)
 
 
@@ -79,6 +81,7 @@ async def save_character(session: AsyncSession, state: "CharacterState", user_id
         max_hp=state.max_hp,
         character_class=state.character_class,
         current_location=state.current_location,
+        pronoun_set=next((k for k, v in PRONOUN_SETS.items() if v == state.pronouns), "they_them"),
         adventure_ref=state.active_adventure.adventure_ref if state.active_adventure else None,
         adventure_step_index=state.active_adventure.step_index if state.active_adventure else None,
         adventure_step_state=state.active_adventure.step_state if state.active_adventure else None,
@@ -292,6 +295,7 @@ async def load_character(
         "hp": iteration.hp,
         "max_hp": iteration.max_hp,
         "current_location": iteration.current_location,
+        "pronoun_set": iteration.pronoun_set,
         "milestones": milestones,
         "stacks": stacks,
         "instances": instances,

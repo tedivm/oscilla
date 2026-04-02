@@ -55,6 +55,9 @@ class CharacterConfigSpec(BaseModel):
     skill_resources: List["SkillResourceBinding"] = []
     # Optional category governance — absent means no restrictions enforced.
     skill_category_rules: List["SkillCategoryRule"] = []
+    # Additional pronoun sets beyond the built-in three. Games may add xe/xir,
+    # fae/faer, etc. here without touching engine code.
+    extra_pronoun_sets: List["PronounSetDefinition"] = []
 
     @model_validator(mode="after")
     def validate_unique_stat_names(self) -> "CharacterConfigSpec":
@@ -113,6 +116,19 @@ class SkillCategoryRule(BaseModel):
         default=[],
         description="Category names whose known skills conflict with this category.",
     )
+
+
+class PronounSetDefinition(BaseModel):
+    """A named pronoun set that can be selected during character creation."""
+
+    name: str = Field(description="Unique key, e.g. 'xe_xir'.")
+    display_name: str = Field(description="Label shown in character creation UI.")
+    subject: str
+    object: str
+    possessive: str
+    possessive_standalone: str
+    reflexive: str
+    uses_plural_verbs: bool = False
 
 
 # Update CharacterConfigSpec forward references now that the classes are defined.

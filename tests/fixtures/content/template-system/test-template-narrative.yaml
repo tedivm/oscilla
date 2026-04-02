@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-template-narrative
+spec:
+  displayName: "Template Narrative Test"
+  description: "Adventure that uses player.name in narrative text."
+  steps:
+    - type: narrative
+      text: "Hello, {{ player.name }}! You have {{ player.stats.strength }} strength."
+      effects: []

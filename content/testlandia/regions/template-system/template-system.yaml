@@ -1,0 +1,8 @@
+apiVersion: game/v1
+kind: Region
+metadata:
+  name: template-system
+spec:
+  displayName: "Template System Lab"
+  description: "A testing ground for the dynamic content template system: pronoun selection, variable rewards, personalised
+    narrative, and milestone-conditional branching."

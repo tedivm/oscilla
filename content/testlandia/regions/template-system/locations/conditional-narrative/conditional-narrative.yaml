@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: conditional-narrative
+spec:
+  displayName: "Conditional Narrative"
+  description: "Tests milestone-conditional Jinja2 template branching."
+  region: template-system
+  adventures:
+    - ref: fame-check
+      weight: 100

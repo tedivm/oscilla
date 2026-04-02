@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import re
 import time
 from collections import defaultdict
 from dataclasses import dataclass
 from logging import getLogger
 from pathlib import Path
-from typing import Dict, List, Set, Tuple, cast
+from typing import TYPE_CHECKING, Dict, List, Set, Tuple, cast
+
+if TYPE_CHECKING:
+    from oscilla.engine.templates import GameTemplateEngine
 
 from pydantic import ValidationError
 from ruamel.yaml import YAML
@@ -20,12 +24,15 @@ from oscilla.engine.models.adventure import (
     ChoiceStep,
     CombatStep,
     Effect,
+    ItemDropEffect,
     NarrativeStep,
     OutcomeBranch,
     SkillGrantEffect,
+    StatChangeEffect,
     StatCheckStep,
     Step,
     UseItemEffect,
+    XpGrantEffect,
 )
 from oscilla.engine.models.base import AllCondition, Condition, ManifestEnvelope, normalise_condition
 from oscilla.engine.models.buff import BuffManifest
@@ -755,11 +762,118 @@ def build_effective_conditions(manifests: List[ManifestEnvelope]) -> Tuple[List[
     return manifests, errors
 
 
+def _collect_all_template_strings(
+    manifests: List[ManifestEnvelope],
+) -> List[tuple[str, str, str]]:
+    """Walk manifest trees and collect (template_id, template_str, context_type) triples.
+
+    context_type is 'combat' for strings inside CombatStep branches; 'adventure' otherwise.
+    template_id is a stable human-readable path for error messages.
+    """
+    from oscilla.engine.models.adventure import ChoiceStep, CombatStep, NarrativeStep, StatCheckStep
+
+    results: List[tuple[str, str, str]] = []
+
+    def _is_template(value: object) -> bool:
+        if not isinstance(value, str):
+            return False
+        return "{{" in value or "{%" in value or bool(re.search(r"\{[A-Za-z]+\}", value))
+
+    def _walk_effects(effects: List[Effect], path: str, context_type: str) -> None:
+        for effect in effects:
+            if isinstance(effect, XpGrantEffect) and _is_template(effect.amount):
+                results.append((f"__effect_xp_{id(effect)}", effect.amount, context_type))  # type: ignore[arg-type]
+            elif isinstance(effect, StatChangeEffect) and _is_template(effect.amount):
+                results.append((f"__effect_statchange_{id(effect)}", effect.amount, context_type))  # type: ignore[arg-type]
+            elif isinstance(effect, ItemDropEffect) and _is_template(effect.count):
+                results.append((f"__effect_itemdrop_{id(effect)}", effect.count, context_type))  # type: ignore[arg-type]
+
+    def _walk_branch(branch: OutcomeBranch, path: str, context_type: str) -> None:
+        _walk_effects(branch.effects, path, context_type)
+        for i, substep in enumerate(branch.steps):
+            _walk_step(substep, f"{path}.steps[{i}]", context_type)
+
+    def _walk_step(step: Step, path: str, context_type: str) -> None:
+        if isinstance(step, NarrativeStep):
+            if _is_template(step.text):
+                # Use id(step) so the same key is reproduced in run_narrative at runtime.
+                results.append((f"__narrative_{id(step)}", step.text, context_type))
+            _walk_effects(step.effects, path, context_type)
+        elif isinstance(step, ChoiceStep):
+            for j, option in enumerate(step.options):
+                # ChoiceOption has effects and substeps like OutcomeBranch but is a distinct type.
+                _walk_effects(option.effects, f"{path}.options[{j}]", context_type)
+                for k, substep in enumerate(option.steps):
+                    _walk_step(substep, f"{path}.options[{j}].steps[{k}]", context_type)
+        elif isinstance(step, CombatStep):
+            _walk_branch(step.on_win, f"{path}.on_victory", "combat")
+            _walk_branch(step.on_defeat, f"{path}.on_defeat", "combat")
+            if step.on_flee:
+                _walk_branch(step.on_flee, f"{path}.on_flee", "combat")
+        elif isinstance(step, StatCheckStep):
+            _walk_branch(step.on_pass, f"{path}.on_success", context_type)
+            _walk_branch(step.on_fail, f"{path}.on_failure", context_type)
+
+    for manifest in manifests:
+        if manifest.kind != "Adventure":
+            continue
+        adv_manifest = cast(AdventureManifest, manifest)
+        name = adv_manifest.metadata.name
+        for i, step in enumerate(adv_manifest.spec.steps):
+            _walk_step(step, f"{name}:step[{i}]", "adventure")
+
+    return results
+
+
+def _validate_templates(
+    manifests: List[ManifestEnvelope],
+    engine: "GameTemplateEngine",
+) -> List[LoadError]:
+    """Precompile all template strings found in manifests and return any errors."""
+    from oscilla.engine.templates import TemplateValidationError
+
+    errors: List[LoadError] = []
+    triples = _collect_all_template_strings(manifests)
+    for template_id, template_str, context_type in triples:
+        try:
+            engine.precompile_and_validate(template_str, template_id, context_type)
+        except TemplateValidationError as exc:
+            errors.append(LoadError(file=Path(template_id), message=str(exc)))
+    return errors
+
+
+def _validate_pronoun_set_names(
+    manifests: List[ManifestEnvelope],
+) -> List[LoadError]:
+    """Validate that extra_pronoun_sets in CharacterConfig do not conflict with built-in names."""
+    from oscilla.engine.templates import PRONOUN_SETS
+
+    errors: List[LoadError] = []
+    for m in manifests:
+        if m.kind != "CharacterConfig":
+            continue
+        cc = cast(CharacterConfigManifest, m)
+        for ps_def in cc.spec.extra_pronoun_sets:
+            if ps_def.name in PRONOUN_SETS:
+                errors.append(
+                    LoadError(
+                        file=Path(f"<{m.metadata.name}>"),
+                        message=(
+                            f"extra_pronoun_sets name {ps_def.name!r} conflicts with a built-in "
+                            "pronoun set; choose a different key."
+                        ),
+                    )
+                )
+    return errors
+
+
 def load(content_dir: Path) -> ContentRegistry:
-    """Orchestrate scan → parse → validate_references → build_effective_conditions.
+    """Orchestrate scan → parse → validate_references → build_effective_conditions → template validation.
 
     Raises ContentLoadError with all accumulated errors if any are found.
     """
+    from oscilla.engine.templates import GameTemplateEngine
+
     t0 = time.perf_counter()
     paths = scan(content_dir)
     manifests, parse_errors = parse(paths)
@@ -771,7 +885,21 @@ def load(content_dir: Path) -> ContentRegistry:
     if all_errors:
         raise ContentLoadError(all_errors)
 
-    registry = ContentRegistry.build(manifests)
+    # Template validation: extract stat names from CharacterConfig for the mock context.
+    char_config = next((m for m in manifests if m.kind == "CharacterConfig"), None)
+    stat_names: List[str] = []
+    if char_config is not None:
+        cc = cast(CharacterConfigManifest, char_config)
+        all_stats = cc.spec.public_stats + cc.spec.hidden_stats
+        stat_names = [s.name for s in all_stats]
+    template_engine = GameTemplateEngine(stat_names=stat_names)
+
+    pronoun_errors = _validate_pronoun_set_names(manifests)
+    template_errors = _validate_templates(manifests, template_engine)
+    if pronoun_errors or template_errors:
+        raise ContentLoadError(pronoun_errors + template_errors)
+
+    registry = ContentRegistry.build(manifests, template_engine=template_engine)
     elapsed_ms = (time.perf_counter() - t0) * 1000
     logger.info("Content loaded in %.1f ms (%d manifests)", elapsed_ms, len(manifests))
     return registry

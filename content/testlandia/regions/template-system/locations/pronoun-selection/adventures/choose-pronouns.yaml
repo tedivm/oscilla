@@ -1,0 +1,35 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: choose-pronouns
+spec:
+  displayName: "Choose Pronouns"
+  description: "A choice adventure that lets the player select their pronouns."
+  steps:
+    - type: choice
+      prompt: "Which pronouns does your character use?"
+      options:
+        - label: they_them
+          text: "They / Them"
+          steps:
+            - type: narrative
+              text: "Noted — {They} {are} known as {{ player.name }}."
+              effects:
+                - type: set_pronouns
+                  set: they_them
+        - label: she_her
+          text: "She / Her"
+          steps:
+            - type: narrative
+              text: "Noted — {They} {are} known as {{ player.name }}."
+              effects:
+                - type: set_pronouns
+                  set: she_her
+        - label: he_him
+          text: "He / Him"
+          steps:
+            - type: narrative
+              text: "Noted — {They} {are} known as {{ player.name }}."
+              effects:
+                - type: set_pronouns
+                  set: he_him

@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: variable-rewards
+spec:
+  displayName: "Variable Rewards"
+  description: "Tests variable XP and gold rewards using roll() templates."
+  region: template-system
+  adventures:
+    - ref: treasure-hunt
+      weight: 100

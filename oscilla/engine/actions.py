@@ -95,7 +95,7 @@ async def open_actions_screen(
 
     # --- Show the menu -----------------------------------------------------
     # show_skill_menu returns a 0-based index or None for cancel.
-    selection = await tui.show_skill_menu(skill_dicts)  # type: ignore[arg-type]
+    selection = await tui.show_skill_menu(skill_dicts)
     if selection is None:
         return
 

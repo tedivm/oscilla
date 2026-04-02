@@ -12,6 +12,8 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Any, Dict, List, Set
 from uuid import UUID, uuid4
 
+from oscilla.engine.templates import DEFAULT_PRONOUN_SET, PRONOUN_SETS, PronounSet
+
 if TYPE_CHECKING:
     from oscilla.engine.models.character_config import CharacterConfigManifest
     from oscilla.engine.models.game import GameManifest
@@ -23,6 +25,18 @@ logger = getLogger(__name__)
 # Bounds from StatDefinition are enforced in the effect handlers before this point.
 _INT64_MIN: int = -(2**63)
 _INT64_MAX: int = (2**63) - 1
+
+
+def _deserialize_pronoun_set(key: str) -> PronounSet:
+    """Return the PronounSet for key, falling back to they_them for unknown keys."""
+    ps = PRONOUN_SETS.get(key)
+    if ps is None:
+        logger.warning(
+            "Unknown pronoun_set key %r in saved CharacterState — defaulting to 'they_them'.",
+            key,
+        )
+        return DEFAULT_PRONOUN_SET
+    return ps
 
 
 @dataclass
@@ -98,6 +112,8 @@ class CharacterState:
     # 0-based prestige run number; maps to character_iterations.iteration
     iteration: int
     current_location: str | None
+    # Player's chosen pronoun set. Defaults to they/them until explicitly set.
+    pronouns: PronounSet = field(default_factory=lambda: DEFAULT_PRONOUN_SET)
     milestones: Set[str] = field(default_factory=set)
     statistics: CharacterStatistics = field(default_factory=CharacterStatistics)
     # Stackable items: item_ref → quantity
@@ -485,6 +501,10 @@ class CharacterState:
             "hp": self.hp,
             "max_hp": self.max_hp,
             "current_location": self.current_location,
+            "pronoun_set": next(
+                (k for k, v in PRONOUN_SETS.items() if v == self.pronouns),
+                "they_them",  # fallback if using a custom set not in the built-in registry
+            ),
             "milestones": sorted(self.milestones),
             "stacks": dict(self.stacks),
             "instances": [
@@ -608,6 +628,7 @@ class CharacterState:
             hp=data["hp"],
             max_hp=data["max_hp"],
             current_location=data.get("current_location"),
+            pronouns=_deserialize_pronoun_set(data.get("pronoun_set", "they_them")),
             milestones=set(data.get("milestones", [])),
             stacks=dict(data.get("stacks", {})),
             instances=instances,

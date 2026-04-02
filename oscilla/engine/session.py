@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.orm.exc import StaleDataError
 
+from oscilla.engine.templates import PRONOUN_SETS
 from oscilla.services.character import (
     acquire_session_lock,
     add_item_instance,
@@ -253,6 +254,13 @@ class GameSession:
             scalar_fields["character_class"] = state.character_class
         if last is None or state.current_location != last.current_location:
             scalar_fields["current_location"] = state.current_location
+        # Normalize pronoun set to its key name for storage.
+        state_pronoun_key = next((k for k, v in PRONOUN_SETS.items() if v == state.pronouns), "they_them")
+        last_pronoun_key = (
+            next((k for k, v in PRONOUN_SETS.items() if v == last.pronouns), "they_them") if last is not None else None
+        )
+        if last is None or state_pronoun_key != last_pronoun_key:
+            scalar_fields["pronoun_set"] = state_pronoun_key
         if scalar_fields:
             await update_scalar_fields(
                 session=self.db_session,

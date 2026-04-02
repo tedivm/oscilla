@@ -1,0 +1,13 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-template-xp-roll
+spec:
+  displayName: "Template XP Roll Test"
+  description: "Adventure that uses roll() in xp_grant amount."
+  steps:
+    - type: narrative
+      text: "You gain experience!"
+      effects:
+        - type: xp_grant
+          amount: "{{ roll(5, 15) }}"

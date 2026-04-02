@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: pronoun-selection
+spec:
+  displayName: "Pronoun Selection"
+  description: "Choose your character's pronouns. Each choice sets the pronoun_slot stat so you can verify the engine records
+    the selection."
+  region: template-system
+  adventures:
+    - ref: choose-pronouns
+      weight: 100

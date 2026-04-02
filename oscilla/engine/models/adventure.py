@@ -11,7 +11,6 @@ from oscilla.engine.models.base import Condition, ManifestEnvelope
 # NOTE: Dict is imported for use in ApplyBuffEffect and DispelEffect.
 
 
-
 # ---------------------------------------------------------------------------
 # Effects — silent mechanical outcomes (no screen produced)
 # ---------------------------------------------------------------------------
@@ -24,19 +23,21 @@ class ItemDropEntry(BaseModel):
 
 class XpGrantEffect(BaseModel):
     type: Literal["xp_grant"]
-    amount: int = Field(description="XP amount; can be negative (penalty) but not zero.")
+    # str = Jinja2 template string that resolves to a non-zero int at render time.
+    amount: int | str = Field(description="XP amount or template string resolving to int.")
 
     @field_validator("amount")
     @classmethod
-    def amount_not_zero(cls, v: int) -> int:
-        if v == 0:
+    def amount_not_zero(cls, v: int | str) -> int | str:
+        if isinstance(v, int) and v == 0:
             raise ValueError("XP amount cannot be zero")
         return v
 
 
 class ItemDropEffect(BaseModel):
     type: Literal["item_drop"]
-    count: int = Field(default=1, ge=1)
+    # str = template string resolving to a positive int.
+    count: int | str = Field(default=1, description="Roll count or template string resolving to int.")
     loot: List[ItemDropEntry] = Field(min_length=1)
 
 
@@ -62,7 +63,8 @@ class HealEffect(BaseModel):
 class StatChangeEffect(BaseModel):
     type: Literal["stat_change"]
     stat: str = Field(description="Character stat name (player) or ignored when target is 'enemy'.")
-    amount: int = Field(description="Amount to add/subtract; can be negative.")
+    # str = template string resolving to int.
+    amount: int | str = Field(description="Amount to add/subtract; can be negative or a template string.")
     # When target is "enemy", stat is ignored and amount is applied directly to enemy_hp.
     target: Literal["player", "enemy"] = "player"
 
@@ -101,6 +103,17 @@ class DispelEffect(BaseModel):
         default="player",
         description="Only effects targeting this participant are removed.",
     )
+
+
+class SetPronounsEffect(BaseModel):
+    """Assign a named pronoun set to the player.
+
+    The set must be one of the built-in names (they_them, she_her, he_him) or
+    a custom name declared in CharacterConfig extra_pronoun_sets.
+    """
+
+    type: Literal["set_pronouns"]
+    set: str = Field(description="Pronoun set key, e.g. 'they_them', 'she_her', 'he_him', or a custom key.")
 
 
 class ApplyBuffEffect(BaseModel):
@@ -147,6 +160,7 @@ Effect = Annotated[
         SkillGrantEffect,
         DispelEffect,
         ApplyBuffEffect,
+        SetPronounsEffect,
     ],
     Field(discriminator="type"),
 ]

@@ -851,6 +851,7 @@ erDiagram
     INTEGER iteration
     INTEGER level
     INTEGER max_hp
+    VARCHAR pronoun_set
     VARCHAR session_token "nullable"
     DATETIME started_at
     INTEGER version

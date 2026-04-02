@@ -56,6 +56,7 @@ class CharacterIterationRecord(Base):
     max_hp: Mapped[int] = mapped_column(Integer, nullable=False)
     character_class: Mapped[str | None] = mapped_column(String, nullable=True)
     current_location: Mapped[str | None] = mapped_column(String, nullable=True)
+    pronoun_set: Mapped[str] = mapped_column(String, nullable=False, default="they_them")
 
     # Active adventure — scalar identifiers live as columns; step_state is the
     # only JSON column because its keys and shape are set by the step handler at

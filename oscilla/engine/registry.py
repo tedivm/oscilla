@@ -1,6 +1,6 @@
 """Content registry — typed in-memory store for all loaded manifests."""
 
-from typing import Dict, Generic, Iterator, List, Type, TypeVar, cast
+from typing import TYPE_CHECKING, Dict, Generic, Iterator, List, Type, TypeVar, cast
 
 from oscilla.engine.models.adventure import AdventureManifest
 from oscilla.engine.models.base import ManifestEnvelope
@@ -15,6 +15,9 @@ from oscilla.engine.models.quest import QuestManifest
 from oscilla.engine.models.recipe import RecipeManifest
 from oscilla.engine.models.region import RegionManifest
 from oscilla.engine.models.skill import SkillManifest
+
+if TYPE_CHECKING:
+    from oscilla.engine.templates import GameTemplateEngine
 
 T = TypeVar("T", bound=ManifestEnvelope)
 
@@ -67,10 +70,17 @@ class ContentRegistry:
         self.skills: KindRegistry[SkillManifest] = KindRegistry()
         self.game: GameManifest | None = None
         self.character_config: CharacterConfigManifest | None = None
+        # Holds precompiled templates; populated by loader.py after validation.
+        self.template_engine: "GameTemplateEngine | None" = None
 
     @classmethod
-    def build(cls: Type["ContentRegistry"], manifests: List[ManifestEnvelope]) -> "ContentRegistry":
+    def build(
+        cls: Type["ContentRegistry"],
+        manifests: List[ManifestEnvelope],
+        template_engine: "GameTemplateEngine | None" = None,
+    ) -> "ContentRegistry":
         registry = cls()
+        registry.template_engine = template_engine
         for m in manifests:
             match m.kind:
                 case "Region":

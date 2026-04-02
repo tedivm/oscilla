@@ -500,3 +500,86 @@ The content loader (`oscilla/engine/loader.py`) validates skill and buff cross-r
 - Player state changes are applied immediately (no deferred updates)
 - Condition evaluation is recursive but typically shallow
 - Combat and choice steps may require multiple user interactions
+
+## Dynamic Template Engine
+
+The template engine (`oscilla/engine/templates.py`) provides Jinja2-based dynamic content. Templates are compiled once at load time and rendered at runtime.
+
+### Template Lifecycle
+
+```
+load() → _collect_all_template_strings()
+       → GameTemplateEngine(stat_names)
+       → _validate_templates()
+             precompile_and_validate(raw, template_id, context_type)
+                  preprocess_pronouns(raw)      # expand {they} etc.
+                  env.from_string(processed)     # Jinja2 compile
+                  template.render(mock_ctx)      # catch unknown names
+             → ContentLoadError on any failure
+       → ContentRegistry.build(..., template_engine=engine)
+
+adventure_pipeline._dispatch()
+       → _build_context()        # ExpressionContext from CharacterState
+       → run_narrative(step, player, tui, run_effects, registry, ctx)
+             engine.render(template_id, ctx)   # cached template
+       → _run_effects(effects, ctx)
+             run_effect(..., ctx)
+                  engine.render_int(template_id, ctx)  # for numeric fields
+```
+
+### `GameTemplateEngine`
+
+```python
+class GameTemplateEngine:
+    def __init__(self, stat_names: List[str]) -> None: ...
+    def precompile_and_validate(
+        self, raw: str, template_id: str, context_type: str
+    ) -> None: ...
+    def render(self, template_id: str, ctx: ExpressionContext) -> str: ...
+    def render_int(self, template_id: str, ctx: ExpressionContext) -> int: ...
+    def is_template(self, value: str) -> bool: ...
+```
+
+- **`precompile_and_validate`** — compiles the raw string (after pronoun preprocessing) and performs a mock render to catch unknown context references at load time. Raises `TemplateValidationError` on failure.
+- **`render`** / **`render_int`** — looks up the pre-compiled template by ID and renders it against a live `ExpressionContext`. `render_int` coerces the output to `int` for numeric effect fields.
+- **`is_template`** — returns `True` when the string contains `{{` or `{%`.
+- Template IDs are Python object IDs (`id(effect)` / `id(step)`), stable because manifest objects are parsed once and reused throughout the process lifetime.
+
+### `ExpressionContext` and `PlayerContext`
+
+```python
+@dataclass
+class ExpressionContext:
+    player: PlayerContext
+    combat: CombatContextView | None = None
+
+@dataclass
+class PlayerContext:
+    name: str
+    level: int
+    title: str
+    iteration: int
+    hp: int
+    max_hp: int
+    stats: Dict[str, Any]
+    milestones: PlayerMilestoneView
+    pronouns: PlayerPronounView
+
+    @classmethod
+    def from_character(cls, state: CharacterState) -> PlayerContext: ...
+```
+
+`PlayerMilestoneView` exposes `has(name: str) -> bool` for template conditions.
+
+`PlayerPronounView` exposes all grammatical fields (`subject`, `object`, `possessive`, `possessive_standalone`, `reflexive`, `uses_plural_verbs`).
+
+### Pronoun Preprocessing
+
+`preprocess_pronouns(template_str: str) -> str` runs before Jinja2 compilation. It replaces shorthand placeholders like `{they}`, `{Their}`, `{is}`, `{are}`, `{was}`, `{were}`, `{has}`, `{have}` with the equivalent Jinja2 expression that reads from `player.pronouns`. Capitalisation of the placeholder (`{they}` vs `{They}` vs `{THEY}`) controls capitalisation of the output via Jinja2 `| capitalize` / `| upper` filters.
+
+### Adding New Built-in Functions or Filters
+
+- **Built-in functions** — add to `SAFE_GLOBALS` in `templates.py`. If the function has no Jinja2/engine dependency (e.g., a calendar utility), place the implementation in `oscilla/engine/calendar_utils.py` and import it.
+- **Filters** — implement as a plain Python function and add to `SAFE_FILTERS`. The key becomes the filter name in templates.
+- Both `SAFE_GLOBALS` and `SAFE_FILTERS` are injected into the `SandboxedEnvironment` and also merged into the render context dict, making them available both as globals and as `{% set %}` assignments.
+- The mock context (`build_mock_context`) must also expose any new stat names or nested attributes that the new function may reference; otherwise valid uses will fail load-time validation.

@@ -161,6 +161,22 @@ async def game(
         typer.echo("Error: no game packages found in GAMES_PATH.", err=True)
         raise SystemExit(1)
 
+    if reset_db:
+        games_to_reset = [game_name] if game_name else list(games)
+        if not force:
+            scope = f"{game_name!r}" if game_name else "ALL games"
+            typer.confirm(
+                f"This will permanently delete all saved characters for the current user in {scope}. Continue?",
+                abort=True,
+            )
+        async with get_session() as session:
+            user_key = derive_tui_user_key()
+            user = await get_or_create_user(session=session, user_key=user_key)
+            count = 0
+            for gname in games_to_reset:
+                count += await delete_user_characters(session=session, user_id=user.id, game_name=gname)
+        typer.echo(f"Deleted {count} character(s).")
+
     if game_name is None:
         if len(games) == 1:
             game_name = next(iter(games))
@@ -202,18 +218,6 @@ async def game(
     if registry.character_config is None:
         typer.echo(f"Error: no CharacterConfig manifest found in {game_name!r}.", err=True)
         raise SystemExit(1)
-
-    if reset_db:
-        if not force:
-            typer.confirm(
-                f"This will permanently delete all saved characters for the current user in {game_name!r}. Continue?",
-                abort=True,
-            )
-        async with get_session() as session:
-            user_key = derive_tui_user_key()
-            user = await get_or_create_user(session=session, user_key=user_key)
-            count = await delete_user_characters(session=session, user_id=user.id, game_name=game_name)
-        typer.echo(f"Deleted {count} character(s).")
 
     tui_crashed = False
     try:

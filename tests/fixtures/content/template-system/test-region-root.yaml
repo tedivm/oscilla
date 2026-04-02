@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Region
+metadata:
+  name: test-region-root
+spec:
+  displayName: "Template Test Region"
+  description: "Region for template integration tests."
+  parent:
+  locations:
+    - test-location
+  adventures: []

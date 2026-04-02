@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: test-location
+spec:
+  displayName: "Template Test Location"
+  description: "A location for template tests."
+  region: test-region-root
+  adventures:
+    - ref: test-template-narrative
+      weight: 100
+    - ref: test-template-xp-roll
+      weight: 100
+    - ref: test-template-stat-change
+      weight: 100

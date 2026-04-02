@@ -1,0 +1,16 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: treasure-hunt
+spec:
+  displayName: "Treasure Hunt"
+  description: "Tests variable XP grant and gold stat change using roll() templates. Run multiple times to verify reward amounts vary."
+  steps:
+    - type: narrative
+      text: "You discover an ancient chest. The treasure inside shifts and glimmers."
+      effects:
+        - type: xp_grant
+          amount: "{{ roll(10, 50) }}"
+        - type: stat_change
+          stat: gold
+          amount: "{{ roll(1, 20) }}"

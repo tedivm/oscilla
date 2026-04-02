@@ -4,7 +4,8 @@ metadata:
   name: battle-axe
 spec:
   displayName: "Battle Axe"
-  description: "A brutal double-headed axe. Grants the War Rage skill while equipped, letting you channel its destructive fury in combat."
+  description: "A brutal double-headed axe. Grants the War Rage skill while equipped, letting you channel its destructive
+    fury in combat."
   category: weapon
   stackable: false
   equip:

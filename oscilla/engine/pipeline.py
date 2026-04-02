@@ -8,12 +8,16 @@ functions in oscilla/engine/steps/.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Protocol
 
 from oscilla.engine.character import AdventurePosition, CharacterState
 from oscilla.engine.models.adventure import Effect, OutcomeBranch, Step
 from oscilla.engine.registry import ContentRegistry
 from oscilla.engine.signals import _EndSignal, _GotoSignal
+from oscilla.engine.templates import ExpressionContext, PlayerContext
+
+if TYPE_CHECKING:
+    from oscilla.engine.templates import CombatContextView
 
 
 class TUICallbacks(Protocol):
@@ -120,6 +124,13 @@ class AdventurePipeline:
         if self._on_state_change is not None:
             await self._on_state_change(self._player, event)
 
+    def _build_context(self, combat_view: "CombatContextView | None" = None) -> ExpressionContext:
+        """Build a read-only render context from current player state."""
+        return ExpressionContext(
+            player=PlayerContext.from_character(self._player),
+            combat=combat_view,
+        )
+
     async def run(self, adventure_ref: str) -> AdventureOutcome:
         """Execute the adventure from step 0.
 
@@ -205,6 +216,8 @@ class AdventurePipeline:
                     player=self._player,
                     tui=self._tui,
                     run_effects=self._run_effects,
+                    registry=self._registry,
+                    ctx=self._build_context(),
                 )
             case CombatStep():
                 return await run_combat(
@@ -233,10 +246,11 @@ class AdventurePipeline:
         # Unreachable with a complete match; guards against future extension.
         raise ValueError(f"Unhandled step type: {step!r}")  # pragma: no cover
 
-    async def _run_effects(self, effects: List[Effect]) -> None:
+    async def _run_effects(self, effects: List[Effect], ctx: ExpressionContext | None = None) -> None:
         """Apply effects and report each outcome to the player via TUI."""
+        resolved_ctx = ctx or self._build_context()
         for effect in effects:
-            await self._run_effect(effect, self._player, self._registry, self._tui)
+            await self._run_effect(effect, self._player, self._registry, self._tui, ctx=resolved_ctx)
 
     async def _run_outcome_branch(self, branch: OutcomeBranch) -> AdventureOutcome:
         """Fire branch effects, then either run inline steps or raise a goto signal."""

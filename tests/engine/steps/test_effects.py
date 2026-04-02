@@ -14,6 +14,7 @@ from oscilla.engine.models.adventure import (
     ItemDropEffect,
     ItemDropEntry,
     MilestoneGrantEffect,
+    SetPronounsEffect,
     StatChangeEffect,
     StatSetEffect,
     XpGrantEffect,
@@ -341,3 +342,43 @@ async def test_stat_set_clamps_to_content_max() -> None:
     await run_effect(effect=effect, player=player, registry=registry, tui=tui)
     assert player.stats["gold"] == 1000
     assert any("clamped" in msg.lower() for msg in tui.texts)
+
+
+# ---------------------------------------------------------------------------
+# set_pronouns effect
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_set_pronouns_changes_player_pronouns(base_player: CharacterState) -> None:
+    from oscilla.engine.templates import PRONOUN_SETS
+
+    registry = ContentRegistry()
+    tui = MockTUI()
+    effect = SetPronounsEffect(type="set_pronouns", set="she_her")
+    await run_effect(effect=effect, player=base_player, registry=registry, tui=tui)
+    assert base_player.pronouns == PRONOUN_SETS["she_her"]
+
+
+@pytest.mark.asyncio
+async def test_set_pronouns_he_him(base_player: CharacterState) -> None:
+    from oscilla.engine.templates import PRONOUN_SETS
+
+    registry = ContentRegistry()
+    tui = MockTUI()
+    effect = SetPronounsEffect(type="set_pronouns", set="he_him")
+    await run_effect(effect=effect, player=base_player, registry=registry, tui=tui)
+    assert base_player.pronouns == PRONOUN_SETS["he_him"]
+
+
+@pytest.mark.asyncio
+async def test_set_pronouns_unknown_key_skips_and_warns(base_player: CharacterState) -> None:
+    from oscilla.engine.templates import DEFAULT_PRONOUN_SET
+
+    registry = ContentRegistry()
+    tui = MockTUI()
+    effect = SetPronounsEffect(type="set_pronouns", set="unknown_pronouns")
+    await run_effect(effect=effect, player=base_player, registry=registry, tui=tui)
+    # Pronouns unchanged — still the default.
+    assert base_player.pronouns == DEFAULT_PRONOUN_SET
+    assert any("unknown" in msg.lower() or "error" in msg.lower() for msg in tui.texts)

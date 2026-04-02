@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: narrative-test
+spec:
+  displayName: "Narrative Test"
+  description: "Tests personal pronoun placeholders and player context variables in narrative text."
+  region: template-system
+  adventures:
+    - ref: personalized-greeting
+      weight: 100

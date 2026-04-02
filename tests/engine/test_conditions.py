@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from oscilla.engine.character import CharacterState
 from oscilla.engine.conditions import _numeric_compare, evaluate
 from oscilla.engine.models.base import (
     AdventuresCompletedCondition,
@@ -18,8 +19,9 @@ from oscilla.engine.models.base import (
     MilestoneCondition,
     NotCondition,
     PrestigeCountCondition,
+    PronounsCondition,
 )
-from oscilla.engine.character import CharacterState
+from oscilla.engine.templates import PRONOUN_SETS
 
 
 def test_none_condition_always_true(base_player: CharacterState) -> None:
@@ -313,3 +315,42 @@ def test_numeric_compare_multiple_operators_pass() -> None:
     cond = MockCondition()
     # 5 > 2, 5 >= 3, 5 < 8, 5 <= 5, 5 == 5 - all pass
     assert _numeric_compare(5, cond) is True
+
+
+# ---------------------------------------------------------------------------
+# Pronouns condition
+# ---------------------------------------------------------------------------
+
+
+def test_pronouns_condition_matches_default(base_player: CharacterState) -> None:
+    # New characters default to they/them.
+    cond = PronounsCondition(type="pronouns", set="they_them")
+    assert evaluate(condition=cond, player=base_player) is True
+
+
+def test_pronouns_condition_does_not_match_other_set(base_player: CharacterState) -> None:
+    cond = PronounsCondition(type="pronouns", set="she_her")
+    assert evaluate(condition=cond, player=base_player) is False
+
+
+def test_pronouns_condition_matches_after_set(base_player: CharacterState) -> None:
+    base_player.pronouns = PRONOUN_SETS["she_her"]
+    cond = PronounsCondition(type="pronouns", set="she_her")
+    assert evaluate(condition=cond, player=base_player) is True
+
+
+def test_pronouns_condition_unknown_key_returns_false(base_player: CharacterState) -> None:
+    cond = PronounsCondition(type="pronouns", set="unknown_key")
+    assert evaluate(condition=cond, player=base_player) is False
+
+
+def test_pronouns_condition_shorthand_normalisation(base_player: CharacterState) -> None:
+    from pydantic import TypeAdapter
+
+    from oscilla.engine.models.base import Condition, normalise_condition
+
+    raw = {"pronouns": "they_them"}
+    normalised = normalise_condition(raw)
+    assert normalised == {"type": "pronouns", "set": "they_them"}
+    cond = TypeAdapter(Condition).validate_python(normalised)
+    assert evaluate(condition=cond, player=base_player) is True

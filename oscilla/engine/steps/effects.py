@@ -17,6 +17,7 @@ from oscilla.engine.models.adventure import (
     HealEffect,
     ItemDropEffect,
     MilestoneGrantEffect,
+    SetPronounsEffect,
     SkillGrantEffect,
     StatChangeEffect,
     StatSetEffect,
@@ -29,6 +30,7 @@ if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
     from oscilla.engine.pipeline import TUICallbacks
     from oscilla.engine.registry import ContentRegistry
+    from oscilla.engine.templates import ExpressionContext
 
 logger = getLogger(__name__)
 
@@ -59,6 +61,7 @@ async def run_effect(
     registry: "ContentRegistry",
     tui: "TUICallbacks",
     combat: "CombatContext | None" = None,
+    ctx: "ExpressionContext | None" = None,
 ) -> None:
     """Dispatch a single effect to its handler.
 
@@ -67,8 +70,38 @@ async def run_effect(
     rather than crashing — this can occur if a skill with combat-only effects is
     somehow invoked outside combat.
     """
+    # Resolve any template strings in numeric fields before dispatch.
+    if registry.template_engine is not None:
+        from oscilla.engine.templates import ExpressionContext, PlayerContext
+
+        if ctx is None:
+            ctx = ExpressionContext(player=PlayerContext.from_character(player))
+        engine = registry.template_engine
+
+        if isinstance(effect, XpGrantEffect) and isinstance(effect.amount, str):
+            template_id = f"__effect_xp_{id(effect)}"
+            resolved_amount = engine.render_int(template_id, ctx)
+            effect = XpGrantEffect(type="xp_grant", amount=resolved_amount)
+
+        elif isinstance(effect, StatChangeEffect) and isinstance(effect.amount, str):
+            template_id = f"__effect_statchange_{id(effect)}"
+            resolved_amount = engine.render_int(template_id, ctx)
+            effect = StatChangeEffect(
+                type="stat_change",
+                stat=effect.stat,
+                amount=resolved_amount,
+                target=effect.target,
+            )
+
+        elif isinstance(effect, ItemDropEffect) and isinstance(effect.count, str):
+            template_id = f"__effect_itemdrop_{id(effect)}"
+            resolved_count = engine.render_int(template_id, ctx)
+            effect = ItemDropEffect(type="item_drop", count=resolved_count, loot=effect.loot)
+
     match effect:
         case XpGrantEffect(amount=amount):
+            # String amounts are resolved to int by template resolution above.
+            assert isinstance(amount, int), f"Unexpected non-int XP amount after template resolution: {amount!r}"
             game = registry.game
             if game is not None:
                 thresholds = game.spec.xp_thresholds
@@ -87,6 +120,8 @@ async def run_effect(
                 await tui.show_text(f"[bold red]Level down![/bold red] You are now level {level}.")
 
         case ItemDropEffect(count=count, loot=loot):
+            # String counts are resolved to int by template resolution above.
+            assert isinstance(count, int), f"Unexpected non-int item drop count after template resolution: {count!r}"
             items = [entry.item for entry in loot]
             weights = [entry.weight for entry in loot]
             # Roll independently count times with replacement.
@@ -131,6 +166,10 @@ async def run_effect(
                 await tui.show_text(f"Restored {healed} HP. (HP: {player.hp} / {player.max_hp})")
 
         case StatChangeEffect(stat=stat, amount=amount, target=target):
+            # String amounts are resolved to int by template resolution above.
+            assert isinstance(amount, int), (
+                f"Unexpected non-int stat change amount after template resolution: {amount!r}"
+            )
             if target == "enemy":
                 if combat is None:
                     logger.warning("stat_change with target='enemy' called outside combat — skipping effect.")
@@ -295,3 +334,14 @@ async def run_effect(
                 )
             )
             await tui.show_text(f"[bold]{spec.displayName}[/bold] applied for {spec.duration_turns} turn(s).")
+
+        case SetPronounsEffect(set=pronoun_key):
+            from oscilla.engine.templates import resolve_pronoun_set
+
+            ps = resolve_pronoun_set(key=pronoun_key, registry=registry)
+            if ps is None:
+                logger.warning("set_pronouns: unknown pronoun set key %r — skipping.", pronoun_key)
+                await tui.show_text(f"[red]Error: unknown pronoun set {pronoun_key!r}[/red]")
+                return
+            player.pronouns = ps
+            await tui.show_text(f"Pronouns set to {pronoun_key}.")

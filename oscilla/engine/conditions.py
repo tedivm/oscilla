@@ -19,6 +19,7 @@ from oscilla.engine.models.base import (
     MilestoneCondition,
     NotCondition,
     PrestigeCountCondition,
+    PronounsCondition,
     SkillCondition,
 )
 
@@ -96,6 +97,19 @@ def evaluate(
                 # mode == "available": includes item-granted skills; requires registry.
                 # Without a registry (e.g. some test contexts) falls back to known_skills only.
                 return n in player.available_skills(registry)
+
+        # --- Pronoun leaves ---
+        case PronounsCondition(set=pronoun_key):
+            from oscilla.engine.templates import resolve_pronoun_set
+
+            target_ps = resolve_pronoun_set(key=pronoun_key, registry=registry)
+            if target_ps is None:
+                logger.warning(
+                    "pronouns condition: unknown pronoun set key %r — evaluating False.",
+                    pronoun_key,
+                )
+                return False
+            return player.pronouns == target_ps
 
     # Unreachable if all Condition subtypes are handled above; guards against
     # extending the union without adding a case branch.

@@ -4,7 +4,8 @@ metadata:
   name: enchanted-breastplate
 spec:
   displayName: "Enchanted Breastplate"
-  description: "Armor woven with protective runes. Automatically casts Iron Skin at the start of every combat while held in inventory."
+  description: "Armor woven with protective runes. Automatically casts Iron Skin at the start of every combat while held in
+    inventory."
   category: armor
   stackable: false
   equip:

@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-template-stat-change
+spec:
+  displayName: "Template Stat Change Test"
+  description: "Adventure that uses a template in stat_change amount."
+  steps:
+    - type: narrative
+      text: "Your luck affects your strength."
+      effects:
+        - type: stat_change
+          stat: strength
+          amount: "{{ player.stats.luck }}"

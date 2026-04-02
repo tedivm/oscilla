@@ -149,6 +149,11 @@ class AdventuresCompletedCondition(BaseModel):
         return self
 
 
+class PronounsCondition(BaseModel):
+    type: Literal["pronouns"]
+    set: str = Field(description="Pronoun set key to match (e.g. 'they_them', 'she_her', 'he_him').")
+
+
 class SkillCondition(BaseModel):
     type: Literal["skill"]
     name: str = Field(description="Skill manifest name to check.")
@@ -196,6 +201,7 @@ Condition = Annotated[
         LocationsVisitedCondition,
         AdventuresCompletedCondition,
         SkillCondition,
+        PronounsCondition,
     ],
     Field(discriminator="type"),
 ]
@@ -217,6 +223,7 @@ _LEAF_MAPPINGS: dict[str, tuple[str, str]] = {
     "milestone": ("milestone", "name"),
     "item": ("item", "name"),
     "class": ("class", "name"),
+    "pronouns": ("pronouns", "set"),
 }
 
 # Keys whose value is already the full sub-dict (not a scalar)

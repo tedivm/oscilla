@@ -1114,4 +1114,130 @@ uv run oscilla game
 
 ---
 
+## Dynamic Templates
+
+Oscilla supports **Jinja2 template expressions** in narrative text and in numeric effect fields. Templates are validated at load time, so authoring errors are caught before the game is played.
+
+### Where Templates Can Be Used
+
+| Location | Example |
+|---|---|
+| Narrative step `text` | `"Hello, {{ player.name }}!"` |
+| `xp_grant.amount` | `"{{ roll(10, 50) }}"` |
+| `stat_change.amount` | `"{{ player.stats.luck }}"` |
+| `item_drop.count` | `"{{ roll(1, 3) }}"` |
+
+Templates are **opt-in**: plain strings without `{{` or `{%` pass through unchanged.
+
+### Player Context
+
+Inside a template you have access to:
+
+```
+player.name          — character name (str)
+player.level         — current level (int)
+player.hp            — current hit points (int)
+player.max_hp        — maximum hit points (int)
+player.stats.<name>  — any declared stat by name (int, float, bool, or str)
+player.milestones.has("<name>")  — true if player holds the milestone (bool)
+player.pronouns.subject          — e.g. "they" / "she" / "he"
+player.pronouns.object           — e.g. "them" / "her" / "him"
+player.pronouns.possessive       — e.g. "their" / "her" / "his"
+player.pronouns.possessive_standalone  — e.g. "theirs" / "hers" / "his"
+player.pronouns.reflexive        — e.g. "themselves" / "herself" / "himself"
+player.pronouns.uses_plural_verbs — true for they/them (bool)
+```
+
+### Built-in Functions
+
+| Function | Description | Example |
+|---|---|---|
+| `roll(low, high)` | Random integer between `low` and `high` inclusive | `{{ roll(1, 20) }}` |
+| `choice(seq)` | Pick one element at random from a list | `{{ choice(["fire","ice","wind"]) }}` |
+| `random()` | Float in [0.0, 1.0) | `{{ random() }}` |
+| `sample(seq, n)` | Pick `n` elements at random (no repeats) | `{{ sample(items, 2) }}` |
+| `now()` | Current UTC datetime | `{{ now().year }}` |
+| `today()` | Current UTC date | `{{ today() }}` |
+| `clamp(val, lo, hi)` | Clamp value to [lo, hi] | `{{ clamp(player.stats.strength, 0, 20) }}` |
+| `min(a, b)` | Minimum of two values | `{{ min(10, player.stats.speed) }}` |
+| `max(a, b)` | Maximum of two values | `{{ max(0, player.stats.gold) }}` |
+| `round(n)` | Round to nearest integer | `{{ round(x) }}` |
+| `floor(n)` | Round down | `{{ floor(x) }}` |
+| `ceil(n)` | Round up | `{{ ceil(x) }}` |
+| `abs(n)` | Absolute value | `{{ abs(player.stats.debt) }}` |
+| `int(x)` | Convert to integer | `{{ int(x) }}` |
+| `str(x)` | Convert to string | `{{ str(player.level) }}` |
+| `len(seq)` | Length of a sequence | `{{ len(items) }}` |
+| `range(n)` | Integer range | `{% for i in range(3) %}` |
+| `sum(seq)` | Sum a sequence | `{{ sum(values) }}` |
+
+**Calendar and astronomical functions** (all accept a `datetime.date` from `today()`):
+
+| Function | Returns | Example |
+|---|---|---|
+| `season(date)` | `"spring"`, `"summer"`, `"autumn"`, or `"winter"` | `{{ season(today()) }}` |
+| `month_name(date)` | Full month name | `{{ month_name(today()) }}` |
+| `day_name(date)` | Day of week | `{{ day_name(today()) }}` |
+| `week_number(date)` | ISO week number (1–53) | `{{ week_number(today()) }}` |
+| `mean(values)` | Arithmetic mean | `{{ mean([10, 20, 30]) }}` |
+| `zodiac_sign(date)` | Western zodiac sign | `{{ zodiac_sign(today()) }}` |
+| `chinese_zodiac(date)` | Chinese zodiac animal | `{{ chinese_zodiac(today()) }}` |
+| `moon_phase(date)` | Moon phase description | `{{ moon_phase(today()) }}` |
+
+### Built-in Filters
+
+| Filter | Description | Example |
+|---|---|---|
+| `stat_modifier` | Convert stat to `+n`/`-n` modifier | `{{ player.stats.strength \| stat_modifier }}` |
+| `pluralize(singular, plural?)` | Returns `singular` if piped value is 1, else `plural` | `{{ count \| pluralize("wolf","wolves") }}` |
+| `upper` | Uppercase the string | `{{ player.name \| upper }}` |
+| `capitalize` | Capitalize first letter | `{{ player.pronouns.subject \| capitalize }}` |
+| `lower` | Lowercase the string | `{{ player.name \| lower }}` |
+
+### Pronoun Placeholders
+
+Instead of writing Jinja2 expressions for pronouns, use the **shorthand placeholders**.
+Capitalisation of the placeholder controls capitalisation of the output.
+
+| Placeholder | Expands to | Example output (they/them) |
+|---|---|---|
+| `{they}` | subject pronoun | `they` |
+| `{They}` | subject pronoun, capitalized | `They` |
+| `{THEY}` | subject pronoun, uppercase | `THEY` |
+| `{them}` | object pronoun | `them` |
+| `{their}` | possessive adjective | `their` |
+| `{is}` or `{are}` | `is`/`are` based on pronoun set | `are` |
+| `{was}` or `{were}` | `was`/`were` based on pronoun set | `were` |
+| `{has}` or `{have}` | `has`/`have` based on pronoun set | `have` |
+
+Examples:
+
+```yaml
+text: "{They} {are} a brave adventurer named {{ player.name }}."
+# they/them → "They are a brave adventurer named Hero."
+# she/her   → "She is a brave adventurer named Hero."
+# he/him    → "He is a brave adventurer named Hero."
+```
+
+### Template Conditionals
+
+Use Jinja2 `{% if %}` blocks for conditional narrative:
+
+```yaml
+text: |
+  {% if player.milestones.has('hero-of-the-realm') %}
+  The crowd cheers as {{ player.name }} approaches!
+  {% else %}
+  A stranger enters the tavern.
+  {% endif %}
+```
+
+### Validation
+
+Run `oscilla validate` (or `uv run oscilla validate`) to check your content.
+Template syntax errors and unknown context references are reported with the file and field where the error occurred.
+
+---
+
+*For more on pronouns and custom pronoun sets, see [Pronouns](./pronouns.md).*
 *For engine implementation details, see [Game Engine Documentation](../dev/game-engine.md).*

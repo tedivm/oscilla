@@ -1,0 +1,17 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: personalized-greeting
+spec:
+  displayName: "Personalized Greeting"
+  description: "Tests player.name, player.level, pronoun placeholders, and verb agreement in narrative text."
+  steps:
+    - type: narrative
+      text: "Welcome, {{ player.name }}! You have reached level {{ player.level }}."
+      effects: []
+    - type: narrative
+      text: "{They} {are} standing at the crossroads. {Their} journey has only just begun."
+      effects: []
+    - type: narrative
+      text: "{They} {were} chosen for this path. {They} {have} proven {their} worth."
+      effects: []
