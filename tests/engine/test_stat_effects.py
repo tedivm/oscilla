@@ -15,7 +15,7 @@ STAT_EFFECTS_FIXTURE = FIXTURES / "stat-effects"
 
 def test_valid_stat_effects_load_successfully() -> None:
     """Stat effects with correct types should load without error."""
-    registry = load(STAT_EFFECTS_FIXTURE)
+    registry, _warnings = load(STAT_EFFECTS_FIXTURE)
     assert registry.game is not None
     assert registry.character_config is not None
     assert len(registry.adventures) == 1
@@ -23,7 +23,9 @@ def test_valid_stat_effects_load_successfully() -> None:
 
 def test_stat_change_int_positive() -> None:
     """stat_change with positive int amount on int stat should work."""
-    registry = load(STAT_EFFECTS_FIXTURE)
+    registry, _warnings = load(STAT_EFFECTS_FIXTURE)
+    assert registry.game is not None
+    assert registry.character_config is not None
     player = CharacterState.new_character(
         name="TestHero", game_manifest=registry.game, character_config=registry.character_config
     )
@@ -38,6 +40,8 @@ def test_stat_change_int_positive() -> None:
 
     # This would be applied by the effect handler, so let's simulate it
     old_value = player.stats["strength"]
+    assert isinstance(old_value, int)
+    assert isinstance(effect.amount, int)
     new_value = old_value + effect.amount
     player.stats["strength"] = new_value
 
@@ -46,7 +50,9 @@ def test_stat_change_int_positive() -> None:
 
 def test_stat_set_bool() -> None:
     """stat_set with bool value on bool stat should work."""
-    registry = load(STAT_EFFECTS_FIXTURE)
+    registry, _warnings = load(STAT_EFFECTS_FIXTURE)
+    assert registry.game is not None
+    assert registry.character_config is not None
     player = CharacterState.new_character(
         name="TestHero", game_manifest=registry.game, character_config=registry.character_config
     )

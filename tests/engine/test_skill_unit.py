@@ -12,6 +12,7 @@ from oscilla.engine.character import CharacterState
 
 if TYPE_CHECKING:
     from oscilla.engine.registry import ContentRegistry
+
 from oscilla.engine.combat_context import ActiveCombatEffect, CombatContext
 from oscilla.engine.models.base import SkillCondition
 from oscilla.engine.models.buff import (
@@ -22,11 +23,7 @@ from oscilla.engine.models.buff import (
     DamageVulnerabilityModifier,
 )
 from oscilla.engine.models.skill import SkillCooldown
-from oscilla.engine.steps.combat import (
-    _apply_damage_amplify,
-    _apply_incoming_modifiers,
-)
-
+from oscilla.engine.steps.combat import _apply_damage_amplify, _apply_incoming_modifiers
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -49,7 +46,7 @@ def _amplify_effect(target: str, percent: int) -> ActiveCombatEffect:
         target=target,  # type: ignore[arg-type]
         remaining_turns=3,
         per_turn_effects=[],
-        modifiers=[DamageAmplifyModifier(type="damage_amplify", target=target, percent=percent)],  # type: ignore[arg-type]
+        modifiers=[DamageAmplifyModifier(type="damage_amplify", target=target, percent=percent)],
     )
 
 
@@ -59,7 +56,7 @@ def _reduction_effect(target: str, percent: int) -> ActiveCombatEffect:
         target=target,  # type: ignore[arg-type]
         remaining_turns=3,
         per_turn_effects=[],
-        modifiers=[DamageReductionModifier(type="damage_reduction", target=target, percent=percent)],  # type: ignore[arg-type]
+        modifiers=[DamageReductionModifier(type="damage_reduction", target=target, percent=percent)],
     )
 
 
@@ -69,7 +66,7 @@ def _vulnerability_effect(target: str, percent: int) -> ActiveCombatEffect:
         target=target,  # type: ignore[arg-type]
         remaining_turns=3,
         per_turn_effects=[],
-        modifiers=[DamageVulnerabilityModifier(type="damage_vulnerability", target=target, percent=percent)],  # type: ignore[arg-type]
+        modifiers=[DamageVulnerabilityModifier(type="damage_vulnerability", target=target, percent=percent)],
     )
 
 
@@ -79,7 +76,7 @@ def _reflect_effect(target: str, percent: int) -> ActiveCombatEffect:
         target=target,  # type: ignore[arg-type]
         remaining_turns=3,
         per_turn_effects=[],
-        modifiers=[DamageReflectModifier(type="damage_reflect", target=target, percent=percent)],  # type: ignore[arg-type]
+        modifiers=[DamageReflectModifier(type="damage_reflect", target=target, percent=percent)],
     )
 
 
@@ -364,7 +361,7 @@ def test_skill_condition_learned_mode() -> None:
 
 def test_skill_condition_invalid_mode_raises() -> None:
     with pytest.raises(Exception):
-        SkillCondition(type="skill", name="test-skill", mode="unknown_mode")  # type: ignore[arg-type]
+        SkillCondition(type="skill", name="test-skill", mode="unknown_mode")
 
 
 # ---------------------------------------------------------------------------

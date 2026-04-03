@@ -82,22 +82,26 @@ class MockTUI:
 
 @pytest.fixture(scope="session")
 def minimal_registry() -> ContentRegistry:
-    return load(FIXTURES / "minimal")
+    registry, _warnings = load(FIXTURES / "minimal")
+    return registry
 
 
 @pytest.fixture(scope="session")
 def combat_registry() -> ContentRegistry:
-    return load(FIXTURES / "combat-pipeline")
+    registry, _warnings = load(FIXTURES / "combat-pipeline")
+    return registry
 
 
 @pytest.fixture(scope="session")
 def condition_gates_registry() -> ContentRegistry:
-    return load(FIXTURES / "condition-gates")
+    registry, _warnings = load(FIXTURES / "condition-gates")
+    return registry
 
 
 @pytest.fixture(scope="session")
 def region_chain_registry() -> ContentRegistry:
-    return load(FIXTURES / "region-chain")
+    registry, _warnings = load(FIXTURES / "region-chain")
+    return registry
 
 
 # ---------------------------------------------------------------------------

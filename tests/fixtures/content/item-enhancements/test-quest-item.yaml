@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Item
+metadata:
+  name: test-quest-item
+spec:
+  displayName: "Ancient Relic"
+  description: "A quest item."
+  category: misc
+  stackable: true
+  value: 0
+  labels:
+    - quest

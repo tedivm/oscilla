@@ -274,6 +274,7 @@ async def test_stale_data_error_retries(
             await original_persist_diff(state=state, event=event)
 
         session._persist_diff = patched_persist_diff  # type: ignore[method-assign]
+        assert session._character is not None
         await session._on_state_change(state=session._character, event="step_start")
 
     # _persist_diff was called twice: once failed, once retried

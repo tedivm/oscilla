@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: test-location
+spec:
+  displayName: "Test Location"
+  description: "Location for item-enhancements tests."
+  region: test-region
+  adventures:
+    - ref: test-adventure
+      weight: 100

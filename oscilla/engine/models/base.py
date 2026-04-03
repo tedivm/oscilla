@@ -60,6 +60,21 @@ class ItemCondition(BaseModel):
     name: str  # item manifest name; true if quantity > 0
 
 
+class ItemEquippedCondition(BaseModel):
+    type: Literal["item_equipped"]
+    name: str  # non-stackable item manifest name; true when equipped
+
+
+class ItemHeldLabelCondition(BaseModel):
+    type: Literal["item_held_label"]
+    label: str  # true when any held item (stack or instance) has this label
+
+
+class AnyItemEquippedCondition(BaseModel):
+    type: Literal["any_item_equipped"]
+    label: str  # true when any equipped instance has this label
+
+
 class CharacterStatCondition(BaseModel):
     type: Literal["character_stat"]
     name: str
@@ -69,6 +84,9 @@ class CharacterStatCondition(BaseModel):
     lte: int | float | None = None
     eq: int | float | None = None
     mod: ModComparison | None = None
+    # Whether to evaluate against base stats or effective stats (with gear bonuses).
+    # Defaults to "effective" for equip-requirement use cases.
+    stat_source: Literal["base", "effective"] = "effective"
 
     @model_validator(mode="after")
     def require_comparator(self) -> "CharacterStatCondition":
@@ -194,6 +212,9 @@ Condition = Annotated[
         LevelCondition,
         MilestoneCondition,
         ItemCondition,
+        ItemEquippedCondition,
+        ItemHeldLabelCondition,
+        AnyItemEquippedCondition,
         CharacterStatCondition,
         PrestigeCountCondition,
         ClassCondition,
@@ -224,6 +245,9 @@ _LEAF_MAPPINGS: dict[str, tuple[str, str]] = {
     "item": ("item", "name"),
     "class": ("class", "name"),
     "pronouns": ("pronouns", "set"),
+    "item_equipped": ("item_equipped", "name"),
+    "item_held_label": ("item_held_label", "label"),
+    "any_item_equipped": ("any_item_equipped", "label"),
 }
 
 # Keys whose value is already the full sub-dict (not a scalar)

@@ -30,7 +30,8 @@ FIXTURES = Path(__file__).parent.parent / "fixtures" / "content"
 
 @pytest.fixture(scope="module")
 def skill_combat_registry() -> "ContentRegistry":
-    return load(FIXTURES / "skill-combat")
+    registry, _warnings = load(FIXTURES / "skill-combat")
+    return registry
 
 
 # ---------------------------------------------------------------------------

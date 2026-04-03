@@ -1,0 +1,18 @@
+apiVersion: game/v1
+kind: Item
+metadata:
+  name: test-requires-item
+spec:
+  displayName: "Heavy Armor"
+  description: "Requires high strength to equip."
+  category: armor
+  stackable: false
+  value: 100
+  equip:
+    slots:
+      - body
+    requires:
+      type: character_stat
+      name: strength
+      gte: 15
+      stat_source: base

@@ -111,19 +111,15 @@ def _make_player_with_mana(registry: ContentRegistry, mana: int = 20, hp: int = 
 def _add_skill_to_registry(
     registry: ContentRegistry,
     name: str,
-    use_effects: list,  # type: ignore[type-arg]
+    use_effects: list,
     cost_stat: str | None = None,
     cost_amount: int = 5,
     cooldown_scope: str | None = None,
     cooldown_count: int = 2,
 ) -> None:
     """Helper to add a Skill manifest to the registry."""
-    cost = SkillCost(stat=cost_stat, amount=cost_amount) if cost_stat else None  # type: ignore[arg-type]
-    cooldown = (
-        SkillCooldown(scope=cooldown_scope, count=cooldown_count)  # type: ignore[arg-type]
-        if cooldown_scope
-        else None
-    )
+    cost = SkillCost(stat=cost_stat, amount=cost_amount) if cost_stat else None
+    cooldown = SkillCooldown(scope=cooldown_scope, count=cooldown_count) if cooldown_scope else None
     skill = SkillManifest(
         apiVersion="game/v1",
         kind="Skill",
@@ -143,9 +139,9 @@ def _add_buff_to_registry(
     registry: ContentRegistry,
     name: str,
     duration_turns: int,
-    modifiers: list | None = None,  # type: ignore[type-arg]
-    per_turn_effects: list | None = None,  # type: ignore[type-arg]
-    variables: dict | None = None,  # type: ignore[type-arg]
+    modifiers: list | None = None,
+    per_turn_effects: list | None = None,
+    variables: dict | None = None,
 ) -> None:
     """Helper to add a Buff manifest to the registry."""
     buff = BuffManifest(
@@ -281,7 +277,7 @@ async def test_dot_buff_ticks_and_expires() -> None:
     # Use the skill-combat fixture registry which already has the DoT buff.
     from oscilla.engine.loader import load
 
-    registry = load(FIXTURES / "skill-combat")
+    registry, _warnings = load(FIXTURES / "skill-combat")
     assert registry.game is not None
     assert registry.character_config is not None
 

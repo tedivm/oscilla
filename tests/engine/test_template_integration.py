@@ -33,7 +33,8 @@ FIXTURES = Path(__file__).parent.parent / "fixtures" / "content"
 
 @pytest.fixture(scope="module")
 def template_registry() -> "ContentRegistry":
-    return load(FIXTURES / "template-system")
+    registry, _warnings = load(FIXTURES / "template-system")
+    return registry
 
 
 @pytest.fixture

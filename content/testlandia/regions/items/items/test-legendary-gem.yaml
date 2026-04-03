@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Item
+metadata:
+  name: test-legendary-gem
+spec:
+  displayName: "Legendary Test Gem"
+  description: "Holding this gem triggers the passive +2 strength effect declared in game.yaml."
+  category: material
+  stackable: true
+  labels:
+    - test-legendary
+  value: 0

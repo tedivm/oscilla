@@ -85,6 +85,8 @@ class ItemInstance:
     item_ref: str
     # Per-instance stat delta applied on top of the item's equip stat_modifiers
     modifiers: Dict[str, int | float] = field(default_factory=dict)
+    # Remaining uses before auto-removal; None means unlimited (or consumed_on_use controls removal).
+    charges_remaining: int | None = None
 
 
 @dataclass
@@ -196,7 +198,8 @@ class CharacterState:
         if item is not None and not item.spec.stackable:
             if quantity != 1:
                 raise ValueError(f"Cannot add {quantity}x non-stackable item {ref!r}; add one at a time")
-            self.instances.append(ItemInstance(instance_id=uuid4(), item_ref=ref))
+            charges_remaining = item.spec.charges
+            self.instances.append(ItemInstance(instance_id=uuid4(), item_ref=ref, charges_remaining=charges_remaining))
         else:
             self.stacks[ref] = self.stacks.get(ref, 0) + quantity
 
@@ -275,13 +278,21 @@ class CharacterState:
 
     # --- Stat computation ---
 
-    def effective_stats(self, registry: "ContentRegistry | None" = None) -> Dict[str, int | bool | None]:
-        """Return base stats augmented by equipped item stat_modifiers.
+    def effective_stats(
+        self,
+        registry: "ContentRegistry | None" = None,
+        exclude_item: str | None = None,
+    ) -> Dict[str, int | bool | None]:
+        """Return base stats augmented by equipped item stat_modifiers and passive effects.
 
         Iterates over unique equipped instance_ids, looks up each item's equip
         spec, and accumulates stat_modifiers.  Per-instance modifiers from
         ItemInstance.modifiers are also applied.  Non-numeric stats are not
         modified by equipment.
+
+        When exclude_item is set, the named item's stat contributions are skipped.
+        This prevents an item from satisfying its own equip requirements
+        (the self-justification guard).
         """
         result: Dict[str, int | bool | None] = dict(self.stats)
         if registry is None:
@@ -297,6 +308,10 @@ class CharacterState:
             if instance is None:
                 continue
 
+            # Skip the excluded item's stat contributions (self-justification guard).
+            if instance.item_ref == exclude_item:
+                continue
+
             item = registry.items.get(instance.item_ref)
             if item is not None and item.spec.equip is not None:
                 for modifier in item.spec.equip.stat_modifiers:
@@ -309,6 +324,18 @@ class CharacterState:
                 current = result.get(stat, 0)
                 if isinstance(current, int) and not isinstance(current, bool):
                     result[stat] = int(current + amount)
+
+        # Apply passive effects from the game manifest.
+        if registry.game is not None:
+            from oscilla.engine.conditions import evaluate
+
+            for passive in registry.game.spec.passive_effects:
+                # Passive effects are evaluated without registry to avoid recursion.
+                if evaluate(condition=passive.condition, player=self, registry=None):
+                    for modifier in passive.stat_modifiers:
+                        current = result.get(modifier.stat, 0)
+                        if isinstance(current, int) and not isinstance(current, bool):
+                            result[modifier.stat] = int(current + modifier.amount)
 
         return result
 
@@ -356,6 +383,15 @@ class CharacterState:
             item = registry.items.get(inst.item_ref)
             if item is not None:
                 result.update(item.spec.grants_skills_held)
+
+        # Passive effect skill grants from the game manifest.
+        if registry.game is not None:
+            from oscilla.engine.conditions import evaluate
+
+            for passive in registry.game.spec.passive_effects:
+                # Passive conditions evaluated without registry to avoid recursion.
+                if evaluate(condition=passive.condition, player=self, registry=None):
+                    result.update(passive.skill_grants)
 
         return result
 
@@ -512,6 +548,7 @@ class CharacterState:
                     "instance_id": str(inst.instance_id),
                     "item_ref": inst.item_ref,
                     "modifiers": dict(inst.modifiers),
+                    "charges_remaining": inst.charges_remaining,
                 }
                 for inst in self.instances
             ],
@@ -610,6 +647,7 @@ class CharacterState:
                 instance_id=UUID(inst["instance_id"]),
                 item_ref=inst["item_ref"],
                 modifiers=dict(inst.get("modifiers", {})),
+                charges_remaining=inst.get("charges_remaining"),
             )
             for inst in raw_instances
         ]
@@ -618,7 +656,7 @@ class CharacterState:
         raw_equipment: Dict[str, str] = data.get("equipment", {})
         equipment: Dict[str, UUID] = {slot: UUID(iid_str) for slot, iid_str in raw_equipment.items()}
 
-        return cls(
+        result = cls(
             character_id=UUID(data["character_id"]),
             iteration=data["iteration"],
             name=data["name"],
@@ -641,3 +679,87 @@ class CharacterState:
             known_skills=set(data.get("known_skills", [])),
             skill_cooldowns=dict(data.get("skill_cooldowns", {})),
         )
+
+        # Warn about equipped items whose requires condition is no longer satisfied.
+        # The items remain equipped — do not cascade at load time.
+        if registry is not None:
+            from oscilla.engine.conditions import evaluate
+
+            equipped_ids = set(result.equipment.values())
+            for inst in result.instances:
+                if inst.instance_id not in equipped_ids:
+                    continue
+                item_mf = registry.items.get(inst.item_ref)
+                if item_mf is None or item_mf.spec.equip is None:
+                    continue
+                req = item_mf.spec.equip.requires
+                if req is None:
+                    continue
+                if not evaluate(condition=req, player=result, registry=registry, exclude_item=inst.item_ref):
+                    logger.warning(
+                        "Equipped item %r no longer meets its requires condition at session load — "
+                        "item remains equipped (manual unequip required).",
+                        inst.item_ref,
+                    )
+
+        return result
+
+
+def validate_equipped_requires(
+    player: "CharacterState",
+    registry: "ContentRegistry",
+) -> List[str]:
+    """Return item_ref strings for equipped items whose `requires` is no longer satisfied.
+
+    Each item's `requires` is evaluated with `exclude_item=item_ref` to strip its
+    own stat bonuses from the check (self-justification guard).
+    """
+    from oscilla.engine.conditions import evaluate
+
+    failing: List[str] = []
+    equipped_ids = set(player.equipment.values())
+    for inst in player.instances:
+        if inst.instance_id not in equipped_ids:
+            continue
+        item_mf = registry.items.get(inst.item_ref)
+        if item_mf is None or item_mf.spec.equip is None:
+            continue
+        req = item_mf.spec.equip.requires
+        if req is None:
+            continue
+        if not evaluate(condition=req, player=player, registry=registry, exclude_item=inst.item_ref):
+            failing.append(inst.item_ref)
+    return failing
+
+
+def cascade_unequip_invalid(
+    player: "CharacterState",
+    registry: "ContentRegistry",
+) -> List[str]:
+    """Unequip all items whose `requires` is no longer satisfied, repeating until stable.
+
+    Runs in a fixed-point loop so that unequipping one item that enabled another
+    item's requirement will also unequip the dependent item.
+
+    Returns the display names of all unequipped items for TUI notification.
+    """
+    unequipped_names: List[str] = []
+    while True:
+        failing_refs = validate_equipped_requires(player=player, registry=registry)
+        if not failing_refs:
+            break
+        for item_ref in failing_refs:
+            # Find the instance and unequip it from all its slots.
+            for slot in [s for s, iid in player.equipment.items()]:
+                inst = player.instances
+                equipped_inst = next(
+                    (i for i in inst if i.instance_id == player.equipment.get(slot) and i.item_ref == item_ref),
+                    None,
+                )
+                if equipped_inst is not None:
+                    player.unequip_slot(slot)
+                    item_mf = registry.items.get(item_ref)
+                    name = item_mf.spec.displayName if item_mf is not None else item_ref
+                    if name not in unequipped_names:
+                        unequipped_names.append(name)
+    return unequipped_names

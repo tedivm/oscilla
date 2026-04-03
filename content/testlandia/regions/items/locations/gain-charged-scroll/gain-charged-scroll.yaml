@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: gain-charged-scroll
+spec:
+  displayName: "Charged Scroll Drop"
+  description: "Test obtaining a charged scroll. Use it three times to verify charges_remaining decrement and removal at zero."
+  region: items
+  adventures:
+    - ref: gain-charged-scroll
+      weight: 100

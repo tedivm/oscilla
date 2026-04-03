@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from oscilla.engine.character import AdventurePosition, CharacterState
 from oscilla.engine.models.adventure import CombatStep, OutcomeBranch
 from oscilla.engine.models.base import Metadata
 from oscilla.engine.models.enemy import EnemyManifest, EnemySpec
 from oscilla.engine.pipeline import AdventureOutcome
-from oscilla.engine.character import AdventurePosition, CharacterState
 from oscilla.engine.registry import ContentRegistry
 from oscilla.engine.steps.combat import run_combat
 from tests.engine.conftest import MockTUI
@@ -141,8 +141,8 @@ async def test_combat_stat_handling_non_numeric(base_player: CharacterState) -> 
     mock_tui = MockTUI(menu_responses=[1])  # Attack
 
     # Set non-numeric stats
-    base_player.stats["strength"] = "strong"  # Non-numeric
-    base_player.stats["dexterity"] = "agile"  # Non-numeric
+    base_player.stats["strength"] = "strong"  # type: ignore[assignment]  # Non-numeric
+    base_player.stats["dexterity"] = "agile"  # type: ignore[assignment]  # Non-numeric
     base_player.hp = 100
 
     step = CombatStep(

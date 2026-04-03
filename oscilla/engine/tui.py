@@ -26,6 +26,7 @@ from textual.css.stylesheet import StylesheetParseError
 from textual.screen import ModalScreen
 from textual.widgets import Button, Footer, Input, Label, OptionList, RichLog, Static, TabbedContent, TabPane
 
+from oscilla.engine.character import cascade_unequip_invalid, validate_equipped_requires
 from oscilla.engine.conditions import evaluate
 from oscilla.engine.session import GameSession
 from oscilla.engine.steps.effects import run_effect
@@ -168,6 +169,17 @@ class StatusPanel(Static):
             "",
             *stat_lines,
         ]
+
+        # Warn about any equipped items whose requirements are no longer met.
+        invalid_refs = validate_equipped_requires(player=player, registry=self._registry)
+        if invalid_refs:
+            lines.append("")
+            lines.append("[bold red]⚠ Invalid equipment:[/bold red]")
+            for ref in invalid_refs:
+                item_mf = self._registry.items.get(ref)
+                name = item_mf.spec.displayName if item_mf else ref
+                lines.append(f"  [red]• {name}[/red]")
+
         self.update("\n".join(lines))
 
 
@@ -278,8 +290,41 @@ class InventoryScreen(ModalScreen[None]):
     def compose(self) -> ComposeResult:  # noqa: C901
         equipped_ids = set(v for v in self._player.equipment.values() if v is not None)
 
+        # Build label display maps from GameSpec if available.
+        label_color_map: Dict[str, str] = {}
+        label_sort_map: Dict[str, int] = {}
+        if self._registry.game is not None:
+            for lbl_def in self._registry.game.spec.item_labels:
+                label_color_map[lbl_def.name] = lbl_def.color
+                label_sort_map[lbl_def.name] = lbl_def.sort_priority
+
+        def _label_badges(labels: List[str]) -> str:
+            """Render label names as Rich markup badges, coloured when a colour is declared."""
+            parts: List[str] = []
+            for lbl in labels:
+                color = label_color_map.get(lbl, "")
+                if color:
+                    parts.append(f"[{color}][{lbl}][/{color}]")
+                else:
+                    parts.append(f"[dim][{lbl}][/dim]")
+            return " ".join(parts)
+
+        def _item_sort_key(kind_data: tuple[str, Any]) -> tuple[int, str]:
+            """Sort by lowest label sort_priority among the item's labels, then display name."""
+            kind, data = kind_data
+            if kind == "stack":
+                item_ref, qty, item_mf = data
+                labels = item_mf.spec.labels if item_mf else []
+                name = item_mf.spec.displayName if item_mf else item_ref
+            else:
+                inst, item_mf = data
+                labels = item_mf.spec.labels if item_mf else []
+                name = item_mf.spec.displayName if item_mf else inst.item_ref
+            prio = min((label_sort_map.get(lbl, 0) for lbl in labels), default=0)
+            return (prio, name)
+
         # Collect items by category
-        categories: Dict[str, List[tuple[str, object]]] = {}  # category -> [(kind, data)]
+        categories: Dict[str, List[tuple[str, Any]]] = {}  # category -> [(kind, data)]
         for item_ref, qty in self._player.stacks.items():
             item_mf = self._registry.items.get(item_ref)
             cat = item_mf.spec.category if item_mf else "misc"
@@ -297,14 +342,17 @@ class InventoryScreen(ModalScreen[None]):
             else:
                 with TabbedContent():
                     for cat_name, items in sorted(categories.items()):
+                        sorted_items = sorted(items, key=_item_sort_key)
                         with TabPane(cat_name.capitalize(), id=f"cat-{cat_name}"):
-                            for kind, data in items:
+                            for kind, data in sorted_items:
                                 if kind == "stack":
-                                    item_ref, qty, item_mf = data  # type: ignore[misc]
+                                    item_ref, qty, item_mf = data
                                     item_name = item_mf.spec.displayName if item_mf else item_ref
+                                    labels = item_mf.spec.labels if item_mf else []
+                                    badges = f" {_label_badges(labels)}" if labels else ""
                                     with Horizontal(classes="item-row"):
                                         yield Label(
-                                            f"[bold]{item_name}[/bold] [dim]x{qty}[/dim]",
+                                            f"[bold]{item_name}[/bold]{badges} [dim]x{qty}[/dim]",
                                             classes="item-name",
                                         )
                                         if item_mf and item_mf.spec.use_effects:
@@ -322,13 +370,18 @@ class InventoryScreen(ModalScreen[None]):
                                                 classes="item-action",
                                             )
                                 else:
-                                    inst, item_mf = data  # type: ignore[misc]
+                                    inst, item_mf = data
                                     is_equipped = inst.instance_id in equipped_ids
                                     item_name = item_mf.spec.displayName if item_mf else inst.item_ref
+                                    labels = item_mf.spec.labels if item_mf else []
+                                    badges = f" {_label_badges(labels)}" if labels else ""
                                     status = " [dim][equipped][/dim]" if is_equipped else ""
+                                    charges_text = ""
+                                    if inst.charges_remaining is not None:
+                                        charges_text = f" [dim]({inst.charges_remaining} charges)[/dim]"
                                     with Horizontal(classes="item-row"):
                                         yield Label(
-                                            f"[bold]{item_name}[/bold]{status}",
+                                            f"[bold]{item_name}[/bold]{badges}{status}{charges_text}",
                                             classes="item-name",
                                         )
                                         if is_equipped:
@@ -424,6 +477,10 @@ class InventoryScreen(ModalScreen[None]):
 
         if action == "unequip":
             self._player.unequip_slot(arg)
+            cascaded = cascade_unequip_invalid(player=self._player, registry=self._registry)
+            if cascaded:
+                names = ", ".join(cascaded)
+                self.notify(f"Also unequipped: {names} (requirements no longer met)", severity="warning")
             await self._recompose_preserving_state(event.button)
         elif action == "equip":
             instance_id = UUID(arg)
@@ -431,7 +488,20 @@ class InventoryScreen(ModalScreen[None]):
             if inst is not None:
                 item_mf = self._registry.items.get(inst.item_ref)
                 if item_mf is not None and item_mf.spec.equip is not None:
-                    self._player.equip_instance(instance_id=instance_id, slots=item_mf.spec.equip.slots)
+                    # Check equip requirements before allowing equip.
+                    requires = item_mf.spec.equip.requires
+                    if requires is None or evaluate(
+                        condition=requires,
+                        player=self._player,
+                        registry=self._registry,
+                        exclude_item=inst.item_ref,
+                    ):
+                        self._player.equip_instance(instance_id=instance_id, slots=item_mf.spec.equip.slots)
+                    else:
+                        self.notify(
+                            f"Cannot equip {item_mf.spec.displayName}: requirements not met.",
+                            severity="error",
+                        )
             await self._recompose_preserving_state(event.button)
         elif action == "use_stack":
             await self._use_stack(arg)

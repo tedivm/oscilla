@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: Item
+metadata:
+  name: test-rare-item
+spec:
+  displayName: "Rare Sword"
+  description: "A rare equippable weapon."
+  category: weapon
+  stackable: false
+  value: 50
+  labels:
+    - rare
+  equip:
+    slots:
+      - weapon

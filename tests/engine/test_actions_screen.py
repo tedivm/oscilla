@@ -167,7 +167,7 @@ async def test_actions_screen_dispatches_use_effects_with_combat_none() -> None:
     )
     registry = _make_registry(extra_skills=[skill])
     player = _make_player(registry=registry, known_skills=["test-overworld"])
-    initial_strength = int(player.stats["strength"])
+    initial_strength = int(player.stats["strength"])  # type: ignore[arg-type]
 
     # Return index 0 → select first (only) skill.
     tui = MockTUI(skill_menu_responses=[0])
@@ -186,7 +186,7 @@ async def test_actions_screen_cancel_fires_no_effects() -> None:
     )
     registry = _make_registry(extra_skills=[skill])
     player = _make_player(registry=registry, known_skills=["test-overworld"])
-    initial_strength = int(player.stats["strength"])
+    initial_strength = int(player.stats["strength"])  # type: ignore[arg-type]
 
     tui = MockTUI()  # No responses → returns None (cancel).
     await open_actions_screen(player=player, registry=registry, tui=tui)
@@ -242,7 +242,7 @@ async def test_actions_screen_blocks_use_if_insufficient_resource() -> None:
     )
     registry = _make_registry(extra_skills=[skill])
     player = _make_player(registry=registry, known_skills=["test-overworld"])
-    initial_strength = int(player.stats["strength"])
+    initial_strength = int(player.stats["strength"])  # type: ignore[arg-type]
 
     tui = MockTUI(skill_menu_responses=[0])
     await open_actions_screen(player=player, registry=registry, tui=tui)
@@ -283,7 +283,7 @@ async def test_actions_screen_blocks_use_if_adventure_scope_cooldown_active() ->
     player = _make_player(registry=registry, known_skills=["test-overworld"])
     # Simulate active cooldown.
     player.skill_cooldowns["test-overworld"] = 1
-    initial_strength = int(player.stats["strength"])
+    initial_strength = int(player.stats["strength"])  # type: ignore[arg-type]
 
     tui = MockTUI(skill_menu_responses=[0])
     await open_actions_screen(player=player, registry=registry, tui=tui)
@@ -333,7 +333,7 @@ async def test_actions_screen_deducts_mana_cost_after_successful_use() -> None:
     )
     registry = _make_registry(extra_skills=[skill])
     player = _make_player(registry=registry, known_skills=["test-overworld"])
-    initial_mana = int(player.stats["mana"])
+    initial_mana = int(player.stats["mana"])  # type: ignore[arg-type]
 
     tui = MockTUI(skill_menu_responses=[0])
     await open_actions_screen(player=player, registry=registry, tui=tui)

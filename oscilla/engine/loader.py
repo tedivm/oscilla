@@ -37,6 +37,7 @@ from oscilla.engine.models.adventure import (
 from oscilla.engine.models.base import AllCondition, Condition, ManifestEnvelope, normalise_condition
 from oscilla.engine.models.buff import BuffManifest
 from oscilla.engine.models.character_config import CharacterConfigManifest
+from oscilla.engine.models.game import GameManifest
 from oscilla.engine.models.item import ItemManifest
 from oscilla.engine.models.location import LocationManifest
 from oscilla.engine.models.recipe import RecipeManifest
@@ -55,6 +56,24 @@ class LoadError:
 
     def __str__(self) -> str:
         return f"{self.file}: {self.message}"
+
+
+@dataclass
+class LoadWarning:
+    """Non-fatal content issue surfaced by `oscilla validate`.
+
+    Warnings indicate a likely authoring mistake that does not prevent the
+    game from running (e.g. a label typo). The `suggestion` field provides a
+    human-readable fix hint for both authors and AI tooling.
+    """
+
+    file: Path
+    message: str
+    suggestion: str = ""
+
+    def __str__(self) -> str:
+        base = f"{self.file}: {self.message}"
+        return f"{base} — {self.suggestion}" if self.suggestion else base
 
 
 class ContentLoadError(Exception):
@@ -94,6 +113,17 @@ def _normalise_manifest_conditions(raw: Dict[str, object]) -> Dict[str, object]:
             spec["steps"] = [_normalise_step(s) for s in steps]
         if "requires" in spec and spec["requires"] is not None:
             spec["requires"] = normalise_condition(spec["requires"])
+
+    elif kind == "Item":
+        if "equip" in spec and isinstance(spec["equip"], dict):
+            equip = spec["equip"]
+            if "requires" in equip and equip["requires"] is not None:
+                equip["requires"] = normalise_condition(equip["requires"])
+
+    elif kind == "Game":
+        for passive in spec.get("passive_effects", []):
+            if isinstance(passive, dict) and "condition" in passive and passive["condition"] is not None:
+                passive["condition"] = normalise_condition(passive["condition"])
 
     return raw
 
@@ -867,10 +897,125 @@ def _validate_pronoun_set_names(
     return errors
 
 
-def load(content_dir: Path) -> ContentRegistry:
+def _validate_labels(manifests: List[ManifestEnvelope]) -> List[LoadWarning]:
+    """Check item labels against declared item_labels in the Game manifest.
+
+    Emits a LoadWarning for each item label that is not declared in
+    GameSpec.item_labels. Uses Levenshtein distance to suggest the closest
+    declared label when distance ≤ 2 (single-character typos and transpositions).
+    """
+    from oscilla.engine.string_utils import levenshtein
+
+    warnings: List[LoadWarning] = []
+
+    game_manifest = next((m for m in manifests if m.kind == "Game"), None)
+    if game_manifest is None:
+        return warnings
+
+    game = cast(GameManifest, game_manifest)
+    declared_labels = {lbl.name for lbl in game.spec.item_labels}
+
+    for m in manifests:
+        if m.kind != "Item":
+            continue
+        item = cast(ItemManifest, m)
+        for label in item.spec.labels:
+            if label in declared_labels:
+                continue
+            # Find closest match for suggestion.
+            best_match: str | None = None
+            best_dist: int = 3  # threshold: distance ≤ 2 gives a suggestion
+            for declared in declared_labels:
+                dist = levenshtein(label, declared)
+                if dist < best_dist:
+                    best_dist = dist
+                    best_match = declared
+            if best_match is not None:
+                suggestion = f"Did you mean '{best_match}'?"
+            else:
+                suggestion = f"Add '{label}' to item_labels in game.yaml to declare it."
+            warnings.append(
+                LoadWarning(
+                    file=Path(f"<{m.metadata.name}>"),
+                    message=f"item label {label!r} is not declared in GameSpec.item_labels",
+                    suggestion=suggestion,
+                )
+            )
+
+    return warnings
+
+
+def _validate_passive_effects(manifests: List[ManifestEnvelope]) -> List[LoadWarning]:
+    """Emit warnings for passive effects that use unsupported condition types.
+
+    Passive effects are evaluated without a registry (to avoid recursion), so:
+    - item_held_label and any_item_equipped conditions will always evaluate False.
+    - character_stat conditions with stat_source: effective cannot access gear bonuses.
+    """
+    from oscilla.engine.models.base import AnyItemEquippedCondition, CharacterStatCondition, ItemHeldLabelCondition
+
+    warnings: List[LoadWarning] = []
+
+    game_manifest = next((m for m in manifests if m.kind == "Game"), None)
+    if game_manifest is None:
+        return warnings
+
+    game = cast(GameManifest, game_manifest)
+
+    def _check_condition(condition: object, passive_index: int) -> List[LoadWarning]:
+        """Recursively check a condition tree for unsupported passive condition types."""
+        from oscilla.engine.models.base import AllCondition, AnyCondition, NotCondition
+
+        found: List[LoadWarning] = []
+        if condition is None:
+            return found
+        if isinstance(condition, ItemHeldLabelCondition):
+            found.append(
+                LoadWarning(
+                    file=Path("<game>"),
+                    message=f"passive_effects[{passive_index}] uses item_held_label condition which requires a registry and will always evaluate False in passive context",
+                    suggestion="Use a stat or milestone condition instead, or accept that this passive effect will never activate.",
+                )
+            )
+        elif isinstance(condition, AnyItemEquippedCondition):
+            found.append(
+                LoadWarning(
+                    file=Path("<game>"),
+                    message=f"passive_effects[{passive_index}] uses any_item_equipped condition which requires a registry and will always evaluate False in passive context",
+                    suggestion="Use a stat or milestone condition instead, or accept that this passive effect will never activate.",
+                )
+            )
+        elif isinstance(condition, CharacterStatCondition) and condition.stat_source == "effective":
+            found.append(
+                LoadWarning(
+                    file=Path("<game>"),
+                    message=f"passive_effects[{passive_index}] uses character_stat with stat_source: effective which cannot access gear bonuses in passive context",
+                    suggestion="Set stat_source: base to compare against raw stats, which is always available.",
+                )
+            )
+        elif isinstance(condition, AllCondition):
+            for sub in condition.conditions:
+                found.extend(_check_condition(sub, passive_index))
+        elif isinstance(condition, AnyCondition):
+            for sub in condition.conditions:
+                found.extend(_check_condition(sub, passive_index))
+        elif isinstance(condition, NotCondition):
+            found.extend(_check_condition(condition.condition, passive_index))
+        return found
+
+    for idx, passive in enumerate(game.spec.passive_effects):
+        warnings.extend(_check_condition(passive.condition, idx))
+
+    return warnings
+
+
+def load(content_dir: Path) -> Tuple[ContentRegistry, List[LoadWarning]]:
     """Orchestrate scan → parse → validate_references → build_effective_conditions → template validation.
 
-    Raises ContentLoadError with all accumulated errors if any are found.
+    Returns a tuple of (ContentRegistry, warnings). Warnings are non-fatal issues
+    that are surfaced in `oscilla validate` output but do not prevent the game from running.
+
+    Raises ContentLoadError with all accumulated errors if any hard errors are found.
     """
     from oscilla.engine.templates import GameTemplateEngine
 
@@ -902,20 +1047,29 @@ def load(content_dir: Path) -> ContentRegistry:
     registry = ContentRegistry.build(manifests, template_engine=template_engine)
     elapsed_ms = (time.perf_counter() - t0) * 1000
     logger.info("Content loaded in %.1f ms (%d manifests)", elapsed_ms, len(manifests))
-    return registry
+
+    # Collect non-fatal warnings.
+    warnings: List[LoadWarning] = []
+    warnings.extend(_validate_labels(manifests))
+    warnings.extend(_validate_passive_effects(manifests))
+
+    return registry, warnings
 
 
-def load_games(library_root: Path) -> Dict[str, ContentRegistry]:
+def load_games(library_root: Path) -> Tuple[Dict[str, ContentRegistry], Dict[str, List[LoadWarning]]]:
     """Load all game packages found directly under library_root.
 
     Each immediate subdirectory containing a ``game.yaml`` file is treated as a
     game package and passed to :func:`load`.  Subdirectories without ``game.yaml``
     are silently skipped so the library root can contain non-game files.
 
+    Returns a tuple of (games dict, per-game warnings dict).
+
     Raises ContentLoadError with errors prefixed by package name if any game
     fails to load.
     """
     games: Dict[str, ContentRegistry] = {}
+    all_warnings: Dict[str, List[LoadWarning]] = {}
     accumulated: List[LoadError] = []
 
     for subdir in sorted(library_root.iterdir()):
@@ -925,7 +1079,7 @@ def load_games(library_root: Path) -> Dict[str, ContentRegistry]:
             logger.debug("Skipping %s — no game.yaml found", subdir.name)
             continue
         try:
-            registry = load(subdir)
+            registry, warnings = load(subdir)
         except ContentLoadError as exc:
             for err in exc.errors:
                 accumulated.append(LoadError(file=err.file, message=f"[{subdir.name}] {err.message}"))
@@ -933,9 +1087,10 @@ def load_games(library_root: Path) -> Dict[str, ContentRegistry]:
 
         package_key = subdir.name
         games[package_key] = registry
+        all_warnings[package_key] = warnings
         logger.info("Loaded game package %r from %s", package_key, subdir)
 
     if accumulated:
         raise ContentLoadError(accumulated)
 
-    return games
+    return games, all_warnings

@@ -48,7 +48,8 @@ def _make_player(registry: ContentRegistry, name: str = "TestHero") -> Character
 
 @pytest.fixture(scope="module")
 def minimal_registry() -> ContentRegistry:
-    return load(FIXTURES / "minimal")
+    registry, _warnings = load(FIXTURES / "minimal")
+    return registry
 
 
 # ---------------------------------------------------------------------------

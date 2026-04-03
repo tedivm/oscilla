@@ -1,0 +1,10 @@
+apiVersion: game/v1
+kind: Item
+metadata:
+  name: test-item
+spec:
+  displayName: "Test Item"
+  description: "A basic stackable item for testing."
+  category: material
+  stackable: true
+  value: 1

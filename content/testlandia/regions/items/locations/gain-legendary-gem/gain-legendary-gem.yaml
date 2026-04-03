@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: gain-legendary-gem
+spec:
+  displayName: "Legendary Gem Drop"
+  description: "Test the passive effect: holding this gem grants +2 strength from the passive_effects declared in game.yaml."
+  region: items
+  adventures:
+    - ref: gain-legendary-gem
+      weight: 100

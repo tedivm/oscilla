@@ -1,0 +1,18 @@
+apiVersion: game/v1
+kind: Item
+metadata:
+  name: test-charged-scroll
+spec:
+  displayName: "Charged Scroll"
+  description: "A scroll with three uses. Tests charges_remaining decrement and removal at zero."
+  category: consumable
+  stackable: false
+  consumed_on_use: false
+  charges: 3
+  labels:
+    - test-consumable
+  use_effects:
+    - type: stat_change
+      stat: strength
+      amount: 1
+  value: 0

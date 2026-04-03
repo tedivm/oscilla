@@ -7,7 +7,7 @@ from typing import Dict, List, Literal
 from pydantic import BaseModel, Field, model_validator
 
 from oscilla.engine.models.adventure import Effect
-from oscilla.engine.models.base import ManifestEnvelope
+from oscilla.engine.models.base import Condition, ManifestEnvelope
 
 
 class StatModifier(BaseModel):
@@ -18,6 +18,10 @@ class StatModifier(BaseModel):
 class EquipSpec(BaseModel):
     slots: List[str] = Field(min_length=1)
     stat_modifiers: List[StatModifier] = []
+    # Optional prerequisite condition evaluated before allowing equip.
+    # When stat_source is "effective", the item's own bonuses are excluded
+    # from the check to prevent self-justification.
+    requires: Condition | None = None
 
 
 class BuffGrant(BaseModel):
@@ -45,6 +49,11 @@ class ItemSpec(BaseModel):
     stackable: bool = True
     droppable: bool = True
     value: int = Field(default=0, ge=0)
+    # Author-assigned classification tags for display and condition evaluation.
+    labels: List[str] = []
+    # Maximum number of uses before the instance is removed (non-stackable only).
+    # Mutually exclusive with consumed_on_use: true and stackable: true.
+    charges: int | None = None
     # Skills granted only while this item occupies an equipment slot.
     grants_skills_equipped: List[str] = []
     # Skills granted while this item is anywhere in inventory (stacks or instances).
@@ -60,6 +69,20 @@ class ItemSpec(BaseModel):
             raise ValueError(
                 "An item cannot be both stackable and equippable. Set stackable: false to use an equip spec."
             )
+        return self
+
+    @model_validator(mode="after")
+    def validate_charges(self) -> "ItemSpec":
+        if self.charges is not None:
+            if self.consumed_on_use:
+                raise ValueError(
+                    "An item cannot have both 'charges' and 'consumed_on_use: true'. "
+                    "These are mutually exclusive consumption systems."
+                )
+            if self.stackable:
+                raise ValueError(
+                    "An item cannot have 'charges' and be stackable. Charge tracking requires per-instance state."
+                )
         return self
 
 

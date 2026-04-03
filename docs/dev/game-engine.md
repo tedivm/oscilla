@@ -128,6 +128,39 @@ content/                    ← library root
 - Game names come from the `metadata.name` field in `game.yaml`, not directory names
 - If any game package fails validation, `ContentLoadError` is raised for the entire library
 
+### `load()` Return Value and `LoadWarning`
+
+Both `load()` and `load_games()` now return warnings alongside the registry:
+
+```python
+from oscilla.engine.loader import load, load_games, LoadWarning
+
+# Single package
+registry, warnings = load(Path("content/my-game"))
+
+# All packages
+games, per_game_warnings = load_games(Path("content"))
+# games: Dict[str, ContentRegistry]
+# per_game_warnings: Dict[str, List[LoadWarning]]
+```
+
+`LoadWarning` is a dataclass:
+
+```python
+@dataclass
+class LoadWarning:
+    file: Path            # manifest file that triggered the warning
+    message: str          # human-readable problem description
+    suggestion: str = ""  # optional fix hint (e.g. "Did you mean 'rare'?")
+
+    def __str__(self) -> str: ...  # appends suggestion when non-empty
+```
+
+**When to emit a warning vs. raise an error:**
+A `ContentLoadError` is appropriate when the content _cannot_ run correctly.
+A `LoadWarning` is appropriate when the content will run, but something looks wrong or suboptimal.
+See [load-warnings.md](./load-warnings.md) for the full policy and how to add new warning conditions.
+
 ## Player State
 
 The `PlayerState` dataclass tracks all mutable game state:
@@ -200,12 +233,37 @@ Conditions are tree structures that evaluate player state:
 
 - `level`: Player level comparison
 - `milestone`: Milestone possession check
-- `item`: Inventory quantity check
-- `character_stat`: Custom stat comparison
+- `item`: Inventory check (stacks **and** instances — both stackable and equipped items)
+- `character_stat`: Custom stat comparison (see `stat_source` below)
 - `prestige_count`: Prestige level comparison
 - `enemies_defeated`: Combat victory counting
 - `locations_visited`: Exploration tracking
 - `adventures_completed`: Quest completion tracking
+- `item_equipped`: True when a specific non-stackable item is currently in an equipment slot
+- `item_held_label`: True when any item in inventory (stacks or instances) carries the given label
+- `any_item_equipped`: True when any equipped item carries the given label
+
+**`character_stat` and `stat_source`:**
+
+The `character_stat` predicate compares a player stat against a threshold.
+By default it uses effective stats (base + all equipped-item bonuses).
+Set `stat_source: base` to compare against raw stats only, bypassing equipment modifiers.
+This is important for item `requires` checks — set `stat_source: base` to ensure the player's
+intrinsic strength is tested, not a value inflated by the gear they are trying to equip.
+
+```python
+# evaluate() signature
+def evaluate(
+    condition: Condition,
+    player: CharacterState,
+    registry: ContentRegistry | None = None,
+    exclude_item: str | None = None,
+) -> bool:
+```
+
+`exclude_item` strips a named item's stat bonuses from the effective-stats calculation.
+It is used by the equip-time requirement check to prevent an item from satisfying
+its own requirement (self-justification guard).
 
 **Logical Operators:**
 
@@ -583,3 +641,81 @@ class PlayerContext:
 - **Filters** — implement as a plain Python function and add to `SAFE_FILTERS`. The key becomes the filter name in templates.
 - Both `SAFE_GLOBALS` and `SAFE_FILTERS` are injected into the `SandboxedEnvironment` and also merged into the render context dict, making them available both as globals and as `{% set %}` assignments.
 - The mock context (`build_mock_context`) must also expose any new stat names or nested attributes that the new function may reference; otherwise valid uses will fail load-time validation.
+
+
+## Item System Enhancements
+
+### Item Labels
+
+Authors declare a vocabulary of item labels in `game.yaml` via `item_labels`.
+Each label has display metadata (color, sort priority) but no hardcoded meaning.
+
+```python
+class ItemLabelDef:
+    name: str
+    color: str = ""          # Rich markup color string, e.g. "gold1"
+    description: str = ""
+    sort_priority: int = 0   # Lower value = sorted earlier in inventory
+```
+
+Items list their labels in `spec.labels`. At load time, `_validate_labels()` emits a
+`LoadWarning` for any label that is not declared in `game.item_labels`, with a
+Levenshtein-distance suggestion when a close match exists.
+
+### Item Requirements (`EquipSpec.requires`)
+
+An equippable item may declare a `requires: Condition` in its `EquipSpec`.
+The condition is evaluated at equip time with `stat_source: base` recommended
+so the item's own stat bonuses cannot satisfy its own requirement.
+
+Two helpers in `character.py` support requirement enforcement:
+
+```python
+def validate_equipped_requires(
+    player: CharacterState,
+    registry: ContentRegistry,
+) -> List[str]:
+    """Return item_ref strings for equipped items whose requires is no longer met."""
+
+def cascade_unequip_invalid(
+    player: CharacterState,
+    registry: ContentRegistry,
+) -> List[str]:
+    """Unequip all failing items in a fixed-point loop; return their display names."""
+```
+
+`cascade_unequip_invalid` is called by the TUI after every unequip action and by
+stat-mutating step effects (`stat_change`, `stat_set`) to ensure consistency.
+
+At session load, `_warn_invalid_equipped()` in `session.py` logs a `logger.warning`
+for each equipped item whose requirement is no longer satisfied — but does **not**
+unequip it (player intent is preserved across sessions). The TUI `StatusPanel`
+also renders a visible red warning section listing any invalid items.
+
+### Item Charges
+
+Non-stackable items may declare `charges: int` in their spec.
+`ItemInstance.charges_remaining` is initialised from `spec.charges` when the
+instance is created and decremented on each use. When `charges_remaining` reaches
+zero the instance is removed automatically.
+
+`charges` is mutually exclusive with `consumed_on_use: true` and `stackable: true`;
+the model validator raises `ValueError` for either combination.
+
+### Passive Effects
+
+`game.yaml` may declare `passive_effects` — unconditional or condition-gated modifiers
+that always apply when the player holds or has equipped certain items.
+
+```python
+class PassiveEffect:
+    condition: Condition | None       # evaluated with registry=None
+    stat_modifiers: List[StatModifier]
+    skill_grants: List[SkillGrant]
+```
+
+`effective_stats()` and `available_skills()` in `character.py` loop `registry.game.passive_effects`
+and apply matching effects. Because passive effects are evaluated with `registry=None`,
+conditions that require a registry — `item_held_label`, `any_item_equipped` — cannot be honored
+and trigger a `LoadWarning` at load time. Similarly, `character_stat` conditions with
+`stat_source: effective` also emit a warning since the registry is unavailable.

@@ -47,6 +47,10 @@ Engine internals, architecture, and extend points for the text-based adventure s
 
 Command-line interface layer, TUI implementation, and game loop structure.
 
+### [Load Warnings](./load-warnings.md)
+
+The `LoadWarning` dataclass, diagnostic policy (warning vs. error), the `suggestion` field contract, and a guide for adding new warning conditions.
+
 ## Interface Layers
 
 The oscilla project is designed with clear separation between interface layers:

@@ -51,6 +51,25 @@ if TYPE_CHECKING:
 logger = getLogger(__name__)
 
 
+def _warn_invalid_equipped(state: "CharacterState", registry: "ContentRegistry") -> None:
+    """Log a warning for each equipped item whose `requires` condition is not satisfied.
+
+    Does NOT unequip anything — only warns. Called after a character is restored
+    from persistence so players are notified about stale equipment state.
+    """
+    from oscilla.engine.character import validate_equipped_requires
+
+    failing = validate_equipped_requires(player=state, registry=registry)
+    for item_ref in failing:
+        item_mf = registry.items.get(item_ref)
+        name = item_mf.spec.displayName if item_mf is not None else item_ref
+        logger.warning(
+            "Loaded character %r has equipped item %r whose requirements are not currently satisfied.",
+            state.name,
+            name,
+        )
+
+
 class GameSession:
     """Context-manager orchestrator for a single TUI game session.
 
@@ -135,6 +154,8 @@ class GameSession:
                         self.character_name,
                     )
                     state = await self._create_new_character(name=self.character_name, user_id=user.id)
+                else:
+                    _warn_invalid_equipped(state=state, registry=self.registry)
             else:
                 state = await self._create_new_character(name=self.character_name, user_id=user.id)
         else:
@@ -156,8 +177,11 @@ class GameSession:
                         characters[0].name,
                     )
                     state = await self._create_new_character(name=None, user_id=user.id)
+                else:
+                    _warn_invalid_equipped(state=state, registry=self.registry)
             else:
                 state = await self._select_character(characters=characters, user_id=user.id)
+                _warn_invalid_equipped(state=state, registry=self.registry)
 
         self._character = state
         self._last_saved_state = copy.deepcopy(state)

@@ -539,6 +539,40 @@ oscilla --help
 python -m oscilla.cli --help
 ```
 
+## Validate Command
+
+The `validate` command checks all game packages in the configured `GAMES_PATH` and reports errors and warnings:
+
+```bash
+# Validate all game packages
+uv run oscilla validate
+
+# Validate a single package
+uv run oscilla validate --game my-game
+
+# Strict mode: treat warnings as errors (exit 1 if any warnings exist)
+uv run oscilla validate --strict
+uv run oscilla validate --game my-game --strict
+```
+
+**Output format:**
+
+```
+✓ my-game: 3 regions, 5 locations, 12 adventures, 8 items
+  ⚠ <undeclared-label-item>: item label 'rae' is not declared in GameSpec.item_labels — Did you mean 'rare'?
+```
+
+Warnings appear in yellow. With `--strict` they are re-printed in red and the command exits with code 1 — useful in CI pipelines to enforce clean content packages before release.
+
+**Exit codes:**
+
+| Condition | Exit code |
+|---|---|
+| No errors, no warnings | `0` |
+| Warnings present, no `--strict` | `0` |
+| Warnings present, `--strict` set | `1` |
+| Load error (malformed content) | `1` |
+
 ## Game Command
 
 The `game` command launches the interactive text adventure TUI:

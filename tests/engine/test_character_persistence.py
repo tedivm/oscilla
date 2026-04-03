@@ -33,7 +33,7 @@ def test_to_dict_round_trips_all_fields(base_player: CharacterState) -> None:
     from oscilla.engine.loader import load
     from tests.engine.conftest import FIXTURES
 
-    minimal = load(FIXTURES / "minimal")
+    minimal, _warnings = load(FIXTURES / "minimal")
     assert minimal.character_config is not None
 
     restored = CharacterState.from_dict(

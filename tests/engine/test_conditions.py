@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from oscilla.engine.character import CharacterState
@@ -161,7 +163,7 @@ def test_class_condition_always_passes(base_player: CharacterState) -> None:
 def test_character_stat_non_numeric_warning(base_player: CharacterState, caplog: pytest.LogCaptureFixture) -> None:
     """Test that non-numeric stats trigger a warning and are treated as 0."""
     # Set a string stat
-    base_player.stats["text_stat"] = "hello"
+    base_player.stats["text_stat"] = "hello"  # type: ignore[assignment]
 
     # This should trigger the warning and treat the value as 0
     cond = CharacterStatCondition(type="character_stat", name="text_stat", gte=5)
@@ -239,7 +241,7 @@ def test_numeric_compare_all_operators() -> None:
 
     # Create mock condition objects
     class MockCondition:
-        def __init__(self, **kwargs):
+        def __init__(self, **kwargs: Any) -> None:
             for key, value in kwargs.items():
                 setattr(self, key, value)
             # Set default None for all attributes
@@ -274,7 +276,7 @@ def test_numeric_compare_all_operators() -> None:
 
     # Test mod - create a mock ModCondition
     class MockModCondition:
-        def __init__(self, divisor, remainder):
+        def __init__(self, divisor: int, remainder: int) -> None:
             self.divisor = divisor
             self.remainder = remainder
 
@@ -287,7 +289,7 @@ def test_numeric_compare_no_operators_raises_error() -> None:
     """Test that _numeric_compare raises ValueError when no operators are set."""
 
     class MockCondition:
-        def __init__(self):
+        def __init__(self) -> None:
             self.gt = None
             self.gte = None
             self.lt = None
@@ -304,7 +306,7 @@ def test_numeric_compare_multiple_operators_pass() -> None:
     """Test _numeric_compare when no operators fail (hits return True)."""
 
     class MockCondition:
-        def __init__(self):
+        def __init__(self) -> None:
             self.gt = 2
             self.gte = 3
             self.lt = 8
@@ -352,5 +354,37 @@ def test_pronouns_condition_shorthand_normalisation(base_player: CharacterState)
     raw = {"pronouns": "they_them"}
     normalised = normalise_condition(raw)
     assert normalised == {"type": "pronouns", "set": "they_them"}
-    cond = TypeAdapter(Condition).validate_python(normalised)
+    cond: Any = TypeAdapter(Condition).validate_python(normalised)
+    assert evaluate(condition=cond, player=base_player) is True
+
+
+# ---------------------------------------------------------------------------
+# 8.3 — ItemCondition: stacks and instances paths
+# ---------------------------------------------------------------------------
+
+
+def test_item_condition_via_instance(base_player: CharacterState) -> None:
+    """ItemCondition returns True when the item is held as a non-stackable instance."""
+    from oscilla.engine.character import ItemInstance
+    from oscilla.engine.models.base import ItemCondition
+
+    base_player.instances.append(ItemInstance(instance_id=__import__("uuid").uuid4(), item_ref="rare-sword"))
+    cond = ItemCondition(type="item", name="rare-sword")
+    assert evaluate(condition=cond, player=base_player) is True
+
+
+def test_item_condition_absent_from_both(base_player: CharacterState) -> None:
+    """ItemCondition returns False when the item is in neither stacks nor instances."""
+    from oscilla.engine.models.base import ItemCondition
+
+    cond = ItemCondition(type="item", name="nonexistent-item")
+    assert evaluate(condition=cond, player=base_player) is False
+
+
+def test_item_condition_stack_path(base_player: CharacterState) -> None:
+    """ItemCondition returns True when the item is held as a stackable (stacks path)."""
+    from oscilla.engine.models.base import ItemCondition
+
+    base_player.stacks["health-potion"] = 2
+    cond = ItemCondition(type="item", name="health-potion")
     assert evaluate(condition=cond, player=base_player) is True

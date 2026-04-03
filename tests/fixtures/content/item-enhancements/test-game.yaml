@@ -1,0 +1,33 @@
+apiVersion: game/v1
+kind: Game
+metadata:
+  name: test-game
+spec:
+  displayName: "Item Enhancements Test Game"
+  xp_thresholds:
+    - 0
+    - 100
+    - 300
+  hp_formula:
+    base_hp: 20
+    hp_per_level: 5
+  item_labels:
+    - name: rare
+      color: yellow
+      description: "Rare quality items"
+      sort_priority: 1
+    - name: quest
+      color: cyan
+      description: "Quest items"
+      sort_priority: 2
+  passive_effects:
+    - condition:
+        type: character_stat
+        name: strength
+        gte: 15
+        stat_source: base
+      stat_modifiers:
+        - stat: strength
+          amount: 2
+      skill_grants:
+        - test-passive-skill

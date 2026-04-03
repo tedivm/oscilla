@@ -4,12 +4,42 @@ from typing import List, Literal
 
 from pydantic import BaseModel, Field
 
-from oscilla.engine.models.base import ManifestEnvelope
+from oscilla.engine.models.base import Condition, ManifestEnvelope
+from oscilla.engine.models.item import StatModifier
 
 
 class HpFormula(BaseModel):
     base_hp: int = Field(ge=1)
     hp_per_level: int = Field(ge=0)
+
+
+class ItemLabelDef(BaseModel):
+    """Author-defined display vocabulary entry for item labels.
+
+    Used to declare valid label names, assign display colors, and set
+    sort priority for the inventory screen.
+    """
+
+    name: str
+    color: str = ""
+    description: str = ""
+    sort_priority: int = 0
+
+
+class PassiveEffect(BaseModel):
+    """A condition-gated set of stat modifiers and skill grants applied continuously.
+
+    Evaluated in `effective_stats()` and `available_skills()` whenever the
+    condition is satisfied. Registry is not available during evaluation, so
+    conditions that require item lookups (item_held_label, any_item_equipped)
+    are flagged as warnings by the loader.
+    """
+
+    condition: Condition | None = None
+    # Stat deltas applied when the condition is satisfied.
+    stat_modifiers: List[StatModifier] = []
+    # Skill refs granted when the condition is satisfied.
+    skill_grants: List[str] = []
 
 
 class GameSpec(BaseModel):
@@ -19,6 +49,10 @@ class GameSpec(BaseModel):
     xp_thresholds: List[int] = Field(min_length=1)
     hp_formula: HpFormula
     base_adventure_count: int | None = None  # null = unlimited
+    # Author-defined label vocabulary for items.
+    item_labels: List[ItemLabelDef] = []
+    # Condition-gated stat modifiers and skill grants evaluated continuously.
+    passive_effects: List[PassiveEffect] = []
 
 
 class GameManifest(ManifestEnvelope):

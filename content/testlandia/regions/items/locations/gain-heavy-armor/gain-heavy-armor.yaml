@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: gain-heavy-armor
+spec:
+  displayName: "Heavy Armor Drop"
+  description: "Test obtaining armor with a strength >= 15 equip requirement. Character starts with 10 strength — you cannot
+    equip until strength is raised."
+  region: items
+  adventures:
+    - ref: gain-heavy-armor
+      weight: 100

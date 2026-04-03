@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Item
+metadata:
+  name: test-undeclared-label-item
+spec:
+  displayName: "Mystery Item"
+  description: "An item with a label not declared in game.item_labels — tests loader warnings."
+  category: misc
+  stackable: true
+  value: 5
+  labels:
+    - rae

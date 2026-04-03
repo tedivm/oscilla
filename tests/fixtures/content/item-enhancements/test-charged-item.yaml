@@ -1,0 +1,16 @@
+apiVersion: game/v1
+kind: Item
+metadata:
+  name: test-charged-item
+spec:
+  displayName: "Magic Wand"
+  description: "A wand with 3 charges. Not consumed on use — charges track usage instead."
+  category: weapon
+  stackable: false
+  consumed_on_use: false
+  value: 30
+  charges: 3
+  use_effects:
+    - type: stat_change
+      stat: strength
+      amount: 1

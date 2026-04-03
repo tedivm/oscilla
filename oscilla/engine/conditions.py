@@ -9,11 +9,14 @@ from oscilla.engine.models.base import (
     AdventuresCompletedCondition,
     AllCondition,
     AnyCondition,
+    AnyItemEquippedCondition,
     CharacterStatCondition,
     ClassCondition,
     Condition,
     EnemiesDefeatedCondition,
     ItemCondition,
+    ItemEquippedCondition,
+    ItemHeldLabelCondition,
     LevelCondition,
     LocationsVisitedCondition,
     MilestoneCondition,
@@ -34,11 +37,16 @@ def evaluate(
     condition: Condition | None,
     player: "CharacterState",
     registry: "ContentRegistry | None" = None,
+    exclude_item: str | None = None,
 ) -> bool:
     """Evaluate a condition tree against the given player state.
 
     Returns True if condition is None (no gate) or every node evaluates to True.
     Pass registry to enable equipment-aware stat evaluation via effective_stats().
+
+    exclude_item: when set, the named item's stat bonuses are excluded from
+    effective_stats() lookups. Used for the self-justification guard when
+    evaluating EquipSpec.requires.
     """
     if condition is None:
         return True
@@ -46,11 +54,11 @@ def evaluate(
     match condition:
         # --- Branch nodes ---
         case AllCondition(conditions=children):
-            return all(evaluate(c, player, registry) for c in children)
+            return all(evaluate(c, player, registry, exclude_item) for c in children)
         case AnyCondition(conditions=children):
-            return any(evaluate(c, player, registry) for c in children)
+            return any(evaluate(c, player, registry, exclude_item) for c in children)
         case NotCondition(condition=child):
-            return not evaluate(child, player, registry)
+            return not evaluate(child, player, registry, exclude_item)
 
         # --- Player attribute leaves ---
         case LevelCondition(value=v):
@@ -58,17 +66,56 @@ def evaluate(
         case MilestoneCondition(name=n):
             return n in player.milestones
         case ItemCondition(name=n):
-            return player.stacks.get(n, 0) > 0
+            # Fixed: check both stackable items and non-stackable instances.
+            in_stacks = player.stacks.get(n, 0) > 0
+            in_instances = any(inst.item_ref == n for inst in player.instances)
+            return in_stacks or in_instances
         case ClassCondition():
             # No-op in v1: class mechanics are a placeholder; every class always passes.
             return True
         case PrestigeCountCondition() as c:
             return _numeric_compare(player.iteration, c)
 
+        # --- Item equipment/label predicates ---
+        case ItemEquippedCondition(name=n):
+            # True when the named non-stackable item is currently in an equipment slot.
+            equipped_ids = set(player.equipment.values())
+            return any(inst.item_ref == n and inst.instance_id in equipped_ids for inst in player.instances)
+        case ItemHeldLabelCondition(label=lbl):
+            # True when any held item (stack or instance) has the given label.
+            if registry is None:
+                logger.warning("item_held_label condition on %r requires registry — evaluating False.", lbl)
+                return False
+            for item_ref in player.stacks:
+                item = registry.items.get(item_ref)
+                if item is not None and lbl in item.spec.labels:
+                    return True
+            for inst in player.instances:
+                item = registry.items.get(inst.item_ref)
+                if item is not None and lbl in item.spec.labels:
+                    return True
+            return False
+        case AnyItemEquippedCondition(label=lbl):
+            # True when any equipped item instance has the given label.
+            if registry is None:
+                logger.warning("any_item_equipped condition on %r requires registry — evaluating False.", lbl)
+                return False
+            equipped_ids = set(player.equipment.values())
+            for inst in player.instances:
+                if inst.instance_id not in equipped_ids:
+                    continue
+                item = registry.items.get(inst.item_ref)
+                if item is not None and lbl in item.spec.labels:
+                    return True
+            return False
+
         # --- CharacterConfig stat leaves ---
-        case CharacterStatCondition(name=n) as c:
-            # Use effective_stats when registry available to include equipment bonuses
-            stats = player.effective_stats(registry=registry) if registry is not None else player.stats
+        case CharacterStatCondition(name=n, stat_source=stat_source) as c:
+            # Use base stats when stat_source is "base" or registry is unavailable.
+            if stat_source == "base" or registry is None:
+                stats = player.stats
+            else:
+                stats = player.effective_stats(registry=registry, exclude_item=exclude_item)
             value = stats.get(n, 0)
             # Stats may be bool; only numeric stats are comparable.
             if not isinstance(value, int):

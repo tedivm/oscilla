@@ -1,0 +1,10 @@
+apiVersion: game/v1
+kind: Skill
+metadata:
+  name: test-passive-skill
+spec:
+  displayName: "Passive Skill"
+  description: "A skill granted by passive effects when strength is high."
+  contexts:
+    - overworld
+  use_effects: []

@@ -1,0 +1,16 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: gain-heavy-armor
+spec:
+  displayName: "Heavy Armor Drop Test"
+  description: "Awards Heavy Test Armor. Requires strength >= 15 to equip (base stat). Default strength is 10 — use the stat_change
+    adventures to raise it before equipping."
+  steps:
+    - type: narrative
+      text: "You stumble upon a set of imposing steel plate. It is too heavy to wear unless you are sufficiently strong."
+      effects:
+        - type: item_drop
+          loot:
+            - item: test-heavy-armor
+              weight: 100

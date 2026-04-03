@@ -2,7 +2,7 @@ import asyncio
 import logging
 import sys
 from functools import wraps
-from typing import Annotated, Callable, Coroutine, Dict, ParamSpec, TypeVar
+from typing import Annotated, Callable, Coroutine, Dict, List, ParamSpec, TypeVar
 
 import platformdirs
 import typer
@@ -110,14 +110,20 @@ def _load_games() -> "Dict[str, ContentRegistry]":
 
     Prints all validation errors and exits with code 1 on any failures so that
     the CLI exit code is reliable and shell scripts can detect content errors.
+    Warnings are surfaced via the logger but do not cause early exit.
     """
     from rich.console import Console
 
     from oscilla.engine.loader import ContentLoadError, load_games
 
-    _console = Console()
+    _logger = logging.getLogger(__name__)
+    _console = Console(stderr=True)
     try:
-        return load_games(settings.games_path)
+        games, all_warnings = load_games(settings.games_path)
+        for pkg_name, warnings in all_warnings.items():
+            for warning in warnings:
+                _logger.warning("[%s] %s", pkg_name, warning)
+        return games
     except ContentLoadError as exc:
         _console.print("[bold red]Content validation failed:[/bold red]")
         for error in exc.errors:
@@ -248,16 +254,21 @@ async def game(
         pass
 
 
-@app.command(help="Validate all game packages and report any errors.")
+@app.command(help="Validate all game packages and report any errors or warnings.")
 def validate(
     game_name: Annotated[str | None, typer.Option("--game", "-g", help="Validate only this game package.")] = None,
+    strict: Annotated[
+        bool,
+        typer.Option("--strict", help="Treat warnings as errors and exit with code 1 if any are found."),
+    ] = False,
 ) -> None:
-    """Load and validate all manifests in GAMES_PATH, then print a summary or error list."""
+    """Load and validate all manifests in GAMES_PATH, then print a summary, warnings, or error list."""
     from rich.console import Console
 
-    from oscilla.engine.loader import ContentLoadError, load, load_games
+    from oscilla.engine.loader import ContentLoadError, LoadWarning, load, load_games
 
     _console = Console()
+    all_pkg_warnings: Dict[str, List[LoadWarning]] = {}
 
     if game_name is not None:
         # Validate a single game package
@@ -266,22 +277,24 @@ def validate(
             _console.print(f"[bold red]✗ Game package {game_name!r} not found in GAMES_PATH[/bold red]")
             raise SystemExit(1)
         try:
-            registry = load(game_path)
+            registry, warnings = load(game_path)
         except ContentLoadError as exc:
             _console.print(f"[bold red]✗ {game_name}: {len(exc.errors)} error(s) found:[/bold red]\n")
             for error in exc.errors:
                 _console.print(f"  [red]•[/red] {error}")
             raise SystemExit(1)
         games = {game_name: registry}
+        all_pkg_warnings[game_name] = warnings
     else:
         try:
-            games = load_games(settings.games_path)
+            games, all_pkg_warnings = load_games(settings.games_path)
         except ContentLoadError as exc:
             _console.print(f"[bold red]✗ {len(exc.errors)} error(s) found:[/bold red]\n")
             for error in exc.errors:
                 _console.print(f"  [red]•[/red] {error}")
             raise SystemExit(1)
 
+    total_warnings = 0
     for pkg_name, registry in sorted(games.items()):
         counts = {
             "regions": len(registry.regions),
@@ -295,6 +308,16 @@ def validate(
         }
         summary = ", ".join(f"{count} {kind}" for kind, count in counts.items() if count > 0)
         _console.print(f"[bold green]✓ {pkg_name}: {summary}[/bold green]")
+
+        pkg_warnings = all_pkg_warnings.get(pkg_name, [])
+        total_warnings += len(pkg_warnings)
+        for warning in pkg_warnings:
+            color = "bold red" if strict else "yellow"
+            _console.print(f"  [{color}]⚠[/{color}] {warning}")
+
+    if strict and total_warnings > 0:
+        _console.print(f"\n[bold red]Strict mode: {total_warnings} warning(s) treated as errors.[/bold red]")
+        raise SystemExit(1)
 
 
 # Type alias used purely for type checkers — never evaluated at runtime

@@ -14,7 +14,7 @@ MULTI_GAME_LIBRARY = FIXTURES / "multi-game-library"
 
 
 def test_load_games_returns_both_packages() -> None:
-    games = load_games(MULTI_GAME_LIBRARY)
+    games, _warnings = load_games(MULTI_GAME_LIBRARY)
     assert set(games.keys()) == {"test-alpha", "test-beta"}
     assert isinstance(games["test-alpha"], ContentRegistry)
     assert isinstance(games["test-beta"], ContentRegistry)
@@ -22,12 +22,12 @@ def test_load_games_returns_both_packages() -> None:
 
 def test_load_games_skips_dir_without_game_yaml() -> None:
     """Subdirectories without game.yaml (e.g. extras/) must be silently skipped."""
-    games = load_games(MULTI_GAME_LIBRARY)
+    games, _warnings = load_games(MULTI_GAME_LIBRARY)
     assert "extras" not in games
 
 
 def test_load_games_each_package_has_expected_content() -> None:
-    games = load_games(MULTI_GAME_LIBRARY)
+    games, _warnings = load_games(MULTI_GAME_LIBRARY)
     for key in ("test-alpha", "test-beta"):
         reg = games[key]
         assert reg.game is not None
@@ -39,7 +39,7 @@ def test_load_games_each_package_has_expected_content() -> None:
 
 def test_load_games_empty_library(tmp_path: Path) -> None:
     """A library root with no subdirectories returns an empty dict."""
-    games = load_games(tmp_path)
+    games, _warnings = load_games(tmp_path)
     assert games == {}
 
 
@@ -48,7 +48,7 @@ def test_load_games_single_package(tmp_path: Path) -> None:
     import shutil
 
     shutil.copytree(MULTI_GAME_LIBRARY / "test-alpha", tmp_path / "test-alpha")
-    games = load_games(tmp_path)
+    games, _warnings = load_games(tmp_path)
     assert list(games.keys()) == ["test-alpha"]
 
 

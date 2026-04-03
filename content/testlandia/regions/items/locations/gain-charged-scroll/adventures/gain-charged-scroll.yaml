@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: gain-charged-scroll
+spec:
+  displayName: "Charged Scroll Drop Test"
+  description: "Awards a Charged Scroll (3 charges). The item has a test-consumable label and uses charges rather than consumed_on_use."
+  steps:
+    - type: narrative
+      text: "You find a scroll crackling with stored energy. It has three uses before it crumbles."
+      effects:
+        - type: item_drop
+          loot:
+            - item: test-charged-scroll
+              weight: 100

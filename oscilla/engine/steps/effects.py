@@ -7,7 +7,7 @@ from collections import Counter
 from logging import getLogger
 from typing import TYPE_CHECKING, Dict
 
-from oscilla.engine.character import _INT64_MAX, _INT64_MIN
+from oscilla.engine.character import _INT64_MAX, _INT64_MIN, cascade_unequip_invalid
 from oscilla.engine.combat_context import ActiveCombatEffect, CombatContext
 from oscilla.engine.models.adventure import (
     ApplyBuffEffect,
@@ -206,6 +206,10 @@ async def run_effect(
                 )
             player.set_stat(name=stat, value=new_value)
             await tui.show_text(f"Changed {stat}: {old_value} → {new_value}")
+            # Cascade-unequip items whose requirements are no longer satisfied.
+            displaced = cascade_unequip_invalid(player=player, registry=registry)
+            for name in displaced:
+                await tui.show_text(f"[yellow]⚠ {name} unequipped: requirements no longer met.[/yellow]")
 
         case StatSetEffect(stat=stat, value=value):
             if stat not in player.stats:
@@ -216,10 +220,16 @@ async def run_effect(
             if isinstance(value, bool):
                 player.stats[stat] = value
                 await tui.show_text(f"Set {stat}: {old_value} → {value}")
+                displaced = cascade_unequip_invalid(player=player, registry=registry)
+                for name in displaced:
+                    await tui.show_text(f"[yellow]⚠ {name} unequipped: requirements no longer met.[/yellow]")
                 return
             if value is None:
                 player.stats[stat] = None
                 await tui.show_text(f"Set {stat}: {old_value} → None")
+                displaced = cascade_unequip_invalid(player=player, registry=registry)
+                for name in displaced:
+                    await tui.show_text(f"[yellow]⚠ {name} unequipped: requirements no longer met.[/yellow]")
                 return
             lo, hi = _resolve_stat_bounds(stat=stat, registry=registry)
             clamped = max(lo, min(hi, value))
@@ -237,6 +247,10 @@ async def run_effect(
                 )
             player.set_stat(name=stat, value=clamped)
             await tui.show_text(f"Set {stat}: {old_value} → {clamped}")
+            # Cascade-unequip items whose requirements are no longer satisfied.
+            displaced = cascade_unequip_invalid(player=player, registry=registry)
+            for name in displaced:
+                await tui.show_text(f"[yellow]⚠ {name} unequipped: requirements no longer met.[/yellow]")
 
         case UseItemEffect(item=item_ref):
             item = registry.items.get(item_ref)
@@ -260,6 +274,15 @@ async def run_effect(
             # Apply use_effects
             for sub_effect in item.spec.use_effects:
                 await run_effect(effect=sub_effect, player=player, registry=registry, tui=tui, combat=combat)
+
+            # Decrement charges if the item has a charge counter.
+            if not item.spec.stackable and item.spec.charges is not None:
+                instance = next((inst for inst in player.instances if inst.item_ref == item_ref), None)
+                if instance is not None and instance.charges_remaining is not None:
+                    instance.charges_remaining -= 1
+                    if instance.charges_remaining <= 0:
+                        player.remove_instance(instance_id=instance.instance_id)
+                        await tui.show_text(f"[yellow]{item.spec.displayName} has been used up.[/yellow]")
 
             # Consume the item if configured
             if item.spec.consumed_on_use:

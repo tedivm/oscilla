@@ -95,7 +95,29 @@ spec:
     hp_per_level: 10   # Health gained per level
 
   base_adventure_count: null  # Optional: default adventure count per location
+
+  # Optional: declare item label vocabulary (used for condition checks and inventory display)
+  item_labels:
+    - name: consumable
+      description: "Single-use or multi-use items"
+      color: "green"
+      sort_priority: 1
+    - name: rare
+      description: "Hard-to-find items"
+      color: "gold1"
+      sort_priority: 2
+
+  # Optional: always-on or condition-gated stat bonuses and skill grants
+  passive_effects:
+    - condition:
+        type: item_held_label
+        label: rare
+      stat_modifiers:
+        - stat: luck
+          amount: 1
 ```
+
+See the dedicated [Passive Effects](./passive-effects.md) guide for full syntax and examples.
 
 #### Experience and Leveling Mechanics
 
@@ -382,6 +404,8 @@ equip:
 | `use_effects` | list of Effects | `[]` | Effects applied when the player uses the item |
 | `consumed_on_use` | `bool` | `true` | Removes the item after use (stack decremented or instance removed) |
 | `equip` | EquipSpec \| null | `null` | If present, item is equippable rather than stackable |
+| `labels` | list of `str` | `[]` | Classification tags declared in `game.yaml` `item_labels`; used for conditions and inventory display |
+| `charges` | `int` \| null | `null` | Number of uses for a non-stackable item; mutually exclusive with `consumed_on_use: true` and `stackable: true` |
 
 **EquipSpec Fields**:
 
@@ -389,6 +413,7 @@ equip:
 |---|---|---|---|
 | `slots` | list of `str` | required (min 1) | Slot names the item occupies when equipped |
 | `stat_modifiers` | list of StatModifier | `[]` | Passive stat bonuses while equipped |
+| `requires` | Condition \| null | `null` | Condition that must be met for the player to equip this item |
 
 **StatModifier Fields**:
 
@@ -396,6 +421,77 @@ equip:
 |---|---|---|
 | `stat` | `str` | Stat name from `CharacterConfig` |
 | `amount` | `int` or `float` | Bonus amount (positive or negative) |
+
+#### Item Labels
+
+Attach classification tags to items for use in conditions and inventory display:
+
+```yaml
+spec:
+  displayName: "Amulet of Fortune"
+  category: accessory
+  stackable: false
+  labels:
+    - rare
+    - magic
+```
+
+Labels must be declared in `game.yaml` `item_labels`. The validator emits a warning for any undeclared label, with a "Did you mean X?" suggestion when the spelling is close to a declared label.
+
+In `game.yaml`:
+
+```yaml
+item_labels:
+  - name: rare
+    color: "gold1"
+    description: "Hard-to-find items"
+    sort_priority: 2
+  - name: magic
+    color: "blue"
+    sort_priority: 1
+```
+
+#### Item Requirements
+
+Equippable items can require the player to meet a stat threshold before equipping:
+
+```yaml
+spec:
+  displayName: "Heavy Plate Armor"
+  category: armor
+  stackable: false
+  equip:
+    slots:
+      - body
+    requires:
+      type: character_stat
+      stat: strength
+      gte: 15
+      stat_source: base    # compare against base stats, not gear-inflated effective stats
+```
+
+Use `stat_source: base` when checking stats that could be boosted by other gear — this prevents an item from "satisfying its own requirement" by adding a bonus that makes the check pass.
+
+If the player's stats later drop below the threshold (e.g., after a stat-reducing adventure step), the item is **not** automatically unequipped — a warning appears in the status panel instead. The player can manage their equipment manually.
+
+#### Item Charges
+
+Non-stackable items can be limited to a fixed number of uses:
+
+```yaml
+spec:
+  displayName: "Scroll of Fireball"
+  category: consumable
+  stackable: false
+  consumed_on_use: false    # charges handles removal; do not also set consumed_on_use: true
+  charges: 3
+  use_effects:
+    - type: stat_change
+      stat: enemy_hp
+      amount: -25
+```
+
+Each time the player uses the item, `charges_remaining` decrements by one. When it reaches zero the item is removed from the player's inventory automatically. `charges` is incompatible with `consumed_on_use: true` or `stackable: true`.
 
 ### Enemies (`enemies/`)
 
@@ -548,6 +644,8 @@ unlock:
   quantity: 1             # Required amount (default: 1)
 ```
 
+Checks both stackable item counts and non-stackable item instances — the same condition works for potions and equipped gear.
+
 #### Character Stat Comparisons
 
 ```yaml
@@ -558,6 +656,44 @@ requires:
 ```
 
 **Stat Operators**: `gte` (≥), `lte` (≤), `eq` (=), `gt` (>), `lt` (<)
+
+By default the condition compares **effective stats** — base stat plus all bonuses from equipped items.
+Use `stat_source: base` to compare against the raw stat only, ignoring equipment:
+
+```yaml
+requires:
+  type: character_stat
+  stat: strength
+  gte: 15
+  stat_source: base    # ignores equipment bonuses
+```
+
+Use `stat_source: base` on item `equip.requires` conditions to prevent gear from self-justifying its own requirement.
+
+#### Equipment Conditions
+
+Check what a player currently has equipped or held in inventory by label:
+
+```yaml
+# True when a specific item is currently equipped
+requires:
+  type: item_equipped
+  item: heavy-plate-armor
+
+# True when any item in inventory (stack or instance) carries this label
+requires:
+  type: item_held_label
+  label: rare
+
+# True when any equipped item carries this label
+requires:
+  type: any_item_equipped
+  label: magic
+```
+
+These conditions require the label to be declared in `game.yaml` `item_labels` to be meaningful.
+Note: in `passive_effects` conditions, `item_held_label` and `any_item_equipped` are not evaluated
+correctly (the registry is unavailable at that point) and will emit a warning at load time.
 
 #### Statistics Tracking
 
@@ -1043,8 +1179,21 @@ Create upgrade paths through item requirements:
 Run the validator frequently during development:
 
 ```bash
+# Validate all game packages in GAMES_PATH
 uv run oscilla validate
+
+# Validate a single package
+uv run oscilla validate --game my-game
+
+# Strict mode: exit 1 if any warnings exist (useful in CI)
+uv run oscilla validate --strict
 ```
+
+The validator produces three kinds of output:
+
+- **Errors** (red) — Content cannot be loaded. Fix before running.
+- **Warnings** (yellow `⚠`) — Content is valid but something looks suspicious. For example, an item label that closely resembles a declared label will produce: `item label 'rae' is not declared in GameSpec.item_labels — Did you mean 'rare'?`
+- **(silence)** — Everything is fine.
 
 **Common Errors**:
 

@@ -10,3 +10,28 @@ spec:
     base_hp: 100
     hp_per_level: 20
   base_adventure_count:
+
+  # Item label vocabulary for label rendering, sorting, and condition tests.
+  item_labels:
+    - name: test-consumable
+      description: "Single-use or limited-charge items — used to test label badges and condition predicates."
+      color: "green"
+      sort_priority: 1
+    - name: test-equippable
+      description: "Gear requiring a stat threshold — used to test item requirements."
+      color: "cyan"
+      sort_priority: 2
+    - name: test-legendary
+      description: "Rare items that activate the passive effect — used to test passive stat bonuses."
+      color: "gold1"
+      sort_priority: 3
+
+  # Passive effects: intentionally use item_held_label so the loader emits a LoadWarning,
+  # validating that the warning path is exercised on a real content package.
+  passive_effects:
+    - condition:
+        type: item_held_label
+        label: test-legendary
+      stat_modifiers:
+        - stat: strength
+          amount: 2

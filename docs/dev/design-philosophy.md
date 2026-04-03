@@ -97,3 +97,19 @@ Engine code that would only work with a specific content package is always wrong
 Content is data. Behavior that content authors need to express should be achievable by writing YAML manifests, not by writing Python. The engine's role is to make the manifest language expressive enough that authors do not need to reach for code.
 
 The threshold for "expressive enough" is: can a non-programmer author build a complete, interesting game using only manifests? When the answer is no for a common authoring need, the engine needs a new primitive — not a workaround that requires authors to understand Python internals.
+
+---
+
+## Three-Tier Diagnostic System
+
+Content loading produces one of three outcomes for any given problem:
+
+1. **Hard error** — The content package cannot be loaded at all. A missing required field, an unresolvable cross-reference, or a schema violation stops loading immediately and reports the problem. The engine never runs with broken content.
+2. **Load warning** — The content is structurally valid and can run, but something looks suspicious or suboptimal. The validator reports the warning in yellow with an optional suggestion for what to fix (e.g., a label typo with a "Did you mean X?" hint). The game proceeds normally.
+3. **Silent success** — Everything is fine. No output is needed.
+
+**Why not make warnings into errors?** Content authors iterate quickly and often push partial work. A setup that refuses to run because a label is not yet registered would break the authoring workflow. Warnings communicate the problem without blocking progress.
+
+**The `--strict` flag** bridges the two tiers: `oscilla validate --strict` treats all warnings as errors and exits with code 1, enabling CI pipelines to enforce complete, clean content packages before release.
+
+**The `suggestion` field** on `LoadWarning` is a human-readable hint targeted at developers and AI tools reading validation output. When Levenshtein distance to the nearest valid value is ≤ 2, the suggestion reads "Did you mean X?" — catching single-character typos and common transpositions. When no close match exists, the suggestion provides an "Add to item_labels" style instruction.

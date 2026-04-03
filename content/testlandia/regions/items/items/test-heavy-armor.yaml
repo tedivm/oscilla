@@ -1,0 +1,23 @@
+apiVersion: game/v1
+kind: Item
+metadata:
+  name: test-heavy-armor
+spec:
+  displayName: "Heavy Test Armor"
+  description: "Armor requiring strength >= 15. Tests equip requirements and cascade unequip."
+  category: armor
+  stackable: false
+  labels:
+    - test-equippable
+  equip:
+    slots:
+      - armor
+    requires:
+      type: character_stat
+      name: strength
+      gte: 15
+      stat_source: base
+    stat_modifiers:
+      - stat: strength
+        amount: 3
+  value: 0
