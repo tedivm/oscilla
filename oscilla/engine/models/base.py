@@ -184,6 +184,12 @@ class SkillCondition(BaseModel):
     )
 
 
+class QuestStageCondition(BaseModel):
+    type: Literal["quest_stage"]
+    quest: str = Field(description="Quest manifest name.")
+    stage: str = Field(description="Quest stage name that must be the current active stage.")
+
+
 # ---------------------------------------------------------------------------
 # Condition branch nodes (forward-referenced via model_rebuild)
 # ---------------------------------------------------------------------------
@@ -223,6 +229,7 @@ Condition = Annotated[
         AdventuresCompletedCondition,
         SkillCondition,
         PronounsCondition,
+        QuestStageCondition,
     ],
     Field(discriminator="type"),
 ]

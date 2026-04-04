@@ -109,6 +109,9 @@ class CharacterIterationRecord(Base):
     skill_cooldown_rows: Mapped[List["CharacterIterationSkillCooldown"]] = relationship(
         "CharacterIterationSkillCooldown", back_populates="iteration", cascade="all, delete-orphan"
     )
+    adventure_state_rows: Mapped[List["CharacterIterationAdventureState"]] = relationship(
+        "CharacterIterationAdventureState", back_populates="iteration", cascade="all, delete-orphan"
+    )
     character: Mapped["CharacterRecord"] = relationship(  # noqa: F821
         "CharacterRecord", back_populates="iterations"
     )
@@ -235,18 +238,18 @@ class CharacterIterationMilestone(Base):
 
 
 class CharacterIterationQuest(Base):
-    """One row per active or completed quest in this iteration.
+    """One row per active, completed, or failed quest in this iteration.
 
-    status is "active" or "completed".
+    status is "active", "completed", or "failed".
     stage is the current quest stage name — only meaningful for active quests,
-    NULL for completed ones.
+    NULL for completed and failed ones.
     """
 
     __tablename__ = "character_iteration_quests"
 
     iteration_id: Mapped[UUID] = mapped_column(ForeignKey("character_iterations.id"), primary_key=True, nullable=False)
     quest_ref: Mapped[str] = mapped_column(String, primary_key=True)
-    status: Mapped[str] = mapped_column(String, nullable=False)  # "active" | "completed"
+    status: Mapped[str] = mapped_column(String, nullable=False)  # "active" | "completed" | "failed"
     stage: Mapped[str | None] = mapped_column(String, nullable=True)
 
     iteration: Mapped["CharacterIterationRecord"] = relationship(
@@ -310,4 +313,25 @@ class CharacterIterationSkillCooldown(Base):
 
     iteration: Mapped["CharacterIterationRecord"] = relationship(
         "CharacterIterationRecord", back_populates="skill_cooldown_rows"
+    )
+
+
+class CharacterIterationAdventureState(Base):
+    """One row per adventure that has been completed at least once this iteration.
+
+    last_completed_on is the ISO-8601 date string (YYYY-MM-DD) of the most
+    recent completion — used for cooldown_days checks.
+    last_completed_at_total is the total adventures_completed count at the time
+    of the most recent completion — used for cooldown_adventures checks.
+    """
+
+    __tablename__ = "character_iteration_adventure_state"
+
+    iteration_id: Mapped[UUID] = mapped_column(ForeignKey("character_iterations.id"), primary_key=True, nullable=False)
+    adventure_ref: Mapped[str] = mapped_column(String, primary_key=True)
+    last_completed_on: Mapped[str | None] = mapped_column(String, nullable=True)
+    last_completed_at_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    iteration: Mapped["CharacterIterationRecord"] = relationship(
+        "CharacterIterationRecord", back_populates="adventure_state_rows"
     )

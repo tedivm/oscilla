@@ -81,14 +81,17 @@ find content/testlandia -name '*.yaml' -type f | head -5 | xargs cat
 
 Testlandia organizes content by functional area in the `content/testlandia/regions/` directory:
 
-| Category        | Purpose                                                         | Location              |
-| --------------- | --------------------------------------------------------------- | --------------------- |
-| **character/**  | Character progression, leveling, stats testing, prestige system | `regions/character/`  |
-| **choices/**    | Decision trees, condition-based branching, narrative flow       | `regions/choices/`    |
-| **combat/**     | Battle mechanics, enemy AI, skill/buff systems                  | `regions/combat/`     |
-| **conditions/** | Logic evaluation, milestone tracking, stat checks               | `regions/conditions/` |
-| **items/**      | Equipment, inventory, consumables, crafting materials           | `regions/items/`      |
-| **skills/**     | Skill system, buffs, combat abilities, cooldowns                | `regions/skills/`     |
+| Category                 | Purpose                                                                      | Location                       |
+| ------------------------ | ---------------------------------------------------------------------------- | ------------------------------ |
+| **adventure-mechanics/** | Passive steps, repeat controls, custom outcomes, adventure pipeline features | `regions/adventure-mechanics/` |
+| **character/**           | Character progression, leveling, stats testing, prestige system              | `regions/character/`           |
+| **choices/**             | Decision trees, condition-based branching, narrative flow                    | `regions/choices/`             |
+| **combat/**              | Battle mechanics, enemy AI, skill/buff systems                               | `regions/combat/`              |
+| **conditions/**          | Logic evaluation, milestone tracking, stat checks                            | `regions/conditions/`          |
+| **items/**               | Equipment, inventory, consumables, crafting materials                        | `regions/items/`               |
+| **quests/**              | Quest activation, stage progression, failure states, quest_stage conditions  | `regions/quests/`              |
+| **skills/**              | Skill system, buffs, combat abilities, cooldowns                             | `regions/skills/`              |
+| **template-system/**     | Jinja templates, pronoun system, variable text                               | `regions/template-system/`     |
 
 ## Creating New Regions
 
@@ -240,17 +243,22 @@ spec:
     - type: narrative
       text: "QA TEST: [feature name]. This test validates [specific engine behavior]. Expected result: [technical outcome]."
 
-    # Include test steps that exercise the target feature
-    - type: effects
+    # Include test steps that exercise the target feature.
+    # Available step types: narrative, choice, combat, stat_check, passive
+    # Use 'passive' for automatic effect application (no player input):
+    - type: passive
       effects:
         - type: xp_grant
           amount: 50
 
-    # Always include end conditions
-    - type: effects
-      effects:
-        - type: end_adventure
-          outcome: completed # Options: "completed", "defeated", "fled" (defaults to "completed")
+    # End the adventure via an effect on a narrative step, or a choice option:
+    - type: narrative
+      text: "Test complete."
+      choices:
+        - label: "Finish."
+          effects:
+            - type: end_adventure
+              outcome: completed # Options: "completed", "defeated", "fled", or any custom outcome declared in game.yaml
 ```
 
 **Text Content Rules:**
@@ -354,7 +362,7 @@ If templates below don't match the system, **update this skill immediately**.
 
 ```yaml
 apiVersion: game/v1
-kind: AdventureManifest
+kind: Adventure
 metadata:
   name: test-[feature-name]
 spec:
@@ -364,17 +372,71 @@ spec:
     - type: narrative
       text: "QA TEST: [Feature Name]. This test validates [engine behavior]. Expected outcome: [result]."
 
-    - type: effects
+    - type: narrative
+      text: "Test complete."
       effects:
         - type: end_adventure
           outcome: completed
+```
+
+### Passive Step Template
+
+```yaml
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-[feature-name]
+spec:
+  displayName: "Test: [Feature Name]"
+  description: "QA validation for passive step behavior."
+  steps:
+    # Passive step fires its effects automatically with no player input.
+    - type: passive
+      text: "QA TEST: Effect applies automatically."
+      effects:
+        - type: stat_change
+          stat: hp
+          amount: -10
+      # Optional: skip effects when bypass condition is met
+      bypass:
+        type: character_stat
+        name: dexterity
+        gte: 12
+      bypass_text: "Your reflexes save you."
+
+    - type: narrative
+      text: "Done."
+```
+
+### One-Shot / Repeat Controls Template
+
+```yaml
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-one-shot
+spec:
+  displayName: "Test: One-Shot"
+  description: "QA test for repeatable: false — disappears after first completion."
+  repeatable: false # mutually exclusive with max_completions
+  # max_completions: 3   # hard cap per iteration (alternative to repeatable: false)
+  # cooldown_days: 1      # calendar-day cooldown
+  # cooldown_adventures: 3  # cooldown measured in total adventures completed
+  steps:
+    - type: narrative
+      text: "QA TEST: This adventure is one-shot."
+      choices:
+        - label: "Complete it."
+          effects:
+            - type: end_adventure
+              outcome: completed
 ```
 
 ### Basic Item Template
 
 ```yaml
 apiVersion: game/v1
-kind: ItemManifest
+kind: Item
 metadata:
   name: test-[item-purpose]
 spec:
@@ -388,7 +450,7 @@ spec:
 
 ```yaml
 apiVersion: game/v1
-kind: EnemyManifest
+kind: Enemy
 metadata:
   name: test-[enemy-type]
 spec:
@@ -407,7 +469,7 @@ For testing stat modification effects:
 
 ```yaml
 # In adventure steps
-- type: effects
+- type: passive
   effects:
     - type: stat_change
       stat: "strength" # Must exist in character_config.yaml
@@ -416,6 +478,9 @@ For testing stat modification effects:
     - type: stat_set
       stat: "is_blessed"
       value: true
+
+    - type: heal
+      amount: 15 # or amount: "full" to restore to max_hp
 ```
 
 ### Condition Testing
@@ -423,7 +488,7 @@ For testing stat modification effects:
 For testing complex condition evaluation:
 
 ```yaml
-# In adventure branching
+# In adventure steps
 - type: stat_check
   condition:
     type: all
@@ -432,13 +497,39 @@ For testing complex condition evaluation:
         operator: gte
         value: 3
       - type: milestone
-        milestone: "test-milestone-unlocked"
+        name: "test-milestone-unlocked"
   on_pass:
-    - type: narrative
-      text: "QA RESULT: Condition evaluation passed. Test successful."
+    steps:
+      - type: narrative
+        text: "QA RESULT: Condition evaluation passed. Test successful."
   on_fail:
-    - type: narrative
-      text: "QA RESULT: Condition evaluation failed. Test outcome as expected."
+    steps:
+      - type: narrative
+        text: "QA RESULT: Condition evaluation failed. Test outcome as expected."
+```
+
+### Quest Stage Condition Testing
+
+For testing quest-gated content with `quest_stage` conditions:
+
+```yaml
+# requires field on a location pool entry
+requires:
+  type: quest_stage
+  quest: test-some-quest
+  stage: searching
+```
+
+### Quest Failure Testing
+
+For testing quest failure via `fail_condition` or the `quest_fail` effect:
+
+```yaml
+# In an adventure that forces a quest to fail
+- type: passive
+  effects:
+    - type: quest_fail
+      quest_ref: test-some-quest
 ```
 
 ## Integration Points

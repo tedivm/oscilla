@@ -1,0 +1,29 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-custom-outcome
+spec:
+  displayName: "Custom Outcome Test"
+  description: >
+    Tests custom adventure outcome names. Player chooses between pressing deeper
+    (outcome: discovered), retreating early (outcome: fled-early), or finishing
+    normally (outcome: completed). Validates that custom outcomes declared in
+    game.yaml are accepted by the loader and recorded by the engine.
+  steps:
+    - type: choice
+      prompt: "You find a sealed door. What do you do?"
+      options:
+        - label: "Force the door open and explore what lies beyond."
+          effects:
+            - type: end_adventure
+              outcome: discovered
+
+        - label: "Something feels off. Leave now before it is too late."
+          effects:
+            - type: end_adventure
+              outcome: fled-early
+
+        - label: "Mark the location and report back."
+          effects:
+            - type: end_adventure
+              outcome: completed

@@ -1,0 +1,16 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-stage-gate
+spec:
+  displayName: "Stage-Gated Adventure"
+  description: >
+    This adventure only appears when the test-stage-condition-quest is in the 'searching' stage.
+    Running it grants the milestone that advances the quest to completion, removing this adventure
+    from the pool on the next visit.
+  steps:
+    - type: narrative
+      text: "You found what you were looking for. The quest advances."
+      effects:
+        - type: milestone_grant
+          milestone: test-stage-condition-done

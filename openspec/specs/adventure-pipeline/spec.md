@@ -298,6 +298,12 @@ All existing call sites that do not pass `combat` remain valid and require no up
 - **WHEN** a stat_change effect runs in a narrative adventure step (no combat)
 - **THEN** the effect is dispatched normally without error
 
+---
+
+### Requirement: Pipeline executes passive steps
+
+The adventure pipeline SHALL support `type: passive` steps. When a passive step is encountered during adventure execution, the pipeline SHALL call `run_passive()`, which evaluates the bypass condition (if any), shows the appropriate text, and applies effects. The passive step's outcome is always `completed` — it does not terminate the adventure unless an `end_adventure` effect is included in its effects list.
+
 #### Scenario: Enemy-targeting effect outside combat is skipped with warning
 
 - **WHEN** a `stat_change` effect with `target: "enemy"` is dispatched with `combat=None`

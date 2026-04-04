@@ -203,10 +203,11 @@ class AdventurePipeline:
 
     async def _dispatch(self, step: Step) -> AdventureOutcome:
         """Dispatch a step to its type-specific handler function."""
-        from oscilla.engine.models.adventure import ChoiceStep, CombatStep, NarrativeStep, StatCheckStep
+        from oscilla.engine.models.adventure import ChoiceStep, CombatStep, NarrativeStep, PassiveStep, StatCheckStep
         from oscilla.engine.steps.choice import run_choice
         from oscilla.engine.steps.combat import run_combat
         from oscilla.engine.steps.narrative import run_narrative
+        from oscilla.engine.steps.passive import run_passive
         from oscilla.engine.steps.stat_check import run_stat_check
 
         match step:
@@ -242,6 +243,13 @@ class AdventurePipeline:
                     player=self._player,
                     run_outcome_branch=self._run_outcome_branch,
                     registry=self._registry,
+                )
+            case PassiveStep():
+                return await run_passive(
+                    step=step,
+                    player=self._player,
+                    registry=self._registry,
+                    tui=self._tui,
                 )
         # Unreachable with a complete match; guards against future extension.
         raise ValueError(f"Unhandled step type: {step!r}")  # pragma: no cover

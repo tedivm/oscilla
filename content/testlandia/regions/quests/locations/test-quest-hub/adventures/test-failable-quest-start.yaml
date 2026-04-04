@@ -1,0 +1,13 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-failable-quest-start
+spec:
+  displayName: "Start Failable Quest"
+  description: "Activates test-failable-quest. Use test-fail-quest to trigger failure."
+  steps:
+    - type: narrative
+      text: "You accept the failable quest."
+      effects:
+        - type: quest_activate
+          quest_ref: test-failable-quest

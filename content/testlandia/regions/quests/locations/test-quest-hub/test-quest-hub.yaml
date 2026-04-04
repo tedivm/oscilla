@@ -11,3 +11,15 @@ spec:
       weight: 100
     - ref: test-quest-finish
       weight: 100
+    - ref: test-stage-condition-start
+      weight: 100
+    - ref: test-stage-gate
+      weight: 100
+      requires:
+        type: quest_stage
+        quest: test-stage-condition-quest
+        stage: searching
+    - ref: test-failable-quest-start
+      weight: 100
+    - ref: test-fail-quest
+      weight: 100

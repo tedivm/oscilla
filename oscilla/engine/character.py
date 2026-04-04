@@ -15,6 +15,9 @@ from uuid import UUID, uuid4
 from oscilla.engine.templates import DEFAULT_PRONOUN_SET, PRONOUN_SETS, PronounSet
 
 if TYPE_CHECKING:
+    from datetime import date
+
+    from oscilla.engine.models.adventure import AdventureSpec
     from oscilla.engine.models.character_config import CharacterConfigManifest
     from oscilla.engine.models.game import GameManifest
     from oscilla.engine.registry import ContentRegistry
@@ -58,6 +61,8 @@ class CharacterStatistics:
     enemies_defeated: Dict[str, int] = field(default_factory=dict)
     locations_visited: Dict[str, int] = field(default_factory=dict)
     adventures_completed: Dict[str, int] = field(default_factory=dict)
+    # Per-adventure per-outcome completion counts (adventure_ref → {outcome_name: count}).
+    adventure_outcome_counts: Dict[str, Dict[str, int]] = field(default_factory=dict)
 
     def _increment(self, mapping: Dict[str, int], key: str) -> None:
         mapping[key] = mapping.get(key, 0) + 1
@@ -70,6 +75,13 @@ class CharacterStatistics:
 
     def record_adventure_completed(self, adventure_ref: str) -> None:
         self._increment(self.adventures_completed, adventure_ref)
+
+    def record_adventure_outcome(self, adventure_ref: str, outcome: str) -> None:
+        """Increment the per-adventure per-outcome count for the given outcome."""
+        if adventure_ref not in self.adventure_outcome_counts:
+            self.adventure_outcome_counts[adventure_ref] = {}
+        mapping = self.adventure_outcome_counts[adventure_ref]
+        mapping[outcome] = mapping.get(outcome, 0) + 1
 
 
 @dataclass
@@ -127,6 +139,7 @@ class CharacterState:
     # quest_ref → current stage name
     active_quests: Dict[str, str] = field(default_factory=dict)
     completed_quests: Set[str] = field(default_factory=set)
+    failed_quests: Set[str] = field(default_factory=set)
     active_adventure: AdventurePosition | None = None
     # Dynamic stats from CharacterConfig; int | bool | None (not Any).
     stats: Dict[str, int | bool | None] = field(default_factory=dict)
@@ -135,6 +148,10 @@ class CharacterState:
     # Adventure-scope cooldowns: skill_ref → adventures remaining before reuse.
     # Decremented at adventure start; removed when value reaches 0.
     skill_cooldowns: Dict[str, int] = field(default_factory=dict)
+    # Repeat-control tracking: ISO date (YYYY-MM-DD) when each adventure was last completed.
+    adventure_last_completed_on: Dict[str, str] = field(default_factory=dict)
+    # Total adventures_completed sum at the time each adventure was last completed.
+    adventure_last_completed_at_total: Dict[str, int] = field(default_factory=dict)
 
     # --- Factory ---
 
@@ -464,6 +481,47 @@ class CharacterState:
         for skill_ref in spent:
             del self.skill_cooldowns[skill_ref]
 
+    def is_adventure_eligible(
+        self,
+        adventure_ref: str,
+        spec: "AdventureSpec",
+        today: "date",
+    ) -> bool:
+        """Return True if repeat controls allow running this adventure right now.
+
+        Called AFTER the adventure's `requires` condition has already passed.
+        Any constraint that is not met returns False immediately.
+        """
+        from datetime import date as date_t
+
+        completions = self.statistics.adventures_completed.get(adventure_ref, 0)
+
+        # repeatable: false is equivalent to max_completions: 1
+        if not spec.repeatable and completions >= 1:
+            return False
+
+        # max_completions hard cap
+        if spec.max_completions is not None and completions >= spec.max_completions:
+            return False
+
+        # cooldown_days (calendar days since last completion)
+        if spec.cooldown_days is not None:
+            last_on_str = self.adventure_last_completed_on.get(adventure_ref)
+            if last_on_str is not None:
+                last_on = date_t.fromisoformat(last_on_str)
+                if (today - last_on).days < spec.cooldown_days:
+                    return False
+
+        # cooldown_adventures (total adventures completed since last run)
+        if spec.cooldown_adventures is not None:
+            last_total = self.adventure_last_completed_at_total.get(adventure_ref)
+            if last_total is not None:
+                total_now = sum(self.statistics.adventures_completed.values())
+                if total_now - last_total < spec.cooldown_adventures:
+                    return False
+
+        return True
+
     # --- XP / levelling ---
 
     def add_xp(self, amount: int, xp_thresholds: List[int], hp_per_level: int) -> tuple[List[int], List[int]]:
@@ -555,15 +613,21 @@ class CharacterState:
             "equipment": {slot: str(iid) for slot, iid in self.equipment.items()},
             "active_quests": dict(self.active_quests),
             "completed_quests": sorted(self.completed_quests),
+            "failed_quests": sorted(self.failed_quests),
             "stats": dict(self.stats),
             "statistics": {
                 "enemies_defeated": dict(self.statistics.enemies_defeated),
                 "locations_visited": dict(self.statistics.locations_visited),
                 "adventures_completed": dict(self.statistics.adventures_completed),
+                "adventure_outcome_counts": {
+                    ref: dict(counts) for ref, counts in self.statistics.adventure_outcome_counts.items()
+                },
             },
             "active_adventure": active_adventure,
             "known_skills": sorted(self.known_skills),
             "skill_cooldowns": dict(self.skill_cooldowns),
+            "adventure_last_completed_on": dict(self.adventure_last_completed_on),
+            "adventure_last_completed_at_total": dict(self.adventure_last_completed_at_total),
         }
 
     @classmethod
@@ -638,6 +702,9 @@ class CharacterState:
             enemies_defeated=dict(raw_stats.get("enemies_defeated", {})),
             locations_visited=dict(raw_stats.get("locations_visited", {})),
             adventures_completed=dict(raw_stats.get("adventures_completed", {})),
+            adventure_outcome_counts={
+                ref: dict(counts) for ref, counts in raw_stats.get("adventure_outcome_counts", {}).items()
+            },
         )
 
         # Deserialize instances
@@ -673,11 +740,14 @@ class CharacterState:
             equipment=equipment,
             active_quests=dict(data.get("active_quests", {})),
             completed_quests=set(data.get("completed_quests", [])),
+            failed_quests=set(data.get("failed_quests", [])),
             stats=reconciled_stats,
             statistics=statistics,
             active_adventure=active_adventure,
             known_skills=set(data.get("known_skills", [])),
             skill_cooldowns=dict(data.get("skill_cooldowns", {})),
+            adventure_last_completed_on=dict(data.get("adventure_last_completed_on", {})),
+            adventure_last_completed_at_total=dict(data.get("adventure_last_completed_at_total", {})),
         )
 
         # Warn about equipped items whose requires condition is no longer satisfied.

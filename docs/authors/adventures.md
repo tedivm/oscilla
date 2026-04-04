@@ -204,6 +204,57 @@ Branch automatically based on any [condition](./conditions.md) — no player inp
 
 Use stat checks for anything that should branch on player state without presenting a menu: perception checks, passive skill triggers, milestone-based dialogue forks, and so on.
 
+## Passive Steps
+
+Apply effects automatically — no player input, no branching. A passive step fires its `effects` in order and continues to the next step.
+
+```yaml
+- type: passive
+  text: "A warm glow washes over you. You feel restored."
+  effects:
+    - type: heal
+      amount: 15
+```
+
+All fields are optional. Omit `text` to apply effects silently:
+
+```yaml
+- type: passive
+  effects:
+    - type: milestone_grant
+      milestone: entered-inner-sanctum
+```
+
+#### Bypass condition
+
+Declare a `bypass` condition to skip the step (and its effects) automatically when the condition is met. Use this for traps or challenges that skilled or well-equipped players sidestep without a choice menu.
+
+```yaml
+- type: passive
+  text: "A pressure plate triggers a dart trap. You take 10 damage."
+  effects:
+    - type: stat_change
+      stat: hp
+      amount: -10
+  bypass:
+    type: character_stat
+    name: dexterity
+    gte: 12
+  bypass_text: "Your quick reflexes carry you past the pressure plate unscathed."
+```
+
+When `bypass` evaluates to **true**:
+
+- `bypass_text` is shown to the player (if set).
+- The step's `effects` and `text` are **not** shown or applied.
+
+When `bypass` evaluates to **false** (or is absent):
+
+- `text` is shown (if set).
+- `effects` are applied in order.
+
+Omit `bypass_text` for a fully silent bypass.
+
 ---
 
 ## Goto and Labels
@@ -255,7 +306,44 @@ effects:
     outcome: fled
 ```
 
-Allowed outcomes: `completed`, `defeated`, `fled`. Effects appearing before `end_adventure` in the same list still fire.
+The three built-in outcome names — `completed`, `defeated`, `fled` — are always valid without any extra declaration. To use custom outcome names in your content package, declare them in `game.yaml` first. See [Outcome Definitions](#outcome-definitions) below.
+
+Effects appearing before `end_adventure` in the same list still fire.
+
+---
+
+## Outcome Definitions
+
+Adventures report an outcome when they end. Three outcome names are built into the engine and are always valid:
+
+| Outcome | Meaning |
+|---------|---------|
+| `completed` | The adventure ran to its normal conclusion. |
+| `defeated` | The player was beaten in combat. |
+| `fled` | The player retreated via a flee option. |
+
+You can define additional outcome names in `game.yaml` to track story-specific results:
+
+```yaml
+# game.yaml
+spec:
+  outcomes:
+    - discovered
+    - rescued
+    - fled-early
+```
+
+Once declared, your custom outcome name can be used in any `end_adventure` effect across the content package:
+
+```yaml
+effects:
+  - type: end_adventure
+    outcome: discovered
+```
+
+The loader enforces this: using an outcome name that is not built-in and not declared in `game.yaml` is a load-time error.
+
+> **Note:** Outcome tracking is per-adventure. The engine records how many times each outcome fired for each adventure. Built-in analytics and future questing features can inspect these counts.
 
 ---
 
@@ -363,6 +451,7 @@ spec:
 | `combat` | Turn-based fight with win/defeat/flee branches |
 | `choice` | Player-facing menu; options may have conditions |
 | `stat_check` | Automatic condition branch; no player input |
+| `passive` | Silent auto-apply effects; optional bypass condition |
 
 ### Outcome branch fields (on_win, on_defeat, on_flee, on_pass, on_fail)
 
@@ -383,6 +472,67 @@ spec:
 | `effects` | no | Fire before steps or goto |
 | `steps` | no | Nested steps to run |
 | `goto` | no | Step label to jump to (exclusive with `steps`) |
+
+---
+
+## Repeat Controls
+
+By default, every adventure can be run as many times as the player likes. Use the optional repeat-control fields to limit how often an adventure appears in the adventure pool.
+
+All four fields are optional and default to unrestricted behavior. Setting none of them is equivalent to `repeatable: true` with no caps.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `repeatable` | bool | `true` | Set to `false` to make an adventure a one-shot that disappears after the first completion. |
+| `max_completions` | int | none | Hard cap: the adventure is hidden once the player has completed it this many times. |
+| `cooldown_days` | int | none | The adventure is hidden for this many calendar days after the most recent completion. |
+| `cooldown_adventures` | int | none | The adventure is hidden until this many total adventures have been completed since the last run. |
+
+`repeatable: false` and `max_completions` are mutually exclusive — choose one or the other.
+
+### One-shot adventure
+
+An adventure that can only ever be played once:
+
+```yaml
+displayName: "The Lost Shrine"
+repeatable: false
+steps:
+  - type: narrative
+    name: start
+    text: "You find a hidden shrine. It crumbles as you leave."
+    choices:
+      - label: "Leave"
+        effects:
+          - type: end_adventure
+            outcome: completed
+```
+
+### Cooldown by adventures
+
+An adventure that can be replayed, but only after the player has completed three other adventures first:
+
+```yaml
+displayName: "The Bandit Camp"
+cooldown_adventures: 3
+steps:
+  - type: combat
+    name: fight
+    enemy: bandit-leader
+    on_win:
+      effects:
+        - type: end_adventure
+          outcome: completed
+    on_defeat:
+      effects:
+        - type: end_adventure
+          outcome: defeated
+```
+
+### Notes on cooldown tracking
+
+- `cooldown_adventures` counts total adventures completed across all locations, not just in the current region.
+- All repeat-control state resets when the character starts a new iteration (prestige run).
 
 ---
 

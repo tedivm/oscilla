@@ -242,6 +242,7 @@ Conditions are tree structures that evaluate player state:
 - `item_equipped`: True when a specific non-stackable item is currently in an equipment slot
 - `item_held_label`: True when any item in inventory (stacks or instances) carries the given label
 - `any_item_equipped`: True when any equipped item carries the given label
+- `quest_stage`: True when a quest is active and at a specific named stage
 
 **`character_stat` and `stat_source`:**
 
@@ -301,6 +302,13 @@ Each step type has a dedicated handler module:
 - Evaluates condition against player state
 - Branches to `on_pass` or `on_fail` steps
 
+### Passive (`oscilla/engine/steps/passive.py`)
+
+- Auto-evaluated step with no player interaction
+- Evaluates a `condition`; if true, runs `effects` and optionally `steps`
+- If `condition` is absent or false, runs `bypass` effects and steps instead
+- Used for silent in-adventure checks (e.g., giving the player a bonus without showing a menu)
+
 ### Effects (`oscilla/engine/steps/effects.py`)
 
 - `XpGrantEffect`: Adds experience (may trigger leveling)
@@ -308,9 +316,16 @@ Each step type has a dedicated handler module:
 - `HealEffect`: Restores player HP
 - `ItemGrantEffect`: Adds items to inventory
 - `ItemDropEffect`: Weighted random item distribution
-- `MilestoneGrantEffect`: Unlocks story milestones
+- `MilestoneGrantEffect`: Unlocks story milestones; triggers quest advancement and failure checks
 - `StatChangeEffect`: Modifies player stats by amount (addition/subtraction)
 - `StatSetEffect`: Sets player stats to specific values
+- `SkillGrantEffect`: Teaches the player a new skill
+- `UseItemEffect`: Activates an item's use effects
+- `DispelEffect`: Removes active combat buffs/debuffs by label
+- `ApplyBuffEffect`: Applies a named buff manifest during combat
+- `SetPronounsEffect`: Changes the player's active pronoun set
+- `QuestActivateEffect`: Starts a quest at its entry stage
+- `QuestFailEffect`: Immediately fails an active quest and runs its current stage's `fail_effects`
 - `EndAdventureEffect`: Terminates adventure with outcome
 
 #### Stat Mutation Effects

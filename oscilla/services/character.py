@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from oscilla.models.character import CharacterRecord
 from oscilla.models.character_iteration import (
+    CharacterIterationAdventureState,
     CharacterIterationEquipment,
     CharacterIterationInventory,
     CharacterIterationItemInstance,
@@ -152,6 +153,15 @@ async def save_character(session: AsyncSession, state: "CharacterState", user_id
                 stage=None,
             )
         )
+    for quest_ref in state.failed_quests:
+        session.add(
+            CharacterIterationQuest(
+                iteration_id=iteration.id,
+                quest_ref=quest_ref,
+                status="failed",
+                stage=None,
+            )
+        )
     for entity_ref, count in state.statistics.enemies_defeated.items():
         session.add(
             CharacterIterationStatistic(
@@ -237,6 +247,7 @@ async def load_character(
             selectinload(CharacterIterationRecord.statistic_rows),
             selectinload(CharacterIterationRecord.skill_rows),
             selectinload(CharacterIterationRecord.skill_cooldown_rows),
+            selectinload(CharacterIterationRecord.adventure_state_rows),
         )
     )
     iter_result = await session.execute(iter_stmt)
@@ -270,10 +281,12 @@ async def load_character(
         row.quest_ref: row.stage or "" for row in iteration.quest_rows if row.status == "active"
     }
     completed_quests: List[str] = [row.quest_ref for row in iteration.quest_rows if row.status == "completed"]
+    failed_quests: List[str] = [row.quest_ref for row in iteration.quest_rows if row.status == "failed"]
 
     enemies_defeated: Dict[str, int] = {}
     locations_visited: Dict[str, int] = {}
     adventures_completed: Dict[str, int] = {}
+    adventure_outcome_counts: Dict[str, Dict[str, int]] = {}
     for stat_row in iteration.statistic_rows:
         if stat_row.stat_type == "enemies_defeated":
             enemies_defeated[stat_row.entity_ref] = stat_row.count
@@ -281,9 +294,25 @@ async def load_character(
             locations_visited[stat_row.entity_ref] = stat_row.count
         elif stat_row.stat_type == "adventures_completed":
             adventures_completed[stat_row.entity_ref] = stat_row.count
+        elif stat_row.stat_type.startswith("adventure_outcome:"):
+            outcome_name = stat_row.stat_type[len("adventure_outcome:") :]
+            adventure_ref = stat_row.entity_ref
+            if adventure_ref not in adventure_outcome_counts:
+                adventure_outcome_counts[adventure_ref] = {}
+            adventure_outcome_counts[adventure_ref][outcome_name] = stat_row.count
 
     known_skills: List[str] = [row.skill_ref for row in iteration.skill_rows]
     skill_cooldowns: Dict[str, int] = {row.skill_ref: row.cooldown_remaining for row in iteration.skill_cooldown_rows}
+    adventure_last_completed_on: Dict[str, str] = {
+        row.adventure_ref: row.last_completed_on
+        for row in iteration.adventure_state_rows
+        if row.last_completed_on is not None
+    }
+    adventure_last_completed_at_total: Dict[str, int] = {
+        row.adventure_ref: row.last_completed_at_total
+        for row in iteration.adventure_state_rows
+        if row.last_completed_at_total is not None
+    }
 
     data: Dict[str, Any] = {
         "character_id": str(character_id),
@@ -302,15 +331,19 @@ async def load_character(
         "equipment": equipment,
         "active_quests": active_quests,
         "completed_quests": completed_quests,
+        "failed_quests": failed_quests,
         "stats": stats,
         "statistics": {
             "enemies_defeated": enemies_defeated,
             "locations_visited": locations_visited,
             "adventures_completed": adventures_completed,
+            "adventure_outcome_counts": adventure_outcome_counts,
         },
         "active_adventure": active_adventure,
         "known_skills": known_skills,
         "skill_cooldowns": skill_cooldowns,
+        "adventure_last_completed_on": adventure_last_completed_on,
+        "adventure_last_completed_at_total": adventure_last_completed_at_total,
     }
 
     return CharacterState.from_dict(data=data, character_config=character_config, registry=registry)
@@ -758,12 +791,13 @@ async def set_quest(
     session: AsyncSession,
     iteration_id: UUID,
     quest_ref: str,
-    status: Literal["active", "completed"],
+    status: Literal["active", "completed", "failed"],
     stage: "str | None" = None,
 ) -> None:
     """Upsert one character_iteration_quests row.
 
-    status must be "active" or "completed".  stage should be None for completed quests.
+    status must be "active", "completed", or "failed".  stage should be None
+    for completed and failed quests.
     """
     await session.merge(
         CharacterIterationQuest(
@@ -779,7 +813,7 @@ async def set_quest(
 async def increment_statistic(
     session: AsyncSession,
     iteration_id: UUID,
-    stat_type: Literal["enemies_defeated", "locations_visited", "adventures_completed"],
+    stat_type: str,
     entity_ref: str,
     delta: int = 1,
 ) -> None:
@@ -893,4 +927,26 @@ async def set_skill_cooldown(
                 cooldown_remaining=cooldown_remaining,
             )
         )
+    await session.commit()
+
+
+async def upsert_adventure_state(
+    session: AsyncSession,
+    iteration_id: UUID,
+    adventure_ref: str,
+    last_completed_on: str | None,
+    last_completed_at_total: int | None,
+) -> None:
+    """Upsert the repeat-control state for one adventure.
+
+    Creates the row if it does not exist; updates it if it does.
+    """
+    await session.merge(
+        CharacterIterationAdventureState(
+            iteration_id=iteration_id,
+            adventure_ref=adventure_ref,
+            last_completed_on=last_completed_on,
+            last_completed_at_total=last_completed_at_total,
+        )
+    )
     await session.commit()

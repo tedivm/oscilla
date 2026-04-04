@@ -1,0 +1,19 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-one-shot
+spec:
+  displayName: "The Sealed Vault"
+  description: "A one-shot adventure that disappears after the first completion."
+  repeatable: false
+  steps:
+    - type: narrative
+      name: enter
+      text: "You pry open the ancient vault and claim its single secret."
+      choices:
+        - label: "Take the secret and leave"
+          effects:
+            - type: milestone_grant
+              milestone: test-vault-opened
+            - type: end_adventure
+              outcome: completed

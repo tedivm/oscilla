@@ -19,14 +19,17 @@ from ruamel.yaml.error import YAMLError
 
 from oscilla.engine.models import MANIFEST_REGISTRY
 from oscilla.engine.models.adventure import (
+    _BUILTIN_OUTCOMES,
     AdventureManifest,
     ApplyBuffEffect,
     ChoiceStep,
     CombatStep,
     Effect,
+    EndAdventureEffect,
     ItemDropEffect,
     NarrativeStep,
     OutcomeBranch,
+    PassiveStep,
     SkillGrantEffect,
     StatChangeEffect,
     StatCheckStep,
@@ -34,12 +37,20 @@ from oscilla.engine.models.adventure import (
     UseItemEffect,
     XpGrantEffect,
 )
-from oscilla.engine.models.base import AllCondition, Condition, ManifestEnvelope
+from oscilla.engine.models.base import (
+    AllCondition,
+    AnyCondition,
+    Condition,
+    ManifestEnvelope,
+    NotCondition,
+    QuestStageCondition,
+)
 from oscilla.engine.models.buff import BuffManifest
 from oscilla.engine.models.character_config import CharacterConfigManifest
 from oscilla.engine.models.game import GameManifest
 from oscilla.engine.models.item import ItemManifest
 from oscilla.engine.models.location import LocationManifest
+from oscilla.engine.models.quest import QuestManifest
 from oscilla.engine.models.recipe import RecipeManifest
 from oscilla.engine.models.region import RegionManifest
 from oscilla.engine.models.skill import SkillManifest
@@ -245,6 +256,69 @@ def _collect_apply_buff_effects(effects: List[Effect], refs: List[ApplyBuffEffec
             refs.append(eff)
 
 
+def _collect_end_adventure_effects(effects: List[Effect], results: List[EndAdventureEffect]) -> None:
+    """Collect all EndAdventureEffect instances from an effect list."""
+    for eff in effects:
+        if isinstance(eff, EndAdventureEffect):
+            results.append(eff)
+
+
+def _collect_branch_end_adventure(branch: OutcomeBranch, results: List[EndAdventureEffect]) -> None:
+    _collect_end_adventure_effects(branch.effects, results)
+    for sub in branch.steps:
+        _collect_step_end_adventure(sub, results)
+
+
+def _collect_step_end_adventure(step: Step, results: List[EndAdventureEffect]) -> None:
+    match step:
+        case NarrativeStep():
+            _collect_end_adventure_effects(step.effects, results)
+        case CombatStep():
+            for branch in [step.on_win, step.on_defeat, step.on_flee]:
+                _collect_branch_end_adventure(branch, results)
+        case ChoiceStep():
+            for opt in step.options:
+                _collect_end_adventure_effects(opt.effects, results)
+                for sub in opt.steps:
+                    _collect_step_end_adventure(sub, results)
+        case StatCheckStep():
+            for branch in [step.on_pass, step.on_fail]:
+                _collect_branch_end_adventure(branch, results)
+        case _:
+            pass
+
+
+def _validate_outcome_refs(manifests: List[ManifestEnvelope]) -> List[LoadError]:
+    """Validate that custom EndAdventureEffect outcome names are declared in game.yaml."""
+    errors: List[LoadError] = []
+    game_manifests = [m for m in manifests if m.kind == "Game"]
+    if not game_manifests:
+        return errors  # No game manifest to validate against; other validators will catch this.
+    game = cast(GameManifest, game_manifests[0])
+    declared_outcomes: Set[str] = set(game.spec.outcomes)
+
+    for m in manifests:
+        if m.kind != "Adventure":
+            continue
+        adv = cast(AdventureManifest, m)
+        end_effects: List[EndAdventureEffect] = []
+        for step in adv.spec.steps:
+            _collect_step_end_adventure(step, end_effects)
+        for eff in end_effects:
+            if eff.outcome not in _BUILTIN_OUTCOMES and eff.outcome not in declared_outcomes:
+                errors.append(
+                    LoadError(
+                        file=Path(f"<{m.metadata.name}>"),
+                        message=(
+                            f"end_adventure outcome {eff.outcome!r} is not a built-in outcome and is not declared "
+                            f"in game.yaml outcomes list. Built-ins: {sorted(_BUILTIN_OUTCOMES)}"
+                        ),
+                    )
+                )
+
+    return errors
+
+
 def _collect_skill_grant_effects(effects: List[Effect], refs: Set[str]) -> None:
     """Collect skill_grant effect skill name refs from an effect list."""
     for eff in effects:
@@ -416,6 +490,96 @@ def _validate_buff_refs(manifests: List[ManifestEnvelope]) -> List[LoadError]:
                 _collect_step_skill_and_buff_refs(step, _, buff_effects_adv)
             for eff in buff_effects_adv:
                 errors.extend(_check_apply_buff(m.metadata.name, eff))
+
+    return errors
+
+
+def _collect_quest_stage_conditions_in_condition(condition: Condition) -> List[QuestStageCondition]:
+    """Recursively collect all QuestStageCondition instances from a condition tree."""
+    results: List[QuestStageCondition] = []
+    match condition:
+        case QuestStageCondition():
+            results.append(condition)
+        case AllCondition(conditions=children):
+            for child in children:
+                results.extend(_collect_quest_stage_conditions_in_condition(child))
+        case AnyCondition(conditions=children):
+            for child in children:
+                results.extend(_collect_quest_stage_conditions_in_condition(child))
+        case NotCondition(condition=child):
+            results.extend(_collect_quest_stage_conditions_in_condition(child))
+        case _:
+            pass
+    return results
+
+
+def _collect_quest_stage_conditions_from_manifest(m: ManifestEnvelope) -> List[QuestStageCondition]:
+    """Collect all QuestStageCondition instances from any manifest."""
+    results: List[QuestStageCondition] = []
+
+    def _add(cond: Condition | None) -> None:
+        if cond is not None:
+            results.extend(_collect_quest_stage_conditions_in_condition(cond))
+
+    match m.kind:
+        case "Location":
+            loc = cast(LocationManifest, m)
+            _add(loc.spec.unlock)
+            _add(loc.spec.effective_unlock)
+            for adv_entry in loc.spec.adventures:
+                _add(adv_entry.requires)
+        case "Region":
+            region = cast(RegionManifest, m)
+            _add(region.spec.unlock)
+            _add(region.spec.effective_unlock)
+        case "Adventure":
+            adv = cast(AdventureManifest, m)
+            _add(adv.spec.requires)
+            for step in adv.spec.steps:
+                match step:
+                    case ChoiceStep():
+                        for opt in step.options:
+                            _add(opt.requires)
+                    case PassiveStep():
+                        _add(step.bypass)
+        case "Game":
+            game = cast(GameManifest, m)
+            for pe in game.spec.passive_effects:
+                _add(pe.condition)
+
+    return results
+
+
+def _validate_quest_stage_condition_refs(manifests: List[ManifestEnvelope]) -> List[LoadError]:
+    """Validate that quest_stage condition quest and stage names exist in declared Quest manifests."""
+    errors: List[LoadError] = []
+
+    # Build lookup: quest_name → set of stage names
+    quest_stages: Dict[str, Set[str]] = {}
+    for m in manifests:
+        if m.kind == "Quest":
+            quest = cast(QuestManifest, m)
+            quest_stages[m.metadata.name] = {s.name for s in quest.spec.stages}
+
+    for m in manifests:
+        conditions = _collect_quest_stage_conditions_from_manifest(m)
+        for cond in conditions:
+            if cond.quest not in quest_stages:
+                errors.append(
+                    LoadError(
+                        file=Path(f"<{m.metadata.name}>"),
+                        message=f"quest_stage condition references unknown quest: {cond.quest!r}",
+                    )
+                )
+            elif cond.stage not in quest_stages[cond.quest]:
+                errors.append(
+                    LoadError(
+                        file=Path(f"<{m.metadata.name}>"),
+                        message=(
+                            f"quest_stage condition references unknown stage {cond.stage!r} for quest {cond.quest!r}"
+                        ),
+                    )
+                )
 
     return errors
 
@@ -656,6 +820,8 @@ def validate_references(manifests: List[ManifestEnvelope]) -> List[LoadError]:
     # Cross-manifest skill and buff reference validation.
     errors.extend(_validate_skill_refs(manifests))
     errors.extend(_validate_buff_refs(manifests))
+    errors.extend(_validate_outcome_refs(manifests))
+    errors.extend(_validate_quest_stage_condition_refs(manifests))
 
     return errors
 

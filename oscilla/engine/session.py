@@ -37,6 +37,7 @@ from oscilla.services.character import (
     touch_character_updated_at,
     unequip_item,
     update_scalar_fields,
+    upsert_adventure_state,
 )
 from oscilla.services.user import derive_tui_user_key, get_or_create_user
 
@@ -198,6 +199,8 @@ class GameSession:
 
     async def run_adventure(self, adventure_ref: str) -> "AdventureOutcome":
         """Build AdventurePipeline with _on_state_change and run to completion."""
+        from datetime import date as _date
+
         from oscilla.engine.pipeline import AdventurePipeline
 
         if self._character is None:
@@ -209,7 +212,17 @@ class GameSession:
             tui=self.tui,
             on_state_change=self._on_state_change,
         )
-        return await pipeline.run(adventure_ref=adventure_ref)
+        outcome = await pipeline.run(adventure_ref=adventure_ref)
+
+        # Record repeat-control tracking state after each adventure run.
+        self._character.adventure_last_completed_on[adventure_ref] = _date.today().isoformat()
+        self._character.adventure_last_completed_at_total[adventure_ref] = sum(
+            self._character.statistics.adventures_completed.values()
+        )
+        # Record per-outcome count for this completion.
+        self._character.statistics.record_adventure_outcome(adventure_ref=adventure_ref, outcome=outcome.value)
+
+        return outcome
 
     # ---------------------------------------------------------------------------
     # PersistCallback implementation
@@ -374,6 +387,7 @@ class GameSession:
         # --- Quests ---
         last_active = last.active_quests if last is not None else {}
         last_completed = last.completed_quests if last is not None else set()
+        last_failed = last.failed_quests if last is not None else set()
         for quest_ref, stage in state.active_quests.items():
             if quest_ref not in last_active or stage != last_active.get(quest_ref):
                 await set_quest(
@@ -391,12 +405,21 @@ class GameSession:
                 status="completed",
                 stage=None,
             )
+        for quest_ref in state.failed_quests - last_failed:
+            await set_quest(
+                session=self.db_session,
+                iteration_id=iteration_id,
+                quest_ref=quest_ref,
+                status="failed",
+                stage=None,
+            )
 
         # --- Statistics (send deltas, not absolute counts) ---
         last_stats_obj = last.statistics if last is not None else None
         last_enemies = last_stats_obj.enemies_defeated if last_stats_obj else {}
         last_locations = last_stats_obj.locations_visited if last_stats_obj else {}
         last_adventures = last_stats_obj.adventures_completed if last_stats_obj else {}
+        last_outcome_counts = last_stats_obj.adventure_outcome_counts if last_stats_obj else {}
 
         for entity_ref, count in state.statistics.enemies_defeated.items():
             delta = count - last_enemies.get(entity_ref, 0)
@@ -428,6 +451,19 @@ class GameSession:
                     entity_ref=entity_ref,
                     delta=delta,
                 )
+        # Persist per-adventure per-outcome counts using a prefixed stat_type.
+        for adventure_ref, outcome_map in state.statistics.adventure_outcome_counts.items():
+            last_outcomes_for_adv = last_outcome_counts.get(adventure_ref, {})
+            for outcome_name, count in outcome_map.items():
+                delta = count - last_outcomes_for_adv.get(outcome_name, 0)
+                if delta > 0:
+                    await increment_statistic(
+                        session=self.db_session,
+                        iteration_id=iteration_id,
+                        stat_type=f"adventure_outcome:{outcome_name}",
+                        entity_ref=adventure_ref,
+                        delta=delta,
+                    )
 
         # --- Known skills (additive only — skills are never removed mid-iteration) ---
         last_skills = last.known_skills if last is not None else set()
@@ -466,6 +502,20 @@ class GameSession:
                 step_index=None,
                 step_state=None,
             )
+            # Persist adventure repeat-control state for any adventures tracked
+            last_completed_on = last.adventure_last_completed_on if last is not None else {}
+            last_completed_at_total = last.adventure_last_completed_at_total if last is not None else {}
+            for adventure_ref, completed_on in state.adventure_last_completed_on.items():
+                if completed_on != last_completed_on.get(adventure_ref) or state.adventure_last_completed_at_total.get(
+                    adventure_ref
+                ) != last_completed_at_total.get(adventure_ref):
+                    await upsert_adventure_state(
+                        session=self.db_session,
+                        iteration_id=iteration_id,
+                        adventure_ref=adventure_ref,
+                        last_completed_on=completed_on,
+                        last_completed_at_total=state.adventure_last_completed_at_total.get(adventure_ref),
+                    )
             await touch_character_updated_at(
                 session=self.db_session,
                 character_id=state.character_id,

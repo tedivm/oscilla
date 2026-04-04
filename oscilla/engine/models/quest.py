@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, List, Literal, Set
 
 from pydantic import BaseModel, model_validator
 
-from oscilla.engine.models.base import ManifestEnvelope
+from oscilla.engine.models.base import Condition, ManifestEnvelope
 
 if TYPE_CHECKING:
     from oscilla.engine.models.adventure import Effect
@@ -19,6 +19,12 @@ class QuestStage(BaseModel):
     # Effects fired when this stage is reached AND it is terminal.
     # Enforced by model_validator: non-terminal stages must have an empty list.
     completion_effects: List["Effect"] = []
+    # Failure condition evaluated after every milestone grant. If it fires while
+    # the quest is active at this stage, the quest is moved to failed_quests.
+    # Terminal stages must not declare a fail_condition (they are already done).
+    fail_condition: Condition | None = None
+    # Effects fired when this stage's fail_condition triggers. No-op for silent failure.
+    fail_effects: List["Effect"] = []
 
 
 class QuestSpec(BaseModel):
@@ -45,6 +51,9 @@ class QuestSpec(BaseModel):
                     raise ValueError(f"Stage {stage.name!r} is terminal but has next_stage={stage.next_stage!r}")
                 if stage.advance_on:
                     raise ValueError(f"Stage {stage.name!r} is terminal but has advance_on={stage.advance_on!r}")
+                # Terminal stages cannot have a fail_condition — the quest is already done.
+                if stage.fail_condition is not None:
+                    raise ValueError(f"Stage {stage.name!r} is terminal and must not have a fail_condition.")
             else:
                 if stage.next_stage is None:
                     raise ValueError(f"Stage {stage.name!r} is not terminal but has no next_stage")

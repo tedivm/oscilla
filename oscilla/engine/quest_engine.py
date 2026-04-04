@@ -5,6 +5,8 @@ from __future__ import annotations
 from logging import getLogger
 from typing import TYPE_CHECKING
 
+from oscilla.engine.conditions import evaluate
+
 if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
     from oscilla.engine.pipeline import TUICallbacks
@@ -73,6 +75,29 @@ def _advance_quests_silent(player: "CharacterState", registry: "ContentRegistry"
             player.active_quests[quest_ref] = next_stage_name
             current_stage_name = next_stage_name
 
+    # After advancing, silently fail any quests whose fail_condition is now met.
+    _fail_quests_silent(player=player, registry=registry)
+
+
+def _fail_quests_silent(player: "CharacterState", registry: "ContentRegistry") -> None:
+    """Move any active quests whose fail_condition is met to failed_quests.
+
+    No fail_effects are run — this is the silent correction used on character load.
+    """
+    for quest_ref in list(player.active_quests):
+        quest_manifest = registry.quests.get(quest_ref)
+        if quest_manifest is None:
+            continue
+        stage_name = player.active_quests[quest_ref]
+        stage_map = {s.name: s for s in quest_manifest.spec.stages}
+        stage = stage_map.get(stage_name)
+        if stage is None or stage.fail_condition is None:
+            continue
+        if evaluate(condition=stage.fail_condition, player=player, registry=registry):
+            logger.debug("Quest %r: silently failed at stage %r.", quest_ref, stage_name)
+            player.active_quests.pop(quest_ref)
+            player.failed_quests.add(quest_ref)
+
 
 async def evaluate_quest_advancements(
     player: "CharacterState",
@@ -139,3 +164,36 @@ async def evaluate_quest_advancements(
             )
             player.active_quests[quest_ref] = next_stage_name
             current_stage_name = next_stage_name
+
+    # After advancing, check for any quest failures.
+    await _evaluate_quest_failures(player=player, registry=registry, tui=tui)
+
+
+async def _evaluate_quest_failures(
+    player: "CharacterState",
+    registry: "ContentRegistry",
+    tui: "TUICallbacks",
+) -> None:
+    """Move any active quests whose fail_condition is met to failed_quests.
+
+    Runs fail_effects from the stage that was active when the quest failed.
+    """
+    # Local import to avoid circular dependency: quest_engine ← effects ← quest_engine.
+    from oscilla.engine.steps.effects import run_effect
+
+    for quest_ref in list(player.active_quests):
+        quest_manifest = registry.quests.get(quest_ref)
+        if quest_manifest is None:
+            continue
+        stage_name = player.active_quests[quest_ref]
+        stage_map = {s.name: s for s in quest_manifest.spec.stages}
+        stage = stage_map.get(stage_name)
+        if stage is None or stage.fail_condition is None:
+            continue
+        if evaluate(condition=stage.fail_condition, player=player, registry=registry):
+            player.active_quests.pop(quest_ref)
+            player.failed_quests.add(quest_ref)
+            display_name = quest_manifest.spec.displayName
+            await tui.show_text(f"[bold red]Quest failed: {display_name}[/bold red]")
+            for effect in stage.fail_effects:
+                await run_effect(effect=effect, player=player, registry=registry, tui=tui)

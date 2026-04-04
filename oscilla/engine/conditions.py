@@ -23,6 +23,7 @@ from oscilla.engine.models.base import (
     NotCondition,
     PrestigeCountCondition,
     PronounsCondition,
+    QuestStageCondition,
     SkillCondition,
 )
 
@@ -157,6 +158,10 @@ def evaluate(
                 )
                 return False
             return player.pronouns == target_ps
+
+        # --- Quest leaf ---
+        case QuestStageCondition(quest=q, stage=s):
+            return player.active_quests.get(q) == s
 
     # Unreachable if all Condition subtypes are handled above; guards against
     # extending the union without adding a case branch.

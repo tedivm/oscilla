@@ -25,6 +25,12 @@ spec:
       color: "gold1"
       sort_priority: 3
 
+  # Custom adventure outcome names beyond the three built-in defaults.
+  # Used by test-custom-outcome adventure in the adventure-mechanics location.
+  outcomes:
+    - discovered
+    - fled-early
+
   # Passive effects: intentionally use item_held_label so the loader emits a LoadWarning,
   # validating that the warning path is exercised on a real content package.
   passive_effects:

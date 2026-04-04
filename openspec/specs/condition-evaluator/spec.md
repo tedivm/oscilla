@@ -299,6 +299,12 @@ The three new predicates (`item_equipped`, `item_held_label`, `any_item_equipped
 - **WHEN** a `not: {item_held_label: cursed}` condition is evaluated for a player with no cursed items
 - **THEN** it evaluates to true
 
+---
+
+### Requirement: quest_stage condition type is supported
+
+The condition evaluator SHALL support `type: quest_stage` conditions. The evaluator SHALL read `player.active_quests` dict and return `true` if and only if the quest is present and the current stage value equals the declared `stage` field. No registry access is required to evaluate this condition.
+
 #### Scenario: Conjunction requiring both cloak equipped and ranger-set weapon equipped
 
 - **WHEN** an `all: [{item_equipped: rangers-cloak}, {any_item_equipped: ranger-set}]` condition is evaluated for a player with both conditions met

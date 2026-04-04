@@ -1,0 +1,7 @@
+apiVersion: game/v1
+kind: Region
+metadata:
+  name: adventure-mechanics
+spec:
+  displayName: "Adventure Mechanics Testing"
+  description: "Tests passive steps, repeat controls, custom outcomes, and related mechanics."

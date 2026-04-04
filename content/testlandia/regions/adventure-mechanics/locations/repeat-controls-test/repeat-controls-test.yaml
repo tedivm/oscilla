@@ -1,0 +1,13 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: repeat-controls-test
+spec:
+  displayName: "Repeat Controls Testing"
+  description: "Tests adventure repeat control fields: one-shot and cooldown adventures."
+  region: adventure-mechanics
+  adventures:
+    - ref: test-one-shot
+      weight: 100
+    - ref: test-cooldown
+      weight: 100

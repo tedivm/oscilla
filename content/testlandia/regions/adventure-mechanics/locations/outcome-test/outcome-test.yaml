@@ -1,0 +1,8 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: outcome-test
+spec:
+  displayName: "Outcome Test"
+  description: "Tests custom adventure outcome names declared in game.yaml."
+  region: adventure-mechanics

@@ -59,9 +59,19 @@ class MilestoneGrantEffect(BaseModel):
     milestone: str
 
 
+# Built-in adventure outcome names always accepted without game.yaml declaration.
+_BUILTIN_OUTCOMES: frozenset[str] = frozenset({"completed", "defeated", "fled"})
+
+
 class EndAdventureEffect(BaseModel):
     type: Literal["end_adventure"]
-    outcome: Literal["completed", "defeated", "fled"] = "completed"
+    outcome: str = Field(
+        default="completed",
+        description=(
+            "Outcome name. Built-ins: 'completed', 'defeated', 'fled'. "
+            "Custom names must be declared in game.yaml outcomes list."
+        ),
+    )
 
 
 class HealEffect(BaseModel):
@@ -165,6 +175,11 @@ class QuestActivateEffect(BaseModel):
     quest_ref: str = Field(description="Name of the Quest manifest to activate.")
 
 
+class QuestFailEffect(BaseModel):
+    type: Literal["quest_fail"]
+    quest_ref: str = Field(description="Name of the Quest manifest to fail.")
+
+
 Effect = Annotated[
     Union[
         XpGrantEffect,
@@ -180,6 +195,7 @@ Effect = Annotated[
         ApplyBuffEffect,
         SetPronounsEffect,
         QuestActivateEffect,
+        QuestFailEffect,
     ],
     Field(discriminator="type"),
 ]
@@ -254,8 +270,19 @@ class StatCheckStep(BaseModel):
     on_fail: OutcomeBranch = Field(default_factory=OutcomeBranch)
 
 
+class PassiveStep(BaseModel):
+    type: Literal["passive"]
+    label: str | None = None
+    text: str | None = Field(default=None, description="Narrative text shown when the step fires normally.")
+    effects: List[Effect] = Field(default_factory=list, description="Effects applied when the step is not bypassed.")
+    bypass: Condition | None = Field(default=None, description="If met, skip the normal text and effects entirely.")
+    bypass_text: str | None = Field(
+        default=None, description="Shown when bypass condition is met. Omit for silent bypass."
+    )
+
+
 Step = Annotated[
-    Union[NarrativeStep, CombatStep, ChoiceStep, StatCheckStep],
+    Union[NarrativeStep, CombatStep, ChoiceStep, StatCheckStep, PassiveStep],
     Field(discriminator="type"),
 ]
 
@@ -264,6 +291,7 @@ OutcomeBranch.model_rebuild()
 ChoiceOption.model_rebuild()
 ChoiceStep.model_rebuild()
 StatCheckStep.model_rebuild()
+PassiveStep.model_rebuild()
 
 
 # ---------------------------------------------------------------------------
@@ -276,6 +304,24 @@ class AdventureSpec(BaseModel):
     description: str = ""
     requires: Condition | None = None
     steps: List[Step]
+    # Repeat controls — all optional, all default to unrestricted behavior.
+    repeatable: bool = Field(default=True, description="Set to False to make this a one-shot adventure.")
+    max_completions: int | None = Field(default=None, description="Hard cap on total completions this iteration.")
+    cooldown_days: int | None = Field(default=None, description="Calendar days that must pass between runs.")
+    cooldown_adventures: int | None = Field(
+        default=None,
+        description="Total adventures completed that must pass since last run.",
+    )
+
+    @model_validator(mode="after")
+    def validate_repeat_controls(self) -> "AdventureSpec":
+        """repeatable: false and max_completions are mutually exclusive."""
+        if not self.repeatable and self.max_completions is not None:
+            raise ValueError(
+                "AdventureSpec: 'repeatable: false' and 'max_completions' are mutually exclusive. "
+                "Use max_completions alone to set a specific cap, or repeatable: false for a one-shot."
+            )
+        return self
 
     @model_validator(mode="after")
     def validate_unique_labels(self) -> "AdventureSpec":

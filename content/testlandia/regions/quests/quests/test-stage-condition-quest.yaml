@@ -1,0 +1,17 @@
+apiVersion: game/v1
+kind: Quest
+metadata:
+  name: test-stage-condition-quest
+spec:
+  displayName: "Stage Condition Test Quest"
+  description: "Two-stage quest used to QA the quest_stage condition. Starts at 'searching', advances to terminal 'complete'."
+  entry_stage: searching
+  stages:
+    - name: searching
+      description: "Now in searching stage — the stage-gate adventure should appear."
+      advance_on:
+        - test-stage-condition-done
+      next_stage: complete
+    - name: complete
+      description: "Quest done."
+      terminal: true

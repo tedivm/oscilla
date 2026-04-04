@@ -776,6 +776,13 @@ make document_schema
 <!-- BEGIN_SQLALCHEMY_DOCS -->
 ```mermaid
 erDiagram
+  character_iteration_adventure_state {
+    VARCHAR adventure_ref PK
+    CHAR(32) iteration_id PK,FK
+    INTEGER last_completed_at_total "nullable"
+    VARCHAR last_completed_on "nullable"
+  }
+
   character_iteration_equipment {
     CHAR(32) iteration_id PK,FK
     VARCHAR slot PK
@@ -873,6 +880,7 @@ erDiagram
     VARCHAR user_key UK
   }
 
+  character_iterations ||--o| character_iteration_adventure_state : iteration_id
   character_iterations ||--o| character_iteration_equipment : iteration_id
   character_iterations ||--o| character_iteration_inventory : iteration_id
   character_iteration_item_instances ||--o| character_iteration_item_instance_modifiers : iteration_id

@@ -916,10 +916,17 @@ class OscillaApp(App[None]):
                             location = registry.locations.require(location_ref, "Location")
 
                             # Adventure selection (weighted random from eligible pool)
+                            from datetime import date as _date
+
                             eligible = [
                                 entry
                                 for entry in location.spec.adventures
                                 if evaluate(entry.requires, player, registry)
+                                and player.is_adventure_eligible(
+                                    adventure_ref=entry.ref,
+                                    spec=registry.adventures.require(entry.ref, "Adventure").spec,
+                                    today=_date.today(),
+                                )
                             ]
                             if not eligible:
                                 await tui.show_text("No adventures are available here right now.")

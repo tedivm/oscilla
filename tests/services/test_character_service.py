@@ -27,6 +27,8 @@ from oscilla.services.character import (
     prestige_character,
     release_session_lock,
     save_character,
+    set_quest,
+    upsert_adventure_state,
 )
 from oscilla.services.user import get_or_create_user
 from tests.engine.conftest import FIXTURES
@@ -329,3 +331,84 @@ async def test_release_lock_noop_wrong_token(
     result = await async_session.execute(stmt)
     row = result.scalar_one()
     assert row.session_token == token
+
+
+# ---------------------------------------------------------------------------
+# Adventure repeat-control state persistence (round-trip)
+# ---------------------------------------------------------------------------
+
+
+async def test_adventure_repeat_state_persists_and_reloads(
+    async_session: AsyncSession,
+    minimal_registry: ContentRegistry,
+) -> None:
+    """adventure_last_completed_on / adventure_last_completed_at_total round-trip.
+
+    upsert_adventure_state() writes the row; load_character() reads it back
+    into CharacterState.adventure_last_completed_on and
+    adventure_last_completed_at_total.
+    """
+    assert minimal_registry.character_config is not None
+    user = await get_or_create_user(session=async_session, user_key="advstate@host")
+    player = _make_player(minimal_registry, name="AdvStateHero")
+    await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
+
+    iteration_id = await get_active_iteration_id(session=async_session, character_id=player.character_id)
+    assert iteration_id is not None
+
+    await upsert_adventure_state(
+        session=async_session,
+        iteration_id=iteration_id,
+        adventure_ref="test-quest",
+        last_completed_on="2026-04-04",
+        last_completed_at_total=7,
+    )
+
+    loaded = await load_character(
+        session=async_session,
+        character_id=player.character_id,
+        character_config=minimal_registry.character_config,
+    )
+    assert loaded is not None
+    assert loaded.adventure_last_completed_on["test-quest"] == "2026-04-04"
+    assert loaded.adventure_last_completed_at_total["test-quest"] == 7
+
+
+# ---------------------------------------------------------------------------
+# Quest failure state persistence (round-trip)
+# ---------------------------------------------------------------------------
+
+
+async def test_failed_quests_persists_and_reloads(
+    async_session: AsyncSession,
+    minimal_registry: ContentRegistry,
+) -> None:
+    """set_quest(status='failed') persists; load_character() restores failed_quests.
+
+    Verifies the full persistence round-trip: a quest marked 'failed' via
+    set_quest() reappears in CharacterState.failed_quests after load_character().
+    """
+    assert minimal_registry.character_config is not None
+    user = await get_or_create_user(session=async_session, user_key="failquest@host")
+    player = _make_player(minimal_registry, name="FailQuestHero")
+    await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
+
+    iteration_id = await get_active_iteration_id(session=async_session, character_id=player.character_id)
+    assert iteration_id is not None
+
+    await set_quest(
+        session=async_session,
+        iteration_id=iteration_id,
+        quest_ref="test-hostage-rescue",
+        status="failed",
+        stage=None,
+    )
+
+    loaded = await load_character(
+        session=async_session,
+        character_id=player.character_id,
+        character_config=minimal_registry.character_config,
+    )
+    assert loaded is not None
+    assert "test-hostage-rescue" in loaded.failed_quests
+    assert "test-hostage-rescue" not in loaded.active_quests

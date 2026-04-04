@@ -36,10 +36,6 @@ These items fix existing bugs or remove technical debt that actively misleads au
 | [Season Hemisphere Configuration](#season-hemisphere-configuration) | XS | Calendar Conditions |
 | [Triggered Adventures](#triggered-adventures) | M | — |
 | [Adventure-Scoped Variables](#adventure-scoped-variables) | M | Adventure Authoring |
-| [Adventure Outcome Definitions](#adventure-outcome-definitions) | S | Adventure Authoring |
-| [Passive Event Step](#passive-event-step) | S | Adventure Authoring |
-| [Adventure Repeat Controls](#adventure-repeat-controls) | S | Adventure Authoring |
-| [Decision Tree AI for Enemies](#decision-tree-ai-for-enemies) | L | Combat Overhaul |
 | [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems) | XL | Combat Overhaul |
 | [Buff Blocking and Priority](#buff-blocking-and-priority) | S | Combat Refinement |
 | [Buff Persistence Between Adventures](#buff-persistence-between-adventures) | S | Combat Refinement |
@@ -52,12 +48,9 @@ These items fix existing bugs or remove technical debt that actively misleads au
 | [Persistent NPCs and Dialogue](#persistent-npcs-and-dialogue) | L | Economy & NPCs |
 | [Enhanced Loot Tables](#enhanced-loot-tables) | S | Item System |
 | [Inventory Storage](#inventory-storage) | L | Item System |
-| [Quest Stage Condition](#quest-stage-condition) | S | Quest Depth |
-| [Quest Failure States](#quest-failure-states) | S | Quest Depth |
 | [Quest Branching](#quest-branching) | M | Quest Depth & Factions |
 | [Quest Progress Panel](#quest-progress-panel) | M | Quest Depth |
 | [Faction and Reputation System](#faction-and-reputation-system) | M | Quest Depth & Factions |
-| [Named Random Tables](#named-random-tables) | S | Content Reuse |
 | [Content Inheritance / Prototypes](#content-inheritance--prototypes) | M | Content Reuse |
 | [Multi-Manifest YAML Files](#multi-manifest-yaml-files) | S | Authoring Tooling |
 | [JSON Schema for IDE Support](#json-schema-for-ide-support) | M | Authoring Tooling |
@@ -70,37 +63,6 @@ These items fix existing bugs or remove technical debt that actively misleads au
 ---
 
 ## Condition System
-
-### Remove Condition Shorthand Syntax
-
-**Effort: S** · **Group: —**
-
-The engine's condition parser supports two syntaxes for the same condition. The explicit (type-tagged) form is what `conditions.md` documents and what every doc except `world-building.md` uses:
-
-```yaml
-requires:
-  type: level
-  value: 5
-```
-
-A shorthand (bare-key) form also exists, handled by `normalise_condition()` in `oscilla/engine/models/base.py`:
-
-```yaml
-unlock:
-  level: 5
-```
-
-Both parse to identical Pydantic models. However, having two valid syntaxes creates inconsistency across the docs, surprise for authors switching between files, and ongoing maintenance burden on the normalizer. The shorthand was added as a convenience but predates a stable authoring convention.
-
-What needs to happen:
-
-- Remove `normalise_condition()` and the `_LEAF_MAPPINGS` / `_DICT_LEAVES` normalisation logic
-- Update the loader to require the explicit `type:`-tagged form everywhere
-- Migrate all content in `content/` that uses the shorthand to the explicit form
-- Update `world-building.md` unlock examples and `adventures.md` shorthand examples to use the explicit form throughout
-- Add a load-time error (or migration warning) if bare-key conditions are encountered, to guide authors with existing content
-
-Until this is done, authors reading different doc pages will encounter two different-looking syntaxes with no explanation that they are equivalent.
 
 ### Date and Time Conditions
 
@@ -368,48 +330,6 @@ Revisit the slot naming scheme so that it is either author-defined in `game.yaml
 
 ## Adventure Authoring
 
-### Passive Event Step
-
-**Effort: S** · **Group: Adventure Authoring**
-
-A step type that applies effects automatically — no player input, no choice — with an optional condition that lets the character bypass it entirely. Currently, any automatic effect within an adventure requires workarounds (a fake single-option combat, or bare stat_change effects with no narrative framing). A dedicated passive step makes the intent explicit and the manifest readable.
-
-The step is not inherently negative. Authors use it for traps, environmental hazards, blessing shrines, automatic rewards, time-passing events, or any other scripted outcome with optional narrative text.
-
-```yaml
-- type: passive
-  text: "The pressure plate triggers a dart trap!"
-  effects:
-    - type: stat_change
-      stat: hp
-      amount: -15
-  bypass:           # optional: skip this step entirely if the condition is true
-    type: character_stat
-    name: dexterity
-    gte: 14
-
-- type: passive
-  text: "You step into the healing spring and feel restored."
-  effects:
-    - type: stat_change
-      stat: hp
-      amount: 20
-```
-
-The `bypass` condition uses the existing condition evaluator; no new predicate types are required.
-
-### Adventure Repeat Controls
-
-**Effort: S** · **Group: Adventure Authoring**
-
-Currently unclear from the content model whether adventures are inherently repeatable. Explicit repeat controls would allow authors to express:
-
-- `repeatable: false` — one-shot adventure; once completed, it is removed from the pool
-- `cooldown_days: 1` — adventure cannot be selected again until the next in-game day
-- `max_completions: 3` — adventure can be done multiple times but has a hard cap
-
-These are declared per-adventure in the manifest and enforced by the pool selection logic.
-
 ### Adventure-Scoped Variables
 
 **Effort: M** · **Group: Adventure Authoring**
@@ -436,17 +356,6 @@ steps:
 
 Variables live only for the duration of the adventure run. They are accessible in all subsequent step `text` and effect fields via the normal template context.
 
-### Adventure Outcome Definitions
-
-**Effort: S** · **Group: Adventure Authoring**
-
-Adventure outcomes (`completed`, `defeated`, `fled`) are currently hard-coded strings in the engine. Authors cannot define their own outcome types, and the default outcome (`completed`) must be explicitly set even when there is no branching.
-
-Two improvements:
-
-1. Allow `game.yaml` to declare the valid outcome set and which is the default, so that a game with custom outcomes (e.g. `banished`, `escaped`, `surrendered`) can be expressed cleanly.
-2. Track per-adventure outcome counts as player statistics alongside `adventures_completed`, enabling conditions and templates that branch on how an adventure previously resolved.
-
 ---
 
 ## Item System
@@ -463,14 +372,6 @@ The current `item_drop` loot table is a flat weighted list — each entry has an
 - **Tiered tables**: a rare tier with its own weight that activates separately from a common tier
 
 The loot table schema should be extended to support these patterns without requiring authors to write workarounds using item charges or multi-step adventures.
-
-### Enemy Loot Table Reference in on_win
-
-**Effort: S** · **Group: Item System**
-
-Enemy manifests declare an inline loot table, but there is currently no way to reference that table from an `on_win` outcome branch in a combat step. The `on_win` effects list accepts `item_drop` entries directly — but those require their own inline loot list, completely duplicating the enemy's declared table. As a result, the loot table on an enemy manifest is effectively useless unless the author duplicates it.
-
-The fix is to allow `item_drop` effects to reference an enemy's loot table by name (e.g. `loot_ref: goblin`) so the `on_win` branch can delegate to the enemy's own declared drops without duplication.
 
 ### Inventory Storage
 
@@ -523,56 +424,6 @@ Example use cases:
 ---
 
 ## Quest System
-
-### Quest Activation Engine
-
-**Effort: S** · **Group: Quest Depth**
-
-The `Quest` manifest, player state fields (`active_quests`, `completed_quests`), and database persistence are all in place, but the engine never connects milestone grants to quest state changes. `grant_milestone()` in `character.py` only adds the milestone name to `player.milestones` — it does not inspect loaded quests to activate them or advance their stages.
-
-What is needed:
-
-- When a milestone is granted, scan all loaded quests in the registry.
-- If a quest is not yet active and the granted milestone appears in `entry_stage.advance_on`, set `active_quests[quest_ref] = entry_stage`.
-- If a quest is already active and the granted milestone appears in the current stage's `advance_on`, advance to `next_stage` (or move it to `completed_quests` if the new stage is terminal).
-
-This logic belongs in `grant_milestone()` (or a wrapper called from it) and requires a `ContentRegistry` reference to look up quest manifests. The session's `sync()` method already persists whatever is in `active_quests` and `completed_quests`, so persistence requires no changes.
-
-Until this is implemented, Quest manifests are parsed and validated but never activated at runtime — the `Starting a Quest` section of the author docs is aspirational.
-
-### Quest Stage Condition
-
-**Effort: S** · **Group: Quest Depth**
-
-There is no condition type for checking the current stage of an active quest. Authors currently use milestone conditions as a proxy (gating on the milestone that triggered a stage transition), but this breaks down when multiple milestones can trigger the same stage, or when the quest hasn't activated yet and there is no milestone to check.
-
-Add a `quest_stage` condition type:
-
-```yaml
-requires:
-  type: quest_stage
-  quest: missing-merchant
-  stage: active-search   # true when quest is active AND in this named stage
-```
-
-This gives authors direct, explicit control over adventure gating without relying on implicit milestone-as-stage-proxy assumptions. It also creates a natural integration point with the Quest Activation Engine — once quests can actually advance stages, conditions can meaningfully reflect them.
-
-### Quest Failure States
-
-**Effort: S** · **Group: Quest Depth**
-
-Quests currently only have stages that advance forward. Adding explicit failure conditions would allow time-limited quests and quests that can be permanently failed (not just abandoned).
-
-```yaml
-stages:
-  - name: "Rescue the Hostage"
-    advance_milestone: hostage-rescued
-    fail_condition:
-      type: milestone
-      name: hostage-killed    # Set by an enemy loot effect on the hostage enemy
-```
-
-Failure triggers a `on_fail` outcome with its own effects (narrative, stat changes, milestone), mirrors how combat has `on_defeat`.
 
 ### Quest Branching
 
@@ -653,29 +504,6 @@ spec:
 ```
 
 The directory scanner and manifest loader need to use a multi-document YAML parser (the `ruamel.yaml` library already supports this via `load_all`). File naming and directory layout remain unchanged — authors can continue using one-manifest-per-file if they prefer.
-
-### Named Random Tables
-
-**Effort: S** · **Group: Content Reuse**
-
-A reusable, named loot/random table that can be referenced by multiple adventures, enemies, and items. Today, every loot table is inline — if the same forest loot should drop from three different enemies, the author must duplicate the table in all three places.
-
-```yaml
-apiVersion: game/v1
-kind: RandomTable
-metadata:
-  name: forest-loot
-spec:
-  entries:
-    - item: herbs
-      weight: 60
-    - item: small-gem
-      weight: 30
-    - item: ancient-coin
-      weight: 10
-```
-
-Referenced in item_drop effects as `table_ref: forest-loot` instead of an inline `loot:` list.
 
 ### Content Inheritance / Prototypes
 

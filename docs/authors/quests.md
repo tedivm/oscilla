@@ -199,6 +199,99 @@ Two milestones can trigger the `discover` → `confront` transition. Whichever t
 
 ---
 
+## Quest Stage Condition
+
+The `quest_stage` condition lets you gate content on a quest being active at a specific stage. This is more reliable than milestone proxies in multi-path quests because it tests the current stage name directly.
+
+```yaml
+requires:
+  type: quest_stage
+  quest: find-the-artifact
+  stage: searching
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `type` | yes | Must be `quest_stage` |
+| `quest` | yes | Quest manifest name |
+| `stage` | yes | Stage name that must be the player's current active stage |
+
+**When it evaluates to true:** The quest is in `active_quests` *and* the player's current stage matches `stage`.
+
+**When it evaluates to false:** The quest is not active, is completed, or is at a different stage.
+
+**Example — stage-gated adventure:**
+
+```yaml
+# location.yaml
+spec:
+  adventures:
+    - ref: find-the-relic
+      weight: 100
+      requires:
+        type: quest_stage
+        quest: artifact-hunt
+        stage: searching
+```
+
+The adventure `find-the-relic` only appears in the pool while the player is on the `searching` stage. Once the stage advances (or the quest completes), the adventure disappears.
+
+**Loader validation:** The loader checks that `quest` names a defined Quest manifest and that `stage` matches one of its declared stage names. An undeclared quest or stage name is a load-time error.
+
+---
+
+## Quest Failure
+
+A non-terminal stage can declare a `fail_condition` — any [condition](conditions.md) that, when
+it becomes true, **fails** the quest instead of completing it.
+
+```yaml
+stages:
+  - name: active
+    advance_on: [quest-done]
+    next_stage: complete
+    fail_condition:
+      type: milestone
+      name: quest-fail-trigger
+    fail_effects:
+      - type: milestone_grant
+        milestone: quest-failed-side-effect
+  - name: complete
+    terminal: true
+```
+
+**How it works:**
+
+- After every `milestone_grant` effect at runtime, all active quests are checked for both
+  advancement and failure. If a quest's current stage `fail_condition` evaluates to `true`,
+  the quest is moved to `failed_quests` and its `fail_effects` are executed in order.
+- On character load, all active quests undergo a silent correction pass: if a quest's
+  `fail_condition` is already met, it is moved to `failed_quests` **without** running
+  `fail_effects`. This corrects state drift between sessions.
+- Terminal stages **must not** have a `fail_condition`. A quest that is already complete
+  cannot fail. The loader rejects this with a validation error.
+
+**Quest fail effect**
+
+You can also force a quest to fail directly using the `quest_fail` effect type:
+
+```yaml
+effects:
+  - type: quest_fail
+    quest_ref: my-quest
+```
+
+This immediately moves the quest to `failed_quests` and runs its current stage's `fail_effects`.
+If the quest is not active, it is a no-op (with a log warning). If the quest is not found in
+the registry, an error is logged and shown to the player.
+
+| Field | Required | Description |
+|---|---|---|
+| `fail_condition` | no | Condition checked after every milestone grant; if true, the quest fails |
+| `fail_effects` | no | Effects that run when the quest fails at runtime (not during silent correction) |
+
+---
+
 ## Reference
 
 ### Quest manifest fields
@@ -221,6 +314,8 @@ Two milestones can trigger the `discover` → `confront` transition. Whichever t
 | `next_stage` | required (non-terminal) | — | Stage name to advance to |
 | `terminal` | no | `false` | If `true`, this stage is the quest completion state |
 | `completion_effects` | no | `[]` | Effects that fire when this stage is reached (terminal only) |
+| `fail_condition` | no | `null` | Condition checked after each milestone grant; if true, the quest fails (non-terminal only) |
+| `fail_effects` | no | `[]` | Effects that run when the quest fails via `fail_condition` at runtime (non-terminal only) |
 
 ### Validation rules
 

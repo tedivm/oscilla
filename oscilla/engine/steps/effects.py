@@ -18,6 +18,7 @@ from oscilla.engine.models.adventure import (
     ItemDropEffect,
     MilestoneGrantEffect,
     QuestActivateEffect,
+    QuestFailEffect,
     SetPronounsEffect,
     SkillGrantEffect,
     StatChangeEffect,
@@ -416,6 +417,26 @@ async def run_effect(
                 )
             )
             await tui.show_text(f"[bold]{spec.displayName}[/bold] applied for {spec.duration_turns} turn(s).")
+
+        case QuestFailEffect(quest_ref=quest_ref):
+            if quest_ref not in player.active_quests:
+                logger.warning("quest_fail: quest %r is not active — no-op.", quest_ref)
+                return
+            quest_manifest = registry.quests.get(quest_ref)
+            if quest_manifest is None:
+                logger.error("quest_fail: quest %r not found in registry — skipping.", quest_ref)
+                await tui.show_text(f"[red]Error: quest {quest_ref!r} not found.[/red]")
+                return
+            stage_name = player.active_quests.pop(quest_ref)
+            player.failed_quests.add(quest_ref)
+            display_name = quest_manifest.spec.displayName
+            await tui.show_text(f"[bold red]Quest failed: {display_name}[/bold red]")
+            # Run fail_effects from the stage that was active at the time of failure.
+            stage_map = {s.name: s for s in quest_manifest.spec.stages}
+            stage = stage_map.get(stage_name)
+            if stage is not None:
+                for eff in stage.fail_effects:
+                    await run_effect(effect=eff, player=player, registry=registry, tui=tui, combat=combat)
 
         case SetPronounsEffect(set=pronoun_key):
             from oscilla.engine.templates import resolve_pronoun_set

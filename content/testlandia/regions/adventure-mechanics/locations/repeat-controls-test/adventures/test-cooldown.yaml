@@ -1,0 +1,17 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-cooldown
+spec:
+  displayName: "The Patrol Route"
+  description: "A cooldown adventure that requires 3 other adventures between runs."
+  cooldown_adventures: 3
+  steps:
+    - type: narrative
+      name: patrol
+      text: "You scout the patrol route and note the guard positions."
+      choices:
+        - label: "Complete the patrol"
+          effects:
+            - type: end_adventure
+              outcome: completed

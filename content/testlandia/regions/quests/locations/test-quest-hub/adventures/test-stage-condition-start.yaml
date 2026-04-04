@@ -1,0 +1,13 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-stage-condition-start
+spec:
+  displayName: "Start Stage Condition Quest"
+  description: "Activates the stage condition test quest. After running, test-stage-gate should appear."
+  steps:
+    - type: narrative
+      text: "You begin the stage condition test quest. The stage-gated adventure should now appear."
+      effects:
+        - type: quest_activate
+          quest_ref: test-stage-condition-quest

@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: passive-test
+spec:
+  displayName: "Passive Step Testing"
+  description: "Tests passive steps with bypass conditions and healing effects."
+  region: adventure-mechanics
+  adventures:
+    - ref: test-passive-trap
+      weight: 100

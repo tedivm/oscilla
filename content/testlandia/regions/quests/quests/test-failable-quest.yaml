@@ -1,0 +1,27 @@
+apiVersion: game/v1
+kind: Quest
+metadata:
+  name: test-failable-quest
+spec:
+  displayName: "Failable Test Quest"
+  description: "Quest with a fail_condition. QA fixture for quest failure mechanics. Fails if the player grants the test-quest-fail-trigger
+    milestone while active."
+  entry_stage: active
+  stages:
+    - name: active
+      description: "Quest is in progress. Will fail if test-quest-fail-trigger is granted."
+      advance_on:
+        - test-failable-quest-done
+      next_stage: complete
+      fail_condition:
+        type: milestone
+        name: test-quest-fail-trigger
+      fail_effects:
+        - type: milestone_grant
+          milestone: test-failable-quest-failed-penalty
+    - name: complete
+      description: "Quest completed successfully."
+      terminal: true
+      completion_effects:
+        - type: milestone_grant
+          milestone: test-failable-quest-complete

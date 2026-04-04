@@ -1,0 +1,28 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-passive-trap
+spec:
+  displayName: "Passive Trap Test"
+  description: "Tests passive steps: dart trap with dexterity bypass, then a healing spring."
+  steps:
+    - type: passive
+      text: "A dart fires from the wall! You take 10 damage."
+      effects:
+        - type: stat_change
+          stat: hp
+          amount: -10
+      bypass:
+        type: character_stat
+        name: dexterity
+        gte: 12
+      bypass_text: "Your reflexes save you — the dart whizzes past harmlessly."
+
+    - type: passive
+      text: "A healing spring shimmers ahead. You feel restored."
+      effects:
+        - type: heal
+          amount: 15
+
+    - type: narrative
+      text: "You continue deeper into the dungeon."

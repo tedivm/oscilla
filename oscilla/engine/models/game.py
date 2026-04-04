@@ -52,6 +52,8 @@ class GameSpec(BaseModel):
     item_labels: List[ItemLabelDef] = []
     # Condition-gated stat modifiers and skill grants evaluated continuously.
     passive_effects: List[PassiveEffect] = []
+    # Custom outcome names beyond the three engine-internal defaults (completed, defeated, fled).
+    outcomes: List[str] = Field(default_factory=list)
 
 
 class GameManifest(ManifestEnvelope):
