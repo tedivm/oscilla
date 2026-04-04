@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: LootTable
+metadata:
+  name: test-loot
+spec:
+  displayName: "Test Loot Table"
+  description: "Used by test-quest completion and loot_ref QA."
+  loot:
+    - item: test-potion
+      weight: 10
+      quantity: 1
+    - item: test-widget
+      weight: 1
+      quantity: 1

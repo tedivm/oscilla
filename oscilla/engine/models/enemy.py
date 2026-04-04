@@ -5,11 +5,7 @@ from typing import Dict, List, Literal
 from pydantic import BaseModel, Field
 
 from oscilla.engine.models.base import ManifestEnvelope
-
-
-class LootEntry(BaseModel):
-    item: str
-    weight: int = Field(ge=1)
+from oscilla.engine.models.loot_table import LootEntry  # noqa: F401 — re-exported for callers
 
 
 class EnemySkillEntry(BaseModel):

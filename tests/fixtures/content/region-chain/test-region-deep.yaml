@@ -7,4 +7,5 @@ spec:
   description: "A region requiring level 3, nested inside mid."
   parent: test-region-mid
   unlock:
-    level: 3
+    type: level
+    value: 3

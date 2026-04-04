@@ -80,34 +80,63 @@ A terminal stage marks quest completion. It has neither `advance_on` nor `next_s
 
 ## Starting a Quest
 
-> **Not yet implemented.** Quest manifests are parsed and validated, but the engine does not yet connect milestone grants to quest activation or stage advancement. The design below describes the intended behavior once the [Quest Activation Engine](../../ROADMAP.md#quest-activation-engine) work is complete.
-
-Once implemented, the intended pattern is straightforward: a [`milestone_grant` effect](./effects.md#milestone-grant) in any [adventure step](./adventures.md) activates a quest when the granted milestone appears in the entry stage's `advance_on` list. Further milestones advance the quest through its stages automatically.
+Que can be activated from adventure effects using the `quest_activate` effect. When the player encounters this effect, the engine registers the quest as active at its entry stage, notifies the player, and immediately evaluates whether any advancement is already possible.
 
 ```yaml
 # In an adventure step:
 - type: narrative
   text: "The innkeeper grabs your sleeve and whispers urgently."
   effects:
-    - type: milestone_grant
-      milestone: started-missing-merchant
+    - type: quest_activate
+      quest_ref: missing-merchant
 ```
 
+If the player already holds any milestone listed in the entry stage's `advance_on` list at activation time, the quest advances immediately (in the same tick) without any extra effect.
+
+Activating a quest that is already active or already completed is a safe no-op — the engine logs a warning and silently skips the activation.
+
+## Advancing a Quest
+
+A non-terminal stage advances automatically when any milestone in its `advance_on` list is granted to the player. The engine evaluates quest state after every `milestone_grant` effect — there is no need for an explicit advance call in your adventure.
+
 ```yaml
-# In the quest manifest — the entry stage starts active;
-# advance_on lists the milestone that triggers moving to the next stage:
-entry_stage: search-begun
-stages:
-  - name: search-begun
-    description: "Head into the wilderness."
-    advance_on:
-      - started-missing-merchant
-    next_stage: active-search
+# In an adventure step:
+- type: passive_effects
+  effects:
+    - type: milestone_grant
+      milestone: found-gregor-camp
+# The engine immediately checks all active quests.
+# Any quest with 'found-gregor-camp' in its current stage's advance_on list advances.
 ```
 
 ---
 
-## Designing a Quest
+## Completion Effects
+
+A terminal stage can declare `completion_effects` — a list of effects that fire when the quest completes. These run once, at the moment the quest reaches the terminal stage.
+
+```yaml
+- name: complete
+  description: "Justice served."
+  terminal: true
+  completion_effects:
+    - type: xp_grant
+      amount: 200
+    - type: item_drop
+      count: 1
+      loot:
+        - item: reward-sword
+          weight: 100
+    - type: milestone_grant
+      milestone: missing-merchant-resolved
+```
+
+Any [effect](./effects.md) is valid in `completion_effects`. The engine runs them in order, using the same effect pipeline as adventure steps.
+
+**Only terminal stages may have `completion_effects`.** Declaring them on a non-terminal stage is a load-time validation error.
+
+---
+
 
 Quests work through milestones, and milestones are granted by adventure effects. This means:
 
@@ -159,9 +188,14 @@ spec:
     - name: complete
       description: "The lich is destroyed. The dungeon is free."
       terminal: true
+      completion_effects:
+        - type: xp_grant
+          amount: 500
+        - type: milestone_grant
+          milestone: lich-destroyed
 ```
 
-Two milestones can trigger the `discover` → `confront` transition. Whichever the player earns first moves the quest forward.
+Two milestones can trigger the `discover` → `confront` transition. Whichever the player earns first moves the quest forward. The terminal stage fires an XP reward and a milestone when the quest completes.
 
 ---
 
@@ -186,6 +220,7 @@ Two milestones can trigger the `discover` → `confront` transition. Whichever t
 | `advance_on` | required (non-terminal) | `[]` | Milestone names that trigger advancement |
 | `next_stage` | required (non-terminal) | — | Stage name to advance to |
 | `terminal` | no | `false` | If `true`, this stage is the quest completion state |
+| `completion_effects` | no | `[]` | Effects that fire when this stage is reached (terminal only) |
 
 ### Validation rules
 
@@ -194,8 +229,9 @@ Two milestones can trigger the `discover` → `confront` transition. Whichever t
 - Non-terminal stages must have `next_stage`
 - Terminal stages must not have `advance_on` or `next_stage`
 - All `next_stage` values must reference defined stages
+- `completion_effects` may only be declared on terminal stages
 
 ---
 
-*See [Effects](./effects.md) for `milestone_grant` syntax.*
+*See [Effects](./effects.md) for `milestone_grant` and `quest_activate` syntax.*
 *See [Conditions](./conditions.md) for the `milestone` condition type used to gate adventures.*

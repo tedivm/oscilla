@@ -1,0 +1,13 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-quest-finish
+spec:
+  displayName: "Finish Test Quest"
+  description: "Completes the second stage of the test quest, triggering completion effects."
+  steps:
+    - type: narrative
+      text: "You deliver the artifact."
+      effects:
+        - type: milestone_grant
+          milestone: test-quest-stage-two-done

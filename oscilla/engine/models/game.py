@@ -48,7 +48,6 @@ class GameSpec(BaseModel):
     # XP required to reach each level. Index 0 = XP to reach level 2, etc.
     xp_thresholds: List[int] = Field(min_length=1)
     hp_formula: HpFormula
-    base_adventure_count: int | None = None  # null = unlimited
     # Author-defined label vocabulary for items.
     item_labels: List[ItemLabelDef] = []
     # Condition-gated stat modifiers and skill grants evaluated continuously.

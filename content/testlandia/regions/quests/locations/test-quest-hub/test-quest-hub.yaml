@@ -1,0 +1,13 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: test-quest-hub
+spec:
+  displayName: "Quest Testing Hub"
+  description: "Central hub for testing quest activation and completion mechanics."
+  region: quests
+  adventures:
+    - ref: test-quest-start
+      weight: 100
+    - ref: test-quest-finish
+      weight: 100

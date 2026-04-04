@@ -346,18 +346,6 @@ def test_pronouns_condition_unknown_key_returns_false(base_player: CharacterStat
     assert evaluate(condition=cond, player=base_player) is False
 
 
-def test_pronouns_condition_shorthand_normalisation(base_player: CharacterState) -> None:
-    from pydantic import TypeAdapter
-
-    from oscilla.engine.models.base import Condition, normalise_condition
-
-    raw = {"pronouns": "they_them"}
-    normalised = normalise_condition(raw)
-    assert normalised == {"type": "pronouns", "set": "they_them"}
-    cond: Any = TypeAdapter(Condition).validate_python(normalised)
-    assert evaluate(condition=cond, player=base_player) is True
-
-
 # ---------------------------------------------------------------------------
 # 8.3 — ItemCondition: stacks and instances paths
 # ---------------------------------------------------------------------------

@@ -11,6 +11,7 @@ from oscilla.engine.models.game import GameManifest
 from oscilla.engine.models.game_class import ClassManifest
 from oscilla.engine.models.item import EquipSpec, ItemManifest, StatModifier
 from oscilla.engine.models.location import LocationManifest
+from oscilla.engine.models.loot_table import LootTableManifest
 from oscilla.engine.models.quest import QuestManifest
 from oscilla.engine.models.recipe import RecipeManifest
 from oscilla.engine.models.region import RegionManifest
@@ -29,6 +30,7 @@ MANIFEST_REGISTRY: Dict[str, Type[ManifestEnvelope]] = {
     "CharacterConfig": CharacterConfigManifest,
     "Skill": SkillManifest,
     "Buff": BuffManifest,
+    "LootTable": LootTableManifest,
 }
 
 __all__ = [

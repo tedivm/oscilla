@@ -79,7 +79,32 @@ effects:
 
 `count` can also be a [template expression](./templates.md): `"{{ roll(1, 3) }}"`.
 
-### Granting Skills
+Use `quantity` on any loot entry to grant more than one copy when that entry is selected:
+
+```yaml
+effects:
+  - type: item_drop
+    count: 1
+    loot:
+      - item: gold-coins
+        weight: 100
+        quantity: 5    # player always receives 5 coins from this roll
+```
+
+Instead of an inline `loot` list, you can reference a named [LootTable manifest](./items.md#loot-tables) or an enemy manifest by name using `loot_ref`:
+
+```yaml
+effects:
+  - type: item_drop
+    count: 1
+    loot_ref: dungeon-treasure    # named LootTable manifest
+
+  - type: item_drop
+    count: 2
+    loot_ref: goblin-warrior      # enemy manifest — uses its loot list
+```
+
+Exactly one of `loot` or `loot_ref` must be set; providing both or neither is a load-time error.
 
 ```yaml
 effects:
@@ -151,6 +176,22 @@ effects:
 ```
 
 Once a milestone is set, the [`milestone` condition](./conditions.md#milestone) becomes true permanently, and you can use it to gate future content appropriately.
+
+Granting a milestone also triggers automatic [quest stage advancement](./quests.md#advancing-a-quest) — any active quest whose current stage lists the granted milestone in its `advance_on` list will advance in the same tick.
+
+---
+
+### Quest Activate
+
+Starts a [quest](./quests.md) by registering it as active at its entry stage. The player receives a "Quest started" notification.
+
+```yaml
+effects:
+  - type: quest_activate
+    quest_ref: missing-merchant    # must match a Quest manifest name
+```
+
+Activating a quest that is already active or already completed is a safe no-op. If the player already holds any milestone required by the entry stage's `advance_on` list, the quest immediately advances (in the same tick). See [Quests](./quests.md) for the full quest manifest format and `completion_effects`.
 
 ---
 
@@ -260,9 +301,10 @@ Four things happen at once: XP, item, milestone, reputation. That's the composab
 | `xp_grant` | `amount` | — | Positive or negative int/template |
 | `stat_change` | `stat`, `amount` | — | `int` stats only; `amount` can be template |
 | `stat_set` | `stat`, `value` | — | Works on `int` and `bool` stats |
-| `item_drop` | `loot` | `count` (default 1) | Weighted table; `count` can be template |
+| `item_drop` | `loot` or `loot_ref` | `count` (default 1), `quantity` (per entry) | Weighted table; `count` can be template; `loot_ref` names a LootTable or Enemy |
 | `use_item` | `item` | — | Player must already hold the item |
-| `milestone_grant` | `milestone` | — | Sets a permanent story flag |
+| `milestone_grant` | `milestone` | — | Sets a permanent story flag; triggers quest advancement |
+| `quest_activate` | `quest_ref` | — | Activates a named quest; no-op if already active/complete |
 | `skill_grant` | `skill` | — | Player permanently learns the skill |
 | `apply_buff` | `buff_ref` | `target`, `variables` | Combat only; `target`: `player` or `enemy` |
 | `dispel` | `label` | `target` | Combat only; removes buff by manifest name |

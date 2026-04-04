@@ -1,10 +1,13 @@
 """Quest manifest model with stage graph validation."""
 
-from typing import List, Literal, Set
+from typing import TYPE_CHECKING, List, Literal, Set
 
 from pydantic import BaseModel, model_validator
 
 from oscilla.engine.models.base import ManifestEnvelope
+
+if TYPE_CHECKING:
+    from oscilla.engine.models.adventure import Effect
 
 
 class QuestStage(BaseModel):
@@ -13,6 +16,9 @@ class QuestStage(BaseModel):
     advance_on: List[str] = []  # milestone names that trigger advancement
     next_stage: str | None = None  # None only for terminal stages
     terminal: bool = False  # True = quest complete at this stage
+    # Effects fired when this stage is reached AND it is terminal.
+    # Enforced by model_validator: non-terminal stages must have an empty list.
+    completion_effects: List["Effect"] = []
 
 
 class QuestSpec(BaseModel):
@@ -44,9 +50,23 @@ class QuestSpec(BaseModel):
                     raise ValueError(f"Stage {stage.name!r} is not terminal but has no next_stage")
                 if stage.next_stage not in seen:
                     raise ValueError(f"Stage {stage.name!r} → next_stage={stage.next_stage!r} is not a defined stage")
+                # Non-terminal stages must not declare completion_effects — those only
+                # fire when the quest is done; putting effects on intermediate stages
+                # would mislead authors into thinking they fire at mid-stage entrance.
+                if stage.completion_effects:
+                    raise ValueError(
+                        f"Stage {stage.name!r} is not terminal but has completion_effects. "
+                        "completion_effects are only valid on terminal stages."
+                    )
         return self
 
 
 class QuestManifest(ManifestEnvelope):
     kind: Literal["Quest"]
     spec: QuestSpec
+
+
+# Resolve forward reference to Effect after the adventure module is fully loaded.
+from oscilla.engine.models.adventure import Effect  # noqa: E402
+
+QuestStage.model_rebuild()

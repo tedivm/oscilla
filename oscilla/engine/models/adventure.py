@@ -7,6 +7,7 @@ from typing import Annotated, Dict, List, Literal, Union
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from oscilla.engine.models.base import Condition, ManifestEnvelope
+from oscilla.engine.models.loot_table import LootEntry
 
 # NOTE: Dict is imported for use in ApplyBuffEffect and DispelEffect.
 
@@ -14,11 +15,6 @@ from oscilla.engine.models.base import Condition, ManifestEnvelope
 # ---------------------------------------------------------------------------
 # Effects — silent mechanical outcomes (no screen produced)
 # ---------------------------------------------------------------------------
-
-
-class ItemDropEntry(BaseModel):
-    item: str
-    weight: int = Field(ge=1)
 
 
 class XpGrantEffect(BaseModel):
@@ -38,7 +34,24 @@ class ItemDropEffect(BaseModel):
     type: Literal["item_drop"]
     # str = template string resolving to a positive int.
     count: int | str = Field(default=1, description="Roll count or template string resolving to int.")
-    loot: List[ItemDropEntry] = Field(min_length=1)
+    # Exactly one of loot or loot_ref must be set. Enforced by model_validator.
+    loot: List[LootEntry] | None = None
+    loot_ref: str | None = Field(
+        default=None,
+        description=(
+            "Reference to a named LootTable manifest or an Enemy manifest name. Mutually exclusive with loot."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def exactly_one_loot_source(self) -> "ItemDropEffect":
+        has_inline = self.loot is not None and len(self.loot) > 0
+        has_ref = self.loot_ref is not None
+        if has_inline and has_ref:
+            raise ValueError("ItemDropEffect: specify either 'loot' or 'loot_ref', not both.")
+        if not has_inline and not has_ref:
+            raise ValueError("ItemDropEffect: must specify either 'loot' (inline list) or 'loot_ref'.")
+        return self
 
 
 class MilestoneGrantEffect(BaseModel):
@@ -147,6 +160,11 @@ class ApplyBuffEffect(BaseModel):
     )
 
 
+class QuestActivateEffect(BaseModel):
+    type: Literal["quest_activate"]
+    quest_ref: str = Field(description="Name of the Quest manifest to activate.")
+
+
 Effect = Annotated[
     Union[
         XpGrantEffect,
@@ -161,6 +179,7 @@ Effect = Annotated[
         DispelEffect,
         ApplyBuffEffect,
         SetPronounsEffect,
+        QuestActivateEffect,
     ],
     Field(discriminator="type"),
 ]

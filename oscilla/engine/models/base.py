@@ -6,7 +6,7 @@ Condition models are defined here and imported by other manifest modules.
 
 from __future__ import annotations
 
-from typing import Annotated, Dict, List, Literal, Union
+from typing import Annotated, List, Literal, Union
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -230,83 +230,3 @@ Condition = Annotated[
 AllCondition.model_rebuild()
 AnyCondition.model_rebuild()
 NotCondition.model_rebuild()
-
-
-# ---------------------------------------------------------------------------
-# YAML → Python normalisation
-# Converts bare YAML condition keys like {level: 3} to {type: level, value: 3}
-# so Pydantic's discriminated union can dispatch correctly.
-# ---------------------------------------------------------------------------
-
-_LEAF_MAPPINGS: dict[str, tuple[str, str]] = {
-    # key → (type_value, value_key_in_model)
-    "level": ("level", "value"),
-    "milestone": ("milestone", "name"),
-    "item": ("item", "name"),
-    "class": ("class", "name"),
-    "pronouns": ("pronouns", "set"),
-    "item_equipped": ("item_equipped", "name"),
-    "item_held_label": ("item_held_label", "label"),
-    "any_item_equipped": ("any_item_equipped", "label"),
-}
-
-# Keys whose value is already the full sub-dict (not a scalar)
-_DICT_LEAVES: set[str] = {
-    "character_stat",
-    "iteration",
-    "enemies_defeated",
-    "locations_visited",
-    "adventures_completed",
-    "skill",
-}
-
-# Branch keys whose sub-conditions need recursive normalisation
-_BRANCH_KEYS: set[str] = {"all", "any", "not"}
-
-
-def normalise_condition(raw: object) -> Dict[str, object]:
-    """Convert bare YAML condition dict to the type-tagged form Pydantic expects.
-
-    Examples:
-        {"level": 3}            → {"type": "level",     "value": 3}
-        {"milestone": "found"}  → {"type": "milestone", "name": "found"}
-        {"all": [...]}          → {"type": "all",        "conditions": [...]}
-        {"character_stat": {…}} → {"type": "character_stat", "name": …, …}
-
-    Raises ValueError if the dict contains more than one recognised key or
-    if the input is not a dict.
-    """
-    if not isinstance(raw, dict):
-        raise ValueError(f"Condition must be a mapping, got {type(raw).__name__!r}")
-
-    # Already normalised (has a 'type' key)
-    if "type" in raw:
-        return raw
-
-    recognised = [k for k in raw if k in _LEAF_MAPPINGS or k in _DICT_LEAVES or k in _BRANCH_KEYS]
-    if len(recognised) == 0:
-        raise ValueError(f"Unrecognised condition key(s): {list(raw.keys())!r}")
-    if len(recognised) > 1:
-        raise ValueError(
-            f"Condition dict has multiple keys {recognised!r}; each condition must contain exactly one semantic key."
-        )
-
-    key = recognised[0]
-
-    if key in _BRANCH_KEYS:
-        value = raw[key]
-        if key == "not":
-            return {"type": "not", "condition": normalise_condition(value)}
-        # "all" / "any" — value is a list of sub-conditions
-        if not isinstance(value, list):
-            raise ValueError(f"'{key}' condition value must be a list, got {type(value).__name__!r}")
-        return {"type": key, "conditions": [normalise_condition(c) for c in value]}
-
-    if key in _LEAF_MAPPINGS:
-        _type, value_key = _LEAF_MAPPINGS[key]
-        return {"type": _type, value_key: raw[key]}
-
-    # _DICT_LEAVES: value is already a sub-dict; merge type in
-    sub = dict(raw[key])
-    sub["type"] = key
-    return sub

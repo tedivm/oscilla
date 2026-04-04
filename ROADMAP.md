@@ -24,10 +24,7 @@ These items fix existing bugs or remove technical debt that actively misleads au
 
 | Item | Effort | Group |
 |------|--------|-------|
-| [Quest Activation Engine](#quest-activation-engine) | S | Quest Depth |
-| [Remove Condition Shorthand Syntax](#remove-condition-shorthand-syntax) | S | Technical Debt |
-| [Enemy Loot Table Reference in on_win](#enemy-loot-table-reference-in-on_win) | S | Item System |
-| [Remove `base_adventure_count` Field](#remove-base_adventure_count-field) | XS | Technical Debt |
+
 
 ### All Items
 
@@ -54,13 +51,11 @@ These items fix existing bugs or remove technical debt that actively misleads au
 | [Shop and Vendor System](#shop-and-vendor-system) | L | Economy & NPCs |
 | [Persistent NPCs and Dialogue](#persistent-npcs-and-dialogue) | L | Economy & NPCs |
 | [Enhanced Loot Tables](#enhanced-loot-tables) | S | Item System |
-| [Enemy Loot Table Reference in on_win](#enemy-loot-table-reference-in-on_win) | S | Item System |
 | [Inventory Storage](#inventory-storage) | L | Item System |
-| [Quest Activation Engine](#quest-activation-engine) | S | Quest Depth |
-| [Remove Condition Shorthand Syntax](#remove-condition-shorthand-syntax) | S | Technical Debt |
 | [Quest Stage Condition](#quest-stage-condition) | S | Quest Depth |
 | [Quest Failure States](#quest-failure-states) | S | Quest Depth |
 | [Quest Branching](#quest-branching) | M | Quest Depth & Factions |
+| [Quest Progress Panel](#quest-progress-panel) | M | Quest Depth |
 | [Faction and Reputation System](#faction-and-reputation-system) | M | Quest Depth & Factions |
 | [Named Random Tables](#named-random-tables) | S | Content Reuse |
 | [Content Inheritance / Prototypes](#content-inheritance--prototypes) | M | Content Reuse |
@@ -68,7 +63,6 @@ These items fix existing bugs or remove technical debt that actively misleads au
 | [JSON Schema for IDE Support](#json-schema-for-ide-support) | M | Authoring Tooling |
 | [Content Validation CLI Improvements](#content-validation-cli-improvements) | M | Authoring Tooling |
 | [Plugin and Extension System](#plugin-and-extension-system) | L | Engine Architecture |
-| [Remove `base_adventure_count` Field](#remove-base_adventure_count-field) | XS | Technical Debt |
 | [HTTP API for Multi-User Support](#http-api-for-multi-user-support) | XL | Multi-User Platform |
 | [Front End Website](#front-end-website) | XL | Multi-User Platform |
 | [Picture Selection and ASCII Art](#picture-selection-and-ascii-art) | M | — |
@@ -599,6 +593,21 @@ stages:
           name: joined-empire
         advance_milestone: quest-empire-path
 ```
+
+### Quest Progress Panel
+
+**Effort: M** · **Group: Quest Depth**
+
+The TUI currently has no dedicated surface for displaying quest state. Players can only infer quest progress from narrative text and the effects of milestone grants. A quest progress panel would give players visibility into what quests they have active, what stage each is on, and which quests they have completed.
+
+Scope:
+
+- A new TUI panel (similar to the inventory or skills panels) showing `active_quests` and `completed_quests` from character state
+- Each active quest entry shows the quest `displayName` and current stage `description`
+- Completed quests shown in a collapsed or greyed section
+- The panel is read-only — no actions, just status display
+
+This depends on the Quest Activation Engine being functional first. It is explicitly not part of the engine wiring change — it is a pure TUI/presentation deliverable.
 
 ---
 

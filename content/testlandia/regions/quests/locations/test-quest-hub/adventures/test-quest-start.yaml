@@ -1,0 +1,18 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-quest-start
+spec:
+  displayName: "Start Test Quest"
+  description: "Activates the test quest and immediately completes stage one."
+  steps:
+    - type: narrative
+      text: "You begin the test quest."
+      effects:
+        - type: quest_activate
+          quest_ref: test-quest
+    - type: narrative
+      text: "Stage one completed."
+      effects:
+        - type: milestone_grant
+          milestone: test-quest-stage-one-done

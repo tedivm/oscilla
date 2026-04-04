@@ -195,6 +195,67 @@ Items do not automatically appear in the game just because they exist in a manif
 
 ---
 
+## Loot Tables
+
+A `LootTable` manifest defines a named, reusable collection of weighted item entries. Instead of repeating loot lists in every adventure, you define the table once and reference it by name using `loot_ref`.
+
+```yaml
+apiVersion: game/v1
+kind: LootTable
+metadata:
+  name: dungeon-treasure
+spec:
+  displayName: "Dungeon Treasure"
+  description: "Standard dungeon loot mix."
+  loot:
+    - item: gold-coins
+      weight: 70
+      quantity: 5
+    - item: healing-potion
+      weight: 20
+      quantity: 1
+    - item: rare-gem
+      weight: 10
+      quantity: 1
+```
+
+Then reference it from any `item_drop` effect:
+
+```yaml
+effects:
+  - type: item_drop
+    count: 2
+    loot_ref: dungeon-treasure
+```
+
+`loot_ref` also accepts an **enemy manifest name** — the engine will use the loot list defined on that enemy. This means you can define one canonical loot list on the enemy and share it across both the combat outcome and any post-combat treasure narrative:
+
+```yaml
+effects:
+  - type: item_drop
+    count: 1
+    loot_ref: goblin-warrior    # uses EnemyManifest.spec.loot
+```
+
+**Resolution order:** when the engine sees a `loot_ref`, it first checks named `LootTable` manifests, then `Enemy` manifests. Choose names that do not collide between the two kinds if you want predictable resolution.
+
+**Mutual exclusion:** `loot` (inline list) and `loot_ref` (named reference) cannot both be set on the same effect. Exactly one must be present. The engine raises a load error if neither or both are provided.
+
+### `quantity` on loot entries
+
+Each entry in a loot list (whether inline or in a `LootTable`) supports a `quantity` field:
+
+```yaml
+loot:
+  - item: gold-coins
+    weight: 100
+    quantity: 10    # player receives 10 gold-coins per roll
+```
+
+`quantity` defaults to `1` when omitted. When a roll selects an entry, the player receives `quantity` copies. Combined with `count`, you can build generous reward tables — a `count: 3` drop with `quantity: 5` on the winning entry grants 15 items.
+
+---
+
 ## Reference
 
 ### Item manifest fields

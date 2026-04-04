@@ -12,7 +12,6 @@ from oscilla.engine.models.adventure import (
     EndAdventureEffect,
     HealEffect,
     ItemDropEffect,
-    ItemDropEntry,
     MilestoneGrantEffect,
     SetPronounsEffect,
     StatChangeEffect,
@@ -27,6 +26,7 @@ from oscilla.engine.models.character_config import (
     StatDefinition,
 )
 from oscilla.engine.models.game import GameManifest, GameSpec, HpFormula
+from oscilla.engine.models.loot_table import LootEntry
 from oscilla.engine.registry import ContentRegistry
 from oscilla.engine.signals import _EndSignal
 from oscilla.engine.steps.effects import run_effect
@@ -97,16 +97,16 @@ async def test_item_drop_effect_single_item(base_player: CharacterState) -> None
     registry = ContentRegistry()
     tui = MockTUI()
 
-    loot = [ItemDropEntry(item="test-sword", weight=100)]
+    loot = [LootEntry(item="test-sword", weight=100)]
     effect = ItemDropEffect(type="item_drop", count=3, loot=loot)
 
     # Mock random.choices to be deterministic
     with patch("oscilla.engine.steps.effects.random.choices") as mock_choices:
-        mock_choices.return_value = ["test-sword", "test-sword", "test-sword"]
+        mock_choices.return_value = [loot[0], loot[0], loot[0]]
 
         await run_effect(effect=effect, player=base_player, registry=registry, tui=tui)
 
-        mock_choices.assert_called_once_with(population=["test-sword"], weights=[100], k=3)
+        mock_choices.assert_called_once_with(population=loot, weights=[100], k=3)
 
     assert base_player.stacks.get("test-sword", 0) == 3
 
@@ -117,18 +117,18 @@ async def test_item_drop_effect_multiple_items(base_player: CharacterState) -> N
     tui = MockTUI()
 
     loot = [
-        ItemDropEntry(item="common-item", weight=80),
-        ItemDropEntry(item="rare-item", weight=20),
+        LootEntry(item="common-item", weight=80),
+        LootEntry(item="rare-item", weight=20),
     ]
     effect = ItemDropEffect(type="item_drop", count=2, loot=loot)
 
     # Mock random.choices to return mixed results
     with patch("oscilla.engine.steps.effects.random.choices") as mock_choices:
-        mock_choices.return_value = ["common-item", "rare-item"]
+        mock_choices.return_value = [loot[0], loot[1]]
 
         await run_effect(effect=effect, player=base_player, registry=registry, tui=tui)
 
-        mock_choices.assert_called_once_with(population=["common-item", "rare-item"], weights=[80, 20], k=2)
+        mock_choices.assert_called_once_with(population=loot, weights=[80, 20], k=2)
 
     assert base_player.stacks.get("common-item", 0) == 1
     assert base_player.stacks.get("rare-item", 0) == 1
@@ -188,10 +188,10 @@ async def test_multiple_effects_sequence(base_player: CharacterState) -> None:
     await run_effect(effect=milestone_effect, player=base_player, registry=registry, tui=tui)
 
     # Apply item effect
-    loot = [ItemDropEntry(item="reward", weight=100)]
+    loot = [LootEntry(item="reward", weight=100)]
     item_effect = ItemDropEffect(type="item_drop", count=1, loot=loot)
     with patch("oscilla.engine.steps.effects.random.choices") as mock_choices:
-        mock_choices.return_value = ["reward"]
+        mock_choices.return_value = [loot[0]]
         await run_effect(effect=item_effect, player=base_player, registry=registry, tui=tui)
 
     # Verify all effects applied
@@ -208,11 +208,11 @@ async def test_item_drop_effect_accumulates_inventory(base_player: CharacterStat
     # Pre-populate inventory
     base_player.add_item("test-item", 2)
 
-    loot = [ItemDropEntry(item="test-item", weight=100)]
+    loot = [LootEntry(item="test-item", weight=100)]
     effect = ItemDropEffect(type="item_drop", count=3, loot=loot)
 
     with patch("oscilla.engine.steps.effects.random.choices") as mock_choices:
-        mock_choices.return_value = ["test-item", "test-item", "test-item"]
+        mock_choices.return_value = [loot[0], loot[0], loot[0]]
         await run_effect(effect=effect, player=base_player, registry=registry, tui=tui)
 
     # Should accumulate: 2 + 3 = 5

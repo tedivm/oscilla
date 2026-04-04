@@ -141,3 +141,36 @@ def combat_player(combat_registry: ContentRegistry) -> CharacterState:
 @pytest.fixture
 def mock_tui() -> MockTUI:
     return MockTUI()
+
+
+@pytest.fixture
+def minimal_quest_registry() -> ContentRegistry:
+    """Registry with a two-stage quest (stage-a → stage-b terminal) for unit tests."""
+    from oscilla.engine.models.quest import QuestManifest
+
+    registry = ContentRegistry()
+    quest = QuestManifest.model_validate(
+        {
+            "apiVersion": "game/v1",
+            "kind": "Quest",
+            "metadata": {"name": "test-quest"},
+            "spec": {
+                "displayName": "Test Quest",
+                "entry_stage": "stage-a",
+                "stages": [
+                    {
+                        "name": "stage-a",
+                        "advance_on": ["quest-a-done"],
+                        "next_stage": "stage-b",
+                    },
+                    {
+                        "name": "stage-b",
+                        "terminal": True,
+                        "completion_effects": [{"type": "milestone_grant", "milestone": "quest-complete"}],
+                    },
+                ],
+            },
+        }
+    )
+    registry.quests.register(quest)
+    return registry

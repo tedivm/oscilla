@@ -354,7 +354,40 @@ effects:
 - `StatChangeEffect` cannot be applied to `bool` stats (load-time validation error)
 - `StatSetEffect` value must match the stat type (`int` or `bool`)
 - `bounds` cannot be specified on `bool` stats (load-time validation error)
+- `bounds` cannot be specified on `bool` stats (load-time validation error)
 - Load-time validation prevents runtime type errors
+
+## Quest Engine (`oscilla/engine/quest_engine.py`)
+
+Quest progression is handled entirely by `quest_engine.py`. This module owns stage advancement and completion logic, and is imported by `effects.py` and `session.py` without creating circular dependencies.
+
+### Two advancement functions
+
+**`_advance_quests_silent(player, registry)`** — synchronous, no effects.
+
+Called once on every character load (in `session.py` after `load_character`). Re-evaluates every active quest against the player's current milestone set and advances stages without running `completion_effects`. This corrects any desync between quest state and milestone state that could accumulate between sessions or after content updates.
+
+**`evaluate_quest_advancements(player, registry, tui)`** — async, full effects.
+
+Called after every `MilestoneGrantEffect` and after every `QuestActivateEffect` at runtime. Evaluates all active quests, advances stages, and fires `completion_effects` on terminal stages. TUI notifications are sent for quest completion. Multiple chained advancements (where the next stage also has a satisfied milestone) are followed in the same call via an inner `while True` loop.
+
+### Call sites
+
+| Location | Function called | When |
+|----------|----------------|------|
+| `session.py` — `_select_or_create_character()` | `_advance_quests_silent` | After loading a saved character |
+| `effects.py` — `MilestoneGrantEffect` case | `evaluate_quest_advancements` | After granting any milestone |
+| `effects.py` — `QuestActivateEffect` case | `evaluate_quest_advancements` | After activating a quest |
+
+### `QuestActivateEffect`
+
+The `QuestActivateEffect` model in `adventure.py` accepts a single field: `quest_ref` (the name of the Quest manifest to activate). The handler in `effects.py` registers the quest at its `entry_stage`, sends a TUI notification, and immediately calls `evaluate_quest_advancements` — so a quest whose entry stage milestone the player already holds advances in the same tick as activation.
+
+Activating an already-active or already-completed quest is a logged no-op.
+
+### `completion_effects` on `QuestStage`
+
+Terminal stages in quest manifests accept a `completion_effects` list. The model validator `validate_stage_graph` rejects non-terminal stages that declare `completion_effects`. Effects are run by `evaluate_quest_advancements` after the quest is marked complete and the TUI completion notification is shown.
 
 ## Testing with MockTUI
 

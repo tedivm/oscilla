@@ -49,9 +49,12 @@ spec:
   description: "A labyrinth beneath the wilderness."
   parent: wilderness
   unlock:
-    all:
-      - level: 7
-      - milestone: found-dungeon-entrance
+    type: all
+    conditions:
+      - type: level
+        value: 7
+      - type: milestone
+        name: found-dungeon-entrance
 ```
 
 Players can only enter a child region when they meet its unlock condition *and* they can already access the parent region.
@@ -62,21 +65,28 @@ The `unlock` field accepts any [condition](./conditions.md). The region is hidde
 
 ```yaml
 unlock:
-  level: 5  # simple: unlock at level 5
+  type: level
+  value: 5  # simple: unlock at level 5
 ```
 
 ```yaml
 unlock:
-  all:
-    - level: 10
-    - milestone: joined-guild  # all conditions must be true
+  type: all
+  conditions:
+    - type: level
+      value: 10
+    - type: milestone
+      name: joined-guild  # all conditions must be true
 ```
 
 ```yaml
 unlock:
-  any:
-    - milestone: guild-pass    # either condition is enough
-    - milestone: noble-escort
+  type: any
+  conditions:
+    - type: milestone
+      name: guild-pass    # either condition is enough
+    - type: milestone
+      name: noble-escort
 ```
 
 Omitting `unlock` entirely means the region is always available from the start of the game.
@@ -158,7 +168,8 @@ spec:
   description: "A hidden cove only the well-informed know about."
   region: coast
   unlock:
-    milestone: heard-rumor-of-cave
+    type: milestone
+    name: heard-rumor-of-cave
   adventures:
     - ref: smuggler-cache
       weight: 100

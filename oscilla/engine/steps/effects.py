@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 from collections import Counter
 from logging import getLogger
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING, Dict, List
 
 from oscilla.engine.character import _INT64_MAX, _INT64_MIN, cascade_unequip_invalid
 from oscilla.engine.combat_context import ActiveCombatEffect, CombatContext
@@ -17,6 +17,7 @@ from oscilla.engine.models.adventure import (
     HealEffect,
     ItemDropEffect,
     MilestoneGrantEffect,
+    QuestActivateEffect,
     SetPronounsEffect,
     SkillGrantEffect,
     StatChangeEffect,
@@ -28,6 +29,7 @@ from oscilla.engine.signals import _EndSignal
 
 if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
+    from oscilla.engine.models.loot_table import LootEntry
     from oscilla.engine.pipeline import TUICallbacks
     from oscilla.engine.registry import ContentRegistry
     from oscilla.engine.templates import ExpressionContext
@@ -53,6 +55,30 @@ def _resolve_stat_bounds(stat: str, registry: "ContentRegistry") -> tuple[int, i
             hi = stat_def.bounds.max if stat_def.bounds.max is not None else _INT64_MAX
             return lo, hi
     return _INT64_MIN, _INT64_MAX
+
+
+def _resolve_loot_list(
+    effect: ItemDropEffect,
+    registry: "ContentRegistry",
+) -> "List[LootEntry]":
+    """Return the effective loot entry list for an ItemDropEffect.
+
+    Precondition: the loader has already validated that every loot_ref resolves
+    to a known table or enemy (_validate_loot_refs). An unresolvable ref here
+    indicates a programming error or a hot-reload race — assert rather than
+    silently skip.
+    """
+
+    if effect.loot is not None:
+        return effect.loot
+    # loot_ref path — guaranteed resolvable by load-time validation.
+    assert effect.loot_ref is not None
+    entries = registry.resolve_loot_entries(effect.loot_ref)
+    assert entries is not None, (
+        f"loot_ref {effect.loot_ref!r} not found at runtime — "
+        "this should have been caught by _validate_loot_refs at load time."
+    )
+    return entries
 
 
 async def run_effect(
@@ -96,7 +122,13 @@ async def run_effect(
         elif isinstance(effect, ItemDropEffect) and isinstance(effect.count, str):
             template_id = f"__effect_itemdrop_{id(effect)}"
             resolved_count = engine.render_int(template_id, ctx)
-            effect = ItemDropEffect(type="item_drop", count=resolved_count, loot=effect.loot)
+            # Preserve whichever loot source was declared (inline or ref).
+            effect = ItemDropEffect(
+                type="item_drop",
+                count=resolved_count,
+                loot=effect.loot,
+                loot_ref=effect.loot_ref,
+            )
 
     match effect:
         case XpGrantEffect(amount=amount):
@@ -119,26 +151,53 @@ async def run_effect(
             for level in levels_lost:
                 await tui.show_text(f"[bold red]Level down![/bold red] You are now level {level}.")
 
-        case ItemDropEffect(count=count, loot=loot):
-            # String counts are resolved to int by template resolution above.
-            assert isinstance(count, int), f"Unexpected non-int item drop count after template resolution: {count!r}"
-            items = [entry.item for entry in loot]
-            weights = [entry.weight for entry in loot]
+        case ItemDropEffect(count=count) if isinstance(count, int):
+            loot_entries = _resolve_loot_list(effect=effect, registry=registry)
+            weights = [entry.weight for entry in loot_entries]
             # Roll independently count times with replacement.
-            chosen_items = random.choices(population=items, weights=weights, k=count)
-            for item_ref in chosen_items:
-                player.add_item(ref=item_ref, quantity=1, registry=registry)
-            # Announce what was found, grouping identical items.
-            item_counts: Counter[str] = Counter(chosen_items)
+            chosen_entries = random.choices(population=loot_entries, weights=weights, k=count)
+            for entry in chosen_entries:
+                player.add_item(ref=entry.item, quantity=entry.quantity, registry=registry)
+            # Announce grouped findings.
+            item_totals: Counter[str] = Counter()
+            for entry in chosen_entries:
+                item_totals[entry.item] += entry.quantity
             parts = []
-            for item_ref, qty in item_counts.items():
+            for item_ref, total_qty in item_totals.items():
                 item = registry.items.get(item_ref)
                 name = item.spec.displayName if item is not None else item_ref
-                parts.append(f"{name} \u00d7 {qty}" if qty > 1 else name)
+                parts.append(f"{name} \u00d7 {total_qty}" if total_qty > 1 else name)
             await tui.show_text(f"You found: {', '.join(parts)}")
 
         case MilestoneGrantEffect(milestone=milestone):
             player.grant_milestone(milestone)
+            # Quest stage advancement is evaluated after every milestone grant.
+            # This is the primary runtime trigger for quest progression.
+            from oscilla.engine.quest_engine import evaluate_quest_advancements
+
+            await evaluate_quest_advancements(player=player, registry=registry, tui=tui)
+
+        case QuestActivateEffect(quest_ref=quest_ref):
+            if quest_ref in player.completed_quests:
+                logger.warning("quest_activate: %r is already completed — no-op.", quest_ref)
+                return
+            if quest_ref in player.active_quests:
+                logger.warning("quest_activate: %r is already active — no-op.", quest_ref)
+                return
+            quest_manifest = registry.quests.get(quest_ref)
+            if quest_manifest is None:
+                logger.error("quest_activate: quest %r not found in registry — skipping.", quest_ref)
+                await tui.show_text(f"[red]Error: quest {quest_ref!r} not found.[/red]")
+                return
+            entry_stage = quest_manifest.spec.entry_stage
+            player.active_quests[quest_ref] = entry_stage
+            display_name = quest_manifest.spec.displayName
+            await tui.show_text(f"[bold]Quest started:[/bold] {display_name}")
+            # Immediately evaluate advancement — the entry stage might already be
+            # satisfiable if the player already holds any advance_on milestones.
+            from oscilla.engine.quest_engine import evaluate_quest_advancements
+
+            await evaluate_quest_advancements(player=player, registry=registry, tui=tui)
 
         case EndAdventureEffect(outcome=outcome):
             raise _EndSignal(outcome)

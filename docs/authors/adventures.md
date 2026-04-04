@@ -45,7 +45,8 @@ spec:
   displayName: "Elite Training"
   description: "A master warrior offers advanced lessons."
   requires:
-    level: 10     # only appears for players level 10 or above
+    type: level
+    value: 10  # only appears for players level 10 or above
   steps:
     …
 ```

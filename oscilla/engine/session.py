@@ -544,4 +544,11 @@ class GameSession:
                 selected.name,
             )
             return await self._create_new_character(name=None, user_id=user_id)
+        # Re-evaluate quest state on every load. This corrects desync that can occur
+        # when a quest is activated after its trigger milestones were already granted,
+        # or when content is updated between sessions. No effects are run — those are
+        # one-time rewards already reflected in the saved character data.
+        from oscilla.engine.quest_engine import _advance_quests_silent
+
+        _advance_quests_silent(player=state, registry=self.registry)
         return state

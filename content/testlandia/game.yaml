@@ -9,7 +9,6 @@ spec:
   hp_formula:
     base_hp: 100
     hp_per_level: 20
-  base_adventure_count:
 
   # Item label vocabulary for label rendering, sorting, and condition tests.
   item_labels:

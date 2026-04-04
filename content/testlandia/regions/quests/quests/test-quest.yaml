@@ -1,0 +1,27 @@
+apiVersion: game/v1
+kind: Quest
+metadata:
+  name: test-quest
+spec:
+  displayName: "Test Quest"
+  description: "Two-stage quest for QA. Activated by test-quest-start, completed by test-quest-finish."
+  entry_stage: stage-one
+  stages:
+    - name: stage-one
+      description: "Begin the test quest."
+      advance_on:
+        - test-quest-stage-one-done
+      next_stage: stage-two
+    - name: stage-two
+      description: "Complete the test quest."
+      advance_on:
+        - test-quest-stage-two-done
+      next_stage: stage-complete
+    - name: stage-complete
+      description: "Quest completed."
+      terminal: true
+      completion_effects:
+        - type: item_drop
+          loot_ref: test-loot
+        - type: milestone_grant
+          milestone: test-quest-complete

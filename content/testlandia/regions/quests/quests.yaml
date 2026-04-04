@@ -1,0 +1,7 @@
+apiVersion: game/v1
+kind: Region
+metadata:
+  name: quests
+spec:
+  displayName: "Quest Testing Realm"
+  description: "A realm for testing quest activation, stage advancement, and completion effects."

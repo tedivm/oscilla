@@ -34,7 +34,7 @@ from oscilla.engine.models.adventure import (
     UseItemEffect,
     XpGrantEffect,
 )
-from oscilla.engine.models.base import AllCondition, Condition, ManifestEnvelope, normalise_condition
+from oscilla.engine.models.base import AllCondition, Condition, ManifestEnvelope
 from oscilla.engine.models.buff import BuffManifest
 from oscilla.engine.models.character_config import CharacterConfigManifest
 from oscilla.engine.models.game import GameManifest
@@ -88,85 +88,6 @@ def scan(content_dir: Path) -> List[Path]:
     return sorted(p for p in content_dir.rglob("*") if p.suffix in {".yaml", ".yml"})
 
 
-def _normalise_manifest_conditions(raw: Dict[str, object]) -> Dict[str, object]:
-    """Recursively normalise condition fields in a raw manifest dict."""
-    spec = raw.get("spec")
-    if not isinstance(spec, dict):
-        return raw
-
-    kind = raw.get("kind")
-
-    if kind == "Region":
-        if "unlock" in spec and spec["unlock"] is not None:
-            spec["unlock"] = normalise_condition(spec["unlock"])
-
-    elif kind == "Location":
-        if "unlock" in spec and spec["unlock"] is not None:
-            spec["unlock"] = normalise_condition(spec["unlock"])
-        for entry in spec.get("adventures", []):
-            if isinstance(entry, dict) and "requires" in entry and entry["requires"] is not None:
-                entry["requires"] = normalise_condition(entry["requires"])
-
-    elif kind == "Adventure":
-        steps = spec.get("steps", [])
-        if isinstance(steps, list):
-            spec["steps"] = [_normalise_step(s) for s in steps]
-        if "requires" in spec and spec["requires"] is not None:
-            spec["requires"] = normalise_condition(spec["requires"])
-
-    elif kind == "Item":
-        if "equip" in spec and isinstance(spec["equip"], dict):
-            equip = spec["equip"]
-            if "requires" in equip and equip["requires"] is not None:
-                equip["requires"] = normalise_condition(equip["requires"])
-
-    elif kind == "Game":
-        for passive in spec.get("passive_effects", []):
-            if isinstance(passive, dict) and "condition" in passive and passive["condition"] is not None:
-                passive["condition"] = normalise_condition(passive["condition"])
-
-    return raw
-
-
-def _normalise_step(step: object) -> object:
-    """Normalise condition fields within an adventure step dict."""
-    if not isinstance(step, dict):
-        return step
-    step_type = step.get("type")
-
-    if step_type == "stat_check":
-        if "condition" in step and step["condition"] is not None:
-            step["condition"] = normalise_condition(step["condition"])
-        for branch_key in ("on_pass", "on_fail"):
-            if branch_key in step and isinstance(step[branch_key], dict):
-                step[branch_key] = _normalise_branch(step[branch_key])
-
-    elif step_type == "combat":
-        for branch_key in ("on_win", "on_defeat", "on_flee"):
-            if branch_key in step and isinstance(step[branch_key], dict):
-                step[branch_key] = _normalise_branch(step[branch_key])
-
-    elif step_type == "choice":
-        for opt in step.get("options", []):
-            if not isinstance(opt, dict):
-                continue
-            if "requires" in opt and opt["requires"] is not None:
-                opt["requires"] = normalise_condition(opt["requires"])
-            if "steps" in opt and isinstance(opt["steps"], list):
-                opt["steps"] = [_normalise_step(s) for s in opt["steps"]]
-
-    elif step_type == "narrative":
-        pass  # no conditions in narrative steps
-
-    return step
-
-
-def _normalise_branch(branch: Dict[str, object]) -> Dict[str, object]:
-    if "steps" in branch and isinstance(branch["steps"], list):
-        branch["steps"] = [_normalise_step(s) for s in branch["steps"]]
-    return branch
-
-
 def parse(paths: List[Path]) -> Tuple[List[ManifestEnvelope], List[LoadError]]:
     """Parse YAML files and validate against Pydantic models. Accumulates errors."""
     manifests: List[ManifestEnvelope] = []
@@ -190,13 +111,6 @@ def parse(paths: List[Path]) -> Tuple[List[ManifestEnvelope], List[LoadError]]:
         model_cls = MANIFEST_REGISTRY.get(str(kind))
         if model_cls is None:
             errors.append(LoadError(file=path, message=f"Unknown kind: {kind!r}"))
-            continue
-
-        # Normalise bare YAML condition keys before Pydantic validation
-        try:
-            raw = _normalise_manifest_conditions(raw)
-        except ValueError as exc:
-            errors.append(LoadError(file=path, message=f"Condition normalisation error: {exc}"))
             continue
 
         try:
@@ -1009,6 +923,59 @@ def _validate_passive_effects(manifests: List[ManifestEnvelope]) -> List[LoadWar
     return warnings
 
 
+def _collect_step_item_drop_effects(step: Step, effects: List[ItemDropEffect]) -> None:
+    """Collect all ItemDropEffect instances recursively from a step tree."""
+    match step:
+        case NarrativeStep():
+            for eff in step.effects:
+                if isinstance(eff, ItemDropEffect):
+                    effects.append(eff)
+        case CombatStep():
+            for branch in [step.on_win, step.on_defeat, step.on_flee]:
+                for eff in branch.effects:
+                    if isinstance(eff, ItemDropEffect):
+                        effects.append(eff)
+                for sub in branch.steps:
+                    _collect_step_item_drop_effects(sub, effects)
+        case ChoiceStep():
+            for opt in step.options:
+                for eff in opt.effects:
+                    if isinstance(eff, ItemDropEffect):
+                        effects.append(eff)
+                for sub in opt.steps:
+                    _collect_step_item_drop_effects(sub, effects)
+        case StatCheckStep():
+            for branch in [step.on_pass, step.on_fail]:
+                for eff in branch.effects:
+                    if isinstance(eff, ItemDropEffect):
+                        effects.append(eff)
+                for sub in branch.steps:
+                    _collect_step_item_drop_effects(sub, effects)
+        case _:
+            pass
+
+
+def _validate_loot_refs(registry: "ContentRegistry") -> List[LoadError]:
+    """Verify every loot_ref in ItemDropEffect resolves to a known table or enemy."""
+    errors: List[LoadError] = []
+    for adv_manifest in registry.adventures.all():
+        item_drop_effects: List[ItemDropEffect] = []
+        for step in adv_manifest.spec.steps:
+            _collect_step_item_drop_effects(step, item_drop_effects)
+        for effect in item_drop_effects:
+            if effect.loot_ref is None:
+                continue
+            entries = registry.resolve_loot_entries(effect.loot_ref)
+            if entries is None:
+                errors.append(
+                    LoadError(
+                        file=Path(f"<{adv_manifest.metadata.name}>"),
+                        message=(f"loot_ref {effect.loot_ref!r} not found in loot_tables or enemies registry."),
+                    )
+                )
+    return errors
+
+
 def load(content_dir: Path) -> Tuple[ContentRegistry, List[LoadWarning]]:
     """Orchestrate scan → parse → validate_references → build_effective_conditions → template validation.
 
@@ -1045,6 +1012,11 @@ def load(content_dir: Path) -> Tuple[ContentRegistry, List[LoadWarning]]:
         raise ContentLoadError(pronoun_errors + template_errors)
 
     registry = ContentRegistry.build(manifests, template_engine=template_engine)
+
+    loot_ref_errors = _validate_loot_refs(registry)
+    if loot_ref_errors:
+        raise ContentLoadError(loot_ref_errors)
+
     elapsed_ms = (time.perf_counter() - t0) * 1000
     logger.info("Content loaded in %.1f ms (%d manifests)", elapsed_ms, len(manifests))
 

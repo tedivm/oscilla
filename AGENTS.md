@@ -413,6 +413,7 @@ A proposal is an openspec change consisting of `proposal.md`, `design.md`, and `
 * `tasks.md` must include dedicated sections for documentation tasks and testing tasks, at the same granularity as implementation tasks. Each doc and each meaningful test scenario must be its own line item.
 * New developer documents must follow `docs/dev/` placement and naming rules and must be added to the table of contents in `docs/dev/README.md`. New content author documents must follow `docs/authors/` placement and naming rules and must be added to `docs/authors/README.md`.
 * The documentation and testing sections of a proposal are reviewed with the same rigour as the implementation sections. A proposal that fully specifies the code but leaves documentation or testing vague is incomplete.
+* When archiving proposals you **must** always sync deltas first, and you **must** update the Roadmap if you completed an item in it.
 
 ### Files
 

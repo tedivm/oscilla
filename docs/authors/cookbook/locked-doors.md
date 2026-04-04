@@ -149,7 +149,8 @@ Or check it in a `stat_check` later in the same adventure chain.
 
 ```yaml
 requires:
-  all:
+  type: all
+  conditions:
     - type: item
       item_ref: iron-key
       quantity: 1
