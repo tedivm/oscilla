@@ -1,31 +1,35 @@
 # Skills and Buffs
 
-This guide covers the `Skill` and `Buff` manifest kinds, how to wire them to characters, enemies, and items, and how the combat system uses them.
+Skills and buffs give combat meaning beyond hit-trading. A **skill** is an activatable ability a player or enemy can use: a heal, a power attack, a curse. A **buff** is a named timed combat effect a skill (or item) applies: a shield that reduces damage, a poison that ticks each round, an amplifier that boosts attacks.
 
-For a quick overview of all manifest kinds, see the [Content Authoring Guide](./content-authoring.md).
+Together they let you design encounters where preparation and resource management matter. A warrior who memorizes the right skills and equips the right gear will fight very differently from one who doesn't.
 
 ---
 
-## Skills (`skills/`)
+## Defining a Skill
 
-A **Skill** is a learnable, activatable ability. Skills are declared once and referenced by name from character config, items, and effects that grant them to the player.
-
-### Minimal Example
+Every skill is a manifest. By convention, skills are placed in `skills/` directories, but because the engine discovers manifests by scanning all `.yaml` files recursively, they can live anywhere in your package.
 
 ```yaml
 apiVersion: game/v1
 kind: Skill
 metadata:
-  name: arcane-shield
+  name: quick-heal
 spec:
-  displayName: Arcane Shield
-  description: "Conjure a barrier that absorbs 40% of incoming damage for 3 turns."
+  displayName: "Quick Heal"
+  description: "Bind minor wounds in the heat of battle."
   contexts:
     - combat
+  cost:
+    stat: mana
+    amount: 15
   use_effects:
-    - type: apply_buff
-      buff_ref: shielded
+    - type: heal
+      amount: 25
+      target: player
 ```
+
+The `contexts` list controls where the skill can be used. A skill with only `combat` doesn't appear in the overworld actions menu, and vice versa.
 
 ### `SkillSpec` Fields
 
@@ -35,7 +39,7 @@ spec:
 | `description` | `str` | `""` | Flavor text |
 | `category` | `str` | `""` | Informational grouping label; engine enforced only when `skill_category_rules` are configured in `CharacterConfig` |
 | `contexts` | list of `"combat"` \| `"overworld"` | required (min 1) | Contexts where this skill may be activated |
-| `requires` | Condition \| null | `null` | Condition gate checked on every activation attempt (not just at grant time) |
+| `requires` | Condition \| null | `null` | [Condition](./conditions.md) gate checked on every activation attempt (not just at grant time) |
 | `cost` | SkillCost \| null | `null` | Resource consumed on each use |
 | `cooldown` | SkillCooldown \| null | `null` | Cooldown between uses |
 | `use_effects` | list of Effects | `[]` | Effects dispatched once when the skill is activated |
@@ -44,7 +48,7 @@ spec:
 
 ```yaml
 cost:
-  stat: mana          # Stat name for the resource pool
+  stat: mana          # [Stat](./game-configuration.md#stats) name for the resource pool
   amount: 20          # Amount deducted per use (minimum 1)
 ```
 
@@ -74,13 +78,13 @@ use_effects:
 
   # Apply a timed combat buff (defined as a Buff manifest)
   - type: apply_buff
-    buff_ref: on-fire
+    buff_ref: thorns
     target: player    # Who receives the buff (default: "player")
     variables:        # Optional per-call overrides for the buff's variables
       reflect_percent: 60
 ```
 
-See the [Effects reference](./content-authoring.md#all-effect-types) for the full list. Note that `StatSetEffect` cannot target enemies.
+See the [Effects reference](./effects.md#reference) for the full list. Note that `StatSetEffect` cannot target enemies.
 
 ### Skill with `requires` Condition
 
@@ -89,16 +93,15 @@ The `requires` condition is evaluated each time the player tries to activate a s
 ```yaml
 requires:
   type: character_stat
-  stat: hp
-  operator: lte
-  value: 20           # Only usable when HP is at or below 20%
+  name: hp
+  lte: 20           # Only usable when HP is at or below 20
 ```
 
 ---
 
-## Buffs (`buffs/`)
+## Defining a Buff
 
-A **Buff** is a named, reusable timed combat effect. Buffs are always granted through `apply_buff` effects — in `SkillSpec.use_effects`, `ItemSpec.use_effects`, or `ItemSpec.grants_buffs_equipped`/`grants_buffs_held`. The same buff manifest can be applied by multiple different sources without duplication.
+A **buff** is a named, reusable timed combat effect. Buffs are always granted through `apply_buff` effects — in `SkillSpec.use_effects`, or via [item fields](./items.md#buffs-granted-by-equipment) `grants_buffs_equipped`/`grants_buffs_held`. The same buff manifest can be applied by multiple different sources without duplication.
 
 The buff's manifest `name` is its stable identity. `DispelEffect` targets buffs by this name.
 
@@ -235,7 +238,7 @@ Referencing an undeclared variable name in a modifier is a load-time error.
 
 ---
 
-## Applying Buffs: `apply_buff` Effect
+## Applying Buffs
 
 `apply_buff` is the only way to grant a buff. It can appear in skill `use_effects`, item `use_effects`, or as a `grants_buffs_equipped`/`grants_buffs_held` entry on items.
 
@@ -251,7 +254,7 @@ If `apply_buff` is used outside of combat (e.g., in an overworld adventure effec
 
 ---
 
-## Removing Buffs: `dispel` Effect
+## Removing Buffs
 
 The `dispel` effect removes an active buff from a target by its manifest name:
 
@@ -265,7 +268,7 @@ Outside combat, `dispel` is silently skipped. This allows consumables (like Wate
 
 ---
 
-## Skills on Items
+## Skills and Buffs on Items
 
 Items can grant skills or buffs while equipped or held in inventory.
 
@@ -340,7 +343,7 @@ spec:
 
 ---
 
-## Skills in CharacterConfig
+## Wiring Skills to Your Game (CharacterConfig)
 
 `CharacterConfig` supports two skill-related configuration blocks.
 
@@ -379,6 +382,8 @@ Rules are entirely optional. If `skill_category_rules` is omitted or empty, no r
 ---
 
 ## Enemy Skills
+
+See [Enemies](./enemies.md) for the full enemy manifest format. The skill-related fields are reproduced here for reference.
 
 Enemies declare skills directly on their spec:
 
@@ -450,4 +455,7 @@ All modifier `percent` fields accept either an integer literal or a variable nam
 
 ---
 
-*For engine implementation details — CombatContext, cooldown tracking, and `run_effect()` internals — see the [Game Engine Documentation](../dev/game-engine.md#skill-and-buff-system).*
+*See [Effects](./effects.md) for the full effects list usable in `use_effects` and `per_turn_effects`.*
+*See [Conditions](./conditions.md) for condition syntax usable in `requires`.*
+*See [Items](./items.md) for how to attach skills and buffs to gear.*
+*For engine internals — CombatContext, cooldown tracking — see the [Game Engine docs](../dev/game-engine.md#skill-and-buff-system).*

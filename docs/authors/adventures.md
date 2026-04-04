@@ -1,0 +1,390 @@
+# Adventures
+
+An adventure is a single interactive encounter: a conversation, a fight, a mystery to solve. Adventures are the primary way players experience your world. Each adventure is a sequence of **steps** — narrative passages, combat encounters, branching choices, and conditional checks.
+
+---
+
+## Basic Structure
+
+```yaml
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: rat-infestation
+spec:
+  displayName: "Rat Infestation"
+  description: "The innkeeper needs the cellar cleared."
+  steps:
+    - type: narrative
+      text: |
+        The innkeeper leads you downstairs. A skittering sound echoes in the dark.
+```
+
+The `metadata.name` is what you reference in a location's [adventure pool](./world-building.md#adventure-pools) (the `ref` field). `displayName` and `description` appear in loading screens and elsewhere in the UI.
+
+Adventures live inside their owning location directory:
+
+A common convention is to place adventure manifests alongside their owning location:
+
+```
+regions/kingdom/locations/village-square/
+├── village-square.yaml
+└── adventures/
+    ├── rat-infestation.yaml
+    └── merchant-dispute.yaml
+```
+
+Because the engine discovers manifests by scanning all `.yaml` files recursively, adventures can be placed anywhere in your package — folder names and nesting depth don't affect which adventure pool they belong to. That's determined entirely by the location manifest's `adventures` list (by `ref` name).
+
+### Access Control
+
+An adventure can declare a `requires` [condition](./conditions.md). Players who don't meet it are never shown this adventure (the pool entry is filtered out).
+
+```yaml
+spec:
+  displayName: "Elite Training"
+  description: "A master warrior offers advanced lessons."
+  requires:
+    level: 10     # only appears for players level 10 or above
+  steps:
+    …
+```
+
+---
+
+## Step Types
+
+There are four step types. Steps run in order; each step must complete before the next begins.
+
+### Narrative
+
+The simplest step: display text and wait for the player to continue. Attach [`effects`](./effects.md) to fire silently once the player acknowledges.
+
+```yaml
+- type: narrative
+  text: |
+    You push through the iron gate and step into the moonlit courtyard.
+    Something rustles in the hedgerow.
+  effects:
+    - type: milestone_grant
+      milestone: entered-the-courtyard
+```
+
+Use narrative steps to set scenes, deliver story beats, and describe the outcome of choices. They don't require any decisions from the player.
+
+### Combat
+
+Turn-based combat against an [enemy](./enemies.md). The player and enemy trade attacks each round until one dies or the player flees. Attach branching outcomes for each resolution.
+
+```yaml
+- type: combat
+  enemy: town-rat          # must match an Enemy manifest's metadata.name
+  on_win:
+    effects:
+      - type: xp_grant
+        amount: 25
+    steps:
+      - type: narrative
+        text: "The rat is dead. The cellar is quiet again."
+  on_defeat:
+    effects:
+      - type: end_adventure
+        outcome: defeated
+  on_flee:
+    effects:
+      - type: end_adventure
+        outcome: fled
+```
+
+`on_win`, `on_defeat`, and `on_flee` are **outcome branches**. Each branch can carry:
+
+- [`effects`](./effects.md) — fire silently (XP grants, item drops, milestones, stat changes)
+- `steps` — run additional steps (narrative, more combat, choices)
+- `goto` — jump to a labeled step elsewhere in the adventure
+
+`effects` and `steps`/`goto` are independent: you can have both. Effects fire first, then steps run (or the jump happens).
+
+### Choice
+
+Present a menu of options. Options with unmet `requires` conditions are hidden entirely — the player never sees them.
+
+```yaml
+- type: choice
+  prompt: "Two doors. Which do you try?"
+  options:
+    - label: "The iron door (requires Dungeon Key)"
+      requires:
+        type: item
+        item_ref: dungeon-key
+        quantity: 1
+      steps:
+        - type: narrative
+          text: "The key turns smoothly. The door opens onto a treasure vault."
+      effects:
+        - type: milestone_grant
+          milestone: found-vault
+
+    - label: "The wooden door"
+      steps:
+        - type: combat
+          enemy: door-guard
+          on_win:
+            steps:
+              - type: narrative
+                text: "You step over the guard. A damp storeroom."
+          on_defeat:
+            effects:
+              - type: end_adventure
+                outcome: defeated
+```
+
+Each option has:
+
+- `label` — the text shown to the player
+- `requires` — optional condition; option hidden when false
+- `effects` — fire before nested steps or before a goto jump
+- `steps` — nested step sequence to run when the option is selected
+- `goto` — jump to a labeled top-level step instead of running nested steps
+
+`goto` and `steps` are mutually exclusive in a single option. Use `steps` when the option leads to its own short sequence of narrative, combat, or further choices. Use `goto` when the option should converge on a step that already exists elsewhere in the adventure — for example, multiple choices that all lead to the same "you were caught" scene. You cannot combine them because the engine would have no way to determine which to run first or whether to run both. If you need to both run some steps *and* then continue at a label, add your steps inline and place the label on the step you want to reach; inline steps naturally fall through to whatever follows them in the adventure.
+
+```yaml
+# Scenario: two options both end up at a shared "alarm raised" scene,
+# but one option runs some extra steps first.
+
+- type: choice
+  prompt: "How do you enter the vault?"
+  options:
+    - label: "Sneak through the window"
+      steps:
+        - type: narrative
+          text: "You squeeze through—and knock over a candlestick. Alarm bells ring."
+        # Falls through to the next top-level step (alarm-raised) automatically.
+
+    - label: "Kick down the door"
+      goto: alarm-raised    # skip straight to the shared scene
+
+- label: alarm-raised
+  type: narrative
+  text: "Guards pour into the corridor from every direction."
+  effects:
+    - type: end_adventure
+      outcome: defeated
+```
+
+In this example the sneaking option needs its own narrative before the shared outcome, so it uses `steps`. Those steps run in order and then the adventure simply continues to the next top-level step — which carries the `alarm-raised` label. The door-kicking option has nothing unique to say, so it jumps directly with `goto`.
+
+If all options in a choice step are hidden (none of their conditions are met), the step is skipped silently. Design your adventures so there is always at least one visible option when a choice step could be reached.
+
+### Stat Check
+
+Branch automatically based on any [condition](./conditions.md) — no player input.
+
+```yaml
+- type: stat_check
+  condition:
+    type: character_stat
+    name: strength
+    gte: 15
+  on_pass:
+    steps:
+      - type: narrative
+        text: "You heave the boulder aside with ease."
+    effects:
+      - type: xp_grant
+        amount: 10
+  on_fail:
+    steps:
+      - type: narrative
+        text: "The boulder won't budge. You look for another path."
+```
+
+`on_pass` and `on_fail` are outcome branches with the same `effects`/`steps`/`goto` structure as combat outcomes.
+
+Use stat checks for anything that should branch on player state without presenting a menu: perception checks, passive skill triggers, milestone-based dialogue forks, and so on.
+
+---
+
+## Goto and Labels
+
+Any step can carry a `label`. This makes it a target for `goto` jumps from outcome branches and choice options.
+
+```yaml
+- type: combat
+  enemy: boss-one
+  on_win:
+    steps:
+      - type: narrative
+        text: "The first guardian falls."
+  on_defeat:
+    goto: shared-defeat      # jumps to the labeled step below
+
+- type: combat
+  enemy: boss-two
+  on_win:
+    steps:
+      - type: narrative
+        text: "The second guardian falls."
+  on_defeat:
+    goto: shared-defeat      # both combats share the same defeat text
+
+- label: shared-defeat
+  type: narrative
+  text: "The ancient magic overwhelms you. The dungeon expels your broken body."
+  effects:
+    - type: end_adventure
+      outcome: defeated
+```
+
+Labels must be unique across all steps in an adventure. The engine validates this at load time.
+
+`goto` is especially useful when multiple branches converge on the same narrative outcome. It avoids duplicating text.
+
+---
+
+## Ending Adventures Early
+
+By default, an adventure ends when all top-level steps have run. Use [`end_adventure`](./effects.md#end-adventure) in an effects list to force an early end with a specific outcome.
+
+```yaml
+effects:
+  - type: milestone_grant
+    milestone: chose-to-flee
+  - type: end_adventure
+    outcome: fled
+```
+
+Allowed outcomes: `completed`, `defeated`, `fled`. Effects appearing before `end_adventure` in the same list still fire.
+
+---
+
+## A Complete Example
+
+This adventure uses all four step types and demonstrates goto:
+
+```yaml
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: forest-shrine
+spec:
+  displayName: "Forest Shrine"
+  description: "An old shrine pulses with faint light."
+  steps:
+    - type: narrative
+      text: |
+        Moss-covered stones form a ring around a cracked altar.
+        A faint glow emanates from its center.
+
+    - type: stat_check
+      condition:
+        type: milestone
+        name: lore-scholar
+      on_pass:
+        steps:
+          - type: narrative
+            text: "You recognize the sigils — this is a binding altar."
+        effects:
+          - type: milestone_grant
+            milestone: identified-shrine
+
+    - type: choice
+      prompt: "What do you do at the altar?"
+      options:
+        - label: "Offer your blood"
+          steps:
+            - type: narrative
+              text: "A sharp sting. The glow intensifies, then fades."
+          effects:
+            - type: stat_change
+              stat: hp
+              amount: -5
+            - type: xp_grant
+              amount: 60
+            - type: milestone_grant
+              milestone: offered-blood-shrine
+
+        - label: "Smash the altar"
+          steps:
+            - type: combat
+              enemy: shrine-guardian
+              on_win:
+                effects:
+                  - type: xp_grant
+                    amount: 100
+                steps:
+                  - type: narrative
+                    text: "The guardian falls. The glow is gone."
+              on_defeat:
+                goto: guardian-wins
+              on_flee:
+                goto: fled-shrine
+
+        - label: "Leave it alone"
+          steps:
+            - type: narrative
+              text: "Some things are better left undisturbed."
+
+    - label: guardian-wins
+      type: narrative
+      text: "The guardian drives you from the grove."
+      effects:
+        - type: end_adventure
+          outcome: defeated
+
+    - label: fled-shrine
+      type: narrative
+      text: "You retreat through the trees. The glow watches you go."
+      effects:
+        - type: end_adventure
+          outcome: fled
+```
+
+---
+
+## Reference
+
+### Adventure manifest fields
+
+| Field | Required | Description |
+|---|---|---|
+| `metadata.name` | yes | Identifier used in location pool `ref` fields |
+| `spec.displayName` | yes | Player-facing title |
+| `spec.description` | no | Short description |
+| `spec.requires` | no | Condition that prevents this adventure appearing in any pool |
+| `spec.steps` | yes | Ordered list of steps (at least one) |
+
+### Step types
+
+| Type | Description |
+|---|---|
+| `narrative` | Display text; optional silent effects |
+| `combat` | Turn-based fight with win/defeat/flee branches |
+| `choice` | Player-facing menu; options may have conditions |
+| `stat_check` | Automatic condition branch; no player input |
+
+### Outcome branch fields (on_win, on_defeat, on_flee, on_pass, on_fail)
+
+| Field | Type | Description |
+|---|---|---|
+| `effects` | list | Effects that fire silently |
+| `steps` | list | Nested steps to run |
+| `goto` | string | Label of a top-level step to jump to |
+
+`steps` and `goto` are mutually exclusive. Both are optional (an empty branch is valid).
+
+### Choice option fields
+
+| Field | Required | Description |
+|---|---|---|
+| `label` | yes | Player-facing option text |
+| `requires` | no | Condition; option hidden when false |
+| `effects` | no | Fire before steps or goto |
+| `steps` | no | Nested steps to run |
+| `goto` | no | Step label to jump to (exclusive with `steps`) |
+
+---
+
+*See [Effects](./effects.md) for the full list of effect types.*
+*See [Conditions](./conditions.md) for the full condition syntax used in `requires` and `stat_check`.*
+*See [Enemies](./enemies.md) for enemy manifest syntax.*

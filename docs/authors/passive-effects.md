@@ -1,8 +1,8 @@
 # Passive Effects
 
-Passive effects are always-on or conditionally-active modifiers declared in `game.yaml`.
-They apply stat bonuses and grant skills automatically whenever the player's state matches
-the associated condition — no adventure step required.
+Passive effects are always-on or conditionally-active modifiers that apply automatically based on the player's state. They live in `game.yaml` rather than in adventure steps — the engine evaluates them continuously and applies any that match.
+
+Use passive effects when a game-wide rule should apply without any authoring at the adventure level: a bonus unlocked by a milestone, a skill that appears at high level, a permanent stat that upgrades as the player progresses.
 
 ---
 
@@ -49,6 +49,11 @@ trigger a `LoadWarning` at validation time:
 
 - `item_held_label` — requires registry to look up item labels
 - `any_item_equipped` — requires registry to look up item labels
+
+> **Workaround:** Most use cases for these conditions can be handled in one of two ways:
+>
+> - **Place grants directly on the item** using [`grants_skills_equipped`/`grants_skills_held`](./items.md#skills-granted-by-equipment) and [`grants_buffs_equipped`/`grants_buffs_held`](./items.md#buffs-granted-by-equipment), paired with an [`equip.requires` condition](./items.md#equip-requirements) if you need to gate the grant.
+> - **Use `item_equipped` in a passive effect** to check for a specific item being equipped — this condition type is safe and does not require a registry lookup (see the safe example below).
 
 Also avoid:
 
@@ -113,7 +118,7 @@ stat_modifiers:
     amount: -1       # negative amounts reduce the stat
 ```
 
-Stats used here must be declared in `character_config.yaml`. The modifier applies every time
+Stats used here must be declared in [`character_config.yaml`](./game-configuration.md#stats). The modifier applies every time
 `effective_stats()` is called — it does not permanently alter `player.stats`.
 
 ---
@@ -121,7 +126,7 @@ Stats used here must be declared in `character_config.yaml`. The modifier applie
 ## Skill Grants
 
 Each `skill_grant` entry adds a skill to the player's available skills while the condition holds.
-The skill must be defined as a `Skill` manifest in the content package.
+The skill must be defined as a [`Skill` manifest](./skills.md#defining-a-skill) in the content package.
 
 ```yaml
 skill_grants:
@@ -196,3 +201,9 @@ passive_effects:
       - stat: strength
         amount: 1    # stacks: level 10+ players get +2 total
 ```
+
+---
+
+*See [Game Configuration](./game-configuration.md) for where `passive_effects` lives in `game.yaml`.*
+*See [Conditions](./conditions.md) for the full condition syntax — and which condition types are safe to use here.*
+*See [Skills](./skills.md) for skill manifest syntax.*
