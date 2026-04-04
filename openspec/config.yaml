@@ -14,45 +14,46 @@ schema: spec-driven
 
 context: |
   You must read the [design philosophy](./docs/dev/design-philosophy.md) before writing any proposal.
+  You must always update the roadmap when archiving proposals to ensure that completed features are removed.
 
 rules:
   proposal:
-    - Every proposal must include specific testlandia content updates that demonstrate the new feature. This includes 
+    - Every proposal must include specific testlandia content updates that demonstrate the new feature. This includes
       new skills, buffs, items, enemies, adventures, or locations that allow manual QA of the proposed changes.
     - The testlandia updates must be detailed enough to serve as a manual QA tool.
   tasks:
     - Do not attempt to estimate the time a task will take.
-    - Always include specific tasks for updating testlandia content to demonstrate and manually QA the new feature. 
-      These tasks must specify the exact manifest files to create or modify, their content structure, and how they 
+    - Always include specific tasks for updating testlandia content to demonstrate and manually QA the new feature.
+      These tasks must specify the exact manifest files to create or modify, their content structure, and how they
       integrate with existing testlandia content.
-    - Testlandia tasks must be granular enough that each can be implemented and verified independently, with clear 
+    - Testlandia tasks must be granular enough that each can be implemented and verified independently, with clear
       acceptance criteria for what constitutes successful implementation.
   design:
     - When creating diagrams always use Mermaid Diagrams instead of Ascii Diagrams.
     - Every design document must include a Documentation Plan section that names each document to be created or updated,
       its intended audience, and the specific topics it must cover.
-    - Every design document must include a Testing Philosophy section (or equivalent) that describes the test tiers, 
+    - Every design document must include a Testing Philosophy section (or equivalent) that describes the test tiers,
       required fixtures, and which behaviours each tier verifies.
-    - Documentation and testing sections must be as detailed and specific as the implementation sections. Vague entries 
+    - Documentation and testing sections must be as detailed and specific as the implementation sections. Vague entries
       like "write tests" or "update the docs" are not acceptable.
-    - Every design document must include a Testlandia Integration section that specifies exactly what content will be 
-      added to the testlandia developer environment to demonstrate and manually QA the new feature. This must include 
+    - Every design document must include a Testlandia Integration section that specifies exactly what content will be
+      added to the testlandia developer environment to demonstrate and manually QA the new feature. This must include
       specific manifest files, their locations, and how they showcase the feature's core functionality.
-    - The testlandia integration must be comprehensive enough that a developer can manually verify all major use cases 
-      of the feature by playing through the testlandia content, including edge cases and error conditions where 
+    - The testlandia integration must be comprehensive enough that a developer can manually verify all major use cases
+      of the feature by playing through the testlandia content, including edge cases and error conditions where
       possible.
-    - Every changed or new function, method, and class must be shown as a complete Python code block — not a summary, 
+    - Every changed or new function, method, and class must be shown as a complete Python code block — not a summary,
       not a signature stub, not pseudocode. Include the full implementation with all logic. This includes private helper
       functions and utilities introduced to support the change, not just the primary entry points.
-    - For each modified file, show a "before" code block (the existing code) and an "after" code block (the 
+    - For each modified file, show a "before" code block (the existing code) and an "after" code block (the
       replacement). Do not describe what to change in prose alone; always include the actual code.
-    - When a function's signature or contract changes, identify every call site in the codebase and show each updated 
+    - When a function's signature or contract changes, identify every call site in the codebase and show each updated
       call in a code block. A change is not fully specified if callers are only mentioned in prose.
-    - Edge cases and exceptional conditions must be explicitly enumerated per section — list each case and the exact 
+    - Edge cases and exceptional conditions must be explicitly enumerated per section — list each case and the exact
       handling (what the code does, what the user sees, what is logged). Do not bury edge cases in prose.
-    - Test examples in the Testing Philosophy section must be complete runnable test functions with setup, assertions, 
+    - Test examples in the Testing Philosophy section must be complete runnable test functions with setup, assertions,
       and any required fixtures — not just a table of test names or one-line descriptions.
-    - If the tests require a stub or mock (e.g. MockTUI, a fake registry), show the complete stub class implementation 
+    - If the tests require a stub or mock (e.g. MockTUI, a fake registry), show the complete stub class implementation
       alongside the test functions, not just a reference to it by name.
-    - Use inline code comments to document language gotchas, design tradeoffs, and non-obvious implementation decisions 
+    - Use inline code comments to document language gotchas, design tradeoffs, and non-obvious implementation decisions
       at the point in the code where they matter — not only in surrounding prose.

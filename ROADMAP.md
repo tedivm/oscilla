@@ -46,7 +46,6 @@ These items fix existing bugs or remove technical debt that actively misleads au
 | [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems) | XL | Combat Overhaul |
 | [Buff Blocking and Priority](#buff-blocking-and-priority) | S | Combat Refinement |
 | [Buff Persistence Between Adventures](#buff-persistence-between-adventures) | S | Combat Refinement |
-| [Documentation Refactor and Rebuild](#documentation-refactor-and-rebuild) | M | — |
 | [Character Archetypes](#character-archetypes) | M | Character Progression |
 | [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades) | L | Character Progression |
 | [Stat Formula Templates](#stat-formula-templates) | M | Character Progression |
@@ -252,23 +251,6 @@ Add an optional `duration` scope to buff manifests:
 - `scope: persistent` — stored on the player and persists until explicitly dispelled or a duration expires
 
 Persistent buffs require a small addition to the player state serialization.
-
----
-
-## Documentation
-
-### Documentation Refactor and Rebuild
-
-**Effort: M** · **Group: —**
-
-The current documentation has grown incrementally alongside the codebase and needs a holistic review and restructure. Goals:
-
-- Audit all existing documents in `docs/dev/` and `docs/authors/` for accuracy and completeness
-- Establish a clear information architecture: orientation (what is this?), how-to guides (how do I do X?), reference (what are all the options?), and explanation (why does it work this way?)
-- Ensure every major engine subsystem has a corresponding developer document
-- Ensure every content authoring concept (stats, conditions, skills, templates, combat, regions) has a corresponding author document
-- Add a top-level `docs/README.md` that orients both audiences and links to both `docs/dev/README.md` and `docs/authors/README.md`
-- Remove or archive stale documents that describe features that no longer exist or have changed significantly
 
 ---
 
