@@ -19,7 +19,7 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "character_iteration_adventure_state",
-        sa.Column("iteration_id", sa.UUID(), nullable=False),
+        sa.Column("iteration_id", sa.Uuid(), nullable=False),
         sa.Column("adventure_ref", sa.String(), nullable=False),
         sa.Column("last_completed_on", sa.String(), nullable=True),
         sa.Column("last_completed_at_total", sa.Integer(), nullable=True),
