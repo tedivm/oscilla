@@ -140,22 +140,21 @@ def test_cooldown_days_never_completed_no_cooldown() -> None:
 
 
 def test_cooldown_adventures_below_threshold() -> None:
-    """cooldown_adventures=3 → ineligible when fewer than 3 adventures completed since last run."""
+    """cooldown_adventures=3 maps to cooldown_ticks=3; ineligible when < 3 ticks elapsed."""
     player = _make_player()
-    # Last completed when total was 10; currently 12 → delta = 2 < 3
-    player.adventure_last_completed_at_total["cave"] = 10
-    player.statistics.adventures_completed["other-a"] = 10
-    player.statistics.adventures_completed["other-b"] = 2
+    # Last completed at tick 10; only 2 ticks have elapsed (internal_ticks=12) → ineligible
+    player.adventure_last_completed_at_ticks["cave"] = 10
+    player.internal_ticks = 12
     spec = _spec(cooldown_adventures=3)
     assert player.is_adventure_eligible("cave", spec, date.today()) is False
 
 
 def test_cooldown_adventures_at_threshold() -> None:
-    """cooldown_adventures=3 → eligible at exactly 3 adventures completed since last run."""
+    """cooldown_adventures=3 maps to cooldown_ticks=3; eligible at exactly 3 ticks elapsed."""
     player = _make_player()
-    player.adventure_last_completed_at_total["cave"] = 10
-    player.statistics.adventures_completed["other-a"] = 10
-    player.statistics.adventures_completed["other-b"] = 3
+    # Last completed at tick 10; 3 ticks have elapsed (internal_ticks=13) → eligible
+    player.adventure_last_completed_at_ticks["cave"] = 10
+    player.internal_ticks = 13
     spec = _spec(cooldown_adventures=3)
     assert player.is_adventure_eligible("cave", spec, date.today()) is True
 

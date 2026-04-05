@@ -11,6 +11,7 @@ from oscilla.models.character import CharacterRecord
 from oscilla.models.character_iteration import (
     CharacterIterationAdventureState,
     CharacterIterationEquipment,
+    CharacterIterationEraState,
     CharacterIterationInventory,
     CharacterIterationItemInstance,
     CharacterIterationItemInstanceModifier,
@@ -248,6 +249,7 @@ async def load_character(
             selectinload(CharacterIterationRecord.skill_rows),
             selectinload(CharacterIterationRecord.skill_cooldown_rows),
             selectinload(CharacterIterationRecord.adventure_state_rows),
+            selectinload(CharacterIterationRecord.era_state_rows),
         )
     )
     iter_result = await session.execute(iter_stmt)
@@ -308,10 +310,18 @@ async def load_character(
         for row in iteration.adventure_state_rows
         if row.last_completed_on is not None
     }
-    adventure_last_completed_at_total: Dict[str, int] = {
-        row.adventure_ref: row.last_completed_at_total
+    adventure_last_completed_at_ticks: Dict[str, int] = {
+        row.adventure_ref: row.last_completed_at_ticks
         for row in iteration.adventure_state_rows
-        if row.last_completed_at_total is not None
+        if row.last_completed_at_ticks is not None
+    }
+    era_started_at_ticks: Dict[str, int] = {
+        row.era_name: row.started_at_game_ticks
+        for row in iteration.era_state_rows
+        if row.started_at_game_ticks is not None
+    }
+    era_ended_at_ticks: Dict[str, int] = {
+        row.era_name: row.ended_at_game_ticks for row in iteration.era_state_rows if row.ended_at_game_ticks is not None
     }
 
     data: Dict[str, Any] = {
@@ -343,7 +353,11 @@ async def load_character(
         "known_skills": known_skills,
         "skill_cooldowns": skill_cooldowns,
         "adventure_last_completed_on": adventure_last_completed_on,
-        "adventure_last_completed_at_total": adventure_last_completed_at_total,
+        "adventure_last_completed_at_ticks": adventure_last_completed_at_ticks,
+        "internal_ticks": iteration.internal_ticks,
+        "game_ticks": iteration.game_ticks,
+        "era_started_at_ticks": era_started_at_ticks,
+        "era_ended_at_ticks": era_ended_at_ticks,
     }
 
     return CharacterState.from_dict(data=data, character_config=character_config, registry=registry)
@@ -935,7 +949,7 @@ async def upsert_adventure_state(
     iteration_id: UUID,
     adventure_ref: str,
     last_completed_on: str | None,
-    last_completed_at_total: int | None,
+    last_completed_at_ticks: int | None,
 ) -> None:
     """Upsert the repeat-control state for one adventure.
 
@@ -946,7 +960,55 @@ async def upsert_adventure_state(
             iteration_id=iteration_id,
             adventure_ref=adventure_ref,
             last_completed_on=last_completed_on,
-            last_completed_at_total=last_completed_at_total,
+            last_completed_at_ticks=last_completed_at_ticks,
         )
     )
+    await session.commit()
+
+
+async def update_character_tick_state(
+    session: AsyncSession,
+    iteration_id: UUID,
+    internal_ticks: int,
+    game_ticks: int,
+    adventure_last_completed_at_ticks: Dict[str, int],
+    era_started_at_ticks: Dict[str, int],
+    era_ended_at_ticks: Dict[str, int],
+) -> None:
+    """Persist tick counters, adventure cooldown ticks, and era latch state.
+
+    Called after every adventure completion. Upserts adventure_state and
+    era_state rows to avoid racing with concurrent writes.
+    """
+    # Update tick counters on the iteration record.
+    stmt = (
+        update(CharacterIterationRecord)
+        .where(and_(CharacterIterationRecord.id == iteration_id))
+        .values(internal_ticks=internal_ticks, game_ticks=game_ticks)
+        .execution_options(synchronize_session="fetch")
+    )
+    await session.execute(stmt)
+
+    # Upsert adventure state rows for tick-based cooldowns.
+    for adventure_ref, ticks_value in adventure_last_completed_at_ticks.items():
+        await session.merge(
+            CharacterIterationAdventureState(
+                iteration_id=iteration_id,
+                adventure_ref=adventure_ref,
+                last_completed_at_ticks=ticks_value,
+            )
+        )
+
+    # Upsert era state rows.
+    all_era_names = set(era_started_at_ticks) | set(era_ended_at_ticks)
+    for era_name in all_era_names:
+        await session.merge(
+            CharacterIterationEraState(
+                iteration_id=iteration_id,
+                era_name=era_name,
+                started_at_game_ticks=era_started_at_ticks.get(era_name),
+                ended_at_game_ticks=era_ended_at_ticks.get(era_name),
+            )
+        )
+
     await session.commit()

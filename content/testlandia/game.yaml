@@ -40,3 +40,120 @@ spec:
       stat_modifiers:
         - stat: strength
           amount: 2
+
+  # In-game time system: dual clocks, season/lunar cycles, named eras.
+  # Each adventure costs 1 tick by default. test-time-advances sets ticks: 10.
+  # The season cycle has count 4 with an hour parent (24 ticks), so one season
+  # spans 4 × 24 = 96 ticks. Spring is at the epoch:
+  #   game_ticks 0–95 = Spring, 96–191 = Summer, 192–287 = Autumn, 288–383 = Winter.
+  time:
+    base_unit: hour
+    ticks_per_adventure: 1
+    pre_epoch_behavior: clamp
+
+    cycles:
+      # Root cycle: the atomic tick unit. One tick = one game hour.
+      # No labels or subdivisions — all named display cycles derive from this.
+      - type: ticks
+        name: tick
+
+      # hour: 24 display positions (named hours of the day). Driven by the root tick.
+      - type: cycle
+        name: hour
+        parent: tick
+        count: 24
+        labels:
+          - Dawn
+          - Early Morning
+          - Morning
+          - Mid-Morning
+          - Late Morning
+          - Near Noon
+          - Noon
+          - Early Afternoon
+          - Afternoon
+          - Mid-Afternoon
+          - Late Afternoon
+          - Dusk
+          - Early Evening
+          - Evening
+          - Late Evening
+          - Nightfall
+          - Night
+          - Deep Night
+          - Late Night
+          - After Midnight
+          - Midnight
+          - Before Dawn
+          - Early Hours
+          - Pre-Dawn
+
+      # season: 4 full hour cycles per season = 4 × 24 = 96 ticks per season.
+      - type: cycle
+        name: season
+        parent: hour
+        count: 4
+        labels:
+          - Spring
+          - Summer
+          - Autumn
+          - Winter
+
+      # lunar_cycle: 28 full hour cycles = 28 × 24 = 672 ticks per lunar month.
+      # Labels cycle through 8 moon phases with varying day counts per phase.
+      - type: cycle
+        name: lunar_cycle
+        parent: hour
+        count: 28
+        labels:
+          - New Moon
+          - New Moon
+          - New Moon
+          - Waxing Crescent
+          - Waxing Crescent
+          - Waxing Crescent
+          - Waxing Crescent
+          - First Quarter
+          - First Quarter
+          - First Quarter
+          - Waxing Gibbous
+          - Waxing Gibbous
+          - Waxing Gibbous
+          - Waxing Gibbous
+          - Full Moon
+          - Full Moon
+          - Full Moon
+          - Waning Gibbous
+          - Waning Gibbous
+          - Waning Gibbous
+          - Waning Gibbous
+          - Last Quarter
+          - Last Quarter
+          - Last Quarter
+          - Waning Crescent
+          - Waning Crescent
+          - Waning Crescent
+          - Waning Crescent
+
+    # epoch: start the game in Spring (season index 0, position 1).
+    epoch:
+      season: Spring
+
+    eras:
+      # Always-active era tracking realm years.
+      # 1 year = 4 seasons × 96 ticks = 384 game_ticks.
+      - name: testlandia_era
+        format: "Year {count} of the Realm"
+        epoch_count: 1
+        tracks: season
+
+      # Moon Age era: unlocks once game_ticks >= 56 (triggers after 6 runs of
+      # test-time-advances at 10 ticks each: 6 × 10 = 60 > 56).
+      - name: moon_age
+        format: "Moon Age {count}"
+        epoch_count: 1
+        tracks: lunar_cycle
+        start_condition:
+          type: game_calendar_time_is
+          clock: game
+          gte: 56

@@ -8,9 +8,10 @@ from collections import defaultdict
 from dataclasses import dataclass
 from logging import getLogger
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Set, Tuple, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Set, Tuple, cast
 
 if TYPE_CHECKING:
+    from oscilla.engine.models.time import GameTimeSpec
     from oscilla.engine.templates import GameTemplateEngine
 
 from pydantic import ValidationError
@@ -1170,7 +1171,18 @@ def load(content_dir: Path) -> Tuple[ContentRegistry, List[LoadWarning]]:
         cc = cast(CharacterConfigManifest, char_config)
         all_stats = cc.spec.public_stats + cc.spec.hidden_stats
         stat_names = [s.name for s in all_stats]
-    template_engine = GameTemplateEngine(stat_names=stat_names)
+
+    # Detect if the game manifest has an in-game time system configured so the
+    # template engine can provide a mock InGameTimeView during validation.
+    game_manifest = next((m for m in manifests if m.kind == "Game"), None)
+    has_ingame_time = False
+    if game_manifest is not None:
+        from oscilla.engine.models.game import GameManifest
+
+        gm = cast(GameManifest, game_manifest)
+        has_ingame_time = gm.spec.time is not None
+
+    template_engine = GameTemplateEngine(stat_names=stat_names, has_ingame_time=has_ingame_time)
 
     pronoun_errors = _validate_pronoun_set_names(manifests)
     template_errors = _validate_templates(manifests, template_engine)
@@ -1192,6 +1204,54 @@ def load(content_dir: Path) -> Tuple[ContentRegistry, List[LoadWarning]]:
     warnings.extend(_validate_passive_effects(manifests))
 
     return registry, warnings
+
+
+def compute_epoch_offset(spec: "GameTimeSpec") -> int:
+    """Compute the tick offset corresponding to the epoch's named position.
+
+    The offset is added to game_ticks before computing cycle positions, so that
+    tick 0 displays as the epoch's named position rather than the start of the
+    first cycle.
+
+    Returns 0 when no epoch positions are declared or when no cycles are configured.
+    """
+    if not spec.cycles or not spec.epoch:
+        return 0
+
+    # Build name/alias → CycleSpec mapping.
+    by_name: Dict[str, Any] = {}
+    for cycle in spec.cycles:
+        by_name[cycle.name] = cycle
+        if hasattr(cycle, "aliases"):
+            for alias in cycle.aliases:
+                by_name[alias] = cycle
+
+    def _ticks_per_unit(name: str) -> int:
+        c = by_name[name]
+        if c.type == "ticks":
+            return 1
+        parent = by_name[c.parent]
+        return int(c.count * _ticks_per_unit(parent.name))
+
+    offset = 0
+    for cycle_name, value in spec.epoch.items():
+        epoch_cycle = by_name.get(cycle_name)
+        if epoch_cycle is None:
+            continue
+        # Resolve value to a 0-based index.
+        if isinstance(value, str):
+            labels = epoch_cycle.labels if epoch_cycle.type == "cycle" else []
+            idx = labels.index(value) if value in labels else 0
+        else:
+            idx = max(0, int(value) - 1)  # 1-based author input → 0-based
+        # Contribution of this epoch entry to the total offset.
+        if epoch_cycle.type == "ticks":
+            tpu_parent = 1
+        else:
+            tpu_parent = _ticks_per_unit(by_name[epoch_cycle.parent].name)
+        offset += idx * tpu_parent
+
+    return offset
 
 
 def load_games(library_root: Path) -> Tuple[Dict[str, ContentRegistry], Dict[str, List[LoadWarning]]]:

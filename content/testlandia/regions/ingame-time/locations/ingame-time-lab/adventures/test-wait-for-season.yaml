@@ -1,0 +1,24 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-wait-for-season
+spec:
+  displayName: "Wait for Season — Summer Gate"
+  description: "Requires Summer. Unavailable during Spring (game_ticks 0-95). Becomes available once game_ticks >= 96 (after
+    10 completions of test-time-advances at 10 ticks each, for a total of 100 ticks)."
+  requires:
+    type: game_calendar_cycle_is
+    cycle: season
+    value: Summer
+  steps:
+    - type: narrative
+      text: |
+        **SUMMER GATE — PASSED**
+
+        It is Summer and this adventure is now accessible.
+
+        Current season:    {{ ingame_time.cycles['season'].label }}
+        Current game tick: {{ ingame_time.game_ticks }}
+
+        Summer spans game_ticks 96–191. Run test-time-advances 10+ times
+        to advance into Autumn (48–71) and watch this adventure lock again.

@@ -129,10 +129,21 @@ class AdventurePipeline:
         game_spec = self._registry.game.spec if self._registry.game is not None else None
         hemisphere = game_spec.season_hemisphere if game_spec is not None else "northern"
         timezone = game_spec.timezone if game_spec is not None else None
+        # Resolve ingame_time view when the time system is configured.
+        ingame_time = None
+        resolver = self._registry.ingame_time_resolver
+        if resolver is not None:
+            ingame_time = resolver.resolve(
+                game_ticks=self._player.game_ticks,
+                internal_ticks=self._player.internal_ticks,
+                player=self._player,
+                registry=self._registry,
+            )
         return ExpressionContext(
             player=PlayerContext.from_character(self._player),
             combat=combat_view,
             game=GameContext(season_hemisphere=hemisphere, timezone=timezone),
+            ingame_time=ingame_time,
         )
 
     async def run(self, adventure_ref: str) -> AdventureOutcome:
@@ -177,8 +188,37 @@ class AdventurePipeline:
         self._player.active_adventure = None
         if outcome == AdventureOutcome.COMPLETED:
             self._player.statistics.record_adventure_completed(adventure_ref)
+            # Advance both tick counters by the adventure's tick cost.
+            tick_cost = self._resolve_tick_cost(adventure_ref)
+            self._player.internal_ticks += tick_cost
+            self._player.game_ticks += tick_cost
+            # Record internal_ticks snapshot for cooldown evaluation.
+            self._player.adventure_last_completed_at_ticks[adventure_ref] = self._player.internal_ticks
+            # Evaluate era start/end conditions and latch activation ticks.
+            if self._registry.game is not None and self._registry.game.spec.time is not None:
+                from oscilla.engine.ingame_time import update_era_states
+
+                update_era_states(
+                    player=self._player,
+                    spec=self._registry.game.spec.time,
+                    registry=self._registry,
+                )
         await self._checkpoint("adventure_end")
         return outcome
+
+    def _resolve_tick_cost(self, adventure_ref: str) -> int:
+        """Return the tick cost for the given adventure.
+
+        Prefers the adventure's own ticks field; falls back to
+        game.time.ticks_per_adventure; falls back to 1 when no time system
+        is configured.
+        """
+        spec = self._registry.adventures.get(adventure_ref)
+        if spec is not None and spec.spec.ticks is not None:
+            return spec.spec.ticks
+        if self._registry.game is not None and self._registry.game.spec.time is not None:
+            return self._registry.game.spec.time.ticks_per_adventure
+        return 1
 
     # --- Internal step execution ---
 

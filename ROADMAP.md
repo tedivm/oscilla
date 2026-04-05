@@ -30,7 +30,6 @@ These items fix existing bugs or remove technical debt that actively misleads au
 
 | Item | Effort | Group |
 |------|--------|-------|
-| [In-Game Time System](#in-game-time-system) | M | Calendar Conditions |
 | [Triggered Adventures](#triggered-adventures) | M | — |
 | [Adventure-Scoped Variables](#adventure-scoped-variables) | M | Adventure Authoring |
 | [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems) | XL | Combat Overhaul |
@@ -58,29 +57,6 @@ These items fix existing bugs or remove technical debt that actively misleads au
 ---
 
 ## Condition System
-
-### In-Game Time System
-
-**Effort: M** · **Group: Calendar Conditions**
-
-The existing calendar functions (`season()`, `moon_phase()`, etc.) operate on real-world time via `today()` and `now()`. Some games have no real-world tie-in — a dungeon crawler, a space opera, a mythological world — and want time to flow according to in-game rules rather than the Gregorian calendar.
-
-Add an opt-in in-game time system declared in `game.yaml`:
-
-```yaml
-spec:
-  time:
-    ticks_per_day: 10        # one "day" passes every 10 adventure completions
-    days_per_season: 30
-    seasons:
-      - name: "The Bright Season"
-      - name: "The Frost Season"
-      - name: "The Thaw"
-```
-
-The in-game time counter increments automatically on adventure completion (or on other configurable events). Templates and conditions expose an `ingame_time` object with the current day, season name, and tick count alongside the existing real-world `today()` and `now()`. Authors who omit `time:` entirely continue using real-world calendar functions with no change.
-
----
 
 ## Adventure System
 

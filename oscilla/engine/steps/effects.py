@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Dict, List
 from oscilla.engine.character import _INT64_MAX, _INT64_MIN, cascade_unequip_invalid
 from oscilla.engine.combat_context import ActiveCombatEffect, CombatContext
 from oscilla.engine.models.adventure import (
+    AdjustGameTicksEffect,
     ApplyBuffEffect,
     DispelEffect,
     Effect,
@@ -454,3 +455,13 @@ async def run_effect(
                 return
             player.pronouns = ps
             await tui.show_text(f"Pronouns set to {pronoun_key}.")
+
+        case AdjustGameTicksEffect(delta=delta):
+            if registry.game is None or registry.game.spec.time is None:
+                logger.warning("adjust_game_ticks effect applied with no time system configured — ignoring.")
+                return
+            pre_epoch = registry.game.spec.time.pre_epoch_behavior
+            new_ticks = player.game_ticks + delta
+            if pre_epoch == "clamp":
+                new_ticks = max(0, new_ticks)
+            player.game_ticks = new_ticks

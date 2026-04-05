@@ -1,0 +1,34 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-turn-back-the-clock
+spec:
+  displayName: "Turn Back the Clock — Rewind"
+  description: "Applies adjust_game_ticks with delta -10. Shows game_ticks before the effect fires. internal_ticks is unchanged.
+    game_ticks is clamped at 0."
+  steps:
+    - type: narrative
+      text: |
+        **TURN BACK THE CLOCK**
+
+        Measuring before the rewind…
+
+        Internal ticks (play-time, unchanged): {{ ingame_time.internal_ticks }}
+        Game ticks (narrative, BEFORE effect): {{ ingame_time.game_ticks }}
+
+        The clock will rewind by 10 game ticks after this step.
+    - type: narrative
+      effects:
+        - type: adjust_game_ticks
+          delta: -10
+      text: |
+        **REWIND APPLIED**
+
+        game_ticks was just reduced by 10 (clamped at 0).
+
+        Internal ticks (unchanged): {{ ingame_time.internal_ticks }}
+        Game ticks (AFTER rewind):  {{ ingame_time.game_ticks }}
+
+        Note: internal_ticks will still advance by 1 on adventure completion
+        (the default ticks_per_adventure), since internal_ticks is not affected
+        by adjust_game_ticks.

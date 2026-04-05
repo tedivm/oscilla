@@ -779,7 +779,7 @@ erDiagram
   character_iteration_adventure_state {
     VARCHAR adventure_ref PK
     CHAR(32) iteration_id PK,FK
-    INTEGER last_completed_at_total "nullable"
+    BIGINT last_completed_at_ticks "nullable"
     VARCHAR last_completed_on "nullable"
   }
 
@@ -787,6 +787,13 @@ erDiagram
     CHAR(32) iteration_id PK,FK
     VARCHAR slot PK
     VARCHAR instance_id
+  }
+
+  character_iteration_era_state {
+    VARCHAR era_name PK
+    CHAR(32) iteration_id PK,FK
+    BIGINT ended_at_game_ticks "nullable"
+    BIGINT started_at_game_ticks "nullable"
   }
 
   character_iteration_inventory {
@@ -853,7 +860,9 @@ erDiagram
     VARCHAR character_class "nullable"
     DATETIME completed_at "nullable"
     VARCHAR current_location "nullable"
+    BIGINT game_ticks
     INTEGER hp
+    BIGINT internal_ticks
     BOOLEAN is_active
     INTEGER iteration
     INTEGER level
@@ -882,6 +891,7 @@ erDiagram
 
   character_iterations ||--o| character_iteration_adventure_state : iteration_id
   character_iterations ||--o| character_iteration_equipment : iteration_id
+  character_iterations ||--o| character_iteration_era_state : iteration_id
   character_iterations ||--o| character_iteration_inventory : iteration_id
   character_iteration_item_instances ||--o| character_iteration_item_instance_modifiers : iteration_id
   character_iteration_item_instances ||--o| character_iteration_item_instance_modifiers : instance_id
@@ -915,6 +925,7 @@ The character persistence layer uses nine tables. Three are the core identity ta
 | `character_iteration_milestones` | One row per milestone held; `(iteration_id, milestone_ref)` composite PK. |
 | `character_iteration_quests` | One row per quest; `(iteration_id, quest_ref)` composite PK; `status` is "active" or "completed". |
 | `character_iteration_statistics` | Aggregate counters; `(iteration_id, stat_type, entity_ref)` composite PK. `stat_type` is one of `enemies_defeated`, `locations_visited`, or `adventures_completed`. |
+| `character_iteration_era_state` | One row per era that has ever been active; records `started_at_game_ticks` and `ended_at_game_ticks`. Used for era latch logic and era `count` queries. |
 
 ### Iteration Model and Prestige Lifecycle
 
@@ -948,6 +959,21 @@ except StaleDataError:
 ```
 
 Adventure progress columns (`adventure_ref`, `adventure_step_index`, `adventure_step_state`) are updated via raw SQL `UPDATE` statements in `save_adventure_progress()` — they bypass the version increment because combat-round writes are high-frequency and do not represent player-visible stat mutations.
+
+### In-Game Time Columns
+
+When the [in-game time system](../authors/ingame-time.md) is active, two monotonically non-decreasing BIGINT columns on `character_iterations` track the dual clocks:
+
+| Column | Description |
+|---|---|
+| `internal_ticks` | The monotone play-time counter. Advances by tick cost on every adventure completion. Never decremented. Used for cooldown eligibility checks. |
+| `game_ticks` | The narrative clock. Advances with `internal_ticks` but can be reduced by `adjust_game_ticks` effects (clamped at 0). Drives in-game calendar conditions and era progression. |
+
+Both default to 0 and remain 0 when the time system is not configured.
+
+The `character_iteration_adventure_state` table's `last_completed_at_ticks` column (BIGINT, nullable) records the `internal_ticks` value at which each adventure was last completed. This replaces the former `last_completed_at_total` integer that counted raw completions.
+
+The `character_iteration_era_state` table records when each named era was activated and (if applicable) deactivated. The two columns `started_at_game_ticks` and `ended_at_game_ticks` drive era latch logic: once a row exists with a non-null `started_at_game_ticks`, the era is considered permanently activated (until the end condition fires and `ended_at_game_ticks` is set).
 
 ### SQLite WAL Mode
 

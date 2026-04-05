@@ -1,0 +1,56 @@
+apiVersion: game/v1
+kind: Game
+metadata:
+  name: test-time-game
+spec:
+  displayName: "Test Time Game"
+  xp_thresholds:
+    - 0
+    - 100
+    - 300
+  hp_formula:
+    base_hp: 20
+    hp_per_level: 5
+  time:
+    ticks_per_adventure: 1
+    base_unit: tick
+    pre_epoch_behavior: clamp
+    cycles:
+      - type: ticks
+        name: test-tick
+      - type: cycle
+        name: test-hour
+        parent: test-tick
+        count: 4
+        aliases:
+          - hour
+        labels:
+          - Dawn
+          - Noon
+          - Dusk
+          - Midnight
+      - type: cycle
+        name: test-day
+        parent: test-hour
+        count: 3
+        labels:
+          - Monday
+          - Tuesday
+          - Wednesday
+    epoch:
+      test-hour: 1
+    eras:
+      - name: test-era-always
+        format: "Year {count}"
+        epoch_count: 1
+        tracks: test-day
+      - name: test-era-conditional
+        format: "Age {count}"
+        epoch_count: 1
+        tracks: test-day
+        start_condition:
+          type: level
+          value: 2
+        end_condition:
+          type: level
+          value: 5

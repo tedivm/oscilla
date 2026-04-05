@@ -150,8 +150,19 @@ class CharacterState:
     skill_cooldowns: Dict[str, int] = field(default_factory=dict)
     # Repeat-control tracking: ISO date (YYYY-MM-DD) when each adventure was last completed.
     adventure_last_completed_on: Dict[str, str] = field(default_factory=dict)
-    # Total adventures_completed sum at the time each adventure was last completed.
-    adventure_last_completed_at_total: Dict[str, int] = field(default_factory=dict)
+    # internal_ticks value at the time each adventure was last completed.
+    # Replaces the deprecated adventure_last_completed_at_total (adventure count).
+    adventure_last_completed_at_ticks: Dict[str, int] = field(default_factory=dict)
+    # In-game tick counters. Both reset to 0 on new iteration.
+    # internal_ticks: monotone; only advances on adventure completion; never adjusted by effects.
+    # game_ticks: narrative clock; advances on completion; adjustable by adjust_game_ticks effect.
+    internal_ticks: int = 0
+    game_ticks: int = 0
+    # Era activation/deactivation latch dicts. Keyed by era name; value is game_ticks when
+    # the era's start_condition (or end_condition) first evaluated true. Populated by
+    # update_era_states() in pipeline.py after each tick advancement. Reset on new iteration.
+    era_started_at_ticks: Dict[str, int] = field(default_factory=dict)
+    era_ended_at_ticks: Dict[str, int] = field(default_factory=dict)
 
     # --- Factory ---
 
@@ -512,12 +523,18 @@ class CharacterState:
                 if (today - last_on).days < spec.cooldown_days:
                     return False
 
-        # cooldown_adventures (total adventures completed since last run)
-        if spec.cooldown_adventures is not None:
-            last_total = self.adventure_last_completed_at_total.get(adventure_ref)
-            if last_total is not None:
-                total_now = sum(self.statistics.adventures_completed.values())
-                if total_now - last_total < spec.cooldown_adventures:
+        # cooldown_ticks (internal_ticks elapsed since last run — default tick-based cooldown)
+        if spec.cooldown_ticks is not None:
+            last_ticks = self.adventure_last_completed_at_ticks.get(adventure_ref)
+            if last_ticks is not None:
+                if self.internal_ticks - last_ticks < spec.cooldown_ticks:
+                    return False
+
+        # cooldown_game_ticks (game_ticks elapsed since last run — narrative clock cooldown)
+        if spec.cooldown_game_ticks is not None:
+            last_game_ticks = self.adventure_last_completed_at_ticks.get(f"__game__{adventure_ref}")
+            if last_game_ticks is not None:
+                if self.game_ticks - last_game_ticks < spec.cooldown_game_ticks:
                     return False
 
         return True
@@ -627,7 +644,11 @@ class CharacterState:
             "known_skills": sorted(self.known_skills),
             "skill_cooldowns": dict(self.skill_cooldowns),
             "adventure_last_completed_on": dict(self.adventure_last_completed_on),
-            "adventure_last_completed_at_total": dict(self.adventure_last_completed_at_total),
+            "adventure_last_completed_at_ticks": dict(self.adventure_last_completed_at_ticks),
+            "internal_ticks": self.internal_ticks,
+            "game_ticks": self.game_ticks,
+            "era_started_at_ticks": dict(self.era_started_at_ticks),
+            "era_ended_at_ticks": dict(self.era_ended_at_ticks),
         }
 
     @classmethod
@@ -747,7 +768,14 @@ class CharacterState:
             known_skills=set(data.get("known_skills", [])),
             skill_cooldowns=dict(data.get("skill_cooldowns", {})),
             adventure_last_completed_on=dict(data.get("adventure_last_completed_on", {})),
-            adventure_last_completed_at_total=dict(data.get("adventure_last_completed_at_total", {})),
+            # Accept both old key (adventure_last_completed_at_total) and new key for backward compat.
+            adventure_last_completed_at_ticks=dict(
+                data.get("adventure_last_completed_at_ticks") or data.get("adventure_last_completed_at_total", {})
+            ),
+            internal_ticks=int(data.get("internal_ticks", 0)),
+            game_ticks=int(data.get("game_ticks", 0)),
+            era_started_at_ticks=dict(data.get("era_started_at_ticks", {})),
+            era_ended_at_ticks=dict(data.get("era_ended_at_ticks", {})),
         )
 
         # Warn about equipped items whose requires condition is no longer satisfied.

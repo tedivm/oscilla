@@ -24,6 +24,7 @@ from oscilla.engine import calendar_utils
 
 if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
+    from oscilla.engine.ingame_time import InGameTimeView
 
 logger = getLogger(__name__)
 
@@ -290,11 +291,15 @@ class ExpressionContext:
 
     game carries game-level configuration (e.g. season_hemisphere) so that
     template functions can adapt to game settings without explicit parameters.
+
+    ingame_time is None when the time system is not configured. Templates
+    must guard with {% if ingame_time %} before accessing it.
     """
 
     player: PlayerContext
     combat: CombatContextView | None = None
     game: GameContext = field(default_factory=GameContext)
+    ingame_time: "InGameTimeView | None" = None
 
 
 # ---------------------------------------------------------------------------
@@ -519,7 +524,37 @@ class _MockGame:
         raise TemplateValidationError(f"game has no attribute {name!r}")
 
 
-def build_mock_context(stat_names: List[str], include_combat: bool = False) -> Dict[str, Any]:
+class _MockInGameCycles:
+    """Mock cycle dict for load-time template validation of ingame_time.cycles[x]."""
+
+    def __init__(self, default_cycle: Any) -> None:
+        self._default = default_cycle
+
+    def __getitem__(self, key: str) -> Any:
+        return self._default
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self._default
+
+
+class _MockInGameEras:
+    """Mock era dict for load-time template validation of ingame_time.eras[x]."""
+
+    def __init__(self, default_era: Any) -> None:
+        self._default = default_era
+
+    def __getitem__(self, key: str) -> Any:
+        return self._default
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self._default
+
+
+def build_mock_context(
+    stat_names: List[str],
+    include_combat: bool = False,
+    has_ingame_time: bool = False,
+) -> Dict[str, Any]:
     """Build a comprehensive mock context for load-time template validation."""
     ctx: Dict[str, Any] = {}
     ctx.update(SAFE_GLOBALS)
@@ -534,6 +569,21 @@ def build_mock_context(stat_names: List[str], include_combat: bool = False) -> D
     ctx["season"] = lambda date: calendar_utils.season(date, hemisphere=mock_game.season_hemisphere)
     ctx["today"] = lambda: datetime.date.today()
     ctx["now"] = lambda: datetime.datetime.now()
+    if has_ingame_time:
+        # Provide a minimal mock InGameTimeView so templates referencing
+        # ingame_time at load time pass the semantic check.
+        from typing import cast as _cast
+
+        from oscilla.engine.ingame_time import CycleState, EraState, InGameTimeView
+
+        mock_cycle = CycleState(name="mock", position=0, label="Mock")
+        mock_era = EraState(name="mock", count=1, active=True)
+        ctx["ingame_time"] = InGameTimeView(
+            internal_ticks=0,
+            game_ticks=0,
+            cycles=_cast(Dict[str, CycleState], _MockInGameCycles(mock_cycle)),
+            eras=_cast(Dict[str, EraState], _MockInGameEras(mock_era)),
+        )
     return ctx
 
 
@@ -550,8 +600,9 @@ class GameTemplateEngine:
     ContentRegistry and threaded through the pipeline at runtime.
     """
 
-    def __init__(self, stat_names: List[str]) -> None:
+    def __init__(self, stat_names: List[str], has_ingame_time: bool = False) -> None:
         self._stat_names = stat_names
+        self._has_ingame_time = has_ingame_time
         from jinja2 import StrictUndefined
 
         self._env = SandboxedEnvironment(undefined=StrictUndefined)
@@ -584,7 +635,11 @@ class GameTemplateEngine:
 
         # Step 3: mock render (semantic / access check)
         include_combat = context_type == "combat"
-        mock_ctx = build_mock_context(self._stat_names, include_combat=include_combat)
+        mock_ctx = build_mock_context(
+            self._stat_names,
+            include_combat=include_combat,
+            has_ingame_time=self._has_ingame_time,
+        )
         try:
             template.render(**mock_ctx)
         except TemplateValidationError:

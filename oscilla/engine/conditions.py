@@ -20,6 +20,9 @@ from oscilla.engine.models.base import (
     DateIsCondition,
     DayOfWeekIsCondition,
     EnemiesDefeatedCondition,
+    GameCalendarCycleCondition,
+    GameCalendarEraCondition,
+    GameCalendarTimeCondition,
     ItemCondition,
     ItemEquippedCondition,
     ItemHeldLabelCondition,
@@ -261,6 +264,78 @@ def evaluate(
             else:
                 # Midnight-wrapping window: true when >= start OR <= end.
                 return now_time >= t_start or now_time <= t_end
+
+        # --- In-game calendar predicates ---
+
+        case GameCalendarTimeCondition() as c:
+            # Evaluate False with warning when time system is not configured.
+            if registry is None or registry.game is None or registry.game.spec.time is None:
+                logger.warning(
+                    "game_calendar_time_is condition evaluated without a configured time system — returning False."
+                )
+                return False
+            resolver = registry.ingame_time_resolver
+            if resolver is None:
+                return False
+            view = resolver.resolve(
+                game_ticks=player.game_ticks,
+                internal_ticks=player.internal_ticks,
+                player=player,
+                registry=registry,
+            )
+            tick_value = view.internal_ticks if c.clock == "internal" else view.game_ticks
+            return _numeric_compare(tick_value, c)
+
+        case GameCalendarCycleCondition(cycle=cycle_name, value=expected_value):
+            if registry is None or registry.game is None or registry.game.spec.time is None:
+                logger.warning(
+                    "game_calendar_cycle_is condition on %r evaluated without time system — returning False.",
+                    cycle_name,
+                )
+                return False
+            resolver = registry.ingame_time_resolver
+            if resolver is None:
+                return False
+            view = resolver.resolve(
+                game_ticks=player.game_ticks,
+                internal_ticks=player.internal_ticks,
+                player=player,
+                registry=registry,
+            )
+            state = view.cycle(cycle_name)
+            if state is None:
+                logger.warning(
+                    "game_calendar_cycle_is: cycle %r not found in time system — returning False.",
+                    cycle_name,
+                )
+                return False
+            return state.label == expected_value
+
+        case GameCalendarEraCondition(era=era_name, state=expected_state):
+            if registry is None or registry.game is None or registry.game.spec.time is None:
+                logger.warning(
+                    "game_calendar_era_is condition on %r evaluated without time system — returning False.",
+                    era_name,
+                )
+                return False
+            resolver = registry.ingame_time_resolver
+            if resolver is None:
+                return False
+            view = resolver.resolve(
+                game_ticks=player.game_ticks,
+                internal_ticks=player.internal_ticks,
+                player=player,
+                registry=registry,
+            )
+            era_state = view.era(era_name)
+            if era_state is None:
+                logger.warning(
+                    "game_calendar_era_is: era %r not found — returning False.",
+                    era_name,
+                )
+                return False
+            is_active = era_state.active
+            return is_active if expected_state == "active" else not is_active
 
     # Unreachable if all Condition subtypes are handled above; guards against
     # extending the union without adding a case branch.

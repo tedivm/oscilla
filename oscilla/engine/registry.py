@@ -18,6 +18,7 @@ from oscilla.engine.models.region import RegionManifest
 from oscilla.engine.models.skill import SkillManifest
 
 if TYPE_CHECKING:
+    from oscilla.engine.ingame_time import InGameTimeResolver
     from oscilla.engine.templates import GameTemplateEngine
 
 T = TypeVar("T", bound=ManifestEnvelope)
@@ -74,6 +75,13 @@ class ContentRegistry:
         self.character_config: CharacterConfigManifest | None = None
         # Holds precompiled templates; populated by loader.py after validation.
         self.template_engine: "GameTemplateEngine | None" = None
+        # InGameTimeResolver is built once after game manifest is registered.
+        # None when time system is not configured.
+        self._ingame_time_resolver: "InGameTimeResolver | None" = None
+
+    @property
+    def ingame_time_resolver(self) -> "InGameTimeResolver | None":
+        return self._ingame_time_resolver
 
     @classmethod
     def build(
@@ -109,6 +117,24 @@ class ContentRegistry:
                     registry.buffs.register(cast(BuffManifest, m))
                 case "Game":
                     registry.game = cast(GameManifest, m)
+                    # Build the in-game time resolver once the game manifest is available.
+                    # A malformed time spec (e.g. missing root cycle) may raise here; skip
+                    # resolver construction so the semantic validator can report the error.
+                    game_manifest = registry.game
+                    if game_manifest.spec.time is not None:
+                        from oscilla.engine.ingame_time import InGameTimeResolver
+                        from oscilla.engine.loader import compute_epoch_offset
+
+                        try:
+                            epoch_offset = compute_epoch_offset(game_manifest.spec.time)
+                            registry._ingame_time_resolver = InGameTimeResolver(
+                                spec=game_manifest.spec.time,
+                                epoch_offset=epoch_offset,
+                            )
+                        except Exception:
+                            # Leave _ingame_time_resolver as None; the semantic validator
+                            # will surface actionable errors about the malformed spec.
+                            pass
                 case "CharacterConfig":
                     registry.character_config = cast(CharacterConfigManifest, m)
         return registry

@@ -301,6 +301,37 @@ Custom pronoun sets are immediately available during character creation alongsid
 
 ---
 
+## In-Game Time System
+
+The engine includes an optional calendar and dual-clock system that lets you define in-world cycles (hours, seasons, moon phases), named eras, and tick-based cooldowns. When enabled, adventures advance one or more time units on completion, conditions can gate content on the current cycle position or active era, and template expressions can display the current time state.
+
+To enable the system, add a `time:` block to your `game.yaml` spec. See the [In-Game Time](./ingame-time.md) guide for the full reference.
+
+```yaml
+spec:
+  time:
+    base_unit: hour
+    ticks_per_adventure: 1
+    pre_epoch_behavior: clamp
+    cycles:
+      - name: hour
+        count: 24
+        labels: [Dawn, Morning, Noon, Dusk, ...]
+      - name: day
+        parent: hour
+        count: 7
+        labels: [Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday]
+    epoch:
+      hour: 1
+    eras:
+      - name: age-of-heroes
+        format: "Year {count} of Heroes"
+        epoch_count: 1
+        tracks: day
+```
+
+---
+
 ## Reference
 
 ### `game.yaml` spec fields
@@ -316,6 +347,7 @@ Custom pronoun sets are immediately available during character creation alongsid
 | `passive_effects` | no | List of game-wide passive effect entries |
 | `season_hemisphere` | no | `northern` (default) or `southern` — flips which months are which season |
 | `timezone` | no | IANA timezone name (e.g. `"America/New_York"`); defaults to server local time |
+| `time` | no | In-game time system configuration — cycles, eras, epoch. See [In-Game Time](./ingame-time.md). |
 
 ### `character_config.yaml` spec fields
 

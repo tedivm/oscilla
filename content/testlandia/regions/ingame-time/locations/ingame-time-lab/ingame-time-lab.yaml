@@ -1,0 +1,22 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: ingame-time-lab
+spec:
+  displayName: "Time Lab"
+  description: "Exercise in-game time features. Adventures here test tick advancement, cycle conditions, era conditions, and
+    the adjust_game_ticks effect."
+  region: ingame-time
+  adventures:
+    - ref: test-time-display
+      weight: 100
+    - ref: test-time-advances
+      weight: 100
+    - ref: test-wait-for-season
+      weight: 100
+    - ref: test-turn-back-the-clock
+      weight: 100
+    - ref: test-new-era-unlocked
+      weight: 100
+    - ref: test-count-the-days
+      weight: 100

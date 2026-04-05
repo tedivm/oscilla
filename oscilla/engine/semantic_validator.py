@@ -9,7 +9,7 @@ unreachable content.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, List, Set
+from typing import TYPE_CHECKING, Dict, List, Set
 
 if TYPE_CHECKING:
     from oscilla.engine.registry import ContentRegistry
@@ -40,6 +40,7 @@ def validate_semantic(registry: "ContentRegistry") -> List[SemanticIssue]:
     issues.extend(_check_circular_region_parents(registry))
     issues.extend(_check_orphaned_adventures(registry))
     issues.extend(_check_unreachable_adventures(registry))
+    issues.extend(_validate_time_spec(registry))
     return issues
 
 
@@ -228,4 +229,267 @@ def _check_unreachable_adventures(registry: "ContentRegistry") -> List[SemanticI
                             severity="warning",
                         )
                     )
+    return issues
+
+
+def _validate_time_spec(registry: "ContentRegistry") -> List[SemanticIssue]:
+    """Validate the game time spec (game.yaml spec.time) for structural correctness.
+
+    Checks:
+    1. Exactly one root cycle (type: ticks).
+    2. No circular parent references in the cycle DAG.
+    3. All parent names resolve to a declared cycle name or alias.
+    4. No duplicate names or aliases across all cycles.
+    5. Labels list length matches count when labels are supplied.
+    6. Epoch keys are declared cycle names/aliases; values are valid labels or in-range integers.
+    7. Era `tracks` references a declared cycle.
+    8. `game_calendar_cycle_is` conditions reference declared cycles; values match declared labels.
+    9. `game_calendar_era_is` conditions reference declared eras.
+    """
+    if registry.game is None or registry.game.spec.time is None:
+        return []
+
+    from oscilla.engine.models.base import (
+        AllCondition,
+        AnyCondition,
+        GameCalendarCycleCondition,
+        GameCalendarEraCondition,
+        NotCondition,
+    )
+    from oscilla.engine.models.time import DerivedCycleSpec, RootCycleSpec
+
+    issues: List[SemanticIssue] = []
+    spec = registry.game.spec.time
+
+    # --- Build lookup maps ---
+    # Map every name/alias → canonical cycle name
+    name_to_canonical: Dict[str, str] = {}
+    # Map canonical name → cycle spec
+    canonical_to_spec: Dict[str, RootCycleSpec | DerivedCycleSpec] = {}
+    duplicate_names: Set[str] = set()
+
+    for cycle in spec.cycles:
+        tokens = [cycle.name]
+        if isinstance(cycle, RootCycleSpec):
+            tokens.extend(cycle.aliases)
+        for token in tokens:
+            if token in name_to_canonical:
+                duplicate_names.add(token)
+            else:
+                name_to_canonical[token] = cycle.name
+        canonical_to_spec[cycle.name] = cycle
+
+    era_names: Set[str] = {era.name for era in spec.eras}
+
+    # Rule 4: Duplicate names/aliases
+    for dup in sorted(duplicate_names):
+        issues.append(
+            SemanticIssue(
+                kind="duplicate_name",
+                message=f"Duplicate cycle name or alias {dup!r} in time spec",
+                manifest="game",
+            )
+        )
+
+    # Rule 1: Exactly one root cycle
+    root_cycles = [c for c in spec.cycles if isinstance(c, RootCycleSpec)]
+    if len(root_cycles) == 0:
+        issues.append(
+            SemanticIssue(
+                kind="invalid_time_spec",
+                message="time.cycles must contain exactly one root cycle (type: ticks); found none",
+                manifest="game",
+            )
+        )
+    elif len(root_cycles) > 1:
+        names = ", ".join(repr(c.name) for c in root_cycles)
+        issues.append(
+            SemanticIssue(
+                kind="invalid_time_spec",
+                message=f"time.cycles must contain exactly one root cycle (type: ticks); found {len(root_cycles)}: {names}",
+                manifest="game",
+            )
+        )
+
+    # Rule 3: All parent names resolve + Rule 2: No circular parent refs
+    for cycle in spec.cycles:
+        if isinstance(cycle, DerivedCycleSpec):
+            if cycle.parent not in name_to_canonical:
+                issues.append(
+                    SemanticIssue(
+                        kind="undefined_ref",
+                        message=f"Cycle {cycle.name!r} parent {cycle.parent!r} does not resolve to any declared cycle",
+                        manifest="game",
+                    )
+                )
+
+    # Rule 2: Circular parent refs (DFS)
+    visited: Set[str] = set()
+    rec_stack: Set[str] = set()
+
+    def _dfs_cycle(name: str) -> bool:
+        visited.add(name)
+        rec_stack.add(name)
+        cyc = canonical_to_spec.get(name)
+        if cyc is not None and isinstance(cyc, DerivedCycleSpec):
+            parent_canonical = name_to_canonical.get(cyc.parent)
+            if parent_canonical is not None:
+                if parent_canonical not in visited:
+                    if _dfs_cycle(parent_canonical):
+                        return True
+                elif parent_canonical in rec_stack:
+                    issues.append(
+                        SemanticIssue(
+                            kind="circular_chain",
+                            message=f"Circular parent chain detected in cycles: {name!r} → {cyc.parent!r}",
+                            manifest="game",
+                        )
+                    )
+                    return True
+        rec_stack.discard(name)
+        return False
+
+    for cycle in spec.cycles:
+        if cycle.name not in visited:
+            _dfs_cycle(cycle.name)
+
+    # Rule 5: Labels length = count — only applicable to derived cycles (root has no labels)
+    for cycle in spec.cycles:
+        if cycle.type == "cycle" and cycle.labels and len(cycle.labels) != cycle.count:
+            issues.append(
+                SemanticIssue(
+                    kind="invalid_time_spec",
+                    message=(
+                        f"Cycle {cycle.name!r} has {len(cycle.labels)} labels but count={cycle.count}; they must match"
+                    ),
+                    manifest="game",
+                )
+            )
+
+    # Rule 6: Epoch keys and values
+    for key, value in spec.epoch.items():
+        canonical = name_to_canonical.get(key)
+        if canonical is None:
+            issues.append(
+                SemanticIssue(
+                    kind="undefined_ref",
+                    message=f"Epoch key {key!r} does not resolve to any declared cycle",
+                    manifest="game",
+                )
+            )
+            continue
+        cycle = canonical_to_spec[canonical]
+        if isinstance(value, str):
+            labels = cycle.labels if cycle.type == "cycle" else []
+            if labels and value not in labels:
+                issues.append(
+                    SemanticIssue(
+                        kind="invalid_time_spec",
+                        message=(f"Epoch value {value!r} for cycle {key!r} is not in declared labels: {labels!r}"),
+                        manifest="game",
+                    )
+                )
+        else:
+            # 1-based integer
+            if value < 1 or value > cycle.count:
+                issues.append(
+                    SemanticIssue(
+                        kind="invalid_time_spec",
+                        message=(f"Epoch value {value!r} for cycle {key!r} is out of range; must be 1..{cycle.count}"),
+                        manifest="game",
+                    )
+                )
+
+    # Rule 7: Era `tracks` references declared cycles
+    for era in spec.eras:
+        if era.tracks not in name_to_canonical:
+            issues.append(
+                SemanticIssue(
+                    kind="undefined_ref",
+                    message=f"Era {era.name!r} tracks cycle {era.tracks!r} which is not declared",
+                    manifest="game",
+                )
+            )
+
+    # Rules 8 + 9: Walk all conditions in the registry and validate calendar refs
+    def _collect_calendar_conditions(condition: object) -> List[object]:
+        """Recursively collect all calendar conditions from a condition tree."""
+        if condition is None:
+            return []
+        result: List[object] = []
+        if isinstance(condition, (GameCalendarCycleCondition, GameCalendarEraCondition)):
+            result.append(condition)
+        elif isinstance(condition, (AllCondition, AnyCondition)):
+            for sub in condition.conditions:
+                result.extend(_collect_calendar_conditions(sub))
+        elif isinstance(condition, NotCondition):
+            result.extend(_collect_calendar_conditions(condition.condition))
+        return result
+
+    def _check_calendar_conditions(conditions: List[object], source: str) -> None:
+        for cond in conditions:
+            if isinstance(cond, GameCalendarCycleCondition):
+                canonical = name_to_canonical.get(cond.cycle)
+                if canonical is None:
+                    issues.append(
+                        SemanticIssue(
+                            kind="undefined_ref",
+                            message=f"game_calendar_cycle_is references unknown cycle {cond.cycle!r}",
+                            manifest=source,
+                        )
+                    )
+                else:
+                    cycle = canonical_to_spec[canonical]
+                    labels = cycle.labels if cycle.type == "cycle" else []
+                    if labels and cond.value not in labels:
+                        issues.append(
+                            SemanticIssue(
+                                kind="invalid_time_spec",
+                                message=(
+                                    f"game_calendar_cycle_is value {cond.value!r} for cycle {cond.cycle!r} "
+                                    f"is not in declared labels: {labels!r}"
+                                ),
+                                manifest=source,
+                            )
+                        )
+            elif isinstance(cond, GameCalendarEraCondition):
+                if cond.era not in era_names:
+                    issues.append(
+                        SemanticIssue(
+                            kind="undefined_ref",
+                            message=f"game_calendar_era_is references unknown era {cond.era!r}",
+                            manifest=source,
+                        )
+                    )
+
+    # Check era start/end conditions
+    for era in spec.eras:
+        for cond_field in (era.start_condition, era.end_condition):
+            cal_conds = _collect_calendar_conditions(cond_field)
+            _check_calendar_conditions(cal_conds, source=f"era:{era.name}")
+
+    # Check all conditions in adventures (requires + step conditions)
+    from oscilla.engine.graph import _walk_all_steps
+    from oscilla.engine.models.adventure import ChoiceStep, StatCheckStep
+
+    for adv in registry.adventures.all():
+        src = f"adventure:{adv.metadata.name}"
+        cal_conds = _collect_calendar_conditions(adv.spec.requires)
+        _check_calendar_conditions(cal_conds, source=src)
+        for step in _walk_all_steps(adv.spec.steps):
+            if isinstance(step, StatCheckStep):
+                cal_conds = _collect_calendar_conditions(step.condition)
+                _check_calendar_conditions(cal_conds, source=src)
+            elif isinstance(step, ChoiceStep):
+                for opt in step.options:
+                    cal_conds = _collect_calendar_conditions(opt.requires)
+                    _check_calendar_conditions(cal_conds, source=src)
+
+    # Check location adventure pool conditions
+    for loc in registry.locations.all():
+        src = f"location:{loc.metadata.name}"
+        for entry in loc.spec.adventures:
+            cal_conds = _collect_calendar_conditions(entry.requires)
+            _check_calendar_conditions(cal_conds, source=src)
+
     return issues

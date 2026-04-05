@@ -401,11 +401,70 @@ class NotCondition(BaseModel):
     condition: "Condition"
 
 
+class GameCalendarTimeCondition(BaseModel):
+    """Numeric comparison against internal_ticks or game_ticks.
+
+    clock: "internal" (default) uses internal_ticks — the monotone clock.
+           "game" uses game_ticks — the narrative clock, adjustable by effects.
+
+    At least one of gt/gte/lt/lte/eq/mod must be set.
+    Only valid when game.time is configured; evaluates False with a warning otherwise.
+    """
+
+    type: Literal["game_calendar_time_is"]
+    clock: Literal["internal", "game"] = "internal"
+    gt: int | None = None
+    gte: int | None = None
+    lt: int | None = None
+    lte: int | None = None
+    eq: int | None = None
+    mod: "ModComparison | None" = None
+
+    @model_validator(mode="after")
+    def at_least_one_comparator(self) -> "GameCalendarTimeCondition":
+        if all(v is None for v in (self.gt, self.gte, self.lt, self.lte, self.eq, self.mod)):
+            raise ValueError("game_calendar_time_is condition must specify at least one of: gt, gte, lt, lte, eq, mod")
+        return self
+
+
+class GameCalendarCycleCondition(BaseModel):
+    """Tests the current label of any named cycle against a value.
+
+    cycle: the cycle name or alias to query.
+    value: the expected label string. Validated against declared labels at load time
+           by the semantic validator.
+
+    Only valid when game.time defines the named cycle; evaluates False with a warning otherwise.
+    """
+
+    type: Literal["game_calendar_cycle_is"]
+    cycle: str
+    value: str
+
+
+class GameCalendarEraCondition(BaseModel):
+    """Tests whether a named era is currently active or inactive.
+
+    era: the era name to query.
+    state: "active" (default) evaluates to True when the era's condition is met.
+           "inactive" is the logical negation.
+
+    Only valid when game.time defines the named era; evaluates False with a warning otherwise.
+    """
+
+    type: Literal["game_calendar_era_is"]
+    era: str
+    state: Literal["active", "inactive"] = "active"
+
+
 Condition = Annotated[
     Union[
         AllCondition,
         AnyCondition,
         NotCondition,
+        GameCalendarTimeCondition,
+        GameCalendarCycleCondition,
+        GameCalendarEraCondition,
         LevelCondition,
         MilestoneCondition,
         ItemCondition,

@@ -36,6 +36,7 @@ from oscilla.services.character import (
     set_stat,
     touch_character_updated_at,
     unequip_item,
+    update_character_tick_state,
     update_scalar_fields,
     upsert_adventure_state,
 )
@@ -216,9 +217,6 @@ class GameSession:
 
         # Record repeat-control tracking state after each adventure run.
         self._character.adventure_last_completed_on[adventure_ref] = _date.today().isoformat()
-        self._character.adventure_last_completed_at_total[adventure_ref] = sum(
-            self._character.statistics.adventures_completed.values()
-        )
         # Record per-outcome count for this completion.
         self._character.statistics.record_adventure_outcome(adventure_ref=adventure_ref, outcome=outcome.value)
 
@@ -504,18 +502,28 @@ class GameSession:
             )
             # Persist adventure repeat-control state for any adventures tracked
             last_completed_on = last.adventure_last_completed_on if last is not None else {}
-            last_completed_at_total = last.adventure_last_completed_at_total if last is not None else {}
+            last_completed_at_ticks = last.adventure_last_completed_at_ticks if last is not None else {}
             for adventure_ref, completed_on in state.adventure_last_completed_on.items():
-                if completed_on != last_completed_on.get(adventure_ref) or state.adventure_last_completed_at_total.get(
+                if completed_on != last_completed_on.get(adventure_ref) or state.adventure_last_completed_at_ticks.get(
                     adventure_ref
-                ) != last_completed_at_total.get(adventure_ref):
+                ) != last_completed_at_ticks.get(adventure_ref):
                     await upsert_adventure_state(
                         session=self.db_session,
                         iteration_id=iteration_id,
                         adventure_ref=adventure_ref,
                         last_completed_on=completed_on,
-                        last_completed_at_total=state.adventure_last_completed_at_total.get(adventure_ref),
+                        last_completed_at_ticks=state.adventure_last_completed_at_ticks.get(adventure_ref),
                     )
+            # Persist tick counters and era states
+            await update_character_tick_state(
+                session=self.db_session,
+                iteration_id=iteration_id,
+                internal_ticks=state.internal_ticks,
+                game_ticks=state.game_ticks,
+                adventure_last_completed_at_ticks=dict(state.adventure_last_completed_at_ticks),
+                era_started_at_ticks=state.era_started_at_ticks,
+                era_ended_at_ticks=state.era_ended_at_ticks,
+            )
             await touch_character_updated_at(
                 session=self.db_session,
                 character_id=state.character_id,

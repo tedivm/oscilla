@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from oscilla.engine.models.base import Condition, ManifestEnvelope
 from oscilla.engine.models.item import StatModifier
+from oscilla.engine.models.time import GameTimeSpec
 
 
 class HpFormula(BaseModel):
@@ -61,6 +62,9 @@ class GameSpec(BaseModel):
     # IANA timezone name (e.g. "America/New_York") used by calendar predicates.
     # Defaults to None (server local time).
     timezone: str | None = None
+    # Optional in-game time system. When absent, all ingame_time features
+    # are disabled and existing behaviour is fully preserved.
+    time: GameTimeSpec | None = None
 
 
 class GameManifest(ManifestEnvelope):

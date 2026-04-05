@@ -75,6 +75,11 @@ class CharacterIterationRecord(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
+    # In-game tick counters. Both reset to 0 on new iteration.
+    # Stored as BigInteger to accommodate games with very high tick rates or long runs.
+    internal_ticks: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    game_ticks: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+
     # Session soft-lock — detects and recovers from dead processes (see design D11).
     # session_token is a per-GameSession UUID written at lock acquisition and
     # cleared on clean exit. If a new session finds this non-NULL it concludes
@@ -111,6 +116,9 @@ class CharacterIterationRecord(Base):
     )
     adventure_state_rows: Mapped[List["CharacterIterationAdventureState"]] = relationship(
         "CharacterIterationAdventureState", back_populates="iteration", cascade="all, delete-orphan"
+    )
+    era_state_rows: Mapped[List["CharacterIterationEraState"]] = relationship(
+        "CharacterIterationEraState", back_populates="iteration", cascade="all, delete-orphan"
     )
     character: Mapped["CharacterRecord"] = relationship(  # noqa: F821
         "CharacterRecord", back_populates="iterations"
@@ -321,8 +329,8 @@ class CharacterIterationAdventureState(Base):
 
     last_completed_on is the ISO-8601 date string (YYYY-MM-DD) of the most
     recent completion — used for cooldown_days checks.
-    last_completed_at_total is the total adventures_completed count at the time
-    of the most recent completion — used for cooldown_adventures checks.
+    last_completed_at_ticks is the internal_ticks value at the time of the most
+    recent completion — used for cooldown_ticks and cooldown_game_ticks checks.
     """
 
     __tablename__ = "character_iteration_adventure_state"
@@ -330,8 +338,30 @@ class CharacterIterationAdventureState(Base):
     iteration_id: Mapped[UUID] = mapped_column(ForeignKey("character_iterations.id"), primary_key=True, nullable=False)
     adventure_ref: Mapped[str] = mapped_column(String, primary_key=True)
     last_completed_on: Mapped[str | None] = mapped_column(String, nullable=True)
-    last_completed_at_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    last_completed_at_ticks: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     iteration: Mapped["CharacterIterationRecord"] = relationship(
         "CharacterIterationRecord", back_populates="adventure_state_rows"
+    )
+
+
+class CharacterIterationEraState(Base):
+    """One row per era that has activated or deactivated this iteration.
+
+    started_at_game_ticks: game_ticks at the moment the era's start_condition
+        first evaluated true (or 0 for always-active eras). NULL if the era
+        has not yet started.
+    ended_at_game_ticks: game_ticks at the moment the era's end_condition first
+        evaluated true. NULL if the era has not yet ended (or has no end_condition).
+    """
+
+    __tablename__ = "character_iteration_era_state"
+
+    iteration_id: Mapped[UUID] = mapped_column(ForeignKey("character_iterations.id"), primary_key=True, nullable=False)
+    era_name: Mapped[str] = mapped_column(String, primary_key=True)
+    started_at_game_ticks: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    ended_at_game_ticks: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+
+    iteration: Mapped["CharacterIterationRecord"] = relationship(
+        "CharacterIterationRecord", back_populates="era_state_rows"
     )

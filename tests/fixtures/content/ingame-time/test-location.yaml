@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: test-location
+spec:
+  displayName: "Test Location"
+  description: "A basic location for testing."
+  region: test-region-root
+  adventures:
+    - ref: test-narrative
+      weight: 100

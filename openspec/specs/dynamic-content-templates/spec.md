@@ -29,7 +29,7 @@ The system SHALL use a `jinja2.sandbox.SandboxedEnvironment` as the underlying t
 
 ### Requirement: Templates have access to a read-only ExpressionContext
 
-Templates SHALL receive an `ExpressionContext` at render time containing a `PlayerContext` (read-only projection of `CharacterState`), an optional `CombatContextView`, and a `GameContext` (read-only projection of `GameSpec`). Templates SHALL NOT be able to mutate any field on these objects.
+Templates SHALL receive an `ExpressionContext` at render time containing a `PlayerContext` (read-only projection of `CharacterState`), an optional `CombatContextView`, a `GameContext` (read-only projection of `GameSpec`), and an optional `InGameTimeView` exposed as `ingame_time`. Templates SHALL NOT be able to mutate any field on these objects.
 
 The `PlayerContext` SHALL expose:
 
@@ -46,6 +46,8 @@ The `GameContext` SHALL expose:
 
 - `game.season_hemisphere` — `"northern"` or `"southern"`; defaults to `"northern"` when the game manifest does not declare it
 - `game.timezone` — IANA timezone name string (e.g. `"America/New_York"`), or `None` when the game manifest does not declare a timezone
+
+The `ingame_time` field SHALL expose an `InGameTimeView` when the game has a `time:` block configured, and `None` otherwise. Full specification of `ingame_time` properties is in the `ingame-time-templates` spec.
 
 #### Scenario: Template accesses player name
 
@@ -86,6 +88,16 @@ The `GameContext` SHALL expose:
 
 - **WHEN** a manifest template accesses `game.xp_thresholds` (a property not in `GameContext`)
 - **THEN** `load()` raises a `ContentLoadError` during mock render
+
+#### Scenario: Template accesses ingame_time when time is configured
+
+- **WHEN** a game has a `time:` block and a template renders `{{ ingame_time.game_ticks }}`
+- **THEN** the rendered output contains the current `game_ticks` value
+
+#### Scenario: Template guards ingame_time when time is not configured
+
+- **WHEN** a game has no `time:` block and a template contains `{% if ingame_time %}{{ ingame_time.game_ticks }}{% endif %}`
+- **THEN** the block is skipped and no error is raised
 
 ---
 

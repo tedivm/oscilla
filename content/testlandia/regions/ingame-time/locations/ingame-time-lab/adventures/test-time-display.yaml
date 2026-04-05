@@ -1,0 +1,21 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-time-display
+spec:
+  displayName: "Time Display — Read-Out"
+  description: "Always available. Shows the current values of both clocks, the current season, the current moon phase, and
+    the active era count. No side effects."
+  steps:
+    - type: narrative
+      text: |
+        **IN-GAME TIME READ-OUT**
+
+        Internal ticks (play-time clock): {{ ingame_time.internal_ticks }}
+        Game ticks (narrative clock):     {{ ingame_time.game_ticks }}
+
+        Current hour (root cycle):        {{ ingame_time.cycles['hour'].label }}
+        Current season:                   {{ ingame_time.cycles['season'].label }}
+        Current lunar phase:              {{ ingame_time.cycles['lunar_cycle'].label }}
+
+        Testlandia Era:                   {{ ingame_time.eras['testlandia_era'].count }}

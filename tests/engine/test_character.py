@@ -334,3 +334,93 @@ def test_set_stat_at_int64_boundary_is_not_clamped() -> None:
     assert player.stats["gold"] == _INT64_MAX
     player.set_stat(name="gold", value=_INT64_MIN)
     assert player.stats["gold"] == _INT64_MIN
+
+
+# ---------------------------------------------------------------------------
+# CharacterState serialization — tick fields (task 10.5)
+# ---------------------------------------------------------------------------
+
+
+def test_ticks_round_trip(minimal_registry: ContentRegistry) -> None:
+    """internal_ticks and game_ticks survive a to_dict()/from_dict() round-trip."""
+    assert minimal_registry.character_config is not None
+    player = CharacterState.new_character(
+        name="TickTester",
+        game_manifest=minimal_registry.game,
+        character_config=minimal_registry.character_config,
+    )
+    player.internal_ticks = 42
+    player.game_ticks = 17
+    player.era_started_at_ticks = {"ancient": 5}
+    player.era_ended_at_ticks = {"ancient": 10}
+    player.adventure_last_completed_at_ticks = {"quest-x": 3}
+
+    data = player.to_dict()
+    assert data["internal_ticks"] == 42
+    assert data["game_ticks"] == 17
+
+    restored = CharacterState.from_dict(data=data, character_config=minimal_registry.character_config)
+    assert restored.internal_ticks == 42
+    assert restored.game_ticks == 17
+    assert restored.era_started_at_ticks == {"ancient": 5}
+    assert restored.era_ended_at_ticks == {"ancient": 10}
+    assert restored.adventure_last_completed_at_ticks == {"quest-x": 3}
+
+
+def test_ticks_default_to_zero_when_absent(minimal_registry: ContentRegistry) -> None:
+    """Deserializing an old save without tick keys produces zeros (backward compat)."""
+    assert minimal_registry.character_config is not None
+    player = CharacterState.new_character(
+        name="OldSave",
+        game_manifest=minimal_registry.game,
+        character_config=minimal_registry.character_config,
+    )
+    data = player.to_dict()
+    # Simulate an old save by removing the new keys.
+    data.pop("internal_ticks", None)
+    data.pop("game_ticks", None)
+    data.pop("era_started_at_ticks", None)
+    data.pop("era_ended_at_ticks", None)
+    data.pop("adventure_last_completed_at_ticks", None)
+
+    restored = CharacterState.from_dict(data=data, character_config=minimal_registry.character_config)
+    assert restored.internal_ticks == 0
+    assert restored.game_ticks == 0
+    assert restored.era_started_at_ticks == {}
+    assert restored.era_ended_at_ticks == {}
+    assert restored.adventure_last_completed_at_ticks == {}
+
+
+def test_old_adventure_tick_key_mapped_to_new_key(minimal_registry: ContentRegistry) -> None:
+    """adventure_last_completed_at_total (deprecated key) maps to adventure_last_completed_at_ticks."""
+    assert minimal_registry.character_config is not None
+    player = CharacterState.new_character(
+        name="Migration",
+        game_manifest=minimal_registry.game,
+        character_config=minimal_registry.character_config,
+    )
+    data = player.to_dict()
+    # Simulate an old save using the deprecated key name.
+    data.pop("adventure_last_completed_at_ticks", None)
+    data["adventure_last_completed_at_total"] = {"old-quest": 7}
+
+    restored = CharacterState.from_dict(data=data, character_config=minimal_registry.character_config)
+    assert restored.adventure_last_completed_at_ticks == {"old-quest": 7}
+
+
+def test_new_adventure_tick_key_takes_precedence(minimal_registry: ContentRegistry) -> None:
+    """New key adventure_last_completed_at_ticks wins over the deprecated key when both present."""
+    assert minimal_registry.character_config is not None
+    player = CharacterState.new_character(
+        name="Precedence",
+        game_manifest=minimal_registry.game,
+        character_config=minimal_registry.character_config,
+    )
+    data = player.to_dict()
+    data["adventure_last_completed_at_ticks"] = {"new-quest": 99}
+    data["adventure_last_completed_at_total"] = {"old-quest": 1}
+
+    restored = CharacterState.from_dict(data=data, character_config=minimal_registry.character_config)
+    # new key takes precedence; old key is ignored
+    assert restored.adventure_last_completed_at_ticks == {"new-quest": 99}
+    assert "old-quest" not in restored.adventure_last_completed_at_ticks

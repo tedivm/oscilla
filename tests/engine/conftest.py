@@ -104,6 +104,12 @@ def region_chain_registry() -> ContentRegistry:
     return registry
 
 
+@pytest.fixture(scope="session")
+def ingame_time_registry() -> ContentRegistry:
+    registry, _warnings = load(FIXTURES / "ingame-time")
+    return registry
+
+
 # ---------------------------------------------------------------------------
 # Player fixtures
 # ---------------------------------------------------------------------------

@@ -55,6 +55,7 @@ These documents cover each manifest kind in depth.
 | Guide | What it covers |
 |---|---|
 | [Game Configuration](./game-configuration.md) | `game.yaml` and `character_config.yaml` — XP thresholds, HP formula, item labels, stats, equipment slots, custom pronoun sets. |
+| [In-Game Time](./ingame-time.md) | Calendar cycles, dual clocks, eras, tick-based cooldowns, and time conditions. |
 | [World Building](./world-building.md) | Regions, nested regions, locations, adventure pools, unlock conditions. |
 | [Adventures](./adventures.md) | Narrative, combat, choice, and stat-check steps; goto/labels; outcome branches. |
 | [Items](./items.md) | Consumables, gear, charges, equip requirements, labels, skill/buff grants. |
@@ -102,5 +103,6 @@ Ready-made patterns for common authoring challenges:
 | [Reputation System](./cookbook/reputation-system.md) | Tracking player standing with a faction using a stat, conditions, and templates |
 | [Locked Doors](./cookbook/locked-doors.md) | Gating a choice behind a key item, one-time discovery, and item consumption |
 | [Day-Night Narrative](./cookbook/day-night-narrative.md) | Writing text that changes based on the real system clock |
+| [In-Game Time Patterns](./cookbook/ingame-time-patterns.md) | Seasonal events, era transitions, time skips, lunar gates, and time-reversal puzzles |
 
 More recipes: [Cookbook README](./cookbook/README.md)

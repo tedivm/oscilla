@@ -1,0 +1,37 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-count-the-days
+spec:
+  displayName: "Count the Days — Internal Clock Gate"
+  description: "Multi-step adventure. Step 1 shows travel hours. Step 2 is gated on internal_ticks >= 5 — reachable after
+    at least 5 completions of any tick-advancing adventure."
+  steps:
+    - type: narrative
+      text: "You have traveled {{ ingame_time.internal_ticks }} hours."
+    - type: stat_check
+      condition:
+        type: game_calendar_time_is
+        clock: internal
+        gte: 5
+      on_pass:
+        steps:
+          - type: narrative
+            text: |
+              **INTERNAL CLOCK GATE — PASSED**
+
+              You have accumulated at least 5 internal ticks.
+              Internal ticks: {{ ingame_time.internal_ticks }}
+              Game ticks:     {{ ingame_time.game_ticks }}
+
+              The internal clock (play-time) tracks all adventure completions
+              regardless of any adjust_game_ticks rewinds.
+      on_fail:
+        steps:
+          - type: narrative
+            text: |
+              **INTERNAL CLOCK GATE — NOT YET**
+
+              You have only {{ ingame_time.internal_ticks }} internal ticks.
+              Complete at least {{ 5 - ingame_time.internal_ticks }} more tick-advancing
+              adventures to pass this gate.

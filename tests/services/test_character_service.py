@@ -342,11 +342,11 @@ async def test_adventure_repeat_state_persists_and_reloads(
     async_session: AsyncSession,
     minimal_registry: ContentRegistry,
 ) -> None:
-    """adventure_last_completed_on / adventure_last_completed_at_total round-trip.
+    """adventure_last_completed_on / adventure_last_completed_at_ticks round-trip.
 
     upsert_adventure_state() writes the row; load_character() reads it back
     into CharacterState.adventure_last_completed_on and
-    adventure_last_completed_at_total.
+    adventure_last_completed_at_ticks.
     """
     assert minimal_registry.character_config is not None
     user = await get_or_create_user(session=async_session, user_key="advstate@host")
@@ -361,7 +361,7 @@ async def test_adventure_repeat_state_persists_and_reloads(
         iteration_id=iteration_id,
         adventure_ref="test-quest",
         last_completed_on="2026-04-04",
-        last_completed_at_total=7,
+        last_completed_at_ticks=7,
     )
 
     loaded = await load_character(
@@ -371,7 +371,7 @@ async def test_adventure_repeat_state_persists_and_reloads(
     )
     assert loaded is not None
     assert loaded.adventure_last_completed_on["test-quest"] == "2026-04-04"
-    assert loaded.adventure_last_completed_at_total["test-quest"] == 7
+    assert loaded.adventure_last_completed_at_ticks["test-quest"] == 7
 
 
 # ---------------------------------------------------------------------------

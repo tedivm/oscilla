@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 
 from oscilla.engine.models.adventure import (
     AdventureManifest,
@@ -175,3 +176,259 @@ def test_undefined_enemy_in_combat_step() -> None:
     issues = validate_semantic(registry)
     errors = [i for i in issues if i.severity == "error"]
     assert any("no-such-enemy" in i.message for i in errors)
+
+
+# ---------------------------------------------------------------------------
+# Time system — semantic validator tests (tasks 12.1-12.4)
+# ---------------------------------------------------------------------------
+
+
+def _time_game(cycles: list, epoch: dict | None = None, eras: list | None = None) -> object:
+    """Build a minimal GameManifest with a time block for validator testing."""
+    from oscilla.engine.models.game import GameManifest, GameSpec
+
+    return GameManifest(
+        apiVersion="game/v1",
+        kind="Game",
+        metadata=Metadata(name="test-game"),
+        spec=GameSpec(
+            displayName="Test",
+            xp_thresholds=[0, 100],
+            hp_formula={"base_hp": 10, "hp_per_level": 5},
+            time={
+                "ticks_per_adventure": 1,
+                "base_unit": "tick",
+                "pre_epoch_behavior": "clamp",
+                "cycles": cycles,
+                "epoch": epoch or {},
+                "eras": eras or [],
+            },
+        ),
+    )
+
+
+# --- 12.1  Cycle DAG validation errors ---
+
+
+def test_time_no_root_cycle_raises_error() -> None:
+    """A time spec with no root cycle (type: ticks) must produce an error."""
+    game = _time_game(
+        cycles=[{"type": "cycle", "name": "hour", "parent": "tick", "count": 24}],
+    )
+    registry = ContentRegistry.build(manifests=[game])
+    errors = [i for i in validate_semantic(registry) if i.severity == "error"]
+    assert any("root" in i.message.lower() for i in errors)
+
+
+def test_time_two_root_cycles_raises_error() -> None:
+    """Two root cycles in a time spec must produce an error."""
+    game = _time_game(
+        cycles=[
+            {"type": "ticks", "name": "tick-a"},
+            {"type": "ticks", "name": "tick-b"},
+        ],
+    )
+    registry = ContentRegistry.build(manifests=[game])
+    errors = [i for i in validate_semantic(registry) if i.severity == "error"]
+    assert any("root" in i.message.lower() for i in errors)
+
+
+def test_time_circular_parent_reference_raises_error() -> None:
+    """Two derived cycles that are each other's parent form a cycle — must be an error."""
+    game = _time_game(
+        cycles=[
+            {"type": "ticks", "name": "tick"},
+            {"type": "cycle", "name": "cycle-a", "parent": "cycle-b", "count": 2},
+            {"type": "cycle", "name": "cycle-b", "parent": "cycle-a", "count": 3},
+        ],
+    )
+    registry = ContentRegistry.build(manifests=[game])
+    errors = [i for i in validate_semantic(registry) if i.severity == "error"]
+    assert any("circular" in i.message.lower() for i in errors)
+
+
+def test_time_unknown_parent_raises_error() -> None:
+    """A derived cycle whose parent does not exist must produce an error."""
+    game = _time_game(
+        cycles=[
+            {"type": "ticks", "name": "tick"},
+            {"type": "cycle", "name": "hour", "parent": "no-such-cycle", "count": 24},
+        ],
+    )
+    registry = ContentRegistry.build(manifests=[game])
+    errors = [i for i in validate_semantic(registry) if i.severity == "error"]
+    assert any("no-such-cycle" in i.message for i in errors)
+
+
+def test_time_duplicate_cycle_name_raises_error() -> None:
+    """Two cycles sharing a name must produce an error."""
+    game = _time_game(
+        cycles=[
+            {"type": "ticks", "name": "tick"},
+            {"type": "cycle", "name": "tick", "parent": "tick", "count": 4},
+        ],
+    )
+    registry = ContentRegistry.build(manifests=[game])
+    errors = [i for i in validate_semantic(registry) if i.severity == "error"]
+    assert any("duplicate" in i.message.lower() or "tick" in i.message for i in errors)
+
+
+def test_time_labels_length_mismatch_raises_error() -> None:
+    """labels list length not matching count must produce an error.
+
+    DerivedCycleSpec enforces this invariant via a Pydantic model_validator — the
+    mismatch is caught at model construction time (before the semantic validator runs).
+    """
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="labels list has"):
+        _time_game(
+            cycles=[
+                {"type": "ticks", "name": "tick"},
+                {
+                    "type": "cycle",
+                    "name": "hour",
+                    "parent": "tick",
+                    "count": 4,
+                    # Only 3 labels provided but count=4
+                    "labels": ["Dawn", "Noon", "Dusk"],
+                },
+            ],
+        )
+
+
+# --- 12.2  Epoch validation errors ---
+
+
+def test_time_epoch_nonexistent_cycle_raises_error() -> None:
+    """An epoch entry referencing an undeclared cycle name must produce an error."""
+    game = _time_game(
+        cycles=[{"type": "ticks", "name": "tick"}],
+        epoch={"ghost-cycle": 1},
+    )
+    registry = ContentRegistry.build(manifests=[game])
+    errors = [i for i in validate_semantic(registry) if i.severity == "error"]
+    assert any("ghost-cycle" in i.message for i in errors)
+
+
+def test_time_epoch_invalid_label_raises_error() -> None:
+    """An epoch entry with a string value not in the cycle's labels must produce an error."""
+    game = _time_game(
+        cycles=[
+            {"type": "ticks", "name": "tick"},
+            {
+                "type": "cycle",
+                "name": "season",
+                "parent": "tick",
+                "count": 4,
+                "labels": ["Spring", "Summer", "Autumn", "Winter"],
+            },
+        ],
+        epoch={"season": "MidWinter"},  # not a valid label
+    )
+    registry = ContentRegistry.build(manifests=[game])
+    errors = [i for i in validate_semantic(registry) if i.severity == "error"]
+    assert any("MidWinter" in i.message for i in errors)
+
+
+def test_time_epoch_out_of_range_integer_raises_error() -> None:
+    """An epoch integer outside the cycle's 1-based range must produce an error."""
+    game = _time_game(
+        cycles=[
+            {"type": "ticks", "name": "tick"},
+            {"type": "cycle", "name": "season", "parent": "tick", "count": 4},
+        ],
+        epoch={"season": 5},  # out of range; valid range is 1..4
+    )
+    registry = ContentRegistry.build(manifests=[game])
+    errors = [i for i in validate_semantic(registry) if i.severity == "error"]
+    assert any("season" in i.message for i in errors)
+
+
+# --- 12.3  Era validation errors ---
+
+
+def test_time_era_unknown_tracks_raises_error() -> None:
+    """An era referencing an undeclared tracks cycle must produce an error."""
+    game = _time_game(
+        cycles=[{"type": "ticks", "name": "tick"}],
+        eras=[
+            {
+                "name": "test-era",
+                "format": "Year {count}",
+                "epoch_count": 1,
+                "tracks": "ghost-cycle",
+            }
+        ],
+    )
+    registry = ContentRegistry.build(manifests=[game])
+    errors = [i for i in validate_semantic(registry) if i.severity == "error"]
+    assert any("ghost-cycle" in i.message or "tracks" in i.message.lower() for i in errors)
+
+
+# --- 12.4  Condition cross-reference validation ---
+
+
+def test_time_condition_cycle_is_unknown_cycle_raises_error() -> None:
+    """game_calendar_cycle_is referencing an unknown cycle name must produce an error."""
+    game = _time_game(cycles=[{"type": "ticks", "name": "tick"}])
+    adventure = AdventureManifest(
+        apiVersion="game/v1",
+        kind="Adventure",
+        metadata=Metadata(name="gated"),
+        spec=AdventureSpec(
+            displayName="Gated",
+            steps=[NarrativeStep(type="narrative", text="ok.")],
+            requires={"type": "game_calendar_cycle_is", "cycle": "ghost-cycle", "value": "Dawn"},
+        ),
+    )
+    registry = ContentRegistry.build(manifests=[game, adventure])
+    errors = [i for i in validate_semantic(registry) if i.severity == "error"]
+    assert any("ghost-cycle" in i.message for i in errors)
+
+
+def test_time_condition_cycle_is_invalid_label_raises_error() -> None:
+    """game_calendar_cycle_is with a value not in the cycle's labels must produce an error."""
+    game = _time_game(
+        cycles=[
+            {"type": "ticks", "name": "tick"},
+            {
+                "type": "cycle",
+                "name": "season",
+                "parent": "tick",
+                "count": 4,
+                "labels": ["Spring", "Summer", "Autumn", "Winter"],
+            },
+        ]
+    )
+    adventure = AdventureManifest(
+        apiVersion="game/v1",
+        kind="Adventure",
+        metadata=Metadata(name="gated"),
+        spec=AdventureSpec(
+            displayName="Gated",
+            steps=[NarrativeStep(type="narrative", text="ok.")],
+            requires={"type": "game_calendar_cycle_is", "cycle": "season", "value": "Monsoon"},
+        ),
+    )
+    registry = ContentRegistry.build(manifests=[game, adventure])
+    errors = [i for i in validate_semantic(registry) if i.severity == "error"]
+    assert any("Monsoon" in i.message for i in errors)
+
+
+def test_time_condition_era_is_unknown_era_raises_error() -> None:
+    """game_calendar_era_is referencing an unknown era name must produce an error."""
+    game = _time_game(cycles=[{"type": "ticks", "name": "tick"}])
+    adventure = AdventureManifest(
+        apiVersion="game/v1",
+        kind="Adventure",
+        metadata=Metadata(name="gated"),
+        spec=AdventureSpec(
+            displayName="Gated",
+            steps=[NarrativeStep(type="narrative", text="ok.")],
+            requires={"type": "game_calendar_era_is", "era": "ghost-era", "state": "active"},
+        ),
+    )
+    registry = ContentRegistry.build(manifests=[game, adventure])
+    errors = [i for i in validate_semantic(registry) if i.severity == "error"]
+    assert any("ghost-era" in i.message for i in errors)

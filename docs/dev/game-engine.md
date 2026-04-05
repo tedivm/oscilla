@@ -781,3 +781,101 @@ and apply matching effects. Because passive effects are evaluated with `registry
 conditions that require a registry — `item_held_label`, `any_item_equipped` — cannot be honored
 and trigger a `LoadWarning` at load time. Similarly, `character_stat` conditions with
 `stat_source: effective` also emit a warning since the registry is unavailable.
+
+---
+
+## Dual Clock Model
+
+The engine maintains two independent integer counters on each character iteration:
+
+| Clock | Field | Behavior |
+|---|---|---|
+| Internal | `internal_ticks` | Monotone, strictly non-decreasing. Represents the character's total play-time in ticks. Used for cooldown checks. |
+| Game | `game_ticks` | Narrative clock. Advances with adventures but can be adjusted backward by `adjust_game_ticks` effects. Drives in-game calendar conditions and era progression. |
+
+Both clocks start at 0 and advance by the adventure's tick cost on completion.
+
+### Tick Cost Resolution
+
+Each adventure completion charges both clocks by `_resolve_tick_cost()` in `pipeline.py`:
+
+1. If the adventure manifest sets `spec.ticks`, that value is used.
+2. Otherwise, `game.spec.time.ticks_per_adventure` is used (when the time system is active).
+3. When the time system is inactive, tick cost is 0 and both clocks stay at 0.
+
+### `adjust_game_ticks` Effect
+
+The `adjust_game_ticks` step effect adjusts `game_ticks` by a signed delta:
+
+```yaml
+- type: adjust_game_ticks
+  delta: -10        # reduce game_ticks by 10 (clamped at 0)
+```
+
+The delta is applied during adventure step execution — before the pipeline's end-of-adventure tick advance. `internal_ticks` is never affected.
+
+### `InGameTimeResolver`
+
+`InGameTimeResolver` (`oscilla/engine/ingame_time.py`) provides a read-only view of the current in-game time for a given tick count. It is built from the `GameTimeSpec` by `compute_epoch_offset()` in `loader.py` and stored as `registry.ingame_time_resolver`.
+
+It exposes:
+
+- `cycles` — a dict of `CycleState` (position, label, count of full cycles elapsed)
+- `eras` — a dict of `EraState` (active flag, count of full era-epochs elapsed)
+- `update_era_states(game_ticks, character_era_state)` — applies era start/end latch logic
+
+#### Cycle DAG
+
+Cycles form a DAG with exactly one root cycle (type `ticks`). All other cycles derive from a parent:
+
+```
+hour (root, count=24)
+  └── season (count=4)
+        └── year (count=10)
+  └── lunar_cycle (count=28)
+```
+
+The position of a derived cycle advances whenever the parent completes a full revolution. For example, a `season` cycle with `parent: hour` and `count: 4` advances one slot every 24 hours.
+
+#### Epoch
+
+`epoch` offsets the starting position of named cycles so tick 0 maps to a specific calendar position. For example:
+
+```yaml
+epoch:
+  season: Spring     # start in the Spring slot
+```
+
+The loader calls `compute_epoch_offset()` to translate the cycle position (label or 1-based integer) into the equivalent number of root ticks to subtract from the query.
+
+#### Eras
+
+Eras are named periods with an optional `start_condition` and `end_condition`. They are evaluated via `update_era_states()` each time character state is saved:
+
+- An era without `start_condition` is always active from tick 0.
+- An era with `start_condition` activates when the condition first evaluates to true.
+- Once active, an era remains active until `end_condition` evaluates to true (if set).
+- The latch nature means conditions are not re-evaluated once their transition has fired.
+
+Era `count` tracks completed `epoch_count` × `tracks` cycle revolutions since the era started.
+
+### Condition Types
+
+Three conditions operate against the dual clock state:
+
+| Type | Description |
+|---|---|
+| `game_calendar_time_is` | Numeric comparison (gt/gte/lt/lte/eq/mod) against `internal_ticks` or `game_ticks` |
+| `game_calendar_cycle_is` | Tests the current label of a named cycle |
+| `game_calendar_era_is` | Tests whether a named era is active or inactive |
+
+All three evaluate to `False` with a log warning when the time system is not configured in `game.yaml`.
+
+### Persistence
+
+Tick state is saved by `update_character_tick_state()` in `services/character.py`. The following fields are written on every adventure completion:
+
+- `character_iterations.internal_ticks`
+- `character_iterations.game_ticks`
+- `character_iteration_adventure_state.last_completed_at_ticks` (per adventure)
+- `character_iteration_era_state` rows (insert/update for each era with a changed state)

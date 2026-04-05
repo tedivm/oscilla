@@ -7,6 +7,7 @@ Ready-made patterns for common authoring challenges. Each recipe shows a complet
 | [Reputation System](./reputation-system.md) | Tracking player standing with a faction using a stat, conditions, and templates |
 | [Locked Doors](./locked-doors.md) | Gating a choice option behind a key item, including one-time discovery and item consumption |
 | [Day-Night Narrative](./day-night-narrative.md) | Writing text that changes based on the real system clock using `hour()`, `season()`, and `today()` |
+| [In-Game Time Patterns](./ingame-time-patterns.md) | Seasonal events, age counters, era transitions, lunar gates, time skips, time reversal, corruption pressure curves, and honest cooldowns |
 
 ---
 

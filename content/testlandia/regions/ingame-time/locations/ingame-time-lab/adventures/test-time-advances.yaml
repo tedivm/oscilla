@@ -1,0 +1,20 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-time-advances
+spec:
+  displayName: "Time Advances — Tick Warp"
+  description: "Each completion costs 10 ticks (both clocks). Shows game_ticks before and after so you can observe the counter
+    rise."
+  ticks: 10
+  steps:
+    - type: narrative
+      text: |
+        **TICK WARP — 10 ticks will be charged on completion**
+
+        Internal ticks BEFORE: {{ ingame_time.internal_ticks }}
+        Game ticks BEFORE:     {{ ingame_time.game_ticks }}
+
+        Completing this adventure charges 10 ticks to both clocks.
+        After 10 completions (100 game ticks) the season advances to Summer.
+        After 6 completions (60 game ticks) the Moon Age era unlocks (gte 56).

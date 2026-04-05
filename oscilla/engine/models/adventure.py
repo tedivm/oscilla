@@ -180,6 +180,18 @@ class QuestFailEffect(BaseModel):
     quest_ref: str = Field(description="Name of the Quest manifest to fail.")
 
 
+class AdjustGameTicksEffect(BaseModel):
+    """Adjust the character's game_ticks by a signed integer delta.
+
+    Positive delta moves the game clock forward; negative moves it backward.
+    The internal_ticks counter is never affected by this effect.
+    Clamping at zero is controlled by game.time.pre_epoch_behavior.
+    """
+
+    type: Literal["adjust_game_ticks"]
+    delta: int = Field(description="Signed integer tick adjustment. May be negative.")
+
+
 Effect = Annotated[
     Union[
         XpGrantEffect,
@@ -196,6 +208,7 @@ Effect = Annotated[
         SetPronounsEffect,
         QuestActivateEffect,
         QuestFailEffect,
+        AdjustGameTicksEffect,
     ],
     Field(discriminator="type"),
 ]
@@ -304,14 +317,43 @@ class AdventureSpec(BaseModel):
     description: str = ""
     requires: Condition | None = None
     steps: List[Step]
+    # Tick cost for this adventure. Defaults to game.time.ticks_per_adventure when time
+    # is configured, or 1 when time is not configured.
+    ticks: int | None = Field(default=None, ge=1, description="Tick cost for this adventure.")
     # Repeat controls — all optional, all default to unrestricted behavior.
     repeatable: bool = Field(default=True, description="Set to False to make this a one-shot adventure.")
     max_completions: int | None = Field(default=None, description="Hard cap on total completions this iteration.")
     cooldown_days: int | None = Field(default=None, description="Calendar days that must pass between runs.")
+    # cooldown_adventures is deprecated. Use cooldown_ticks instead.
+    # At load time, cooldown_adventures is mapped to cooldown_ticks with a warning.
     cooldown_adventures: int | None = Field(
         default=None,
-        description="Total adventures completed that must pass since last run.",
+        description="Deprecated. Use cooldown_ticks instead.",
     )
+    cooldown_ticks: int | None = Field(
+        default=None,
+        description="internal_ticks that must pass since last completion (default clock for cooldowns).",
+    )
+    cooldown_game_ticks: int | None = Field(
+        default=None,
+        description="game_ticks that must pass since last completion.",
+    )
+
+    @model_validator(mode="after")
+    def migrate_deprecated_cooldown_adventures(self) -> "AdventureSpec":
+        """Map deprecated cooldown_adventures to cooldown_ticks with a load warning."""
+        if self.cooldown_adventures is not None:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Adventure uses deprecated 'cooldown_adventures' — use 'cooldown_ticks' instead. "
+                "Mapping %d → cooldown_ticks.",
+                self.cooldown_adventures,
+            )
+            if self.cooldown_ticks is None:
+                self.cooldown_ticks = self.cooldown_adventures
+            self.cooldown_adventures = None
+        return self
 
     @model_validator(mode="after")
     def validate_repeat_controls(self) -> "AdventureSpec":

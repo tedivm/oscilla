@@ -1,0 +1,24 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-new-era-unlocked
+spec:
+  displayName: "New Era Unlocked — Moon Age"
+  description: "Gated on the moon_age era being active. The moon_age era unlocks once game_ticks >= 56. Run test-time-advances
+    6 times (60 ticks) to unlock it."
+  requires:
+    type: game_calendar_era_is
+    era: moon_age
+    state: active
+  steps:
+    - type: narrative
+      text: |
+        **MOON AGE ERA — ACTIVE**
+
+        The Moon Age era has begun. You have reached or passed 56 game ticks.
+
+        Current game ticks: {{ ingame_time.game_ticks }}
+        Current moon phase: {{ ingame_time.cycles['lunar_cycle'].label }}
+
+        This adventure was locked until the moon_age era activated.
+        Its start_condition was: game_calendar_time_is clock=game gte=56.
