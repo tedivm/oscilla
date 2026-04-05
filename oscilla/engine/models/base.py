@@ -6,9 +6,10 @@ Condition models are defined here and imported by other manifest modules.
 
 from __future__ import annotations
 
+import calendar as _calendar_module  # stdlib; aliased to avoid shadowing local variables
 from typing import Annotated, List, Literal, Union
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Metadata(BaseModel):
@@ -191,6 +192,196 @@ class QuestStageCondition(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Normalisation helpers for calendar condition models
+# ---------------------------------------------------------------------------
+
+
+def _resolve_month(value: int | str) -> int:
+    """Normalize a month value to an integer 1-12.
+
+    Accepts int (1-12) or full English month name (case-insensitive).
+    Raises ValueError for unrecognized values.
+    """
+    if isinstance(value, int):
+        if not (1 <= value <= 12):
+            raise ValueError(f"month must be 1-12, got {value}")
+        return value
+    # calendar.month_name is 1-indexed; index 0 is the empty string.
+    for i in range(1, 13):
+        if _calendar_module.month_name[i].lower() == value.lower():
+            return i
+    raise ValueError(f"Unrecognized month name: {value!r}")
+
+
+def _resolve_weekday(value: int | str) -> int:
+    """Normalize a day-of-week value to an integer 0-6 (Monday=0, Sunday=6).
+
+    Accepts int (0-6) or full English weekday name (case-insensitive).
+    Raises ValueError for unrecognized values.
+    """
+    if isinstance(value, int):
+        if not (0 <= value <= 6):
+            raise ValueError(f"day_of_week must be 0-6, got {value}")
+        return value
+    for i in range(7):
+        if _calendar_module.day_name[i].lower() == value.lower():
+            return i
+    raise ValueError(f"Unrecognized weekday name: {value!r}")
+
+
+# ---------------------------------------------------------------------------
+# Calendar condition leaf nodes
+# ---------------------------------------------------------------------------
+
+
+class SeasonIsCondition(BaseModel):
+    type: Literal["season_is"]
+    value: Literal["spring", "summer", "autumn", "winter"]
+
+
+class MoonPhaseIsCondition(BaseModel):
+    type: Literal["moon_phase_is"]
+    value: Literal[
+        "New Moon",
+        "Waxing Crescent",
+        "First Quarter",
+        "Waxing Gibbous",
+        "Full Moon",
+        "Waning Gibbous",
+        "Last Quarter",
+        "Waning Crescent",
+    ]
+
+
+class ZodiacIsCondition(BaseModel):
+    type: Literal["zodiac_is"]
+    value: Literal[
+        "Aries",
+        "Taurus",
+        "Gemini",
+        "Cancer",
+        "Leo",
+        "Virgo",
+        "Libra",
+        "Scorpio",
+        "Sagittarius",
+        "Capricorn",
+        "Aquarius",
+        "Pisces",
+    ]
+
+
+class ChineseZodiacIsCondition(BaseModel):
+    type: Literal["chinese_zodiac_is"]
+    value: Literal[
+        "Rat",
+        "Ox",
+        "Tiger",
+        "Rabbit",
+        "Dragon",
+        "Snake",
+        "Horse",
+        "Goat",
+        "Monkey",
+        "Rooster",
+        "Dog",
+        "Pig",
+    ]
+
+
+class MonthIsCondition(BaseModel):
+    """True when today's month matches the given value.
+
+    Accepts an integer (1-12) or a full English month name ("January"..."December").
+    Normalized to int by model validator.
+    """
+
+    type: Literal["month_is"]
+    value: int | str
+
+    @model_validator(mode="after")
+    def normalise_month(self) -> "MonthIsCondition":
+        object.__setattr__(self, "value", _resolve_month(self.value))
+        return self
+
+
+class DayOfWeekIsCondition(BaseModel):
+    """True when today's weekday matches the given value.
+
+    Accepts an integer (0=Monday ... 6=Sunday) or a full English name.
+    Normalized to int by model validator.
+    """
+
+    type: Literal["day_of_week_is"]
+    value: int | str
+
+    @model_validator(mode="after")
+    def normalise_weekday(self) -> "DayOfWeekIsCondition":
+        object.__setattr__(self, "value", _resolve_weekday(self.value))
+        return self
+
+
+class DateIsCondition(BaseModel):
+    """True when today matches the given month/day, and optionally year.
+
+    When year is omitted the condition matches annually on that date.
+    When year is present it matches only on that specific calendar date.
+    month accepts int (1-12) or full English name; day is always int.
+    """
+
+    type: Literal["date_is"]
+    month: int | str
+    day: int = Field(ge=1, le=31)
+    year: int | None = None
+
+    @model_validator(mode="after")
+    def normalise_month(self) -> "DateIsCondition":
+        object.__setattr__(self, "month", _resolve_month(self.month))
+        return self
+
+
+class DateBoundary(BaseModel):
+    """A month/day pair used as a start or end point in DateBetweenCondition."""
+
+    model_config = ConfigDict(frozen=True)
+    month: int | str
+    day: int = Field(ge=1, le=31)
+
+    @model_validator(mode="after")
+    def normalise_month(self) -> "DateBoundary":
+        object.__setattr__(self, "month", _resolve_month(self.month))
+        return self
+
+
+class DateBetweenCondition(BaseModel):
+    """True when today falls within the date range [start, end] (month/day only).
+
+    When start comes after end in the calendar year, the range wraps across
+    the year boundary (e.g. start=Dec 1, end=Jan 31 covers December and January).
+    When start == end the condition always evaluates False and logs a warning.
+    No year field is provided; use DateIsCondition or combine with AllCondition
+    for year-specific date ranges.
+    """
+
+    type: Literal["date_between"]
+    start: DateBoundary
+    end: DateBoundary
+
+
+class TimeBetweenCondition(BaseModel):
+    """True when the current local time falls in the window [start, end].
+
+    Both values are HH:MM strings in 24-hour format.
+    When start > end the window wraps midnight (e.g. 22:00–04:00 is "night").
+    When start == end the window has zero duration and always evaluates False.
+    """
+
+    type: Literal["time_between"]
+    start: str = Field(pattern=r"^\d{2}:\d{2}$", description="HH:MM (24-hour)")
+    end: str = Field(pattern=r"^\d{2}:\d{2}$", description="HH:MM (24-hour)")
+
+
+# ---------------------------------------------------------------------------
 # Condition branch nodes (forward-referenced via model_rebuild)
 # ---------------------------------------------------------------------------
 
@@ -230,6 +421,16 @@ Condition = Annotated[
         SkillCondition,
         PronounsCondition,
         QuestStageCondition,
+        # Calendar predicates
+        SeasonIsCondition,
+        MoonPhaseIsCondition,
+        ZodiacIsCondition,
+        ChineseZodiacIsCondition,
+        MonthIsCondition,
+        DayOfWeekIsCondition,
+        DateIsCondition,
+        DateBetweenCondition,
+        TimeBetweenCondition,
     ],
     Field(discriminator="type"),
 ]

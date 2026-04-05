@@ -77,7 +77,7 @@ tomlsort_fixes:
 # Testing
 #
 .PHONY: tests
-tests: install pytest ruff_check black_check mypy_check dapperdata_check tomlsort_check paracelsus_check validate
+tests: install pytest ruff_check black_check mypy_check dapperdata_check tomlsort_check paracelsus_check check_ungenerated_migrations validate
 
 .PHONY: pytest
 pytest:

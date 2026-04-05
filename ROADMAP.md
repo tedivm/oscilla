@@ -30,10 +30,7 @@ These items fix existing bugs or remove technical debt that actively misleads au
 
 | Item | Effort | Group |
 |------|--------|-------|
-| [Date and Time Conditions](#date-and-time-conditions) | S | Calendar Conditions |
-| [Calendar Functions in Conditions](#calendar-and-astronomical-functions-in-conditions) | XS | Calendar Conditions |
 | [In-Game Time System](#in-game-time-system) | M | Calendar Conditions |
-| [Season Hemisphere Configuration](#season-hemisphere-configuration) | XS | Calendar Conditions |
 | [Triggered Adventures](#triggered-adventures) | M | — |
 | [Adventure-Scoped Variables](#adventure-scoped-variables) | M | Adventure Authoring |
 | [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems) | XL | Combat Overhaul |
@@ -62,30 +59,6 @@ These items fix existing bugs or remove technical debt that actively misleads au
 
 ## Condition System
 
-### Date and Time Conditions
-
-**Effort: S** · **Group: Calendar Conditions**
-
-Add date and time predicates to the condition evaluator so content authors can create holiday events, time-of-day atmosphere, and seasonal content without requiring any template logic.
-
-Example use cases:
-
-- Show a special greeting every December 25th
-- Play a spooky encounter only in October
-- Display a morning/evening variant of a location description
-
-This pairs naturally with the `now()` and `today()` template functions added in `dynamic-content-templates`, but belongs in the condition system so that entire adventure branches — not just narrative text — can be gated on the calendar.
-
-Candidate condition types: `date_is`, `month_is`, `day_of_week_is`, `time_between`.
-
-### Calendar and Astronomical Functions in Conditions
-
-**Effort: XS** · **Group: Calendar Conditions**
-
-The `dynamic-content-templates` change introduces `oscilla/engine/calendar_utils.py` — a dependency-free module with `season`, `month_name`, `day_name`, `week_number`, `mean`, `zodiac_sign`, `chinese_zodiac`, and `moon_phase`. This module was deliberately separated from the template engine so the condition evaluator can import the same functions without duplication.
-
-When calendar conditions are added to the condition evaluator, the implementation details (zodiac boundary tables, lunar cycle math, etc.) are already solved and available in `calendar_utils`. The condition system only needs to expose them as evaluable predicates (e.g., `season_is: summer`, `moon_phase_is: Full Moon`, `zodiac_is: Aries`).
-
 ### In-Game Time System
 
 **Effort: M** · **Group: Calendar Conditions**
@@ -106,14 +79,6 @@ spec:
 ```
 
 The in-game time counter increments automatically on adventure completion (or on other configurable events). Templates and conditions expose an `ingame_time` object with the current day, season name, and tick count alongside the existing real-world `today()` and `now()`. Authors who omit `time:` entirely continue using real-world calendar functions with no change.
-
-### Season Hemisphere Configuration
-
-**Effort: XS** · **Group: Calendar Conditions**
-
-The `season()` function in `calendar_utils.py` uses Northern Hemisphere meteorological season boundaries. Authors writing games set in a Southern Hemisphere context (or a fictional world with a different seasonal calendar) have no way to change this.
-
-Add an optional `season_hemisphere` field in `game.yaml` — and a per-character override — that controls which hemisphere's boundaries `season()` uses. Valid values: `northern` (default), `southern`. This pairs naturally with the In-Game Time System, which would render the real-world hemisphere setting irrelevant for games using fictitious calendars.
 
 ---
 

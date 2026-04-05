@@ -1,0 +1,159 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-zodiac-is
+spec:
+  displayName: "Zodiac Is — Condition Check"
+  description: "Always available. Tests all 12 zodiac signs so exactly one PASS fires regardless of the current date."
+  steps:
+    - type: narrative
+      text: |
+        **ZODIAC_IS — Branch Test**
+
+        Current zodiac sign: {{ zodiac_sign(today()) }}
+
+        Testing each of the 12 signs…
+    - type: stat_check
+      condition:
+        type: zodiac_is
+        value: Aries
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Aries: PASS — the current sign is Aries (Mar 21 – Apr 19)"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Aries: FAIL"
+    - type: stat_check
+      condition:
+        type: zodiac_is
+        value: Taurus
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Taurus: PASS — the current sign is Taurus (Apr 20 – May 20)"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Taurus: FAIL"
+    - type: stat_check
+      condition:
+        type: zodiac_is
+        value: Gemini
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Gemini: PASS — the current sign is Gemini (May 21 – Jun 20)"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Gemini: FAIL"
+    - type: stat_check
+      condition:
+        type: zodiac_is
+        value: Cancer
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Cancer: PASS — the current sign is Cancer (Jun 21 – Jul 22)"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Cancer: FAIL"
+    - type: stat_check
+      condition:
+        type: zodiac_is
+        value: Leo
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Leo: PASS — the current sign is Leo (Jul 23 – Aug 22)"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Leo: FAIL"
+    - type: stat_check
+      condition:
+        type: zodiac_is
+        value: Virgo
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Virgo: PASS — the current sign is Virgo (Aug 23 – Sep 22)"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Virgo: FAIL"
+    - type: stat_check
+      condition:
+        type: zodiac_is
+        value: Libra
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Libra: PASS — the current sign is Libra (Sep 23 – Oct 22)"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Libra: FAIL"
+    - type: stat_check
+      condition:
+        type: zodiac_is
+        value: Scorpio
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Scorpio: PASS — the current sign is Scorpio (Oct 23 – Nov 21)"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Scorpio: FAIL"
+    - type: stat_check
+      condition:
+        type: zodiac_is
+        value: Sagittarius
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Sagittarius: PASS — the current sign is Sagittarius (Nov 22 – Dec 21)"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Sagittarius: FAIL"
+    - type: stat_check
+      condition:
+        type: zodiac_is
+        value: Capricorn
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Capricorn: PASS — the current sign is Capricorn (Dec 22 – Jan 19)"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Capricorn: FAIL"
+    - type: stat_check
+      condition:
+        type: zodiac_is
+        value: Aquarius
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Aquarius: PASS — the current sign is Aquarius (Jan 20 – Feb 18)"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Aquarius: FAIL"
+    - type: stat_check
+      condition:
+        type: zodiac_is
+        value: Pisces
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Pisces: PASS — the current sign is Pisces (Feb 19 – Mar 20)"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Pisces: FAIL"

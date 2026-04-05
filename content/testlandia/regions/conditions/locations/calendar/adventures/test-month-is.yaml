@@ -1,0 +1,160 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-month-is
+spec:
+  displayName: "Month Is — Condition Check"
+  description: "Always available. Tests all 12 months so exactly one PASS fires regardless of the current date. Also verifies
+    integer and string forms agree."
+  steps:
+    - type: narrative
+      text: |
+        **MONTH_IS — Branch Test**
+
+        Current month: {{ month_name(today().month) }} ({{ today().month }})
+
+        Testing each of the 12 months (string form)…
+    - type: stat_check
+      condition:
+        type: month_is
+        value: January
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  January (1): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  January (1): FAIL"
+    - type: stat_check
+      condition:
+        type: month_is
+        value: February
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  February (2): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  February (2): FAIL"
+    - type: stat_check
+      condition:
+        type: month_is
+        value: March
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  March (3): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  March (3): FAIL"
+    - type: stat_check
+      condition:
+        type: month_is
+        value: April
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  April (4): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  April (4): FAIL"
+    - type: stat_check
+      condition:
+        type: month_is
+        value: May
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  May (5): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  May (5): FAIL"
+    - type: stat_check
+      condition:
+        type: month_is
+        value: June
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  June (6): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  June (6): FAIL"
+    - type: stat_check
+      condition:
+        type: month_is
+        value: July
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  July (7): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  July (7): FAIL"
+    - type: stat_check
+      condition:
+        type: month_is
+        value: August
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  August (8): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  August (8): FAIL"
+    - type: stat_check
+      condition:
+        type: month_is
+        value: September
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  September (9): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  September (9): FAIL"
+    - type: stat_check
+      condition:
+        type: month_is
+        value: October
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  October (10): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  October (10): FAIL"
+    - type: stat_check
+      condition:
+        type: month_is
+        value: November
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  November (11): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  November (11): FAIL"
+    - type: stat_check
+      condition:
+        type: month_is
+        value: December
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  December (12): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  December (12): FAIL"

@@ -1,0 +1,63 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-season-is
+spec:
+  displayName: "Season Is — Condition Check"
+  description: "Always available. Uses stat_check to demonstrate season_is for each season regardless of the current date."
+  steps:
+    - type: narrative
+      text: |
+        **SEASON_IS — Branch Test**
+
+        Current season: {{ season(today()) }}
+
+        Testing each season predicate now…
+    - type: stat_check
+      condition:
+        type: season_is
+        value: spring
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  spring: PASS — it is spring"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  spring: FAIL — it is {{ season(today()) }}, not spring"
+    - type: stat_check
+      condition:
+        type: season_is
+        value: summer
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  summer: PASS — it is summer"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  summer: FAIL — it is {{ season(today()) }}, not summer"
+    - type: stat_check
+      condition:
+        type: season_is
+        value: autumn
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  autumn: PASS — it is autumn"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  autumn: FAIL — it is {{ season(today()) }}, not autumn"
+    - type: stat_check
+      condition:
+        type: season_is
+        value: winter
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  winter: PASS — it is winter"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  winter: FAIL — it is {{ season(today()) }}, not winter"

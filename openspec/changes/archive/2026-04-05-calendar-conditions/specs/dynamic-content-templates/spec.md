@@ -1,31 +1,4 @@
-# Dynamic Content Templates
-
-## Purpose
-
-Defines the Jinja2-based template engine that powers dynamic narrative content. Templates are precompiled and validated at content load time, sandboxed for security, and rendered at runtime with a read-only player/combat context.
-
-## Requirements
-
-### Requirement: Template engine is sandboxed and precompiled at content load time
-
-The system SHALL use a `jinja2.sandbox.SandboxedEnvironment` as the underlying template runtime. All template strings detected in content manifests SHALL be compiled with `env.from_string()` and rendered against a comprehensive mock context during `load()`. Any compilation or mock-render failure SHALL raise a `ContentLoadError` before the `ContentRegistry` is returned. No template string SHALL be compiled lazily at play time.
-
-#### Scenario: Valid template compiles and mock-renders without error
-
-- **WHEN** a manifest field contains `"Hello, {{ player.name }}!"`
-- **THEN** `load()` compiles and mock-renders the string without raising an error
-
-#### Scenario: Syntax error is caught at load time
-
-- **WHEN** a manifest field contains `"{{ player.name "` (unterminated expression)
-- **THEN** `load()` raises a `ContentLoadError` identifying the template location and the syntax error
-
-#### Scenario: Non-template strings are not compiled
-
-- **WHEN** a manifest field contains a plain string with no `{{`, `{%`, or `{word}` patterns
-- **THEN** no compilation is performed and the string is stored as-is
-
----
+## MODIFIED Requirements
 
 ### Requirement: Templates have access to a read-only ExpressionContext
 
@@ -222,8 +195,3 @@ All other Python builtins, modules, and dunder attributes SHALL be blocked by th
 
 - **WHEN** `{{ zodiac_sign(today()) }}` is rendered
 - **THEN** the output is one of the twelve Western zodiac sign names
-
-#### Scenario: chinese_zodiac() returns a valid animal name
-
-- **WHEN** `{{ chinese_zodiac(today().year) }}` is rendered
-- **THEN** the output is one of the twelve Chinese zodiac animal names

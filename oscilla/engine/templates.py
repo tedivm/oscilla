@@ -264,6 +264,22 @@ class CombatContextView:
     turn: int
 
 
+@dataclass(frozen=True)
+class GameContext:
+    """Read-only projection of GameSpec for template rendering.
+
+    Exposes season_hemisphere (for hemisphere-correct season() results) and
+    timezone (for timezone-aware today(), now(), and season() results).
+    Authors should not need to pass either as template arguments.
+    """
+
+    season_hemisphere: str = "northern"
+    timezone: str | None = None
+
+    def __getattr__(self, name: str) -> "Any":
+        raise AttributeError(f"game has no attribute {name!r}")
+
+
 @dataclass
 class ExpressionContext:
     """Complete read-only context passed to every template render call.
@@ -271,10 +287,14 @@ class ExpressionContext:
     combat is None for non-combat steps. Templates that reference combat.*
     will raise UndefinedError at mock-render time if the context_type is not
     'combat', which is caught as a validation error at load time.
+
+    game carries game-level configuration (e.g. season_hemisphere) so that
+    template functions can adapt to game settings without explicit parameters.
     """
 
     player: PlayerContext
     combat: CombatContextView | None = None
+    game: GameContext = field(default_factory=GameContext)
 
 
 # ---------------------------------------------------------------------------
@@ -489,12 +509,31 @@ class _MockCombatContext:
         raise TemplateValidationError(f"combat has no attribute {name!r}")
 
 
+class _MockGame:
+    """Mock GameContext for load-time template validation."""
+
+    season_hemisphere: str = "northern"
+    timezone: str | None = None
+
+    def __getattr__(self, name: str) -> Any:
+        raise TemplateValidationError(f"game has no attribute {name!r}")
+
+
 def build_mock_context(stat_names: List[str], include_combat: bool = False) -> Dict[str, Any]:
     """Build a comprehensive mock context for load-time template validation."""
-    ctx: Dict[str, Any] = {"player": _MockPlayer(stat_names)}
+    ctx: Dict[str, Any] = {}
+    ctx.update(SAFE_GLOBALS)
+    ctx["player"] = _MockPlayer(stat_names)
+    # Use a single _MockGame instance for both ctx["game"] and the season() closure
+    # so they share the same object rather than creating two separate instances.
+    mock_game = _MockGame()
+    ctx["game"] = mock_game
     if include_combat:
         ctx["combat"] = _MockCombatContext()
-    ctx.update(SAFE_GLOBALS)
+    # Override the season function with a closure that respects mock hemisphere.
+    ctx["season"] = lambda date: calendar_utils.season(date, hemisphere=mock_game.season_hemisphere)
+    ctx["today"] = lambda: datetime.date.today()
+    ctx["now"] = lambda: datetime.datetime.now()
     return ctx
 
 
@@ -564,11 +603,19 @@ class GameTemplateEngine:
         template = self._cache.get(template_id)
         if template is None:
             raise TemplateRuntimeError(f"Template {template_id!r} not found in cache — was it precompiled?")
-        render_ctx: Dict[str, Any] = {
-            "player": ctx.player,
-            "combat": ctx.combat,
-        }
+        render_ctx: Dict[str, Any] = {}
         render_ctx.update(SAFE_GLOBALS)
+        render_ctx["player"] = ctx.player
+        render_ctx["combat"] = ctx.combat
+        render_ctx["game"] = ctx.game
+        # Override time functions from SAFE_GLOBALS with closures that respect
+        # the game's configured timezone. today() and now() return values in the
+        # game's timezone; season() uses the hemisphere from that same context.
+        resolved_dt = calendar_utils.resolve_local_datetime(ctx.game.timezone)
+        tz = resolved_dt.tzinfo
+        render_ctx["today"] = lambda: datetime.datetime.now(tz=tz).date()
+        render_ctx["now"] = lambda: datetime.datetime.now(tz=tz)
+        render_ctx["season"] = lambda date: calendar_utils.season(date, hemisphere=ctx.game.season_hemisphere)
         try:
             return str(template.render(**render_ctx))
         except Exception as exc:

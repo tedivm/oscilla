@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
+import datetime
 from logging import getLogger
 from typing import TYPE_CHECKING
 
+from oscilla.engine import calendar_utils
 from oscilla.engine.models.base import (
     AdventuresCompletedCondition,
     AllCondition,
     AnyCondition,
     AnyItemEquippedCondition,
     CharacterStatCondition,
+    ChineseZodiacIsCondition,
     ClassCondition,
     Condition,
+    DateBetweenCondition,
+    DateIsCondition,
+    DayOfWeekIsCondition,
     EnemiesDefeatedCondition,
     ItemCondition,
     ItemEquippedCondition,
@@ -20,11 +26,16 @@ from oscilla.engine.models.base import (
     LevelCondition,
     LocationsVisitedCondition,
     MilestoneCondition,
+    MonthIsCondition,
+    MoonPhaseIsCondition,
     NotCondition,
     PrestigeCountCondition,
     PronounsCondition,
     QuestStageCondition,
+    SeasonIsCondition,
     SkillCondition,
+    TimeBetweenCondition,
+    ZodiacIsCondition,
 )
 
 if TYPE_CHECKING:
@@ -32,6 +43,14 @@ if TYPE_CHECKING:
     from oscilla.engine.registry import ContentRegistry
 
 logger = getLogger(__name__)
+
+
+def _current_datetime(registry: "ContentRegistry | None") -> datetime.datetime:
+    """Return the current datetime in the game's configured timezone."""
+    tz_name: str | None = None
+    if registry is not None and registry.game is not None:
+        tz_name = registry.game.spec.timezone
+    return calendar_utils.resolve_local_datetime(tz_name)
 
 
 def evaluate(
@@ -162,6 +181,86 @@ def evaluate(
         # --- Quest leaf ---
         case QuestStageCondition(quest=q, stage=s):
             return player.active_quests.get(q) == s
+
+        # --- Calendar predicates ---
+        # All predicates derive date/time from a single call so that all
+        # conditions see a consistent moment in the game's configured timezone.
+        case SeasonIsCondition(value=v):
+            today = _current_datetime(registry).date()
+            # Read hemisphere from game config when available; default to northern.
+            hemisphere = "northern"
+            if registry is not None and registry.game is not None:
+                hemisphere = registry.game.spec.season_hemisphere
+            elif registry is None:
+                logger.debug("season_is condition evaluated without a registry — defaulting to northern hemisphere.")
+            return calendar_utils.season(today, hemisphere=hemisphere) == v
+
+        case MoonPhaseIsCondition(value=v):
+            return calendar_utils.moon_phase(_current_datetime(registry).date()) == v
+
+        case ZodiacIsCondition(value=v):
+            return calendar_utils.zodiac_sign(_current_datetime(registry).date()) == v
+
+        case ChineseZodiacIsCondition(value=v):
+            return calendar_utils.chinese_zodiac(_current_datetime(registry).date().year) == v
+
+        case MonthIsCondition(value=v):
+            # value is always int (normalized by model validator).
+            return _current_datetime(registry).date().month == v
+
+        case DayOfWeekIsCondition(value=v):
+            # value is always int 0-6 (normalized by model validator), matching
+            # Python's date.weekday() convention (Monday=0, Sunday=6).
+            return _current_datetime(registry).date().weekday() == v
+
+        case DateIsCondition(month=m, day=d, year=y):
+            today = _current_datetime(registry).date()
+            if y is not None and today.year != y:
+                return False
+            return today.month == m and today.day == d
+
+        case DateBetweenCondition(start=start, end=end):
+            today = _current_datetime(registry).date()
+            start_md = (start.month, start.day)
+            end_md = (end.month, end.day)
+            today_md = (today.month, today.day)
+
+            if start_md == end_md:
+                # Zero-duration range — always false.
+                logger.warning(
+                    "date_between has identical start and end (%d-%02d) — always false.",
+                    start.month,
+                    start.day,
+                )
+                return False
+
+            if start_md <= end_md:
+                # Normal within-year window.
+                return start_md <= today_md <= end_md
+            else:
+                # Year-wrapping window (e.g. Dec 1 – Jan 31): true when >= start OR <= end.
+                return today_md >= start_md or today_md <= end_md
+
+        case TimeBetweenCondition(start=start_str, end=end_str):
+            now_time = _current_datetime(registry).time()
+            # fromisoformat() handles HH:MM; pattern validation already ensures the format.
+            t_start = datetime.time.fromisoformat(start_str)
+            t_end = datetime.time.fromisoformat(end_str)
+
+            if t_start == t_end:
+                # Zero-duration window — always false.
+                logger.warning(
+                    "time_between condition has identical start and end (%s) — always false.",
+                    start_str,
+                )
+                return False
+
+            if t_start < t_end:
+                # Normal same-day window.
+                return t_start <= now_time <= t_end
+            else:
+                # Midnight-wrapping window: true when >= start OR <= end.
+                return now_time >= t_start or now_time <= t_end
 
     # Unreachable if all Condition subtypes are handled above; guards against
     # extending the union without adding a case branch.

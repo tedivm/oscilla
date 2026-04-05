@@ -54,6 +54,13 @@ class GameSpec(BaseModel):
     passive_effects: List[PassiveEffect] = []
     # Custom outcome names beyond the three engine-internal defaults (completed, defeated, fled).
     outcomes: List[str] = Field(default_factory=list)
+    # Hemisphere used by season() to compute meteorological seasons.
+    # "northern" (default) or "southern". Only affects season(); all other
+    # calendar functions are hemisphere-agnostic.
+    season_hemisphere: Literal["northern", "southern"] = "northern"
+    # IANA timezone name (e.g. "America/New_York") used by calendar predicates.
+    # Defaults to None (server local time).
+    timezone: str | None = None
 
 
 class GameManifest(ManifestEnvelope):

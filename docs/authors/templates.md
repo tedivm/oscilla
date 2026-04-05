@@ -122,7 +122,7 @@ text: "Your accuracy is {{ (random() * 100) | round }}%."
 
 ## Calendar and Astronomical Functions
 
-These functions take a `datetime.date` object from `today()` and compute calendar information. Use them for seasonal narrative variation, holiday events, or atmospheric flavor.
+These functions give you current date, time, and astronomical data for use in narrative text. By default they use server local time; configure `timezone` in `game.yaml` to pin them to a specific IANA timezone (e.g. `"America/New_York"`).
 
 ```yaml
 text: |
@@ -132,16 +132,18 @@ text: |
 
 | Function | Returns | Example output |
 |---|---|---|
-| `now()` | Current UTC datetime | `now().year` → `2026` |
-| `today()` | Current UTC date | Use as argument to functions below |
-| `season(date)` | `"spring"`, `"summer"`, `"autumn"`, or `"winter"` | `"winter"` |
-| `month_name(date)` | Full month name | `"December"` |
-| `day_name(date)` | Day of week | `"Friday"` |
+| `now()` | Current datetime in the game timezone (server local if not set) | `now().year` → `2026` |
+| `today()` | Current date in the game timezone (server local if not set) | Use as argument to functions below |
+| `season(date)` | `"spring"`, `"summer"`, `"autumn"`, or `"winter"` (respects `game.season_hemisphere`) | `"winter"` |
+| `month_name(n)` | Full month name from an integer month number | `month_name(12)` → `"December"` |
+| `day_name(n)` | Day-of-week name from an integer (0=Monday … 6=Sunday) | `day_name(today().weekday())` → `"Friday"` |
 | `week_number(date)` | ISO week number 1–53 | `51` |
 | `zodiac_sign(date)` | Western zodiac sign | `"Sagittarius"` |
-| `chinese_zodiac(date)` | Chinese zodiac animal | `"Horse"` |
+| `chinese_zodiac(year)` | Chinese zodiac animal from an integer year | `chinese_zodiac(today().year)` → `"Horse"` |
 | `moon_phase(date)` | Moon phase description | `"Waxing Gibbous"` |
 | `mean(values)` | Arithmetic mean | `{{ mean([10, 20, 30]) }}` → `20.0` |
+
+> **Timezone note:** `now()` and `today()` — and all calendar conditions — use the `timezone` field set in `game.yaml`. Without it they fall back to server local time, which may differ from your players' clock. See [Game Configuration](./game-configuration.md#timezone-configuration).
 
 ---
 
@@ -275,6 +277,25 @@ Template syntax errors and unknown context references are reported with the file
 | `player.pronouns.possessive_standalone` | str | Standalone possessive (theirs/hers/his) |
 | `player.pronouns.reflexive` | str | Reflexive (themselves/herself/himself) |
 | `player.pronouns.uses_plural_verbs` | bool | True for they/them pronoun sets |
+
+### Game Context Object
+
+The `game` object exposes game-wide settings configured in `game.yaml`. Use it when your narrative needs to reference the game's configured locale or hemisphere.
+
+| Expression | Type | Description |
+|---|---|---|
+| `game.season_hemisphere` | str | `"northern"` or `"southern"` — the hemisphere used for season calculations |
+| `game.timezone` | str \| None | IANA timezone name (e.g. `"America/New_York"`), or `None` if not set |
+
+```yaml
+text: |
+  This world follows {{ game.season_hemisphere }} hemisphere seasons.
+  {% if game.timezone %}
+  Game time is anchored to {{ game.timezone }}.
+  {% else %}
+  Game time follows the server clock.
+  {% endif %}
+```
 
 ### Pronoun Placeholder Reference
 

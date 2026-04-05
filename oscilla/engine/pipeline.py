@@ -14,7 +14,7 @@ from oscilla.engine.character import AdventurePosition, CharacterState
 from oscilla.engine.models.adventure import Effect, OutcomeBranch, Step
 from oscilla.engine.registry import ContentRegistry
 from oscilla.engine.signals import _EndSignal, _GotoSignal
-from oscilla.engine.templates import ExpressionContext, PlayerContext
+from oscilla.engine.templates import ExpressionContext, GameContext, PlayerContext
 
 if TYPE_CHECKING:
     from oscilla.engine.templates import CombatContextView
@@ -126,9 +126,13 @@ class AdventurePipeline:
 
     def _build_context(self, combat_view: "CombatContextView | None" = None) -> ExpressionContext:
         """Build a read-only render context from current player state."""
+        game_spec = self._registry.game.spec if self._registry.game is not None else None
+        hemisphere = game_spec.season_hemisphere if game_spec is not None else "northern"
+        timezone = game_spec.timezone if game_spec is not None else None
         return ExpressionContext(
             player=PlayerContext.from_character(self._player),
             combat=combat_view,
+            game=GameContext(season_hemisphere=hemisphere, timezone=timezone),
         )
 
     async def run(self, adventure_ref: str) -> AdventureOutcome:

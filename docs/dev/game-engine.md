@@ -244,6 +244,20 @@ Conditions are tree structures that evaluate player state:
 - `any_item_equipped`: True when any equipped item carries the given label
 - `quest_stage`: True when a quest is active and at a specific named stage
 
+**Calendar Conditions (evaluate real-world date/time):**
+
+All calendar predicates resolve the current date and time via `resolve_local_datetime(timezone_name)` in `oscilla/engine/calendar_utils.py`. When the game's `timezone` field is set they use that IANA zone; otherwise they fall back to server local time.
+
+- `season_is`: Compares current meteorological season; hemisphere driven by `GameSpec.season_hemisphere`
+- `moon_phase_is`: Approximate lunar phase (±1 day, 29.5-day cycle)
+- `zodiac_is`: Western zodiac sign based on Sun-entry boundary dates
+- `chinese_zodiac_is`: 12-year Chinese zodiac cycle
+- `month_is`: Integer 1–12 or full English month name
+- `day_of_week_is`: Integer 0–6 (Mon=0) or full English weekday name
+- `date_is`: Month + day (optionally year) — annual or one-off date match
+- `date_between`: Month/day range (start + end, each with `month` + `day`); wraps year boundary when start > end
+- `time_between`: 24-hour HH:MM window; wraps midnight when start > end
+
 **`character_stat` and `stat_source`:**
 
 The `character_stat` predicate compares a player stat against a threshold.
@@ -537,7 +551,7 @@ Each active buff is represented as an `ActiveCombatEffect`:
 | `target` | `"player"` \| `"enemy"` | Who the buff is applied to |
 | `turns_remaining` | `int` | Decremented at round start; removed when 0 |
 | `per_turn_effects` | `List[Effect]` | Dispatched through `run_effect()` each round |
-| `modifiers` | `List[CombatModifier]` | Passive damage-arithmetic modifiers queried during attack/defence |
+| `modifiers` | `List[CombatModifier]` | Passive damage-arithmetic modifiers queried during attack/defense |
 
 ### `available_skills()` Contract
 

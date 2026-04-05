@@ -42,7 +42,7 @@ These documents explain the three cross-cutting systems you'll use in almost eve
 
 | Guide | What it covers |
 |---|---|
-| [Conditions](./conditions.md) | All condition types — level, milestone, item, stat, skill, and logical operators. Used in unlock gates, adventure requirements, stat checks, and choice option visibility. |
+| [Conditions](./conditions.md) | All condition types — level, milestone, item, stat, skill, calendar/time predicates, and logical operators. Used in unlock gates, adventure requirements, stat checks, and choice option visibility. |
 | [Effects](./effects.md) | All effect types — XP, item drops, stat changes, milestones, skills, flow control, and combat buffs. Used anywhere something happens: adventure outcomes, skill use, item use. |
 | [Templates](./templates.md) | Jinja2 templates in narrative text — player context, mathematical functions, calendar functions, filters, and pronoun placeholders. |
 

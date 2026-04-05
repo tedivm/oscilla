@@ -99,10 +99,16 @@ async def run_effect(
     """
     # Resolve any template strings in numeric fields before dispatch.
     if registry.template_engine is not None:
-        from oscilla.engine.templates import ExpressionContext, PlayerContext
+        from oscilla.engine.templates import ExpressionContext, GameContext, PlayerContext
 
         if ctx is None:
-            ctx = ExpressionContext(player=PlayerContext.from_character(player))
+            game_spec = registry.game.spec if registry.game is not None else None
+            hemisphere = game_spec.season_hemisphere if game_spec is not None else "northern"
+            timezone = game_spec.timezone if game_spec is not None else None
+            ctx = ExpressionContext(
+                player=PlayerContext.from_character(player),
+                game=GameContext(season_hemisphere=hemisphere, timezone=timezone),
+            )
         engine = registry.template_engine
 
         if isinstance(effect, XpGrantEffect) and isinstance(effect.amount, str):

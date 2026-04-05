@@ -126,6 +126,40 @@ See [Passive Effects](./passive-effects.md) for the full system.
 
 ---
 
+## Timezone Configuration
+
+### season_hemisphere
+
+Add `season_hemisphere` to your `game.yaml` spec to flip the seasons for a Southern Hemisphere or Southern-inspired setting. This field affects both `season_is` conditions and the `{{ season(today()) }}` template function.
+
+```yaml
+spec:
+  season_hemisphere: southern   # default is "northern"
+```
+
+| Hemisphere | spring | summer | autumn | winter |
+|---|---|---|---|---|
+| `northern` (default) | Mar–May | Jun–Aug | Sep–Nov | Dec–Feb |
+| `southern` | Sep–Nov | Dec–Feb | Mar–May | Jun–Aug |
+
+### timezone
+
+Set `timezone` to an IANA timezone name so that all calendar conditions and the `now()`/`today()` template functions evaluate against your players' local time rather than the server's.
+
+```yaml
+spec:
+  timezone: "America/New_York"   # Eastern US
+  # Other examples:
+  # timezone: "Europe/London"
+  # timezone: "Asia/Tokyo"
+  # timezone: "Australia/Sydney"
+  # timezone: null    # (default) — use server local time
+```
+
+Without `timezone`, calendar predicates such as `time_between`, `month_is`, and `season_is` all use server local time. For games with time-sensitive content or a global audience, setting this field ensures consistency. If the value is not a recognized IANA key (typo, etc.), the engine logs a warning and falls back to server local time — the adventure will not crash.
+
+---
+
 ## character_config.yaml
 
 ### Minimal Example
@@ -280,6 +314,8 @@ Custom pronoun sets are immediately available during character creation alongsid
 | `hp_formula.hp_per_level` | yes | HP gained per level |
 | `item_labels` | no | List of label definitions (see above) |
 | `passive_effects` | no | List of game-wide passive effect entries |
+| `season_hemisphere` | no | `northern` (default) or `southern` — flips which months are which season |
+| `timezone` | no | IANA timezone name (e.g. `"America/New_York"`); defaults to server local time |
 
 ### `character_config.yaml` spec fields
 

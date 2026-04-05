@@ -1,0 +1,106 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-date-between
+spec:
+  displayName: "Date Between — Condition Check"
+  description:
+    "Always available. Four non-overlapping quarterly windows cover every day of the year so exactly one PASS fires
+    regardless of the current date. Also tests year-wrapping syntax."
+  steps:
+    - type: narrative
+      text: |
+        **DATE_BETWEEN — Branch Test**
+
+        Current date: {{ now().strftime('%B %-d') }}
+
+        Testing four quarterly windows that together cover the full year…
+    - type: stat_check
+      condition:
+        type: date_between
+        start:
+          month: January
+          day: 1
+        end:
+          month: March
+          day: 31
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Jan 1 – Mar 31 (Q1): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Jan 1 – Mar 31 (Q1): FAIL"
+    - type: stat_check
+      condition:
+        type: date_between
+        start:
+          month: April
+          day: 1
+        end:
+          month: June
+          day: 30
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Apr 1 – Jun 30 (Q2): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Apr 1 – Jun 30 (Q2): FAIL"
+    - type: stat_check
+      condition:
+        type: date_between
+        start:
+          month: July
+          day: 1
+        end:
+          month: September
+          day: 30
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Jul 1 – Sep 30 (Q3): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Jul 1 – Sep 30 (Q3): FAIL"
+    - type: stat_check
+      condition:
+        type: date_between
+        start:
+          month: October
+          day: 1
+        end:
+          month: December
+          day: 31
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Oct 1 – Dec 31 (Q4): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Oct 1 – Dec 31 (Q4): FAIL"
+    - type: narrative
+      text: |2
+
+        Year-wrap demo (Dec 1 – Mar 31, covering winter):
+    - type: stat_check
+      condition:
+        type: date_between
+        start:
+          month: December
+          day: 1
+        end:
+          month: March
+          day: 31
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Dec 1 – Mar 31 (year-wrap, winter): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Dec 1 – Mar 31 (year-wrap, winter): FAIL"

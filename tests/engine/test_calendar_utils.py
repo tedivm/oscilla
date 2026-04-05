@@ -37,6 +37,34 @@ def test_season_winter() -> None:
     assert calendar_utils.season(datetime.date(2024, 2, 28)) == "winter"
 
 
+def test_season_southern_july() -> None:
+    # July is summer in northern hemisphere, winter in southern.
+    d = datetime.date(2026, 7, 15)
+    assert calendar_utils.season(d, hemisphere="northern") == "summer"
+    assert calendar_utils.season(d, hemisphere="southern") == "winter"
+
+
+def test_season_southern_january() -> None:
+    # January is winter in northern hemisphere, summer in southern.
+    d = datetime.date(2026, 1, 15)
+    assert calendar_utils.season(d, hemisphere="northern") == "winter"
+    assert calendar_utils.season(d, hemisphere="southern") == "summer"
+
+
+def test_season_southern_spring_boundary() -> None:
+    # April is spring in northern, autumn in southern.
+    d = datetime.date(2026, 4, 15)
+    assert calendar_utils.season(d, hemisphere="northern") == "spring"
+    assert calendar_utils.season(d, hemisphere="southern") == "autumn"
+
+
+def test_season_southern_autumn_boundary() -> None:
+    # October is autumn in northern, spring in southern.
+    d = datetime.date(2026, 10, 15)
+    assert calendar_utils.season(d, hemisphere="northern") == "autumn"
+    assert calendar_utils.season(d, hemisphere="southern") == "spring"
+
+
 # ---------------------------------------------------------------------------
 # month_name()
 # ---------------------------------------------------------------------------

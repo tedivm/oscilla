@@ -101,6 +101,13 @@ docker compose exec service_name bash # Open a bash shell in a running service c
 * Use keyword arguments instead of positional arguments when calling functions and methods.
 * Do not put `import` statements inside functions unless necessary to prevent circular imports. Imports must be at the top of the file.
 
+### Personality
+
+* Always use American English Spelling conventions (ie, normalizes instead of normalises).
+* Treat the developer as a partner with deep subject matter expertise, but assume they are fallible and challenge requests or guidance that appears wrong.
+* Do not make assumptions. When confronted with ambiguity or multiple options seek guidance from the developer.
+* Speak concisely while still communicating: over communicate but avoid being overly verbose.
+
 ### Security
 
 * Always write secure code.

@@ -1,0 +1,134 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-moon-phase-composition
+spec:
+  displayName: "Moon Phase — Condition Check"
+  description: "Always available. Tests all 8 moon phases so exactly one PASS fires regardless of the current date. Also demonstrates
+    calendar condition composition (all: with month_is and moon_phase_is)."
+  steps:
+    - type: narrative
+      text: |
+        **MOON_PHASE_IS — Branch Test**
+
+        Current moon phase: {{ moon_phase(today()) }}
+        Current month: {{ month_name(today().month) }}
+
+        Testing each of the 8 moon phases…
+    - type: stat_check
+      condition:
+        type: moon_phase_is
+        value: "New Moon"
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  New Moon: PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  New Moon: FAIL"
+    - type: stat_check
+      condition:
+        type: moon_phase_is
+        value: "Waxing Crescent"
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Waxing Crescent: PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Waxing Crescent: FAIL"
+    - type: stat_check
+      condition:
+        type: moon_phase_is
+        value: "First Quarter"
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  First Quarter: PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  First Quarter: FAIL"
+    - type: stat_check
+      condition:
+        type: moon_phase_is
+        value: "Waxing Gibbous"
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Waxing Gibbous: PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Waxing Gibbous: FAIL"
+    - type: stat_check
+      condition:
+        type: moon_phase_is
+        value: "Full Moon"
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Full Moon: PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Full Moon: FAIL"
+    - type: stat_check
+      condition:
+        type: moon_phase_is
+        value: "Waning Gibbous"
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Waning Gibbous: PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Waning Gibbous: FAIL"
+    - type: stat_check
+      condition:
+        type: moon_phase_is
+        value: "Last Quarter"
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Last Quarter: PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Last Quarter: FAIL"
+    - type: stat_check
+      condition:
+        type: moon_phase_is
+        value: "Waning Crescent"
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  Waning Crescent: PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  Waning Crescent: FAIL"
+    - type: narrative
+      text: |
+        Composition test — all: [month_is April, moon_phase_is Full Moon]…
+        (rare condition; expect FAIL most of the time)
+    - type: stat_check
+      condition:
+        type: all
+        conditions:
+          - type: month_is
+            value: 4
+          - type: moon_phase_is
+            value: "Full Moon"
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  all: [April + Full Moon]: PASS — both conditions met simultaneously"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  all: [April + Full Moon]: FAIL — it is {{ month_name(today().month) }} and moon is {{ moon_phase(today())
+              }}; both must match"

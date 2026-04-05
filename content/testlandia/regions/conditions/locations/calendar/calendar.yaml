@@ -1,0 +1,26 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: test-calendar
+spec:
+  displayName: "Calendar Conditions Lab"
+  description: "A lab for testing real-world calendar and time conditions."
+  region: conditions
+  adventures:
+    # Unconditional — renders all current calendar values via template functions
+    - ref: test-calendar-data
+      weight: 100
+    # Always-available stat_check adventures — test each predicate type via branching,
+    # so results are visible regardless of the current date or time.
+    - ref: test-season-is
+      weight: 100
+    - ref: test-month-is
+      weight: 100
+    - ref: test-time-between
+      weight: 100
+    - ref: test-zodiac-is
+      weight: 100
+    - ref: test-moon-phase-composition
+      weight: 100
+    - ref: test-date-between
+      weight: 100

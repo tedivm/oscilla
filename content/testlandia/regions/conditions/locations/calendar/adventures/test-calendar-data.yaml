@@ -1,0 +1,19 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-calendar-data
+spec:
+  displayName: "Calendar Data — Current Values"
+  description: "Renders all current calendar and astronomical data using template functions."
+  steps:
+    - type: narrative
+      text: |
+        **Calendar Template Functions — Current Values**
+
+        Date: {{ today() }}
+        Season: {{ season(today()) }}
+        Moon phase: {{ moon_phase(today()) }}
+        Zodiac sign: {{ zodiac_sign(today()) }}
+        Chinese zodiac: {{ chinese_zodiac(today().year) }}
+        Day of week: {{ day_name(today().weekday()) }}
+        Month name: {{ month_name(today().month) }}

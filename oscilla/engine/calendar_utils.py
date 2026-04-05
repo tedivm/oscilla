@@ -11,7 +11,11 @@ from __future__ import annotations
 import calendar
 import datetime
 import statistics
+import zoneinfo
+from logging import getLogger
 from typing import List
+
+logger = getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Date-derived helpers
@@ -20,7 +24,9 @@ from typing import List
 # Meteorological seasons: month ranges map to season names.
 # Meteorological (not astronomical) convention is used because it avoids
 # solstice/equinox edge cases and is what most authors intuitively expect.
-_SEASON_MONTHS: tuple[tuple[int, int, str], ...] = (
+
+# Northern Hemisphere meteorological seasons.
+_SEASON_MONTHS_N: tuple[tuple[int, int, str], ...] = (
     (3, 5, "spring"),
     (6, 8, "summer"),
     (9, 11, "autumn"),
@@ -28,17 +34,47 @@ _SEASON_MONTHS: tuple[tuple[int, int, str], ...] = (
     (1, 2, "winter"),
 )
 
+# Southern Hemisphere — spring and autumn swap, summer and winter swap.
+_SEASON_MONTHS_S: tuple[tuple[int, int, str], ...] = (
+    (3, 5, "autumn"),
+    (6, 8, "winter"),
+    (9, 11, "spring"),
+    (12, 12, "summer"),
+    (1, 2, "summer"),
+)
 
-def season(date: datetime.date) -> str:
+
+def season(date: datetime.date, hemisphere: str = "northern") -> str:
     """Return the meteorological season for the given date.
 
     Returns one of: "spring", "summer", "autumn", "winter".
+
+    hemisphere: "northern" (default) or "southern". Southern Hemisphere
+    reverses the thermal seasons, so December is summer not winter.
     """
+    table = _SEASON_MONTHS_S if hemisphere == "southern" else _SEASON_MONTHS_N
     m = date.month
-    for start, end, name in _SEASON_MONTHS:
+    for start, end, name in table:
         if start <= m <= end:
             return name
     return "winter"  # unreachable; satisfies type checker
+
+
+def resolve_local_datetime(timezone_name: str | None) -> datetime.datetime:
+    """Return the current datetime in the given IANA timezone.
+
+    Falls back to server local time when timezone_name is None or when
+    the key is not recognized by zoneinfo. Unrecognized keys emit a warning.
+    """
+    if timezone_name is not None:
+        try:
+            return datetime.datetime.now(tz=zoneinfo.ZoneInfo(timezone_name))
+        except zoneinfo.ZoneInfoNotFoundError:
+            logger.warning(
+                "Unknown timezone %r in game config; falling back to server local time.",
+                timezone_name,
+            )
+    return datetime.datetime.now()
 
 
 def month_name(n: int) -> str:

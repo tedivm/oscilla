@@ -1,0 +1,68 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-time-between
+spec:
+  displayName: "Time Between — Condition Check"
+  description: "Always available. Four non-overlapping windows cover every minute of the day so exactly one PASS fires regardless
+    of the current time. Also tests midnight-wrap syntax."
+  steps:
+    - type: narrative
+      text: |
+        **TIME_BETWEEN — Branch Test**
+
+        Current time: {{ now().strftime('%H:%M') }}
+
+        Testing four windows that together cover all 24 hours…
+    - type: stat_check
+      condition:
+        type: time_between
+        start: "04:00"
+        end: "09:00"
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  04:00-09:00 (early morning): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  04:00-09:00 (early morning): FAIL"
+    - type: stat_check
+      condition:
+        type: time_between
+        start: "09:00"
+        end: "17:00"
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  09:00-17:00 (business hours): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  09:00-17:00 (business hours): FAIL"
+    - type: stat_check
+      condition:
+        type: time_between
+        start: "17:00"
+        end: "22:00"
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  17:00-22:00 (evening): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  17:00-22:00 (evening): FAIL"
+    - type: stat_check
+      condition:
+        type: time_between
+        start: "22:00"
+        end: "04:00"
+      on_pass:
+        steps:
+          - type: narrative
+            text: "  22:00-04:00 (night, wraps midnight): PASS"
+      on_fail:
+        steps:
+          - type: narrative
+            text: "  22:00-04:00 (night, wraps midnight): FAIL"

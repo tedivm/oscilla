@@ -11,6 +11,7 @@ from oscilla.engine.templates import (
     DEFAULT_PRONOUN_SET,
     CombatContextView,
     ExpressionContext,
+    GameContext,
     GameTemplateEngine,
     PlayerContext,
     PlayerMilestoneView,
@@ -375,3 +376,38 @@ def test_is_template_pronoun_shorthand() -> None:
 def test_is_template_plain_string() -> None:
     engine = _make_engine()
     assert not engine.is_template("Hello, adventurer!")
+
+
+# ---------------------------------------------------------------------------
+# GameContext and ExpressionContext
+# ---------------------------------------------------------------------------
+
+
+def test_expression_context_default_game() -> None:
+    ctx = ExpressionContext(player=_make_player())
+    assert ctx.game.season_hemisphere == "northern"
+
+
+def test_expression_context_custom_hemisphere() -> None:
+    ctx = ExpressionContext(
+        player=_make_player(),
+        game=GameContext(season_hemisphere="southern"),
+    )
+    assert ctx.game.season_hemisphere == "southern"
+
+
+def test_game_season_hemisphere_renders_in_template() -> None:
+    engine = _make_engine()
+    ctx = ExpressionContext(
+        player=_make_player(),
+        game=GameContext(season_hemisphere="southern"),
+    )
+    engine.precompile_and_validate("{{ game.season_hemisphere }}", "game-hemisphere", "adventure")
+    result = engine.render("game-hemisphere", ctx)
+    assert result == "southern"
+
+
+def test_game_unknown_field_raises_validation_error() -> None:
+    engine = _make_engine()
+    with pytest.raises(TemplateValidationError):
+        engine.precompile_and_validate("{{ game.nonexistent_field }}", "game-bad-field", "adventure")

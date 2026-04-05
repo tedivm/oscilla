@@ -340,3 +340,19 @@ The `evaluate()` function SHALL accept an `exclude_item: str | None = None` para
 
 - **WHEN** `evaluate()` is called with `exclude_item="vorpal-blade"` and the condition uses `stat_source: base`
 - **THEN** the result is the same as without `exclude_item` — base stats are never modified by the exclusion
+
+---
+
+### Requirement: Calendar condition predicates compose with existing tree nodes
+
+All eight new calendar predicates (`season_is`, `moon_phase_is`, `zodiac_is`, `chinese_zodiac_is`, `month_is`, `day_of_week_is`, `date_is`, `time_between`) SHALL be valid leaf node types within the existing `Condition` union and SHALL compose with `all`, `any`, and `not` branch nodes identically to all other leaf predicates.
+
+#### Scenario: calendar predicate under all node
+
+- **WHEN** an `all` condition contains a `season_is` predicate and a `milestone` predicate, both of which are satisfied
+- **THEN** the `all` node evaluates to true
+
+#### Scenario: calendar predicate negated under not node
+
+- **WHEN** a `not` condition wraps a `month_is: 10` predicate and the current month is July
+- **THEN** the `not` node evaluates to true

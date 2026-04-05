@@ -205,6 +205,219 @@ requires:
 
 ---
 
+## Real-World Calendar Conditions
+
+Calendar conditions gate content on the real-world date and time. All eight predicates compose with `all`, `any`, and `not` the same way as every other condition type.
+
+> **Server time and timezone:** By default, all calendar predicates evaluate against server local time. If your game has a specific audience timezone, set `timezone` in `game.yaml` (e.g. `timezone: "America/New_York"`) so that seasons, months, and time windows reflect your players' clock rather than the server's. See [Game Configuration](./game-configuration.md#timezone-configuration).
+
+### season_is
+
+True when the current real-world season matches. Uses meteorological seasons (not astronomical). The hemisphere is determined by `season_hemisphere` in `game.yaml` (default `northern`).
+
+| Hemisphere | spring | summer | autumn | winter |
+|---|---|---|---|---|
+| northern | Mar–May | Jun–Aug | Sep–Nov | Dec–Feb |
+| southern | Sep–Nov | Dec–Feb | Mar–May | Jun–Aug |
+
+```yaml
+requires:
+  type: season_is
+  value: spring    # spring | summer | autumn | winter
+```
+
+### moon_phase_is
+
+True when the current lunar phase matches. Uses an approximate 29.5-day cycle. Accuracy is ±1 day, suitable for narrative flavor.
+
+Valid values: `New Moon`, `Waxing Crescent`, `First Quarter`, `Waxing Gibbous`, `Full Moon`, `Waning Gibbous`, `Last Quarter`, `Waning Crescent`
+
+```yaml
+requires:
+  type: moon_phase_is
+  value: "Full Moon"
+```
+
+### zodiac_is
+
+True when today's Western zodiac sign matches. Based on Sun-entry boundary dates.
+
+Valid values: `Aries`, `Taurus`, `Gemini`, `Cancer`, `Leo`, `Virgo`, `Libra`, `Scorpio`, `Sagittarius`, `Capricorn`, `Aquarius`, `Pisces`
+
+```yaml
+requires:
+  type: zodiac_is
+  value: Scorpio
+```
+
+### chinese_zodiac_is
+
+True when the current year's Chinese zodiac animal matches. Uses a 12-year cycle. Does not account for the Lunar New Year boundary (late January/February) — if that precision matters, combine with `month_is`.
+
+Valid values: `Rat`, `Ox`, `Tiger`, `Rabbit`, `Dragon`, `Snake`, `Horse`, `Goat`, `Monkey`, `Rooster`, `Dog`, `Pig`
+
+```yaml
+requires:
+  type: chinese_zodiac_is
+  value: Dragon
+```
+
+### month_is
+
+True when the current month matches. Accepts either an integer (1–12) or a full English month name. Abbreviated names (e.g. `Oct`) are not accepted.
+
+```yaml
+# Integer form
+requires:
+  type: month_is
+  value: 10
+
+# String form — same result
+requires:
+  type: month_is
+  value: October
+```
+
+### day_of_week_is
+
+True when the current day of the week matches. Accepts either an integer (0=Monday … 6=Sunday) or a full English weekday name. Abbreviated names (e.g. `Fri`) are not accepted.
+
+```yaml
+# String form
+requires:
+  type: day_of_week_is
+  value: Friday
+
+# Integer form — same result (4 = Friday)
+requires:
+  type: day_of_week_is
+  value: 4
+```
+
+### date_is
+
+True when the current date matches. `year` is optional — omit it to match the same date every year (annual events such as holidays). Include `year` for a one-off date.
+
+```yaml
+# Annual — matches every December 25
+requires:
+  type: date_is
+  month: 12
+  day: 25
+
+# One-off — only April 5, 2026
+requires:
+  type: date_is
+  month: April
+  day: 5
+  year: 2026
+```
+
+`month` accepts an integer or a full English name.
+
+### date_between
+
+True when the current date falls within a month/day range. Both `start` and `end` are objects with `month` and `day` fields. The range is **inclusive** on both ends. `month` accepts an integer or a full English name.
+
+```yaml
+# True during the summer months (June 1 through August 31)
+requires:
+  type: date_between
+  start:
+    month: June
+    day: 1
+  end:
+    month: August
+    day: 31
+```
+
+When `start` is later in the year than `end`, the range wraps the year boundary:
+
+```yaml
+# Winter holiday season: December 1 through January 31
+requires:
+  type: date_between
+  start:
+    month: December
+    day: 1
+  end:
+    month: January
+    day: 31
+```
+
+Setting `start` equal to `end` always evaluates to false and logs a warning. For a single specific date use `date_is` instead.
+
+### time_between
+
+True when the current time falls within the specified window. Times are in 24-hour `HH:MM` format. The window is inclusive on both ends.
+
+```yaml
+# Business hours
+requires:
+  type: time_between
+  start: "09:00"
+  end: "17:00"
+```
+
+When `start` is later in the day than `end`, the window wraps midnight:
+
+```yaml
+# Night hours: 22:00 or later, or 04:00 or earlier
+requires:
+  type: time_between
+  start: "22:00"
+  end: "04:00"
+```
+
+Setting `start` equal to `end` always evaluates to false and logs a warning.
+
+### Composing calendar conditions
+
+Calendar predicates compose freely with `all`, `any`, and `not`:
+
+```yaml
+# Full Moon in autumn
+requires:
+  type: all
+  conditions:
+    - type: season_is
+      value: autumn
+    - type: moon_phase_is
+      value: "Full Moon"
+
+# Autumn months (September, October, November) using any
+requires:
+  type: any
+  conditions:
+    - type: month_is
+      value: 9
+    - type: month_is
+      value: 10
+    - type: month_is
+      value: 11
+
+# Friday evening
+requires:
+  type: all
+  conditions:
+    - type: day_of_week_is
+      value: Friday
+    - type: time_between
+      start: "18:00"
+      end: "23:00"
+
+# Not winter
+requires:
+  type: not
+  condition:
+    type: season_is
+    value: winter
+```
+
+> **Calendar functions in templates:** All eight calendar predicates have matching template functions — `season(today())`, `moon_phase(today())`, `zodiac_sign(today())`, etc. — for use in narrative text. See [Templates §Calendar and Astronomical Functions](./templates.md#calendar-and-astronomical-functions).
+
+---
+
 ## Combining Conditions
 
 A single condition is useful, but the real power comes from composing them.
@@ -308,6 +521,15 @@ requires:
 | `all` | `conditions` | — | All child conditions must pass (AND) |
 | `any` | `conditions` | — | Any child condition must pass (OR) |
 | `not` | `condition` | — | Inverts the single child condition |
+| `season_is` | `value` | — | True when meteorological season matches; `spring` \| `summer` \| `autumn` \| `winter` |
+| `moon_phase_is` | `value` | — | True when lunar phase matches (approximate ±1 day) |
+| `zodiac_is` | `value` | — | True when Western zodiac sign matches today's date |
+| `chinese_zodiac_is` | `value` | — | True when Chinese zodiac animal matches the current year |
+| `month_is` | `value` | — | Integer 1–12 or full English month name |
+| `day_of_week_is` | `value` | — | Integer 0–6 (Mon=0) or full English weekday name |
+| `date_is` | `month`, `day` | `year` | Annual when `year` omitted; one-off when `year` included |
+| `date_between` | `start`, `end` | — | Each has `month` + `day`; wraps year boundary when `start` > `end` |
+| `time_between` | `start`, `end` | — | `HH:MM` 24-hour format; wraps midnight when `start` > `end` |
 
 ### `stat_source` Values
 
