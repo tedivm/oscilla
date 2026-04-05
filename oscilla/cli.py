@@ -9,10 +9,12 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 
+from .cli_content import content_app
 from .services.crash import _GITHUB_ISSUES_URL, write_crash_report
 from .settings import settings
 
 app = typer.Typer()
+app.add_typer(content_app, name="content")
 
 
 def _configure_logging() -> None:
@@ -261,6 +263,13 @@ def validate(
         bool,
         typer.Option("--strict", help="Treat warnings as errors and exit with code 1 if any are found."),
     ] = False,
+    no_semantic: Annotated[
+        bool,
+        typer.Option(
+            "--no-semantic",
+            help="Skip semantic checks (undefined refs, circular chains, orphaned/unreachable content).",
+        ),
+    ] = False,
 ) -> None:
     """Load and validate all manifests in GAMES_PATH, then print a summary, warnings, or error list."""
     from rich.console import Console
@@ -314,6 +323,26 @@ def validate(
         for warning in pkg_warnings:
             color = "bold red" if strict else "yellow"
             _console.print(f"  [{color}]⚠[/{color}] {warning}")
+
+    if not no_semantic:
+        from oscilla.engine.semantic_validator import validate_semantic
+
+        semantic_total_warnings = 0
+        for pkg_name, registry in sorted(games.items()):
+            semantic_issues = validate_semantic(registry)
+            for issue in semantic_issues:
+                if issue.severity == "error":
+                    _console.print(f"  [red]✗[/red] [{pkg_name}] [{issue.kind}] {issue}")
+                    total_warnings += 1  # re-use exit logic
+                else:
+                    semantic_total_warnings += 1
+                    total_warnings += 1 if strict else 0
+                    color = "bold red" if strict else "yellow"
+                    _console.print(f"  [{color}]⚠[/{color}] [{pkg_name}] [{issue.kind}] {issue}")
+        if semantic_total_warnings and not strict:
+            _console.print(
+                f"\n[dim]{semantic_total_warnings} semantic warning(s). Use --strict to treat as errors.[/dim]"
+            )
 
     if strict and total_warnings > 0:
         _console.print(f"\n[bold red]Strict mode: {total_warnings} warning(s) treated as errors.[/bold red]")

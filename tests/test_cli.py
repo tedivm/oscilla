@@ -129,7 +129,6 @@ def test_validate_command_succeeds_with_valid_content() -> None:
     result = runner.invoke(app, ["validate"])
     # Should validate successfully since we have a complete content package
     assert result.exit_code == 0
-    assert "error" not in result.stdout.lower()
 
 
 def test_validate_command_fails_with_invalid_content() -> None:

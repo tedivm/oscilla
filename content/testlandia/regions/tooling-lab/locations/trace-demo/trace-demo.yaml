@@ -1,0 +1,11 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: trace-demo
+spec:
+  displayName: "Trace Demonstration Hub"
+  description: "Host for the trace-demo adventure. Visit here to manually exercise the 'oscilla content trace' command."
+  region: tooling-lab
+  adventures:
+    - ref: trace-demo
+      weight: 1

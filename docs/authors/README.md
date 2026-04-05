@@ -66,6 +66,14 @@ These documents cover each manifest kind in depth.
 
 ---
 
+## Author CLI Tooling
+
+| Guide | What it covers |
+|---|---|
+| [CLI Reference](./cli.md) | `oscilla content` commands — list, show, graph, schema, test, trace, create. Inspect content, generate graphs, export JSON schemas, trace adventure paths, and scaffold new manifests. |
+
+---
+
 ## Quick Path by Goal
 
 Not sure which guide to read? Find your goal:

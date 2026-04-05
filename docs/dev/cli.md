@@ -615,6 +615,53 @@ The key is stored in the `users` table under `user_key`. All characters belong t
 
 Each `game` invocation acquires a soft-lock on the active `character_iterations` row. The lock is released automatically when the TUI exits. If a previous session crashed without releasing its lock, the next session detects the stale token, logs a WARNING, clears any orphaned adventure state, and takes over the lock.
 
+## Content Subapp
+
+The `oscilla content` subapp provides developer and author tooling for inspecting, graphing, tracing, validating, exporting schemas, and scaffolding game content. It lives in `oscilla/cli_content.py` and is registered as a Typer sub-app.
+
+### Registration
+
+In `oscilla/cli.py`, the content subapp is imported at the top of the file and registered immediately after the main `app` is created:
+
+```python
+from .cli_content import content_app
+
+app = typer.Typer()
+app.add_typer(content_app, name="content")
+```
+
+### Architecture
+
+**`_KIND_MAP`** is a dict mapping plural CLI slug → `KindInfo` from `oscilla/engine/kinds.py`. It drives the `list` and `show` commands and validates the `<kind>` argument uniformly across all subcommands:
+
+```python
+_KIND_MAP: Dict[str, KindInfo] = {k.plural: k for k in ALL_KINDS}
+```
+
+**Singleton registry accessor** — many commands call `_load_registry()` which returns a `ContentRegistry`. Some stores in the registry (e.g. `KindRegistry`) hold a single item rather than a list; the commands check using `isinstance(store, KindRegistry)` and present the singleton directly.
+
+**`spec: Any = getattr(manifest, "spec", None)`** — All manifest model classes have a `spec` field, but since the command code is generic and mypy cannot narrow to the right spec type, `getattr` with `Any` annotation is used for field inspection.
+
+### Available Commands
+
+| Command | Description |
+|---|---|
+| `content list <kind>` | List all loaded manifests of a kind. |
+| `content show <kind> <name>` | Pretty-print fields of a single manifest. |
+| `content graph` | Render the world dependency graph. |
+| `content schema <kind>` | Export JSON Schema for a manifest kind. |
+| `content test` | Run semantic validation on all content and report issues. |
+| `content trace <adventure>` | Trace all paths through an adventure's step graph. |
+| `content create <kind>` | Scaffold a new manifest YAML file interactively. |
+
+### Extending the Subapp
+
+1. **Add a new command** as a `@content_app.command()` in `oscilla/cli_content.py`.
+2. **If the command accepts a `<kind>` argument**, validate against `_KIND_MAP` the same way existing commands do — this ensures unknown kinds produce a clear error.
+3. **Add tests** in `tests/test_cli_content.py` following the existing pattern: use `CliRunner(env={"TERM": "dumb"})` so Rich output is stable in CI.
+
+For the user-facing guide to all content commands, see [docs/authors/cli.md](../authors/cli.md).
+
 ## References
 
 - [Typer Documentation](https://typer.tiangolo.com/)

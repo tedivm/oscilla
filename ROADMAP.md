@@ -53,8 +53,6 @@ These items fix existing bugs or remove technical debt that actively misleads au
 | [Faction and Reputation System](#faction-and-reputation-system) | M | Quest Depth & Factions |
 | [Content Inheritance / Prototypes](#content-inheritance--prototypes) | M | Content Reuse |
 | [Multi-Manifest YAML Files](#multi-manifest-yaml-files) | S | Authoring Tooling |
-| [JSON Schema for IDE Support](#json-schema-for-ide-support) | M | Authoring Tooling |
-| [Content Validation CLI Improvements](#content-validation-cli-improvements) | M | Authoring Tooling |
 | [Plugin and Extension System](#plugin-and-extension-system) | L | Engine Architecture |
 | [HTTP API for Multi-User Support](#http-api-for-multi-user-support) | XL | Multi-User Platform |
 | [Front End Website](#front-end-website) | XL | Multi-User Platform |
@@ -535,26 +533,6 @@ spec:
   hp: 80
   damage: 22
 ```
-
-### JSON Schema for IDE Support
-
-**Effort: M** · **Group: Authoring Tooling**
-
-Publish JSON Schema files for all manifest kinds so content authors get autocomplete, inline documentation, and red underlines for invalid fields in VS Code, Neovim, and other editors without any extra plugins. This is a documentation/tooling deliverable, not an engine change.
-
-Schema files live in `schemas/` and are registered in the project so editors can associate them with `game/v1` manifests automatically via a `.vscode/settings.json` mapping or a `yaml-language-server` directive.
-
-### Content Validation CLI Improvements
-
-**Effort: M** · **Group: Authoring Tooling**
-
-The `oscilla validate` command currently reports schema errors. Extend it to catch semantic errors that are currently only discovered at runtime:
-
-- References to undefined items, enemies, skills, milestones, or regions
-- `goto` targets that never exist in the same adventure (already caught, but error messages could be richer)
-- Unreachable adventures (an adventure pool entry whose `requires` condition can never be met given the content package)
-- Circular region parent chains
-- Orphaned content (manifests that are defined but never referenced anywhere)
 
 ---
 

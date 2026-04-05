@@ -1,0 +1,51 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: trace-demo
+spec:
+  displayName: "Trace Demo"
+  description:
+    "A multi-branch adventure designed to exercise every path in the tracer. Contains a choice, a stat check on
+    each branch, and endings with different outcomes."
+  steps:
+    - type: narrative
+      text: "You enter the Tooling Lab and see two glowing doors."
+
+    - type: choice
+      prompt: "Which door do you try first?"
+      options:
+        - label: "Left Door"
+          steps:
+            - type: stat_check
+              condition:
+                type: character_stat
+                name: courage
+                gte: 5
+              on_pass:
+                steps:
+                  - type: narrative
+                    text: "Your courage carries you through."
+                    effects:
+                      - type: end_adventure
+                        outcome: completed
+              on_fail:
+                steps:
+                  - type: narrative
+                    text: "You hesitate and step back."
+                    effects:
+                      - type: end_adventure
+                        outcome: fled
+
+        - label: "Right Door"
+          steps:
+            - type: passive
+              text: "A spark of magic energises you."
+              effects:
+                - type: stat_change
+                  stat: courage
+                  amount: 1
+            - type: narrative
+              text: "You stride through confidently."
+              effects:
+                - type: end_adventure
+                  outcome: completed
