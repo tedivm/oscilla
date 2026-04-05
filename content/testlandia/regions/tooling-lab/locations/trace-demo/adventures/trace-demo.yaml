@@ -4,8 +4,7 @@ metadata:
   name: trace-demo
 spec:
   displayName: "Trace Demo"
-  description:
-    "A multi-branch adventure designed to exercise every path in the tracer. Contains a choice, a stat check on
+  description: "A multi-branch adventure designed to exercise every path in the tracer. Contains a choice, a stat check on
     each branch, and endings with different outcomes."
   steps:
     - type: narrative

@@ -4,6 +4,5 @@ metadata:
   name: tooling-lab
 spec:
   displayName: "Tooling Lab"
-  description:
-    "A developer region for manually exercising author CLI commands. Contains adventures designed to produce known
+  description: "A developer region for manually exercising author CLI commands. Contains adventures designed to produce known
     trace outputs for manual QA of the tracer and graph tools."

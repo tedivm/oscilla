@@ -1,11 +1,11 @@
 [project]
-authors = [{"name" = "Robert Hafner"}]
-description = ""
-dynamic = ["version"]
-license = "MIT"
 name = "oscilla"
-readme = {file = "README.md", content-type = "text/markdown"}
+description = ""
+readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.12"
+license = "MIT"
+authors = [{ "name" = "Robert Hafner" }]
+dynamic = ["version"]
 
 dependencies = [
   "SQLAlchemy",
@@ -51,8 +51,8 @@ dev = [
 ]
 
 [build-system]
-build-backend = "setuptools.build_meta"
 requires = ["setuptools>=67.0", "setuptools_scm[toml]>=7.1"]
+build-backend = "setuptools.build_meta"
 
 [tool.coverage.run]
 concurrency = ["thread", "greenlet"]
@@ -82,7 +82,7 @@ exclude = [".venv", "./oscilla/_version.py"]
 line-length = 120
 
 [tool.setuptools.dynamic]
-readme = {file = ["README.md"]}
+readme = { file = ["README.md"] }
 
 [tool.setuptools.package-data]
 oscilla = ["py.typed", "../content/**/*.yaml", "../content/**/*.yml"]
