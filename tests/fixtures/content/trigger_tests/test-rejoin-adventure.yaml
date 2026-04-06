@@ -1,0 +1,9 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: rejoin-adventure
+spec:
+  displayName: "Welcome Back"
+  steps:
+    - type: narrative
+      text: "Welcome back! The world has continued without you."

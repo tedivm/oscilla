@@ -348,6 +348,8 @@ spec:
 | `season_hemisphere` | no | `northern` (default) or `southern` — flips which months are which season |
 | `timezone` | no | IANA timezone name (e.g. `"America/New_York"`); defaults to server local time |
 | `time` | no | In-game time system configuration — cycles, eras, epoch. See [In-Game Time](./ingame-time.md). |
+| `triggers` | no | Trigger declarations: `custom`, `on_game_rejoin`, `on_stat_threshold`, `max_trigger_queue_depth` |
+| `trigger_adventures` | no | Maps trigger keys to ordered adventure ref lists (see Triggered Adventures above) |
 
 ### `character_config.yaml` spec fields
 
@@ -379,6 +381,120 @@ spec:
 
 ---
 
+## Triggered Adventures
+
+Triggered adventures fire automatically in response to game events — no location or player choice required. The trigger system is made up of two co-operating blocks in `game.yaml`: `triggers` (declaration) and `trigger_adventures` (routing).
+
+### `triggers` block
+
+```yaml
+triggers:
+  # Custom trigger names that adventures can emit with emit_trigger effects.
+  custom:
+    - my-custom-event
+
+  # Fire when a returning player reopens the game after a long absence.
+  on_game_rejoin:
+    absence_hours: 4    # minimum hours away before the trigger fires
+
+  # Fire when a stat crosses a threshold upward (not on downward movement).
+  on_stat_threshold:
+    - stat: reputation
+      threshold: 100
+      name: reputation-reached    # unique name used as the trigger key below
+    - stat: reputation
+      threshold: 500
+      name: fame-cap
+
+  # Control the max queue depth — drops triggers that exceed the limit.
+  max_trigger_queue_depth: 6    # default; raise if you have deep event chains
+```
+
+All fields are optional. An empty `triggers:` block is valid.
+
+#### `on_stat_threshold` rules
+
+- Only fires on **upward crossings**: stat going from below the threshold to at-or-above.
+- Does **not** de-duplicate: if the stat dips below and rises again, it fires again.
+- Each entry must have a unique `name`; duplicate names produce a load warning.
+- Use `repeatable: false` or `max_completions: 1` on the triggered adventure itself if you only want it to fire once per character.
+
+### `trigger_adventures` block
+
+Maps trigger keys to ordered lists of adventure refs. All adventures in the list run in order each time the trigger fires.
+
+```yaml
+trigger_adventures:
+  # Lifecycle triggers:
+  on_character_create:
+    - new-player-intro
+
+  on_game_rejoin:
+    - welcome-back-scene
+
+  on_level_up:
+    - level-up-fanfare
+
+  # Outcome triggers (fires after an adventure ends with that outcome):
+  on_outcome_defeated:
+    - defeat-recovery
+
+  on_outcome_completed:
+    - completion-bonus
+
+  # Stat threshold triggers (use the name from triggers.on_stat_threshold):
+  reputation-reached:
+    - reputation-milestone-scene
+
+  # Custom triggers (use the name from triggers.custom):
+  my-custom-event:
+    - custom-event-scene
+```
+
+#### Valid trigger keys
+
+| Key | When it fires |
+|---|---|
+| `on_character_create` | Once, immediately after a new character is created |
+| `on_level_up` | Once per level gained (fires multiple times on multi-level jumps) |
+| `on_game_rejoin` | When the player returns after `absence_hours` or more |
+| `on_outcome_<name>` | After any adventure ends with outcome `<name>` (built-ins: `completed`, `defeated`, `fled`; declare custom outcomes in `game.yaml outcomes`) |
+| `<threshold.name>` | When the named stat crosses its threshold upward |
+| `<custom>` | When an `emit_trigger` effect fires with that name |
+
+#### Multiple adventures per trigger
+
+When a trigger maps to multiple adventure refs, they run in order. Each one respects `requires`, `repeatable`, and cooldown settings. If any adventure is gated, only that one is skipped; the others still run.
+
+```yaml
+trigger_adventures:
+  on_level_up:
+    - level-up-fanfare         # narrative scene, always
+    - level-up-bonus-chest     # repeatable loot, always
+    - class-advancement-scene  # requires: {type: level, value: 10}
+```
+
+### Condition and repeat controls on triggered adventures
+
+Triggered adventures use exactly the same manifest structure as pool adventures. `requires`, `repeatable`, `max_completions`, `cooldown_days`, and `cooldown_ticks` all apply and are enforced by the drain loop before running.
+
+```yaml
+# content/adventures/one-time-intro.yaml
+spec:
+  displayName: "Welcome to the Realm"
+  repeatable: false       # fire at most once per character
+  steps:
+    - type: narrative
+      text: "A herald announces your arrival."
+```
+
+### Load warnings
+
+A `trigger_adventures` key that does not match a known trigger name produces a **load warning** (non-fatal). The same applies to adventure refs that cannot be resolved. Check `oscilla validate` output after editing this block.
+
+---
+
 *Next: [World Building](./world-building.md) — regions, locations, and adventure pools.*
 *See [Templates](./templates.md#pronouns) for using pronoun placeholders in narrative text.*
 *See [Passive Effects](./passive-effects.md) for the full `passive_effects` syntax.*
+*See [Effects](./effects.md#emit-trigger) for the `emit_trigger` effect that fires custom triggers.*

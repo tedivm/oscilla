@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-defeat-recovery
+spec:
+  displayName: "Recovery"
+  steps:
+    - type: narrative
+      text: "You wake up bruised but alive. Someone carried you to safety."
+      effects:
+        - type: heal
+          amount: full

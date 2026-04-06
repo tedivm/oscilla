@@ -1,0 +1,13 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: test-trigger-location
+spec:
+  displayName: "Trigger Test Location"
+  description: "A location for trigger integration tests."
+  region: test-trigger-region
+  adventures:
+    - ref: test-xp-grant-adventure
+      weight: 50
+    - ref: test-stat-boost-adventure
+      weight: 50

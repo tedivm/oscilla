@@ -1,0 +1,10 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: welcome-adventure
+spec:
+  displayName: "Welcome"
+  repeatable: false
+  steps:
+    - type: narrative
+      text: "Welcome, adventurer! Your journey begins here."

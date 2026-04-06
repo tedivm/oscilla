@@ -14,6 +14,8 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.orm.exc import StaleDataError
 
+from oscilla.models.character_iteration import CharacterIterationPendingTrigger
+
 from oscilla.engine.templates import PRONOUN_SETS
 from oscilla.services.character import (
     acquire_session_lock,
@@ -23,6 +25,7 @@ from oscilla.services.character import (
     equip_item,
     get_active_iteration_id,
     get_character_by_name,
+    get_character_record,
     increment_statistic,
     list_characters_for_user,
     load_character,
@@ -188,6 +191,29 @@ class GameSession:
         self._character = state
         self._last_saved_state = copy.deepcopy(state)
 
+        # on_game_rejoin: fire if the player has been absent longer than the configured threshold.
+        # Only applicable on load paths (not new character creation).
+        if self.registry.game is not None:
+            rejoin_cfg = self.registry.game.spec.triggers.on_game_rejoin
+            if rejoin_cfg is not None and "on_game_rejoin" in self.registry.trigger_index:
+                from datetime import datetime, timezone
+
+                char_record = await get_character_record(
+                    session=self.db_session,
+                    character_id=state.character_id,
+                )
+                if char_record is not None:
+                    # SQLite returns timezone-naive datetimes; normalise to UTC.
+                    updated_at = char_record.updated_at
+                    if updated_at.tzinfo is None:
+                        updated_at = updated_at.replace(tzinfo=timezone.utc)
+                    absence = datetime.now(tz=timezone.utc) - updated_at
+                    if absence.total_seconds() >= rejoin_cfg.absence_hours * 3600:
+                        state.enqueue_trigger(
+                            "on_game_rejoin",
+                            max_depth=self.registry.game.spec.triggers.max_trigger_queue_depth,
+                        )
+
         iteration_id = await get_active_iteration_id(session=self.db_session, character_id=state.character_id)
         if iteration_id is None:
             raise RuntimeError(f"No active iteration found for character {state.character_id}")
@@ -220,7 +246,74 @@ class GameSession:
         # Record per-outcome count for this completion.
         self._character.statistics.record_adventure_outcome(adventure_ref=adventure_ref, outcome=outcome.value)
 
+        # Queue on_outcome_<name> trigger for this adventure's outcome.
+        trigger_key = f"on_outcome_{outcome.value}"
+        if trigger_key in self.registry.trigger_index and self.registry.game is not None:
+            self._character.enqueue_trigger(
+                trigger_key,
+                max_depth=self.registry.game.spec.triggers.max_trigger_queue_depth,
+            )
+
         return outcome
+
+    async def drain_trigger_queue(self) -> None:
+        """Drain the player's pending_triggers queue, running each registered adventure.
+
+        Continues until the queue is empty. Newly queued triggers (from emit_trigger
+        effects inside triggered adventures) are appended to the back of the same list
+        and processed in order — FIFO. The max-depth guard on enqueue_trigger() prevents
+        runaway cycles.
+
+        A triggered adventure that does not meet its `requires` condition is skipped
+        silently, consistent with how pool adventures are filtered.
+        """
+        if self._character is None:
+            return
+
+        from datetime import date as _date
+
+        from oscilla.engine.conditions import evaluate
+
+        while self._character.pending_triggers:
+            trigger_name = self._character.pending_triggers.pop(0)
+            adventure_refs = self.registry.trigger_index.get(trigger_name, [])
+
+            for adventure_ref in adventure_refs:
+                adv_manifest = self.registry.adventures.get(adventure_ref)
+                if adv_manifest is None:
+                    logger.warning(
+                        "Triggered adventure %r not found in registry; skipping.",
+                        adventure_ref,
+                    )
+                    continue
+
+                # Apply conditions gate — same as pool eligibility check.
+                if not evaluate(adv_manifest.spec.requires, self._character, self.registry):
+                    logger.debug(
+                        "Triggered adventure %r skipped: requires condition not met.",
+                        adventure_ref,
+                    )
+                    continue
+
+                # Apply repeat controls — triggered adventures respect the same rules.
+                if not self._character.is_adventure_eligible(
+                    adventure_ref=adventure_ref,
+                    spec=adv_manifest.spec,
+                    today=_date.today(),
+                ):
+                    logger.debug(
+                        "Triggered adventure %r skipped: repeat control not satisfied.",
+                        adventure_ref,
+                    )
+                    continue
+
+                await self.run_adventure(adventure_ref=adventure_ref)
+                # run_adventure() already handles repeat-control tracking, outcome recording,
+                # and on_outcome_* trigger queuing — chaining works naturally.
+
+        # Persist the (now-empty or reduced) queue so the drain is visible to a future session.
+        if self._character is not None:
+            await self._on_state_change(state=self._character, event="adventure_end")
 
     # ---------------------------------------------------------------------------
     # PersistCallback implementation
@@ -528,6 +621,24 @@ class GameSession:
                 session=self.db_session,
                 character_id=state.character_id,
             )
+            # Replace the pending trigger queue atomically.
+            last_pending = last.pending_triggers if last is not None else []
+            if state.pending_triggers != last_pending:
+                from sqlalchemy import delete
+
+                await self.db_session.execute(
+                    delete(CharacterIterationPendingTrigger).where(
+                        CharacterIterationPendingTrigger.iteration_id == iteration_id
+                    )
+                )
+                for position, trigger_name in enumerate(state.pending_triggers):
+                    self.db_session.add(
+                        CharacterIterationPendingTrigger(
+                            iteration_id=iteration_id,
+                            position=position,
+                            trigger_name=trigger_name,
+                        )
+                    )
             await self.db_session.commit()
         elif state.active_adventure is not None:
             # step_start or combat_round
@@ -562,6 +673,13 @@ class GameSession:
             game_manifest=self.registry.game,
             character_config=self.registry.character_config,
         )
+        # Queue the on_character_create trigger before the first persist so it
+        # survives into the drain call immediately following start().
+        if "on_character_create" in self.registry.trigger_index and self.registry.game is not None:
+            state.enqueue_trigger(
+                "on_character_create",
+                max_depth=self.registry.game.spec.triggers.max_trigger_queue_depth,
+            )
         await save_character(
             session=self.db_session,
             state=state,

@@ -863,6 +863,10 @@ class OscillaApp(App[None]):
                     status_panel.refresh_player(player)
                     self._player = player
 
+                    # Drain A: on_character_create and on_game_rejoin triggers.
+                    await session.drain_trigger_queue()
+                    status_panel.refresh_player(player)
+
                     while True:
                         # Region selection
                         accessible_regions = [
@@ -941,6 +945,10 @@ class OscillaApp(App[None]):
                             self._in_adventure = True
                             outcome = await session.run_adventure(adventure_ref)
                             self._in_adventure = False
+
+                            # Drain B: on_level_up, on_outcome_*, on_stat_threshold, emit_trigger.
+                            await session.drain_trigger_queue()
+                            status_panel.refresh_player(player)
 
                             message = _OUTCOME_MESSAGES.get(outcome.value, f"Adventure ended: {outcome.value}")
                             await tui.show_text(message)

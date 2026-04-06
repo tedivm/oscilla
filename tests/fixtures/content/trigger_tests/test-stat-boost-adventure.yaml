@@ -1,0 +1,13 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-stat-boost-adventure
+spec:
+  displayName: "Stat Boost"
+  steps:
+    - type: narrative
+      text: "You find a large cache of gold."
+      effects:
+        - type: stat_set
+          stat: gold
+          value: 60

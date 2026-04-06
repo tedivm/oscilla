@@ -1,0 +1,9 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-custom-trigger-scene
+spec:
+  displayName: "Custom Trigger Fired"
+  steps:
+    - type: narrative
+      text: "A custom emit_trigger event was received and routed correctly."

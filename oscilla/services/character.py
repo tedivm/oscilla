@@ -250,6 +250,7 @@ async def load_character(
             selectinload(CharacterIterationRecord.skill_cooldown_rows),
             selectinload(CharacterIterationRecord.adventure_state_rows),
             selectinload(CharacterIterationRecord.era_state_rows),
+            selectinload(CharacterIterationRecord.pending_trigger_rows),
         )
     )
     iter_result = await session.execute(iter_stmt)
@@ -358,6 +359,8 @@ async def load_character(
         "game_ticks": iteration.game_ticks,
         "era_started_at_ticks": era_started_at_ticks,
         "era_ended_at_ticks": era_ended_at_ticks,
+        # Rows are already ordered ascending by position via the relationship order_by.
+        "pending_triggers": [row.trigger_name for row in iteration.pending_trigger_rows],
     }
 
     return CharacterState.from_dict(data=data, character_config=character_config, registry=registry)
@@ -434,6 +437,16 @@ async def get_character_by_name(
             CharacterRecord.name == name,
         )
     )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def get_character_record(
+    session: AsyncSession,
+    character_id: UUID,
+) -> "CharacterRecord | None":
+    """Return the CharacterRecord for the given character_id, or None."""
+    stmt = select(CharacterRecord).where(and_(CharacterRecord.id == character_id))
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
 

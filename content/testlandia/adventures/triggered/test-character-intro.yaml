@@ -1,0 +1,23 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-character-intro
+spec:
+  displayName: "Welcome to Testlandia"
+  repeatable: false
+  steps:
+    - type: choice
+      prompt: "Choose a starting bonus:"
+      options:
+        - label: "Extra gold (+10)"
+          effects:
+            - type: stat_change
+              stat: gold
+              amount: 10
+        - label: "Extra strength (+1)"
+          effects:
+            - type: stat_change
+              stat: strength
+              amount: 1
+    - type: narrative
+      text: "Your adventure begins."

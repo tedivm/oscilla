@@ -1,0 +1,9 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-rejoin-scene
+spec:
+  displayName: "Welcome Back"
+  steps:
+    - type: narrative
+      text: "You've been away for a while. The world has continued without you."

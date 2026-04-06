@@ -78,6 +78,11 @@ class ContentRegistry:
         # InGameTimeResolver is built once after game manifest is registered.
         # None when time system is not configured.
         self._ingame_time_resolver: "InGameTimeResolver | None" = None
+        # Built by loader.py after all manifests are registered.
+        # trigger_name → ordered list of adventure refs from trigger_adventures.
+        self.trigger_index: Dict[str, List[str]] = {}
+        # stat_name → sorted list of (threshold_value, trigger_name) pairs.
+        self.stat_threshold_index: Dict[str, List[tuple[int, str]]] = {}
 
     @property
     def ingame_time_resolver(self) -> "InGameTimeResolver | None":

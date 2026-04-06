@@ -30,6 +30,9 @@ These items fix existing bugs or remove technical debt that actively misleads au
 
 | Item | Effort | Group |
 |------|--------|-------|
+| [Character Creation Flow](#character-creation-flow) | M | Character Configuration |
+| [Full TUI Upgrade](#full-tui-upgrade) | L | — |
+| [Prestige System](#prestige-system) | M | Character Progression |
 | [Triggered Adventures](#triggered-adventures) | M | — |
 | [Adventure-Scoped Variables](#adventure-scoped-variables) | M | Adventure Authoring |
 | [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems) | XL | Combat Overhaul |
@@ -53,6 +56,7 @@ These items fix existing bugs or remove technical debt that actively misleads au
 | [HTTP API for Multi-User Support](#http-api-for-multi-user-support) | XL | Multi-User Platform |
 | [Front End Website](#front-end-website) | XL | Multi-User Platform |
 | [Picture Selection and ASCII Art](#picture-selection-and-ascii-art) | M | — |
+| [Region Maps](#region-maps) | M | — |
 
 ---
 
@@ -82,6 +86,53 @@ Design considerations:
 - Multiple adventures may be registered for the same trigger; the engine runs them in declaration order
 - Triggers declared in `character_config.yaml` or `game.yaml` apply globally; triggers in a region or location manifest apply only while that region/location is active
 - The normal condition system applies — a triggered adventure can still have `conditions:` that gate whether it actually runs
+
+### Character Creation Flow
+
+**Effort: M** · **Group: Character Configuration**
+
+A structured, author-driven character creation experience that guides players through building a new character before entering the world. Currently, new characters are initialized from `character_config.yaml` defaults and dropped directly into the game; there is no opportunity for players to make choices (class, backstory, starting gear) at creation time.
+
+The primary implementation path is a dedicated `on_character_create` triggered adventure (see [Triggered Adventures](#triggered-adventures)). Because triggered adventures run automatically in response to lifecycle events and share the same step types, condition system, and effect system as normal adventures, no new engine primitives are needed — character creation is simply an adventure that fires exactly once per new character.
+
+Typical creation flow authored this way:
+
+```yaml
+# adventure: character-creation
+triggers:
+  - on_character_create
+steps:
+  - type: choice
+    text: "Choose your calling."
+    choices:
+      - text: "Warrior — strength and endurance above all."
+        effects:
+          - type: archetype_add
+            archetype: warrior
+      - text: "Mage — command of arcane forces."
+        effects:
+          - type: archetype_add
+            archetype: mage
+  - type: choice
+    text: "Where did you come from?"
+    choices:
+      - text: "A noble house, fallen from grace."
+        effects:
+          - type: stat_change
+            stat: gold
+            amount: 50
+      - text: "The streets — you learned to survive before you learned to read."
+        effects:
+          - type: stat_change
+            stat: cunning
+            amount: 2
+```
+
+Design considerations:
+
+- Requires Triggered Adventures to be implemented first; Character Creation Flow is an authoring convention on top of that system, not a separate engine feature
+- The TUI must handle first-run adventures gracefully before the player reaches the world map — this may require a small flow change but no fundamental TUI restructuring
+- Content packages that do not wish to gate entry behind a creation adventure simply omit the `on_character_create` trigger; default stat initialization from `character_config.yaml` applies as today
 
 ---
 
@@ -264,6 +315,27 @@ This feature is already noted as coming in the author documentation for `game-co
 The `passive_1`, `passive_2` etc. slot names used in `skill_grants` within passive effects and NPC manifests are confusing. They imply a fixed UI grid that may not match how a given game surfaces skills, and the term "passive" conflicts with the existing "passive effects" concept.
 
 Revisit the slot naming scheme so that it is either author-defined in `game.yaml` (allowing names like `utility`, `combat`, `exploration`) or removed entirely if the TUI does not actually display slots in a position-dependent way.
+
+### Prestige System
+
+**Effort: M** · **Group: Character Progression**
+
+A mechanism for resetting a character to a new iteration — wiping progress back to a baseline state while carrying forward a permanent legacy marker that distinguishes a prestige run from a first-time run. The engine provides the reset primitive and the persistent record; what it *means* narratively (ascending to godhood, reincarnating, joining a harder difficulty tier) is entirely determined by content authors.
+
+The primary activation path is an `on_stat_threshold` or custom `emit_trigger` triggered adventure (see [Triggered Adventures](#triggered-adventures)) that fires when the player reaches the conditions the author considers "ready to prestige" — a level cap, a specific milestone, an accumulated stat value. The adventure can present a narrative choice, apply any final legacy rewards, and then invoke a `prestige` effect that resets the character.
+
+Key design points:
+
+- A `prestige` effect resets the character's stats, skills, and items to their `character_config.yaml` defaults, increments a `prestige_count` (or author-named equivalent) stat, and optionally carries forward a whitelist of stats or items the author marks as `prestige_persistent`
+- The new iteration is recorded as a new character iteration in the database, preserving the full history of previous iterations for display or narrative purposes
+- Legacy bonuses — permanent stat bumps or unlocked content that persist across the reset — are just stat changes or milestone grants applied before the reset effect fires; no special legacy system is required
+- The condition system gains no new predicates: `prestige_count` is a regular stat, so existing `stat_gte` and `stat_lte` predicates already gate prestige-unlocked content
+- Content packages that do not want prestige simply never emit the `prestige` effect; the feature is fully opt-in and invisible to authors who do not use it
+
+Design considerations:
+
+- Depends on Triggered Adventures being implemented; the prestige effect itself can ship earlier as a standalone effect type, but the full author experience requires triggered adventures for automatic gating
+- The TUI should surface the character's iteration number and prestige count somewhere on the character screen so players know where they stand across runs
 
 ---
 
@@ -538,6 +610,53 @@ Considerations:
 ---
 
 ## Media and Presentation
+
+### Full TUI Upgrade
+
+**Effort: L** · **Group: —**
+
+A comprehensive pass over the terminal TUI to surface all engine features that have been added since the original TUI was written but are not yet represented with dedicated UI — inventory management, the skill system, quests, faction reputations, NPC interactions, and prestige state among them. The current TUI shows the player's location and adventure choices but leaves most character depth invisible.
+
+Scope of the upgrade:
+
+- **Character sheet panel** — stats, archetypes, prestige count, and iteration number in a browsable panel; pulls from fields already tracked in character state
+- **Inventory panel** — full item list with equip/unequip actions, item descriptions, and (if Inventory Storage is implemented) a link to open storage containers at supported locations
+- **Skills panel** — active and passive skills with descriptions, slot names, and cooldown/charge state where applicable
+- **Quests panel** — active and completed quests with current stage descriptions (depends on Quest Progress Panel being designed; this item covers the TUI surface, not the underlying engine wiring)
+- **Factions panel** — reputation values for all declared factions, displayed once Faction and Reputation System is implemented
+- **Prestige and iteration display** — after a prestige reset, the character sheet should clearly show current iteration and historical best stats where useful
+- **NPC encounter framing** — when an adventure is associated with an NPC, display speaker context (name, portrait if available) in a dedicated region rather than inline in the narrative text
+- **Keyboard navigation improvements** — consistent bindings across all panels, discoverable help overlay (press `?` to see keys)
+
+This item is deliberately scoped as a TUI-only deliverable. It does not add new engine features; it exposes and presents data already computed by the engine. Each panel can be implemented and shipped independently — the item tracks the full set as a cohesive upgrade goal.
+
+Dependencies:
+
+- Quest Progress Panel (engine wiring) should land before the Quests panel surface is built
+- Faction and Reputation System should land before the Factions panel surface is built
+- All other panels depend only on existing character state fields
+
+### Region Maps
+
+**Effort: M** · **Group: —**
+
+Automatically generated visual maps of a region and the locations within it, rendered in the terminal TUI and optionally as a static image asset for the web front end. Maps give players spatial orientation — they can see which locations are nearby, which they have visited, and how the world is structured — without requiring content authors to hand-draw any art.
+
+Implementation approach:
+
+- Region manifests already declare their child locations; the map generator reads this graph and derives a layout automatically using a force-directed or grid-based placement algorithm — no manual coordinate authoring required
+- Visited locations are tracked in character state (milestone or explicit flag); the map renderer distinguishes visited from unvisited locations using character symbols or color
+- The current location is highlighted with a distinct marker
+- Location connections (edges in the graph) are drawn as lines between nodes; the connection graph is inferred from navigation options declared in location manifests
+- Terminal rendering uses [Rich](https://rich.readthedocs.io/) or a lightweight box-drawing approach; no external image library is required for the TUI surface
+- For the web front end, the same layout graph can be serialized and rendered as an SVG or canvas element
+
+Design considerations:
+
+- Map display is read-only — it shows state, it does not enable travel; navigation remains choice-driven through the standard step system
+- Authors can optionally declare `x`/`y` coordinates on locations to override the automatic layout for regions where spatial precision matters
+- Regions with very large numbers of locations (50+) may need a pan/zoom interaction in the TUI; the initial implementation can cap display at a reasonable node count and revisit scrolling later
+- If [Picture Selection and ASCII Art](#picture-selection-and-ascii-art) is implemented, location icons or themed symbols can be layered onto map nodes
 
 ### Picture Selection and ASCII Art
 

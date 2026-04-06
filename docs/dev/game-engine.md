@@ -879,3 +879,69 @@ Tick state is saved by `update_character_tick_state()` in `services/character.py
 - `character_iterations.game_ticks`
 - `character_iteration_adventure_state.last_completed_at_ticks` (per adventure)
 - `character_iteration_era_state` rows (insert/update for each era with a changed state)
+
+
+---
+
+## Trigger System
+
+Triggered adventures fire automatically in response to game events without the player selecting them from a location pool. The system has three layers: detection, queueing, and drain.
+
+### Indexes Built at Load Time
+
+`loader.py` builds two runtime lookup tables after all manifests are registered:
+
+**`ContentRegistry.trigger_index`** — maps trigger name → ordered list of adventure refs from `game.yaml trigger_adventures`. Built by `_build_trigger_index()`.
+
+**`ContentRegistry.stat_threshold_index`** — maps stat name → sorted list of `(threshold_value, trigger_name)` pairs for `on_stat_threshold` entries. Sorted ascending so multiple thresholds on the same stat are checked in one pass. Built by `_build_stat_threshold_index()`.
+
+### Trigger Detection Points
+
+Each event type is detected at a specific point in the engine and results in `CharacterState.enqueue_trigger()` being called:
+
+| Trigger key | Detection location | Condition |
+|---|---|---|
+| `on_character_create` | `GameSession._create_new_character()` | Always, if wired |
+| `on_game_rejoin` | `GameSession.start()` after character load | `characters.updated_at` absence ≥ `absence_hours` |
+| `on_level_up` | `xp_grant` effect handler in `effects.py` | Once per level in `levels_gained` |
+| `on_outcome_<name>` | `GameSession.run_adventure()` after outcome | Outcome value matches key suffix |
+| `on_stat_threshold` | `stat_change` and `stat_set` effect handlers | `old_value < threshold ≤ new_value` (upward only) |
+| `<custom>` | `emit_trigger` effect handler in `effects.py` | When the effect fires |
+
+All callsites pass `max_depth=registry.game.spec.triggers.max_trigger_queue_depth` to `enqueue_trigger()`.
+
+### Queue Mechanics
+
+`CharacterState.pending_triggers` is a plain `List[str]` — a FIFO queue of trigger names.
+
+`enqueue_trigger(name, max_depth)` appends to the list if `len < max_depth`, otherwise logs a warning and drops the entry. This prevents infinite loops from `emit_trigger` cycles.
+
+The queue is persisted to the `character_iteration_pending_triggers` table at every `adventure_end` event. The ORM model uses a composite PK `(iteration_id, position)` so ordering is preserved without a separate sort column.
+
+### Drain Algorithm — `GameSession.drain_trigger_queue()`
+
+```
+while pending_triggers is not empty:
+    name ← pop front
+    for each adventure_ref in trigger_index.get(name, []):
+        manifest ← registry.adventures.get(adventure_ref)
+        if manifest is None: skip with warning
+        if not evaluate(manifest.requires, player, registry): skip silently
+        if not player.is_adventure_eligible(adventure_ref, ...): skip silently
+        await run_adventure(adventure_ref)
+        # run_adventure appends on_outcome_* and emits any emit_trigger effects,
+        # which may extend pending_triggers — handled by the enclosing while loop.
+persist queue via _on_state_change(event="adventure_end")
+```
+
+FIFO ordering means: triggers enqueued by an adventure during drain are appended to the back and processed after all pre-existing triggers.
+
+### Drain Call Sites in `tui.py`
+
+**Drain A** — immediately after `session.start()` returns. Fires `on_character_create` on first play and `on_game_rejoin` on return play.
+
+**Drain B** — immediately after each `session.run_adventure()` in the main game loop. Fires `on_level_up`, `on_outcome_*`, `on_stat_threshold`, and `emit_trigger` chains.
+
+### Interaction with Repeat Controls
+
+Triggered adventures are subject to identical repeat-control checks as pool adventures. `is_adventure_eligible()` is called inside `drain_trigger_queue()` before running each adventure. Authors use `repeatable: false` or `max_completions: N` to prevent re-firing after the first time.

@@ -120,6 +120,12 @@ class CharacterIterationRecord(Base):
     era_state_rows: Mapped[List["CharacterIterationEraState"]] = relationship(
         "CharacterIterationEraState", back_populates="iteration", cascade="all, delete-orphan"
     )
+    pending_trigger_rows: Mapped[List["CharacterIterationPendingTrigger"]] = relationship(
+        "CharacterIterationPendingTrigger",
+        back_populates="iteration",
+        order_by="CharacterIterationPendingTrigger.position",
+        cascade="all, delete-orphan",
+    )
     character: Mapped["CharacterRecord"] = relationship(  # noqa: F821
         "CharacterRecord", back_populates="iterations"
     )
@@ -364,4 +370,22 @@ class CharacterIterationEraState(Base):
 
     iteration: Mapped["CharacterIterationRecord"] = relationship(
         "CharacterIterationRecord", back_populates="era_state_rows"
+    )
+
+
+class CharacterIterationPendingTrigger(Base):
+    """One row per queued trigger awaiting drain.
+
+    position preserves FIFO order — rows are loaded ascending by position
+    and written with consecutive 0-based positions.
+    """
+
+    __tablename__ = "character_iteration_pending_triggers"
+
+    iteration_id: Mapped[UUID] = mapped_column(ForeignKey("character_iterations.id"), primary_key=True, nullable=False)
+    position: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+    trigger_name: Mapped[str] = mapped_column(String, nullable=False)
+
+    iteration: Mapped["CharacterIterationRecord"] = relationship(
+        "CharacterIterationRecord", back_populates="pending_trigger_rows"
     )

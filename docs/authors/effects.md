@@ -328,4 +328,43 @@ Four things happen at once: XP, item, milestone, reputation. That's the composab
 
 ---
 
+## Emitting Custom Triggers
+
+The `emit_trigger` effect fires a custom trigger that has been declared in `game.yaml`. The trigger is enqueued for drain at the end of the current adventure, which means any adventures mapped to it in `trigger_adventures` run after the currently-active adventure finishes.
+
+```yaml
+effects:
+  - type: emit_trigger
+    trigger: player-discovered-relic   # must be in game.yaml triggers.custom
+```
+
+### When to use `emit_trigger`
+
+Use it when one author-defined event should automatically start a separate adventure without the player explicitly choosing it. For example: a player finds an artifact (pool adventure) and that automatically triggers a follow-up lore scene (triggered adventure), decoupling the two files from each other.
+
+### Requirements
+
+The trigger name in `trigger` must be declared in `game.yaml` under `triggers.custom`. An undeclared name produces a **load warning** when the package is validated. Example declaration:
+
+```yaml
+# game.yaml
+spec:
+  triggers:
+    custom:
+      - player-discovered-relic
+  trigger_adventures:
+    player-discovered-relic:
+      - relic-lore-scene
+```
+
+### `emit_trigger` fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `type` | `"emit_trigger"` | yes | Identifies this effect type |
+| `trigger` | `str` | yes | Custom trigger name declared in `game.yaml triggers.custom` |
+
+---
+
 *Next: [Templates](./templates.md) — dynamic text and calculations in narrative.*
+*See [Game Configuration](./game-configuration.md#triggered-adventures) for the full trigger system.*

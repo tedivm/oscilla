@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-emit-adventure
+spec:
+  displayName: "Emit Trigger"
+  steps:
+    - type: narrative
+      text: "An event is being emitted."
+      effects:
+        - type: emit_trigger
+          trigger: test-custom

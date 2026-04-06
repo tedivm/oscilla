@@ -1,0 +1,15 @@
+apiVersion: game/v1
+kind: CharacterConfig
+metadata:
+  name: trigger-test-character-config
+spec:
+  public_stats:
+    - name: strength
+      type: int
+      default: 10
+      description: "Physical power"
+    - name: gold
+      type: int
+      default: 0
+      description: "Gold coins"
+  hidden_stats: []

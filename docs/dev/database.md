@@ -820,6 +820,12 @@ erDiagram
     VARCHAR milestone_ref PK
   }
 
+  character_iteration_pending_triggers {
+    CHAR(32) iteration_id PK,FK
+    INTEGER position PK
+    VARCHAR trigger_name
+  }
+
   character_iteration_quests {
     CHAR(32) iteration_id PK,FK
     VARCHAR quest_ref PK
@@ -897,6 +903,7 @@ erDiagram
   character_iteration_item_instances ||--o| character_iteration_item_instance_modifiers : instance_id
   character_iterations ||--o| character_iteration_item_instances : iteration_id
   character_iterations ||--o| character_iteration_milestones : iteration_id
+  character_iterations ||--o| character_iteration_pending_triggers : iteration_id
   character_iterations ||--o| character_iteration_quests : iteration_id
   character_iterations ||--o| character_iteration_skill_cooldowns : iteration_id
   character_iterations ||--o| character_iteration_skills : iteration_id

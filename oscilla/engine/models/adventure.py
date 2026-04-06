@@ -192,6 +192,17 @@ class AdjustGameTicksEffect(BaseModel):
     delta: int = Field(description="Signed integer tick adjustment. May be negative.")
 
 
+class EmitTriggerEffect(BaseModel):
+    """Fire a named custom trigger, queuing any registered adventures.
+
+    The trigger name must be declared in game.yaml's triggers.custom list.
+    Validated at content load time — unknown names are a load-time warning.
+    """
+
+    type: Literal["emit_trigger"]
+    trigger: str = Field(description="Custom trigger name declared in game.yaml triggers.custom")
+
+
 Effect = Annotated[
     Union[
         XpGrantEffect,
@@ -209,6 +220,7 @@ Effect = Annotated[
         QuestActivateEffect,
         QuestFailEffect,
         AdjustGameTicksEffect,
+        EmitTriggerEffect,
     ],
     Field(discriminator="type"),
 ]

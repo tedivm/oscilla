@@ -536,6 +536,26 @@ steps:
 
 ---
 
+## Triggered Adventures
+
+Adventures can also be run automatically in response to game events — without the player selecting them from a location's pool. These are called **triggered adventures**.
+
+A triggered adventure uses exactly the same manifest structure as any other adventure. There is nothing special about the YAML file itself. What makes an adventure "triggered" is how it is wired in `game.yaml`:
+
+```yaml
+# game.yaml
+spec:
+  trigger_adventures:
+    on_level_up:
+      - level-up-fanfare    # runs every time the player levels up
+```
+
+Triggered adventures respect the same `requires`, `repeatable`, `max_completions`, `cooldown_days`, and `cooldown_ticks` controls as pool adventures. If the condition is not met, that adventure is silently skipped; others in the list still run.
+
+See [Game Configuration — Triggered Adventures](./game-configuration.md#triggered-adventures) for the full list of trigger event types and the complete `triggers` + `trigger_adventures` schema.
+
+---
+
 *See [Effects](./effects.md) for the full list of effect types.*
 *See [Conditions](./conditions.md) for the full condition syntax used in `requires` and `stat_check`.*
 *See [Enemies](./enemies.md) for enemy manifest syntax.*

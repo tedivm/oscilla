@@ -14,6 +14,7 @@ from oscilla.engine.models.adventure import (
     ApplyBuffEffect,
     DispelEffect,
     Effect,
+    EmitTriggerEffect,
     EndAdventureEffect,
     HealEffect,
     ItemDropEffect,
@@ -156,6 +157,12 @@ async def run_effect(
                 await tui.show_text(f"Lost {abs(amount)} XP.")
             for level in levels_gained:
                 await tui.show_text(f"[bold]Level up![/bold] You are now level {level}!")
+                # Queue once per level gained so multi-level jumps fire the trigger repeatedly.
+                if game is not None and "on_level_up" in registry.trigger_index:
+                    player.enqueue_trigger(
+                        "on_level_up",
+                        max_depth=game.spec.triggers.max_trigger_queue_depth,
+                    )
             for level in levels_lost:
                 await tui.show_text(f"[bold red]Level down![/bold red] You are now level {level}.")
 
@@ -272,8 +279,17 @@ async def run_effect(
                     f"[yellow]Warning: stat {stat!r} clamped to {new_value} (attempted {raw_new}).[/yellow]"
                 )
             player.set_stat(name=stat, value=new_value)
-            await tui.show_text(f"Changed {stat}: {old_value} → {new_value}")
-            # Cascade-unequip items whose requirements are no longer satisfied.
+            await tui.show_text(
+                f"Changed {stat}: {old_value} → {new_value}"
+            )  # Check stat thresholds after mutation — fire on upward crossing only.
+            if isinstance(old_value, int) and isinstance(new_value, int):
+                for threshold_value, trigger_name in registry.stat_threshold_index.get(stat, []):
+                    if old_value < threshold_value <= new_value:
+                        if registry.game is not None:
+                            player.enqueue_trigger(
+                                trigger_name,
+                                max_depth=registry.game.spec.triggers.max_trigger_queue_depth,
+                            )  # Cascade-unequip items whose requirements are no longer satisfied.
             displaced = cascade_unequip_invalid(player=player, registry=registry)
             for name in displaced:
                 await tui.show_text(f"[yellow]⚠ {name} unequipped: requirements no longer met.[/yellow]")
@@ -313,8 +329,17 @@ async def run_effect(
                     f"[yellow]Warning: stat {stat!r} clamped to {clamped} (attempted {value}).[/yellow]"
                 )
             player.set_stat(name=stat, value=clamped)
-            await tui.show_text(f"Set {stat}: {old_value} → {clamped}")
-            # Cascade-unequip items whose requirements are no longer satisfied.
+            await tui.show_text(
+                f"Set {stat}: {old_value} → {clamped}"
+            )  # Check stat thresholds after mutation — fire on upward crossing only.
+            if isinstance(old_value, int) and isinstance(clamped, int):
+                for threshold_value, trigger_name in registry.stat_threshold_index.get(stat, []):
+                    if old_value < threshold_value <= clamped:
+                        if registry.game is not None:
+                            player.enqueue_trigger(
+                                trigger_name,
+                                max_depth=registry.game.spec.triggers.max_trigger_queue_depth,
+                            )  # Cascade-unequip items whose requirements are no longer satisfied.
             displaced = cascade_unequip_invalid(player=player, registry=registry)
             for name in displaced:
                 await tui.show_text(f"[yellow]⚠ {name} unequipped: requirements no longer met.[/yellow]")
@@ -465,3 +490,11 @@ async def run_effect(
             if pre_epoch == "clamp":
                 new_ticks = max(0, new_ticks)
             player.game_ticks = new_ticks
+        case EmitTriggerEffect(trigger=trigger_name):
+            # The loader verified this name is declared in triggers.custom.
+            # If it has no registered adventures, this is a no-op (not an error).
+            if registry.game is not None:
+                player.enqueue_trigger(
+                    trigger_name,
+                    max_depth=registry.game.spec.triggers.max_trigger_queue_depth,
+                )

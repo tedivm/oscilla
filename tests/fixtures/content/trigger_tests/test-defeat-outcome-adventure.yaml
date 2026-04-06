@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-defeat-outcome-adventure
+spec:
+  displayName: "Defeat Outcome"
+  steps:
+    - type: narrative
+      text: "You are defeated in battle."
+      effects:
+        - type: end_adventure
+          outcome: defeated

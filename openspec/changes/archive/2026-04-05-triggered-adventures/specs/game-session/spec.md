@@ -1,58 +1,4 @@
-# Game Session
-
-## Purpose
-
-Defines the `GameSession` orchestrator that ties content loading, user identity, character state, database persistence, and adventure pipeline execution together for the TUI game loop.
-
-## Requirements
-
-### Requirement: GameSession owns the TUI runtime lifecycle
-
-`GameSession` (`oscilla/engine/session.py`) SHALL be the single entry point for the TUI game loop. It SHALL hold references to:
-
-- `ContentRegistry` — loaded once at session start
-- `CharacterState` — the currently active character
-- `AsyncSession` — the database session
-- `TUICallbacks` — the TUI protocol implementation
-
-On `start()`, it SHALL resolve user identity, run character selection or creation, and prepare the character state for the game loop.
-
-#### Scenario: Session start loads content and resolves user
-
-- **WHEN** `GameSession.start()` is called
-- **THEN** the content registry is loaded, the TUI user key is derived, the user is looked up or created in the DB, and character selection proceeds
-
----
-
-### Requirement: Character selection on startup
-
-On startup, `GameSession.start()` SHALL query all `CharacterRecord` rows belonging to the resolved user, ordered by `updated_at DESC`, and:
-
-- **0 characters** → call `_create_new_character()` to create a new `CharacterState` and save it immediately
-- **1 character** → auto-load that character, no prompt shown
-- **N characters (N > 1)** → present a character selection menu via `TUICallbacks`; the menu SHALL always include a `[+] New Character` option at the bottom
-
-#### Scenario: No existing characters
-
-- **WHEN** the user has no saved characters
-- **THEN** a new character creation flow begins without showing a selection menu
-
-#### Scenario: One existing character
-
-- **WHEN** the user has exactly one saved character
-- **THEN** that character is loaded automatically and no selection menu is shown
-
-#### Scenario: Multiple existing characters
-
-- **WHEN** the user has two or more saved characters
-- **THEN** a selection menu is shown with each character name, level, class, and last played date, plus a `[+] New Character` option
-
-#### Scenario: User selects New Character from menu
-
-- **WHEN** the user selects `[+] New Character` from the character selection menu
-- **THEN** the new character creation flow begins
-
----
+## MODIFIED Requirements
 
 ### Requirement: New character creation saves immediately
 
@@ -82,7 +28,7 @@ The trigger must be enqueued before the first persist so it survives into the Dr
 - **WHEN** a new character is created and `on_character_create` is wired in `trigger_adventures`
 - **THEN** `pending_triggers` contains `"on_character_create"` in the database row immediately after creation
 
----
+## ADDED Requirements
 
 ### Requirement: GameSession.drain_trigger_queue() drains queued triggers
 
@@ -115,8 +61,6 @@ After draining, `drain_trigger_queue()` SHALL persist the (now-empty) queue via 
 - **WHEN** `drain_trigger_queue()` is called before `start()` has loaded a character (`_character is None`)
 - **THEN** the method returns immediately without error
 
----
-
 ### Requirement: on_game_rejoin detection at session load
 
 At session start on the load path (loading an existing character), `GameSession.start()` SHALL check whether the player has been absent for longer than the configured `absence_hours` threshold. If `triggers.on_game_rejoin` is configured, `"on_game_rejoin"` is in `registry.trigger_index`, and the time since `characters.updated_at` exceeds `absence_hours`, then `state.enqueue_trigger("on_game_rejoin")` SHALL be called before returning from `start()`.
@@ -137,38 +81,3 @@ The `characters.updated_at` column is the authoritative last-activity timestamp,
 
 - **WHEN** `triggers.on_game_rejoin` is `None`
 - **THEN** no rejoin detection occurs regardless of absence duration
-
----
-
-### Requirement: GameSession implements PersistCallback
-
-`GameSession` SHALL implement the `PersistCallback` protocol. It SHALL save the current `CharacterState` to the database on every call to `_on_state_change(state, event)`. The implementation SHALL handle `StaleDataError` by reloading the character from DB before retrying the save once.
-
-#### Scenario: State saved on each pipeline event
-
-- **WHEN** the adventure pipeline fires `step_start`, `combat_round`, or `adventure_end`
-- **THEN** the `GameSession._on_state_change()` method persists the updated `CharacterState` to the database
-
-#### Scenario: StaleDataError triggers reload and retry
-
-- **WHEN** `_on_state_change()` encounters a `StaleDataError`
-- **THEN** the character is reloaded from the database, the new in-memory state is applied, and the save is retried once
-
----
-
-### Requirement: --character-name CLI flag filters character selection
-
-The `oscilla game` CLI command SHALL accept a `--character-name` option. When provided:
-
-- If a character with that name exists for the current user → that character is auto-loaded (skipping selection menu)
-- If no character with that name exists → a new character with that name is created
-
-#### Scenario: Named character exists
-
-- **WHEN** `oscilla game --character-name "Aragorn"` is run and "Aragorn" exists
-- **THEN** "Aragorn" is loaded without showing the character selection menu
-
-#### Scenario: Named character does not exist
-
-- **WHEN** `oscilla game --character-name "Legolas"` is run and "Legolas" does not exist
-- **THEN** a new character named "Legolas" is created

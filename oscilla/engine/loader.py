@@ -26,6 +26,7 @@ from oscilla.engine.models.adventure import (
     ChoiceStep,
     CombatStep,
     Effect,
+    EmitTriggerEffect,
     EndAdventureEffect,
     ItemDropEffect,
     NarrativeStep,
@@ -1143,6 +1144,150 @@ def _validate_loot_refs(registry: "ContentRegistry") -> List[LoadError]:
     return errors
 
 
+def _validate_trigger_adventures(registry: "ContentRegistry") -> List[LoadWarning]:
+    """Return load warnings for trigger_adventures validation.
+
+    Checks:
+    - Each key in trigger_adventures is a known trigger name.
+    - Each adventure ref in every list resolves to a registered adventure.
+    - emit_trigger effect names validate against triggers.custom.
+    - No duplicate on_stat_threshold names.
+    """
+    warnings: List[LoadWarning] = []
+    if registry.game is None:
+        return warnings
+
+    spec = registry.game.spec
+
+    # Build allowed trigger key set.
+    built_in_outcomes = {"completed", "defeated", "fled"}
+    all_outcomes = built_in_outcomes | set(spec.outcomes)
+    allowed_keys: Set[str] = {"on_character_create", "on_level_up"}
+    allowed_keys |= {f"on_outcome_{o}" for o in all_outcomes}
+    if spec.triggers.on_game_rejoin is not None:
+        allowed_keys.add("on_game_rejoin")
+    for threshold in spec.triggers.on_stat_threshold:
+        allowed_keys.add(threshold.name)
+    for custom in spec.triggers.custom:
+        allowed_keys.add(custom)
+
+    for trigger_key, adv_refs in spec.trigger_adventures.items():
+        if trigger_key not in allowed_keys:
+            warnings.append(
+                LoadWarning(
+                    file=Path("<game.yaml>"),
+                    message=(
+                        f"trigger_adventures key {trigger_key!r} is not a known trigger name. "
+                        f"Allowed: {sorted(allowed_keys)}"
+                    ),
+                    suggestion=(
+                        f"Remove or rename {trigger_key!r} to a valid trigger. "
+                        "Valid keys: on_character_create, on_level_up, on_outcome_<name>, "
+                        "on_game_rejoin, <threshold.name>, or a declared custom trigger name."
+                    ),
+                )
+            )
+        for ref in adv_refs:
+            if registry.adventures.get(ref) is None:
+                warnings.append(
+                    LoadWarning(
+                        file=Path("<game.yaml>"),
+                        message=f"trigger_adventures[{trigger_key!r}] references unknown adventure {ref!r}.",
+                        suggestion=f"Ensure adventure {ref!r} is defined in the content package.",
+                    )
+                )
+
+    # Duplicate threshold names.
+    threshold_names = [t.name for t in spec.triggers.on_stat_threshold]
+    seen: Set[str] = set()
+    for name in threshold_names:
+        if name in seen:
+            warnings.append(
+                LoadWarning(
+                    file=Path("<game.yaml>"),
+                    message=f"Duplicate on_stat_threshold name {name!r} in game.yaml triggers.",
+                    suggestion=f"Each on_stat_threshold entry must have a unique name. Rename one of the {name!r} entries.",
+                )
+            )
+        seen.add(name)
+
+    # emit_trigger effects must reference declared custom triggers.
+    declared_custom: Set[str] = set(spec.triggers.custom)
+    for adv_manifest in registry.adventures.all():
+        emit_effects: List[EmitTriggerEffect] = []
+        for step in adv_manifest.spec.steps:
+            _collect_step_emit_trigger_effects(step, emit_effects)
+        for effect in emit_effects:
+            if effect.trigger not in declared_custom:
+                warnings.append(
+                    LoadWarning(
+                        file=Path(f"<{adv_manifest.metadata.name}>"),
+                        message=(
+                            f"emit_trigger effect uses trigger name {effect.trigger!r} "
+                            "which is not declared in game.yaml triggers.custom."
+                        ),
+                        suggestion=(
+                            f"Add {effect.trigger!r} to game.yaml spec.triggers.custom, "
+                            f"or change the effect to use a declared custom trigger name."
+                        ),
+                    )
+                )
+
+    return warnings
+
+
+def _collect_step_emit_trigger_effects(step: "Step", effects: "List[EmitTriggerEffect]") -> None:
+    """Recursively collect EmitTriggerEffect instances from a step tree."""
+    match step:
+        case NarrativeStep():
+            for eff in step.effects:
+                if isinstance(eff, EmitTriggerEffect):
+                    effects.append(eff)
+        case ChoiceStep():
+            for opt in step.options:
+                for sub in opt.steps:
+                    _collect_step_emit_trigger_effects(sub, effects)
+                for eff in opt.effects:
+                    if isinstance(eff, EmitTriggerEffect):
+                        effects.append(eff)
+        case CombatStep():
+            for branch in [step.on_win, step.on_defeat, step.on_flee]:
+                for eff in branch.effects:
+                    if isinstance(eff, EmitTriggerEffect):
+                        effects.append(eff)
+                for sub in branch.steps:
+                    _collect_step_emit_trigger_effects(sub, effects)
+        case StatCheckStep():
+            for branch in [step.on_pass, step.on_fail]:
+                for eff in branch.effects:
+                    if isinstance(eff, EmitTriggerEffect):
+                        effects.append(eff)
+                for sub in branch.steps:
+                    _collect_step_emit_trigger_effects(sub, effects)
+        case PassiveStep():
+            for eff in step.effects:
+                if isinstance(eff, EmitTriggerEffect):
+                    effects.append(eff)
+        case _:
+            pass
+
+
+def _build_trigger_index(game: GameManifest) -> Dict[str, List[str]]:
+    """Build the runtime lookup table from trigger_adventures."""
+    return dict(game.spec.trigger_adventures)
+
+
+def _build_stat_threshold_index(game: GameManifest) -> Dict[str, List[tuple[int, str]]]:
+    """Build stat → [(threshold, trigger_name)] lookup for detection in effect handlers."""
+    index: Dict[str, List[tuple[int, str]]] = {}
+    for entry in game.spec.triggers.on_stat_threshold:
+        index.setdefault(entry.stat, []).append((entry.threshold, entry.name))
+    # Sort ascending so we can check all thresholds on a stat in one pass.
+    for lst in index.values():
+        lst.sort()
+    return index
+
+
 def load(content_dir: Path) -> Tuple[ContentRegistry, List[LoadWarning]]:
     """Orchestrate scan → parse → validate_references → build_effective_conditions → template validation.
 
@@ -1202,6 +1347,12 @@ def load(content_dir: Path) -> Tuple[ContentRegistry, List[LoadWarning]]:
     warnings: List[LoadWarning] = []
     warnings.extend(_validate_labels(manifests))
     warnings.extend(_validate_passive_effects(manifests))
+    warnings.extend(_validate_trigger_adventures(registry))
+
+    # Build runtime trigger indexes after validation.
+    if registry.game is not None:
+        registry.trigger_index = _build_trigger_index(registry.game)
+        registry.stat_threshold_index = _build_stat_threshold_index(registry.game)
 
     return registry, warnings
 

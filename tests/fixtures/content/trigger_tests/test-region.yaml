@@ -1,0 +1,7 @@
+apiVersion: game/v1
+kind: Region
+metadata:
+  name: test-trigger-region
+spec:
+  displayName: "Trigger Test Region"
+  description: "A region for trigger integration tests."

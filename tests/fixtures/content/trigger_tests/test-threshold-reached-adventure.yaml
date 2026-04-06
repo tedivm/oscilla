@@ -1,0 +1,9 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: threshold-reached-adventure
+spec:
+  displayName: "Threshold Reached"
+  steps:
+    - type: narrative
+      text: "Threshold reached! Your wealth has grown significantly."

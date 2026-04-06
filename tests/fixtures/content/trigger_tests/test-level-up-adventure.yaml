@@ -1,0 +1,9 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: level-up-adventure
+spec:
+  displayName: "Level Up"
+  steps:
+    - type: narrative
+      text: "Level up notification! You feel stronger."

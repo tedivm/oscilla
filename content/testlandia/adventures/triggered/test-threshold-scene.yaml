@@ -1,0 +1,13 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-threshold-scene
+spec:
+  displayName: "Threshold Reached"
+  repeatable: false
+  steps:
+    - type: narrative
+      text: "A tracker stat has crossed its threshold. This scene fires exactly once."
+      effects:
+        - type: milestone_grant
+          milestone: test-threshold-fired

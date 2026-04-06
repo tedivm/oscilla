@@ -163,6 +163,30 @@ class CharacterState:
     # update_era_states() in pipeline.py after each tick advancement. Reset on new iteration.
     era_started_at_ticks: Dict[str, int] = field(default_factory=dict)
     era_ended_at_ticks: Dict[str, int] = field(default_factory=dict)
+    # FIFO queue of trigger names awaiting drain. Appended by detection points
+    # and effect handlers; drained in order by GameSession.drain_trigger_queue().
+    # Persisted to DB at adventure_end so queued triggers survive reconnects.
+    pending_triggers: List[str] = field(default_factory=list)
+
+    # --- Methods ---
+
+    def enqueue_trigger(self, trigger_name: str, max_depth: int = 6) -> None:
+        """Append a trigger name to the pending queue.
+
+        Silently drops and logs a warning if the queue would reach max_depth,
+        preventing infinite emit_trigger cycles. Callers should pass
+        registry.game.spec.triggers.max_trigger_queue_depth as max_depth.
+        The default of 6 matches GameTriggers.max_trigger_queue_depth's default.
+        """
+        if len(self.pending_triggers) >= max_depth:
+            logger.warning(
+                "Trigger queue depth limit (%d) reached; dropping trigger %r. "
+                "Check for emit_trigger cycles in your content.",
+                max_depth,
+                trigger_name,
+            )
+            return
+        self.pending_triggers.append(trigger_name)
 
     # --- Factory ---
 
@@ -776,6 +800,7 @@ class CharacterState:
             game_ticks=int(data.get("game_ticks", 0)),
             era_started_at_ticks=dict(data.get("era_started_at_ticks", {})),
             era_ended_at_ticks=dict(data.get("era_ended_at_ticks", {})),
+            pending_triggers=list(data.get("pending_triggers", [])),
         )
 
         # Warn about equipped items whose requires condition is no longer satisfied.

@@ -1,0 +1,13 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-level-up-scene
+spec:
+  displayName: "Level Up!"
+  steps:
+    - type: narrative
+      text: "You feel stronger. Your level has increased!"
+      effects:
+        - type: stat_change
+          stat: gold
+          amount: 5

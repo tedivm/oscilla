@@ -1,0 +1,12 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-xp-grant-adventure
+spec:
+  displayName: "XP Grant"
+  steps:
+    - type: narrative
+      text: "You complete a challenge and gain experience."
+      effects:
+        - type: xp_grant
+          amount: 100

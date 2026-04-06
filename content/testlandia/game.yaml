@@ -157,3 +157,29 @@ spec:
           type: game_calendar_time_is
           clock: game
           gte: 56
+
+  # Trigger system: exercises all six trigger types for developer QA.
+  triggers:
+    custom:
+      - test-custom-event
+    on_game_rejoin:
+      # Short threshold so QA testers can trigger it within a session break.
+      absence_hours: 1
+    on_stat_threshold:
+      - stat: gold
+        threshold: 50
+        name: test-threshold-reached
+
+  trigger_adventures:
+    on_character_create:
+      - test-character-intro
+    on_level_up:
+      - test-level-up-scene
+    on_outcome_defeated:
+      - test-defeat-recovery
+    on_game_rejoin:
+      - test-rejoin-scene
+    test-threshold-reached:
+      - test-threshold-scene
+    test-custom-event:
+      - test-custom-trigger-scene

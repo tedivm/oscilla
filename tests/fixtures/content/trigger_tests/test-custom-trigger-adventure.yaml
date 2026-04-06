@@ -1,0 +1,9 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: custom-trigger-adventure
+spec:
+  displayName: "Custom Trigger"
+  steps:
+    - type: narrative
+      text: "Custom trigger fired! The emit_trigger chain resolved successfully."

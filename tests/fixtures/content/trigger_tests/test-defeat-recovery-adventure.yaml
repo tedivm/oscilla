@@ -1,0 +1,9 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: defeat-recovery-adventure
+spec:
+  displayName: "Defeat Recovery"
+  steps:
+    - type: narrative
+      text: "You recover from defeat. Someone carried you to safety."
