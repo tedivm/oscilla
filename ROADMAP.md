@@ -8,11 +8,11 @@ Ideas and future directions that are explicitly out of scope for current work bu
 
 | Label | Meaning |
 |-------|---------|
-| **XS** | A day or less — trivial addition, no new design required |
-| **S** | 2–5 days — small, well-scoped feature |
-| **M** | 1–2 weeks — moderate feature, some design work required |
-| **L** | 3–6 weeks — significant feature spanning multiple engine components |
-| **XL** | 2+ months — major system requiring full architectural design |
+| **XS** | Trivial addition — touches one file or a narrow code path, no design required |
+| **S** | Small, well-scoped feature — limited to a single subsystem with minimal interface changes |
+| **M** | Moderate feature — requires design work and touches a few interconnected components |
+| **L** | Significant feature — spans multiple engine subsystems and requires coordinated changes |
+| **XL** | Major system — requires full architectural design and changes across the entire stack |
 
 ## Summary
 
@@ -33,7 +33,6 @@ These items fix existing bugs or remove technical debt that actively misleads au
 | [Character Creation Flow](#character-creation-flow) | M | Character Configuration |
 | [Full TUI Upgrade](#full-tui-upgrade) | L | — |
 | [Prestige System](#prestige-system) | M | Character Progression |
-| [Triggered Adventures](#triggered-adventures) | M | — |
 | [Adventure-Scoped Variables](#adventure-scoped-variables) | M | Adventure Authoring |
 | [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems) | XL | Combat Overhaul |
 | [Buff Blocking and Priority](#buff-blocking-and-priority) | S | Combat Refinement |
@@ -64,36 +63,13 @@ These items fix existing bugs or remove technical debt that actively misleads au
 
 ## Adventure System
 
-### Triggered Adventures
-
-**Effort: M** · **Group: —**
-
-Adventures that fire automatically in response to engine lifecycle events rather than being selected by the player from a location menu. The trigger type is declared in the adventure manifest; the engine detects the event and queues the adventure before normal flow resumes.
-
-Candidate trigger events:
-
-- `on_character_create` — runs immediately after a new character is created; ideal for starting gear selection, backstory questions, or tutorial sequences
-- `on_death` — runs when a character's HP reaches zero; allows a narrative death scene, a resurrection mechanic, or a permadeath epilogue
-- `on_game_rejoin` — runs when a player resumes a session after a configurable absence; useful for recap narratives or "time has passed" world events
-- `on_level_up` — runs immediately after a level-up is applied; allows a narrative acknowledgment or a class-advancement choice sequence
-- `on_stat_threshold` — fires when a tracked stat crosses a defined boundary (e.g., fame reaches 100, an experience stat reaches its cap); this is the generic hook for content-level events like prestige that have no corresponding engine lifecycle fact
-
-Authors can also declare custom trigger names in `game.yaml`; the engine fires them when an `emit_trigger` effect is applied anywhere in content. This allows content-defined lifecycle events without any engine knowledge of what those events mean.
-
-Design considerations:
-
-- A triggered adventure is structurally identical to a normal adventure; only the activation mechanism differs
-- Multiple adventures may be registered for the same trigger; the engine runs them in declaration order
-- Triggers declared in `character_config.yaml` or `game.yaml` apply globally; triggers in a region or location manifest apply only while that region/location is active
-- The normal condition system applies — a triggered adventure can still have `conditions:` that gate whether it actually runs
-
 ### Character Creation Flow
 
 **Effort: M** · **Group: Character Configuration**
 
 A structured, author-driven character creation experience that guides players through building a new character before entering the world. Currently, new characters are initialized from `character_config.yaml` defaults and dropped directly into the game; there is no opportunity for players to make choices (class, backstory, starting gear) at creation time.
 
-The primary implementation path is a dedicated `on_character_create` triggered adventure (see [Triggered Adventures](#triggered-adventures)). Because triggered adventures run automatically in response to lifecycle events and share the same step types, condition system, and effect system as normal adventures, no new engine primitives are needed — character creation is simply an adventure that fires exactly once per new character.
+The primary implementation path is a dedicated `on_character_create` triggered adventure. Because triggered adventures run automatically in response to lifecycle events and share the same step types, condition system, and effect system as normal adventures, no new engine primitives are needed — character creation is simply an adventure that fires exactly once per new character.
 
 Typical creation flow authored this way:
 
@@ -130,7 +106,6 @@ steps:
 
 Design considerations:
 
-- Requires Triggered Adventures to be implemented first; Character Creation Flow is an authoring convention on top of that system, not a separate engine feature
 - The TUI must handle first-run adventures gracefully before the player reaches the world map — this may require a small flow change but no fundamental TUI restructuring
 - Content packages that do not wish to gate entry behind a creation adventure simply omit the `on_character_create` trigger; default stat initialization from `character_config.yaml` applies as today
 
@@ -322,7 +297,7 @@ Revisit the slot naming scheme so that it is either author-defined in `game.yaml
 
 A mechanism for resetting a character to a new iteration — wiping progress back to a baseline state while carrying forward a permanent legacy marker that distinguishes a prestige run from a first-time run. The engine provides the reset primitive and the persistent record; what it *means* narratively (ascending to godhood, reincarnating, joining a harder difficulty tier) is entirely determined by content authors.
 
-The primary activation path is an `on_stat_threshold` or custom `emit_trigger` triggered adventure (see [Triggered Adventures](#triggered-adventures)) that fires when the player reaches the conditions the author considers "ready to prestige" — a level cap, a specific milestone, an accumulated stat value. The adventure can present a narrative choice, apply any final legacy rewards, and then invoke a `prestige` effect that resets the character.
+The primary activation path is an `on_stat_threshold` or custom `emit_trigger` triggered adventure that fires when the player reaches the conditions the author considers "ready to prestige" — a level cap, a specific milestone, an accumulated stat value. The adventure can present a narrative choice, apply any final legacy rewards, and then invoke a `prestige` effect that resets the character.
 
 Key design points:
 
@@ -334,7 +309,6 @@ Key design points:
 
 Design considerations:
 
-- Depends on Triggered Adventures being implemented; the prestige effect itself can ship earlier as a standalone effect type, but the full author experience requires triggered adventures for automatic gating
 - The TUI should surface the character's iteration number and prestige count somewhere on the character screen so players know where they stand across runs
 
 ---
