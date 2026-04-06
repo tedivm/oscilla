@@ -20,19 +20,24 @@ Items sharing a **Group** label can be scoped and worked on together as a single
 
 ### High Priority
 
-These items fix existing bugs or remove technical debt that actively misleads authors or degrades engine correctness. They should be addressed before other roadmap work.
+These items fix existing bugs, remove technical debt that actively misleads authors or degrades engine correctness, or introduce breaking changes to existing content or saves. They should be addressed before other roadmap work to ensure authors and players are not left with incompatible data or content.
+
+Since this project has not had a v1 release yet it is acceptable to break backwards compatibility, but we want to prioritize those features before the v1 release.
 
 | Item | Effort | Group |
 |------|--------|-------|
+| [Tick-Anchored State Refactor](#tick-anchored-state-refactor) | L | Engine Architecture |
+| [Character Archetypes](#character-archetypes) | M | Character Progression |
+| [Skill Slot Naming Revisit](#skill-slot-naming-revisit) | XS | Character Configuration |
 
 
 ### All Items
 
 | Item | Effort | Group |
 |------|--------|-------|
-| [Character Creation Flow](#character-creation-flow) | M | Character Configuration |
 | [Full TUI Upgrade](#full-tui-upgrade) | L | — |
-| [Prestige System](#prestige-system) | M | Character Progression |
+| [Cross-Iteration Conditions/Templates/Effects](#cross-iteration-conditionstemplateseffects) | M | Character Progression |
+| [Tick-Anchored State Refactor](#tick-anchored-state-refactor) | L | Engine Architecture |
 | [Adventure-Scoped Variables](#adventure-scoped-variables) | M | Adventure Authoring |
 | [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems) | XL | Combat Overhaul |
 | [Buff Blocking and Priority](#buff-blocking-and-priority) | S | Combat Refinement |
@@ -61,55 +66,29 @@ These items fix existing bugs or remove technical debt that actively misleads au
 
 ## Condition System
 
-## Adventure System
+### Tick-Anchored State Refactor
 
-### Character Creation Flow
+**Effort: L** · **Group: Engine Architecture**
 
-**Effort: M** · **Group: Character Configuration**
+The internal game clock (`internal_ticks`) is a monotone, tamper-proof counter that already advances on every adventure. It is currently used for adventure cooldowns (`cooldown_ticks`) and era boundary calculations, but most state timestamps — milestones, quest completions, adventure completion history — are stored as opaque sets or string dates decoupled from the tick system. This change refactors those stores to record the `internal_ticks` value at the moment each event occurred.
 
-A structured, author-driven character creation experience that guides players through building a new character before entering the world. Currently, new characters are initialized from `character_config.yaml` defaults and dropped directly into the game; there is no opportunity for players to make choices (class, backstory, starting gear) at creation time.
+Key changes this enables:
 
-The primary implementation path is a dedicated `on_character_create` triggered adventure. Because triggered adventures run automatically in response to lifecycle events and share the same step types, condition system, and effect system as normal adventures, no new engine primitives are needed — character creation is simply an adventure that fires exactly once per new character.
-
-Typical creation flow authored this way:
-
-```yaml
-# adventure: character-creation
-triggers:
-  - on_character_create
-steps:
-  - type: choice
-    text: "Choose your calling."
-    choices:
-      - text: "Warrior — strength and endurance above all."
-        effects:
-          - type: archetype_add
-            archetype: warrior
-      - text: "Mage — command of arcane forces."
-        effects:
-          - type: archetype_add
-            archetype: mage
-  - type: choice
-    text: "Where did you come from?"
-    choices:
-      - text: "A noble house, fallen from grace."
-        effects:
-          - type: stat_change
-            stat: gold
-            amount: 50
-      - text: "The streets — you learned to survive before you learned to read."
-        effects:
-          - type: stat_change
-            stat: cunning
-            amount: 2
-```
+- **Milestone timestamps**: `milestones` changes from `Set[str]` to `Dict[str, int]` (milestone ref → tick when granted). Querying `has_milestone()` stays unchanged; conditions gain `milestone_at_ticks` and `milestone_before_ticks` predicates so authors can write time-relative checks (e.g., "granted the gate-key milestone within the last 10 ticks").
+- **Cooldown unification**: Skill cooldowns currently count down in adventure-units. With tick timestamps, all cooldowns — adventure repeats, skill reuse, and buff durations — can be expressed as `cooldown_ticks` offsets from the granting tick. This removes the `tick_skill_cooldowns()` adventure-start ceremony and the separate `cooldown_days` date-string path.
+- **Effect and trigger timestamps**: `emit_trigger` events and quest stage transitions gain a `granted_at_ticks` field, enabling elapsed-time conditions across the whole authoring surface.
+- **`adventure_last_completed_at_ticks` unification**: The current parallel tracking (`adventure_last_completed_on` for calendar dates, `adventure_last_completed_at_ticks` for ticks) collapses into the single tick-based record; calendar-day comparisons are derived from the tick-to-game-date conversion where a `time:` block is declared.
 
 Design considerations:
 
-- The TUI must handle first-run adventures gracefully before the player reaches the world map — this may require a small flow change but no fundamental TUI restructuring
-- Content packages that do not wish to gate entry behind a creation adventure simply omit the `on_character_create` trigger; default stat initialization from `character_config.yaml` applies as today
+- Backward-compatible migration: existing saves have `milestones` as a set — `from_dict()` must detect the old format and migrate it by assigning `tick = 0` (or `None`) to pre-migration milestones
+- The `has_milestone()` API must not change — only new tick-aware predicates are added; old content remains valid
+- Without a `time:` block in `game.yaml`, the calendar-day cooldown path is already gated — tick-only is the baseline; date conversion is additive
+- Skill cooldown duration would need to be expressed in ticks rather than adventure counts in manifests; a deprecation path for `cooldown_adventures` is required
 
 ---
+
+## Adventure System
 
 ## Combat System
 
@@ -291,25 +270,26 @@ The `passive_1`, `passive_2` etc. slot names used in `skill_grants` within passi
 
 Revisit the slot naming scheme so that it is either author-defined in `game.yaml` (allowing names like `utility`, `combat`, `exploration`) or removed entirely if the TUI does not actually display slots in a position-dependent way.
 
-### Prestige System
+### Cross-Iteration Conditions/Templates/Effects
 
 **Effort: M** · **Group: Character Progression**
 
-A mechanism for resetting a character to a new iteration — wiping progress back to a baseline state while carrying forward a permanent legacy marker that distinguishes a prestige run from a first-time run. The engine provides the reset primitive and the persistent record; what it *means* narratively (ascending to godhood, reincarnating, joining a harder difficulty tier) is entirely determined by content authors.
+A query surface over a character's full `character_iterations` history, enabling conditions, template expressions, and effects that reference data from past prestige runs — not just the current one. This is the natural follow-on to the prestige system, which deliberately scoped itself to current-iteration state.
 
-The primary activation path is an `on_stat_threshold` or custom `emit_trigger` triggered adventure that fires when the player reaches the conditions the author considers "ready to prestige" — a level cap, a specific milestone, an accumulated stat value. The adventure can present a narrative choice, apply any final legacy rewards, and then invoke a `prestige` effect that resets the character.
+Examples of what this enables:
+
+- Condition: "player reached milestone X in any past iteration" (milestone-ever-reached)
+- Template: `{{ player.past_run_count }}` — how many completed iterations exist
+- Effect: grant a cumulative legacy bonus based on the sum of a stat across all past runs
+- Content: an NPC who remembers your best stat from a previous life
 
 Key design points:
 
-- A `prestige` effect resets the character's stats, skills, and items to their `character_config.yaml` defaults, increments a `prestige_count` (or author-named equivalent) stat, and optionally carries forward a whitelist of stats or items the author marks as `prestige_persistent`
-- The new iteration is recorded as a new character iteration in the database, preserving the full history of previous iterations for display or narrative purposes
-- Legacy bonuses — permanent stat bumps or unlocked content that persist across the reset — are just stat changes or milestone grants applied before the reset effect fires; no special legacy system is required
-- The condition system gains no new predicates: `prestige_count` is a regular stat, so existing `stat_gte` and `stat_lte` predicates already gate prestige-unlocked content
-- Content packages that do not want prestige simply never emit the `prestige` effect; the feature is fully opt-in and invisible to authors who do not use it
-
-Design considerations:
-
-- The TUI should surface the character's iteration number and prestige count somewhere on the character screen so players know where they stand across runs
+- Requires a new query surface (`load_all_iterations()` already exists in services) — the gap is exposing that data through `CharacterState`, `PlayerContext`, and the condition evaluator
+- Milestone carry-forward ("always have milestone X once earned in any run") is a special case of this — it can be implemented as a condition check at iteration creation time without changing the iteration model
+- Per-run comparison displays in the TUI (e.g., best run, current vs. previous) also fall here
+- Cross-iteration effects could be limited in scope at first (read-only history for conditions and templates; write effects like carry-forward happen only at prestige time)
+- Since data in past iterations never changes it is an ideal candidate for caching.
 
 ---
 
