@@ -14,9 +14,8 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.orm.exc import StaleDataError
 
-from oscilla.models.character_iteration import CharacterIterationPendingTrigger
-
 from oscilla.engine.templates import PRONOUN_SETS
+from oscilla.models.character_iteration import CharacterIterationPendingTrigger
 from oscilla.services.character import (
     acquire_session_lock,
     add_item_instance,
