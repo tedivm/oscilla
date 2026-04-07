@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from oscilla.cli import app
+from oscilla.engine.loader import load
 
 # TERM=dumb prevents Rich from injecting ANSI escape codes into captured output.
 runner = CliRunner(env={"TERM": "dumb"})
@@ -126,3 +128,19 @@ def test_content_test_validates_game() -> None:
     result = runner.invoke(app, ["content", "test", "--game", "testlandia"])
     # A valid content package should exit 0
     assert result.exit_code == 0
+
+
+_TESTLANDIA_PATH = Path(__file__).parent.parent / "content" / "testlandia"
+
+
+def test_testlandia_character_creation_adventure_is_in_registry() -> None:
+    """The character-creation adventure must be present in the loaded testlandia registry."""
+    registry, _warnings = load(_TESTLANDIA_PATH)
+    assert "character-creation" in registry.adventures
+
+
+def test_testlandia_character_creation_adventure_has_at_least_three_steps() -> None:
+    """The testlandia character-creation adventure must have at least 3 steps."""
+    registry, _warnings = load(_TESTLANDIA_PATH)
+    adventure = registry.adventures.require("character-creation", "Adventure")
+    assert len(adventure.spec.steps) >= 3

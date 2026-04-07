@@ -133,3 +133,63 @@ spec:
     )
     with pytest.raises(ContentLoadError):
         load(tmp_path)
+
+
+_GAME_YAML_WITHOUT_PRESTIGE = """\
+apiVersion: game/v1
+kind: Game
+metadata:
+  name: test-game
+spec:
+  displayName: "Test"
+  xp_thresholds: [100]
+  hp_formula:
+    base_hp: 20
+    hp_per_level: 5
+"""
+
+_GAME_YAML_WITH_PRESTIGE = """\
+apiVersion: game/v1
+kind: Game
+metadata:
+  name: test-game
+spec:
+  displayName: "Test"
+  xp_thresholds: [100]
+  hp_formula:
+    base_hp: 20
+    hp_per_level: 5
+  prestige:
+    carry_stats: []
+"""
+
+_ADVENTURE_WITH_PRESTIGE_EFFECT = """\
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: test-prestige-adventure
+spec:
+  displayName: "Prestige Ceremony"
+  steps:
+    - type: narrative
+      text: "Your journey resets."
+      effects:
+        - type: prestige
+"""
+
+
+def test_loader_rejects_prestige_effect_without_prestige_config(tmp_path: Path) -> None:
+    """A prestige effect in an adventure raises ContentLoadError when prestige: is absent from game.yaml."""
+    (tmp_path / "game.yaml").write_text(_GAME_YAML_WITHOUT_PRESTIGE, encoding="utf-8")
+    (tmp_path / "adventure.yaml").write_text(_ADVENTURE_WITH_PRESTIGE_EFFECT, encoding="utf-8")
+    with pytest.raises(ContentLoadError) as exc_info:
+        load(tmp_path)
+    assert "prestige" in str(exc_info.value).lower()
+
+
+def test_loader_accepts_prestige_effect_when_prestige_config_declared(tmp_path: Path) -> None:
+    """A prestige effect is accepted when the game.yaml declares a prestige: block."""
+    (tmp_path / "game.yaml").write_text(_GAME_YAML_WITH_PRESTIGE, encoding="utf-8")
+    (tmp_path / "adventure.yaml").write_text(_ADVENTURE_WITH_PRESTIGE_EFFECT, encoding="utf-8")
+    # Should not raise — warnings are fine.
+    load(tmp_path)

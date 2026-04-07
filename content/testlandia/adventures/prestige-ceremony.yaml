@@ -1,0 +1,27 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: prestige-ceremony
+spec:
+  displayName: "The Prestige Ceremony"
+  description: "Offered when you reach level 5. Resets your character and carries forward legacy_power."
+  repeatable: false
+  steps:
+    - type: narrative
+      text: "You have reached the peak of your power. Legacy power accumulated: {{ player.stats.legacy_power }}."
+
+    - type: choice
+      prompt: "The ancient ritual awaits. Will you step through and begin again?"
+      options:
+        - label: "Step through (prestige — resets character, carries legacy_power)"
+          effects:
+            - type: prestige
+        - label: "Turn back (end the ceremony)"
+          effects:
+            - type: end_adventure
+              outcome: completed
+
+    - type: narrative
+      text:
+        "A new journey begins. Prestige count: {{ player.prestige_count }}. Legacy power: {{ player.stats.legacy_power
+        }}."

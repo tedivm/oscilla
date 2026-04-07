@@ -203,6 +203,34 @@ class EmitTriggerEffect(BaseModel):
     trigger: str = Field(description="Custom trigger name declared in game.yaml triggers.custom")
 
 
+class PrestigeEffect(BaseModel):
+    """Reset the character to a new iteration using the prestige config from game.yaml.
+
+    Runs pre_prestige_effects, resets state to character_config defaults, applies
+    carry_stats and carry_skills, increments prestige_count, then runs
+    post_prestige_effects. Steps after this effect in the same adventure see the
+    reset state immediately. The DB transition happens at adventure_end.
+
+    Requires ``prestige:`` to be declared in game.yaml. If absent,
+    a ContentLoadError is raised at content load time.
+    """
+
+    type: Literal["prestige"]
+
+
+class SetNameEffect(BaseModel):
+    """Prompt the player for their character's name if the current name looks like a placeholder.
+
+    When the character name matches the auto-generated UUID placeholder pattern
+    (``new-<uuid4>``), prompts the player using ``tui.input_text(prompt)``.
+    If the character already has a real name (from ``--character-name`` CLI flag or
+    ``game.yaml character_creation.default_name``), this effect is a no-op.
+    """
+
+    type: Literal["set_name"]
+    prompt: str = Field(default="What is your name?", description="Prompt shown to the player.")
+
+
 Effect = Annotated[
     Union[
         XpGrantEffect,
@@ -221,6 +249,8 @@ Effect = Annotated[
         QuestFailEffect,
         AdjustGameTicksEffect,
         EmitTriggerEffect,
+        PrestigeEffect,
+        SetNameEffect,
     ],
     Field(discriminator="type"),
 ]
@@ -255,6 +285,7 @@ class NarrativeStep(BaseModel):
     label: str | None = None  # goto target identifier; only meaningful at top-level
     text: str = Field(min_length=1)
     effects: List[Effect] = []
+    requires: Condition | None = None
 
 
 class CombatStep(BaseModel):
@@ -264,6 +295,7 @@ class CombatStep(BaseModel):
     on_win: OutcomeBranch = Field(default_factory=OutcomeBranch)
     on_defeat: OutcomeBranch = Field(default_factory=OutcomeBranch)
     on_flee: OutcomeBranch = Field(default_factory=OutcomeBranch)
+    requires: Condition | None = None
 
 
 class ChoiceOption(BaseModel):
@@ -285,6 +317,7 @@ class ChoiceStep(BaseModel):
     label: str | None = None
     prompt: str
     options: List[ChoiceOption] = Field(min_length=1)
+    requires: Condition | None = None
 
 
 class StatCheckStep(BaseModel):
@@ -293,6 +326,7 @@ class StatCheckStep(BaseModel):
     condition: Condition
     on_pass: OutcomeBranch = Field(default_factory=OutcomeBranch)
     on_fail: OutcomeBranch = Field(default_factory=OutcomeBranch)
+    requires: Condition | None = None
 
 
 class PassiveStep(BaseModel):
@@ -304,6 +338,7 @@ class PassiveStep(BaseModel):
     bypass_text: str | None = Field(
         default=None, description="Shown when bypass condition is met. Omit for silent bypass."
     )
+    requires: Condition | None = None
 
 
 Step = Annotated[
@@ -312,6 +347,8 @@ Step = Annotated[
 ]
 
 # Rebuild all forward-referenced models
+NarrativeStep.model_rebuild()
+CombatStep.model_rebuild()
 OutcomeBranch.model_rebuild()
 ChoiceOption.model_rebuild()
 ChoiceStep.model_rebuild()

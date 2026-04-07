@@ -1,0 +1,14 @@
+apiVersion: game/v1
+kind: Location
+metadata:
+  name: prestige-gated
+spec:
+  displayName: "Veteran's Enclave"
+  description: "Only accessible after prestiging at least once. Tests prestige_count unlock condition."
+  region: conditions
+  unlock:
+    type: prestige_count
+    gte: 1
+  adventures:
+    - ref: prestige-veteran-quest
+      weight: 100

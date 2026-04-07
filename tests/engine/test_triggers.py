@@ -24,7 +24,7 @@ def _make_state(level: int = 1) -> CharacterState:
         xp=0,
         hp=20,
         max_hp=20,
-        iteration=0,
+        prestige_count=0,
         current_location=None,
     )
 

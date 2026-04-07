@@ -1,0 +1,19 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: prestige-veteran-quest
+spec:
+  displayName: "Veteran's Trial"
+  description: "Only veterans who have prestiged at least once may enter. Shows cross-prestige stats."
+  steps:
+    - type: narrative
+      text: |
+        The elder nods at you with recognition. "A veteran, I see."
+        You have prestiged {{ player.prestige_count }} time(s).
+        Accumulated legacy power: {{ player.stats.legacy_power }}.
+    - type: narrative
+      text: "You complete the trial and return stronger for it."
+      effects:
+        - type: stat_change
+          stat: gold
+          amount: 5

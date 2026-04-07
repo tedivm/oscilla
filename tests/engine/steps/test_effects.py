@@ -290,7 +290,7 @@ def _make_gold_player(gold: int = 100) -> CharacterState:
         xp=0,
         hp=20,
         max_hp=20,
-        iteration=0,
+        prestige_count=0,
         current_location=None,
         stats={"gold": gold},
     )

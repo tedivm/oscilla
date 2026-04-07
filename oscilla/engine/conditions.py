@@ -31,6 +31,7 @@ from oscilla.engine.models.base import (
     MilestoneCondition,
     MonthIsCondition,
     MoonPhaseIsCondition,
+    NameEqualsCondition,
     NotCondition,
     PrestigeCountCondition,
     PronounsCondition,
@@ -97,7 +98,7 @@ def evaluate(
             # No-op in v1: class mechanics are a placeholder; every class always passes.
             return True
         case PrestigeCountCondition() as c:
-            return _numeric_compare(player.iteration, c)
+            return _numeric_compare(player.prestige_count, c)
 
         # --- Item equipment/label predicates ---
         case ItemEquippedCondition(name=n):
@@ -184,6 +185,9 @@ def evaluate(
         # --- Quest leaf ---
         case QuestStageCondition(quest=q, stage=s):
             return player.active_quests.get(q) == s
+
+        case NameEqualsCondition(value=v):
+            return player.name == v
 
         # --- Calendar predicates ---
         # All predicates derive date/time from a single call so that all

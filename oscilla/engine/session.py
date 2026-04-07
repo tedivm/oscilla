@@ -28,8 +28,10 @@ from oscilla.services.character import (
     increment_statistic,
     list_characters_for_user,
     load_character,
+    prestige_character,
     release_session_lock,
     remove_item_instance,
+    rename_character,
     save_adventure_progress,
     save_character,
     set_inventory_item,
@@ -108,6 +110,9 @@ class GameSession:
         # Unique string per process — used as the soft-lock identity.
         self._session_token: str = str(uuid4())
         self._iteration_id: UUID | None = None
+        # Tracks the character name stored in CharacterRecord so _persist_diff can detect
+        # in-game name changes and call rename_character() accordingly.
+        self._db_character_name: str = ""
 
     async def __aenter__(self) -> "GameSession":
         return self
@@ -189,6 +194,7 @@ class GameSession:
 
         self._character = state
         self._last_saved_state = copy.deepcopy(state)
+        self._db_character_name = state.name
 
         # on_game_rejoin: fire if the player has been absent longer than the configured threshold.
         # Only applicable on load paths (not new character creation).
@@ -362,6 +368,12 @@ class GameSession:
         """Write only the domains that changed since _last_saved_state."""
         if self._iteration_id is None:
             logger.warning("_persist_diff called before iteration_id was set; skipping.")
+            return
+
+        # While a prestige transition is pending, skip mid-adventure checkpoints.
+        # All state changes between prestige firing and adventure_end will be written
+        # when the new iteration row is created at adventure_end.
+        if state.prestige_pending is not None and event != "adventure_end":
             return
 
         iteration_id = self._iteration_id
@@ -583,8 +595,34 @@ class GameSession:
                     cooldown_remaining=0,
                 )
 
+        # --- Name change detection ---
+        # Fires when the in-memory name (possibly updated by SetNameEffect) differs
+        # from the DB-stored name. rename_character() enforces uniqueness constraints.
+        if state.name != self._db_character_name:
+            await rename_character(
+                session=self.db_session,
+                character_id=state.character_id,
+                new_name=state.name,
+            )
+            self._db_character_name = state.name
+
         # --- Adventure progress ---
         if event == "adventure_end":
+            # Prestige transition: swap iteration rows before writing the reset state.
+            if state.prestige_pending is not None and self.registry.character_config is not None:
+                new_iteration = await prestige_character(
+                    session=self.db_session,
+                    character_id=state.character_id,
+                    character_config=self.registry.character_config,
+                    game_manifest=self.registry.game,
+                )
+                self._iteration_id = new_iteration.id
+                iteration_id = new_iteration.id
+                # Force a full diff — the new iteration row is seeded with defaults only.
+                self._last_saved_state = None
+                last = None
+                state.prestige_pending = None
+
             await save_adventure_progress(
                 session=self.db_session,
                 iteration_id=iteration_id,
@@ -658,11 +696,27 @@ class GameSession:
         name: str | None,
         user_id: UUID,
     ) -> "CharacterState":
-        """Prompt for a name if not provided, create state, and persist immediately."""
+        """Resolve a character name, create state, and persist immediately.
+
+        Name resolution priority:
+        1. ``name`` argument (passed from --character-name CLI flag).
+        2. ``game.spec.character_creation.default_name`` if configured.
+        3. ``DEFAULT_CHARACTER_NAME`` — a static fallback so content can gate
+           name-collection steps with a ``name_equals`` condition.
+        """
         from oscilla.engine.character import CharacterState
 
         if name is None:
-            name = await self.tui.input_text("Enter your character's name:")
+            if (
+                self.registry.game is not None
+                and self.registry.game.spec.character_creation is not None
+                and self.registry.game.spec.character_creation.default_name is not None
+            ):
+                name = self.registry.game.spec.character_creation.default_name
+            else:
+                from oscilla.engine.character import DEFAULT_CHARACTER_NAME
+
+                name = DEFAULT_CHARACTER_NAME
 
         if self.registry.game is None or self.registry.character_config is None:
             raise RuntimeError("Content registry not properly loaded (missing game or character_config).")

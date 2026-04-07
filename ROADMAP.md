@@ -350,6 +350,7 @@ Key design points:
 - The TUI gains a storage panel accessible from the inventory screen when the player is at a location that has a linked storage container
 - Items in storage are not available for use or equipping until moved to the active inventory
 - Storage access uses the standard condition system, so a vault can be gated behind a milestone, a key item, or a minimum level
+- **Item carry-over on prestige**: the prestige system deliberately deferred item and equipment carry-forward across iterations. Once storage containers with `global` scope exist, the carry-over mechanism can be expressed as items moved into a globally scoped container before prestige and retrieved afterward, without any new engine primitives. The `prestige:` block in `game.yaml` can be extended with a `carry_items` list once this feature ships.
 
 ### Shop and Vendor System
 

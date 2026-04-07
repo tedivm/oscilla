@@ -5,9 +5,9 @@ from __future__ import annotations
 import random
 from collections import Counter
 from logging import getLogger
-from typing import TYPE_CHECKING, Dict, List
+from typing import TYPE_CHECKING, Dict, List, Set
 
-from oscilla.engine.character import _INT64_MAX, _INT64_MIN, cascade_unequip_invalid
+from oscilla.engine.character import _INT64_MAX, _INT64_MIN, PrestigeCarryForward, cascade_unequip_invalid
 from oscilla.engine.combat_context import ActiveCombatEffect, CombatContext
 from oscilla.engine.models.adventure import (
     AdjustGameTicksEffect,
@@ -19,8 +19,10 @@ from oscilla.engine.models.adventure import (
     HealEffect,
     ItemDropEffect,
     MilestoneGrantEffect,
+    PrestigeEffect,
     QuestActivateEffect,
     QuestFailEffect,
+    SetNameEffect,
     SetPronounsEffect,
     SkillGrantEffect,
     StatChangeEffect,
@@ -498,3 +500,91 @@ async def run_effect(
                     trigger_name,
                     max_depth=registry.game.spec.triggers.max_trigger_queue_depth,
                 )
+
+        case PrestigeEffect():
+            if registry.game is None or registry.game.spec.prestige is None:
+                logger.error("prestige effect fired but no prestige: block is declared in game.yaml — skipping.")
+                await tui.show_text("[red]Error: prestige not configured in game.yaml.[/red]")
+                return
+
+            prestige_cfg = registry.game.spec.prestige
+
+            # 1. Run pre_prestige_effects against the CURRENT (old) state.
+            for pre_eff in prestige_cfg.pre_prestige_effects:
+                await run_effect(
+                    effect=pre_eff,
+                    player=player,
+                    registry=registry,
+                    tui=tui,
+                    combat=combat,
+                    ctx=ctx,
+                )
+
+            # 2. Snapshot carried stat, skill, and milestone values AFTER pre-effects run
+            #    so legacy bonuses already granted are captured in the carry.
+            carried_stats: Dict[str, int | bool | None] = {
+                stat: player.stats.get(stat) for stat in prestige_cfg.carry_stats if stat in player.stats
+            }
+            carried_skills: Set[str] = player.known_skills & set(prestige_cfg.carry_skills)
+            carried_milestones: Set[str] = player.milestones & set(prestige_cfg.carry_milestones)
+
+            # 3. Reset in-memory state to character_config defaults.
+            if registry.character_config is None:
+                logger.error("prestige effect: character_config not available in registry — skipping reset.")
+                return
+            all_stats = registry.character_config.spec.public_stats + registry.character_config.spec.hidden_stats
+            base_hp = registry.game.spec.hp_formula.base_hp
+            player.level = 1
+            player.xp = 0
+            player.hp = base_hp
+            player.max_hp = base_hp
+            player.character_class = None
+            player.current_location = None
+            player.milestones = set()
+            player.stacks = {}
+            player.instances = []
+            player.equipment = {}
+            player.active_quests = {}
+            player.completed_quests = set()
+            player.failed_quests = set()
+            player.known_skills = set()
+            player.skill_cooldowns = {}
+            player.adventure_last_completed_on = {}
+            player.adventure_last_completed_at_ticks = {}
+            player.internal_ticks = 0
+            player.game_ticks = 0
+            player.era_started_at_ticks = {}
+            player.era_ended_at_ticks = {}
+            player.stats = {s.name: s.default for s in all_stats}
+
+            # 4. Apply carry-forward: overwrite reset values with carried ones.
+            for stat_name, value in carried_stats.items():
+                player.stats[stat_name] = value
+            player.known_skills = carried_skills
+            player.milestones = carried_milestones
+
+            # 5. Increment prestige_count.
+            player.prestige_count += 1
+
+            # 6. Run post_prestige_effects against the NEW (reset + carried) state.
+            for post_eff in prestige_cfg.post_prestige_effects:
+                await run_effect(
+                    effect=post_eff,
+                    player=player,
+                    registry=registry,
+                    tui=tui,
+                    combat=combat,
+                    ctx=ctx,
+                )
+
+            # 7. Signal the session layer to perform the DB iteration transition at adventure_end.
+            player.prestige_pending = PrestigeCarryForward(
+                carry_stats=list(prestige_cfg.carry_stats),
+                carry_skills=list(prestige_cfg.carry_skills),
+            )
+
+            await tui.show_text(f"[bold]Your journey begins anew.[/bold] (Prestige {player.prestige_count})")
+
+        case SetNameEffect(prompt=prompt):
+            chosen: str = await tui.input_text(prompt)
+            player.name = chosen.strip()

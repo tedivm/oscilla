@@ -1,0 +1,57 @@
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: character-creation
+spec:
+  displayName: "Who Are You?"
+  repeatable: false
+  steps:
+    # Step 1: Name input — only runs when the character still has the default name
+    # ("Adventurer"). Skipped automatically when --character-name was supplied at
+    # the CLI or game.yaml sets a different default_name.
+    - type: narrative
+      text: "A new traveler stirs at the threshold of Testlandia."
+      requires:
+        type: name_equals
+        value: "Adventurer"
+      effects:
+        - type: set_name
+          prompt: "What is your name, traveler?"
+
+    # Step 2: Pronoun selection so players see the right pronouns in narrative text.
+    - type: choice
+      prompt: "How should others refer to you?"
+      options:
+        - label: "They / Them"
+          effects:
+            - type: set_pronouns
+              set: they_them
+        - label: "She / Her"
+          effects:
+            - type: set_pronouns
+              set: she_her
+        - label: "He / Him"
+          effects:
+            - type: set_pronouns
+              set: he_him
+
+    # Step 3: Backstory — awards a small starting bonus to a stat.
+    - type: choice
+      prompt: "What drove you to seek adventure?"
+      options:
+        - label: "A life of hard labour (Strength +2)"
+          effects:
+            - type: stat_change
+              stat: strength
+              amount: 2
+        - label: "Years of shady dealings (Gold +15)"
+          effects:
+            - type: stat_change
+              stat: gold
+              amount: 15
+
+    # Step 4: Closing narrative — exercises pronoun tags and stat template rendering.
+    - type: narrative
+      text:
+        "Welcome, {{ player.name }}. {They} stand ready to write {their} legend. Current strength: {{ player.stats.strength
+        }}."

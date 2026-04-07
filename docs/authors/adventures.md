@@ -556,6 +556,148 @@ See [Game Configuration — Triggered Adventures](./game-configuration.md#trigge
 
 ---
 
+## Character Creation Adventures
+
+When a new character is created, the engine fires the `on_character_create` trigger. Any adventure wired to that event runs automatically before the player reaches the world map. This is the canonical place to welcome new players, collect a character name, prompt for pronouns, and apply backstory bonuses.
+
+### Wiring a creation adventure
+
+```yaml
+# game.yaml
+spec:
+  trigger_adventures:
+    on_character_create:
+      - your-character-creation-adventure
+```
+
+### Collecting a name with `set_name`
+
+The `type: set_name` effect always prompts the player and replaces their current name. Use a `requires` condition on the step to control when the prompt is shown — for example, only run the step when the character still has the engine's default name (`"Adventurer"`):
+
+```yaml
+- type: narrative
+  text: "A stranger stirs at the threshold."
+  requires:
+    type: name_equals
+    value: "Adventurer"
+  effects:
+    - type: set_name
+      prompt: "What is your name, traveler?"
+```
+
+The `requires` condition is evaluated before the step runs. If the condition fails, the step is silently skipped. This means:
+
+- Players who supplied `--character-name` at the CLI already have a non-default name, so the step is automatically skipped.
+- Games that set `character_creation.default_name` in `game.yaml` (to something other than `"Adventurer"`) must adjust the `value` in the condition accordingly.
+
+### Pronoun selection
+
+Use `type: set_pronouns` (in a choice step) to let players pick their pronouns:
+
+```yaml
+- type: choice
+  prompt: "How should others refer to you?"
+  options:
+    - label: "They / Them"
+      effects:
+        - type: set_pronouns
+          set: they_them
+    - label: "She / Her"
+      effects:
+        - type: set_pronouns
+          set: she_her
+    - label: "He / Him"
+      effects:
+        - type: set_pronouns
+          set: he_him
+```
+
+### Backstory bonuses
+
+Give players a small starting advantage via stat changes or milestone grants inside choice options — same as any other adventure step.
+
+### Complete creation adventure example
+
+```yaml
+apiVersion: game/v1
+kind: Adventure
+metadata:
+  name: character-creation
+spec:
+  displayName: "Who Are You?"
+  repeatable: false
+  steps:
+    - type: narrative
+      text: "A new traveler arrives at the crossroads."
+      requires:
+        type: name_equals
+        value: "Adventurer"
+      effects:
+        - type: set_name
+          prompt: "What is your name?"
+
+    - type: choice
+      prompt: "How should others refer to you?"
+      options:
+        - label: "They / Them"
+          effects:
+            - type: set_pronouns
+              set: they_them
+        - label: "She / Her"
+          effects:
+            - type: set_pronouns
+              set: she_her
+        - label: "He / Him"
+          effects:
+            - type: set_pronouns
+              set: he_him
+
+    - type: choice
+      prompt: "What drove you to adventure?"
+      options:
+        - label: "Hard labour (Strength +2)"
+          effects:
+            - type: stat_change
+              stat: strength
+              amount: 2
+        - label: "Shady dealings (Gold +15)"
+          effects:
+            - type: stat_change
+              stat: gold
+              amount: 15
+
+    - type: narrative
+      text: "Welcome, {{ player.name }}. {They} {are} ready to write {their} legend."
+```
+
+---
+
+## The Prestige Effect
+
+The `type: prestige` effect resets the character's progression (level, XP, HP, items, skills, quests) while carrying forward any stats, skills, or milestones configured in the game's `prestige:` block. After the effect runs, the engine increments `prestige_count` and signals the session layer to open a new DB iteration row at adventure end.
+
+```yaml
+- type: narrative
+  text: "You have reached the peak of your power. Legacy: {{ player.stats.legacy_power }}."
+
+- type: choice
+  prompt: "Will you step through the ritual and begin again?"
+  options:
+    - label: "Prestige"
+      effects:
+        - type: prestige
+    - label: "Turn back"
+      effects:
+        - type: end_adventure
+          outcome: completed
+```
+
+The `type: prestige` effect is only valid when the game package declares a `prestige:` block in `game.yaml`. Loading a content package where an adventure uses `type: prestige` without a prestige block configured is a content load error.
+
+See [Game Configuration — Prestige](./game-configuration.md#prestige) for the complete prestige block schema.
+
+---
+
 *See [Effects](./effects.md) for the full list of effect types.*
 *See [Conditions](./conditions.md) for the full condition syntax used in `requires` and `stat_check`.*
 *See [Enemies](./enemies.md) for enemy manifest syntax.*

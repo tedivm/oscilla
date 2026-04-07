@@ -247,7 +247,14 @@ class AdventurePipeline:
 
     async def _dispatch(self, step: Step) -> AdventureOutcome:
         """Dispatch a step to its type-specific handler function."""
+        from oscilla.engine.conditions import evaluate
         from oscilla.engine.models.adventure import ChoiceStep, CombatStep, NarrativeStep, PassiveStep, StatCheckStep
+
+        # Skip the step entirely when its requires condition is not met.
+        requires = getattr(step, "requires", None)
+        if requires is not None and not evaluate(requires, self._player, self._registry):
+            return AdventureOutcome.COMPLETED
+
         from oscilla.engine.steps.choice import run_choice
         from oscilla.engine.steps.combat import run_combat
         from oscilla.engine.steps.narrative import run_narrative

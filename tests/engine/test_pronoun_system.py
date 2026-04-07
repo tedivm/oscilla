@@ -114,7 +114,7 @@ def _make_ctx_for_set(pronoun_key: str) -> ExpressionContext:
     player = PlayerContext(
         name="Hero",
         level=1,
-        iteration=0,
+        prestige_count=0,
         hp=20,
         max_hp=20,
         stats={},

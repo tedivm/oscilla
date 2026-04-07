@@ -32,6 +32,7 @@ from oscilla.engine.models.adventure import (
     NarrativeStep,
     OutcomeBranch,
     PassiveStep,
+    PrestigeEffect,
     SkillGrantEffect,
     StatChangeEffect,
     StatCheckStep,
@@ -288,6 +289,63 @@ def _collect_step_end_adventure(step: Step, results: List[EndAdventureEffect]) -
                 _collect_branch_end_adventure(branch, results)
         case _:
             pass
+
+
+def _collect_prestige_effects(effects: List[Effect], results: List[PrestigeEffect]) -> None:
+    """Collect all PrestigeEffect instances from an effect list."""
+    for eff in effects:
+        if isinstance(eff, PrestigeEffect):
+            results.append(eff)
+
+
+def _collect_step_prestige_effects(step: Step, results: List[PrestigeEffect]) -> None:
+    match step:
+        case NarrativeStep():
+            _collect_prestige_effects(step.effects, results)
+        case CombatStep():
+            for branch in [step.on_win, step.on_defeat, step.on_flee]:
+                _collect_prestige_effects(branch.effects, results)
+                for sub in branch.steps:
+                    _collect_step_prestige_effects(sub, results)
+        case ChoiceStep():
+            for opt in step.options:
+                _collect_prestige_effects(opt.effects, results)
+                for sub in opt.steps:
+                    _collect_step_prestige_effects(sub, results)
+        case StatCheckStep():
+            for branch in [step.on_pass, step.on_fail]:
+                _collect_prestige_effects(branch.effects, results)
+                for sub in branch.steps:
+                    _collect_step_prestige_effects(sub, results)
+        case _:
+            pass
+
+
+def _validate_prestige_effects(manifests: List[ManifestEnvelope]) -> List[LoadError]:
+    """Validate that PrestigeEffect is only used when the game.yaml has a prestige block."""
+    errors: List[LoadError] = []
+    game_manifests = [m for m in manifests if m.kind == "Game"]
+    if not game_manifests:
+        return errors
+    game = cast(GameManifest, game_manifests[0])
+    prestige_configured = game.spec.prestige is not None
+
+    for m in manifests:
+        if m.kind != "Adventure":
+            continue
+        adv = cast(AdventureManifest, m)
+        found: List[PrestigeEffect] = []
+        for step in adv.spec.steps:
+            _collect_step_prestige_effects(step, found)
+        if found and not prestige_configured:
+            errors.append(
+                LoadError(
+                    file=Path(f"<{m.metadata.name}>"),
+                    message="Adventure uses prestige effect but game.yaml has no prestige: block configured.",
+                )
+            )
+
+    return errors
 
 
 def _validate_outcome_refs(manifests: List[ManifestEnvelope]) -> List[LoadError]:
@@ -823,6 +881,7 @@ def validate_references(manifests: List[ManifestEnvelope]) -> List[LoadError]:
     errors.extend(_validate_skill_refs(manifests))
     errors.extend(_validate_buff_refs(manifests))
     errors.extend(_validate_outcome_refs(manifests))
+    errors.extend(_validate_prestige_effects(manifests))
     errors.extend(_validate_quest_stage_condition_refs(manifests))
 
     return errors

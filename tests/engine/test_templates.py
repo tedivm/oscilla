@@ -36,7 +36,7 @@ def _make_player(
     return PlayerContext(
         name=name,
         level=level,
-        iteration=0,
+        prestige_count=0,
         hp=20,
         max_hp=20,
         stats=stats or {"strength": 10},

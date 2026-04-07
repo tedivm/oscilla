@@ -179,15 +179,15 @@ def test_character_stat_non_numeric_warning(base_player: CharacterState, caplog:
 def test_iteration_condition(base_player: CharacterState) -> None:
     """Test prestige count conditions."""
     # Default prestige count is 0
-    cond_fail = PrestigeCountCondition(type="iteration", gte=1)
+    cond_fail = PrestigeCountCondition(type="prestige_count", gte=1)
     assert evaluate(condition=cond_fail, player=base_player) is False
 
     # Set prestige count and test
-    base_player.iteration = 2
-    cond_pass = PrestigeCountCondition(type="iteration", gte=1)
+    base_player.prestige_count = 2
+    cond_pass = PrestigeCountCondition(type="prestige_count", gte=1)
     assert evaluate(condition=cond_pass, player=base_player) is True
 
-    cond_exact = PrestigeCountCondition(type="iteration", eq=2)
+    cond_exact = PrestigeCountCondition(type="prestige_count", eq=2)
     assert evaluate(condition=cond_exact, player=base_player) is True
 
 

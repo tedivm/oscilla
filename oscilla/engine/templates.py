@@ -232,7 +232,7 @@ class PlayerContext:
 
     name: str
     level: int
-    iteration: int
+    prestige_count: int
     hp: int
     max_hp: int
     stats: Dict[str, int | bool | None]
@@ -244,7 +244,7 @@ class PlayerContext:
         return cls(
             name=char.name,
             level=char.level,
-            iteration=char.iteration,
+            prestige_count=char.prestige_count,
             hp=char.hp,
             max_hp=char.max_hp,
             stats=dict(char.stats),
@@ -490,7 +490,7 @@ class _MockPlayer:
     def __init__(self, stat_names: List[str]) -> None:
         self.name = "TestPlayer"
         self.level = 5
-        self.iteration = 0
+        self.prestige_count = 0
         self.hp = 30
         self.max_hp = 30
         self.milestones = _MockPlayerMilestones()

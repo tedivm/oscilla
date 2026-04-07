@@ -97,7 +97,7 @@ class CharacterStatCondition(BaseModel):
 
 
 class PrestigeCountCondition(BaseModel):
-    type: Literal["iteration"]
+    type: Literal["prestige_count"]
     gt: int | None = None
     gte: int | None = None
     lt: int | None = None
@@ -108,7 +108,7 @@ class PrestigeCountCondition(BaseModel):
     @model_validator(mode="after")
     def require_comparator(self) -> "PrestigeCountCondition":
         if all(v is None for v in [self.gt, self.gte, self.lt, self.lte, self.eq, self.mod]):
-            raise ValueError("iteration condition must specify at least one of: gt, gte, lt, lte, eq, mod")
+            raise ValueError("prestige_count condition must specify at least one of: gt, gte, lt, lte, eq, mod")
         return self
 
 
@@ -189,6 +189,11 @@ class QuestStageCondition(BaseModel):
     type: Literal["quest_stage"]
     quest: str = Field(description="Quest manifest name.")
     stage: str = Field(description="Quest stage name that must be the current active stage.")
+
+
+class NameEqualsCondition(BaseModel):
+    type: Literal["name_equals"]
+    value: str = Field(description="The exact character name to compare against.")
 
 
 # ---------------------------------------------------------------------------
@@ -480,6 +485,7 @@ Condition = Annotated[
         SkillCondition,
         PronounsCondition,
         QuestStageCondition,
+        NameEqualsCondition,
         # Calendar predicates
         SeasonIsCondition,
         MoonPhaseIsCondition,

@@ -27,6 +27,7 @@ from oscilla.models.character_iteration import (
 if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
     from oscilla.engine.models.character_config import CharacterConfigManifest
+    from oscilla.engine.models.game import GameManifest
     from oscilla.engine.registry import ContentRegistry
 
 from oscilla.engine.templates import PRONOUN_SETS
@@ -75,7 +76,7 @@ async def save_character(session: AsyncSession, state: "CharacterState", user_id
 
     iteration = CharacterIterationRecord(
         character_id=state.character_id,
-        iteration=state.iteration,
+        iteration=state.prestige_count,
         is_active=True,
         level=state.level,
         xp=state.xp,
@@ -327,7 +328,7 @@ async def load_character(
 
     data: Dict[str, Any] = {
         "character_id": str(character_id),
-        "iteration": iteration.iteration,
+        "prestige_count": iteration.iteration,
         "name": character.name,
         "character_class": iteration.character_class,
         "level": iteration.level,
@@ -455,6 +456,7 @@ async def prestige_character(
     session: AsyncSession,
     character_id: UUID,
     character_config: "CharacterConfigManifest",
+    game_manifest: "GameManifest | None" = None,
 ) -> CharacterIterationRecord:
     """Close the active iteration and open a new one.
 
@@ -488,7 +490,7 @@ async def prestige_character(
 
     # 4. Create the new iteration with fresh defaults from character_config
     all_stats = character_config.spec.public_stats + character_config.spec.hidden_stats
-    base_hp = 10  # default; caller should use GameManifest.spec.hp_formula.base_hp for the real value
+    base_hp = game_manifest.spec.hp_formula.base_hp if game_manifest is not None else 10
 
     new_iteration = CharacterIterationRecord(
         character_id=character_id,
@@ -513,8 +515,33 @@ async def prestige_character(
 
     # Update the character's updated_at timestamp
     await touch_character_updated_at(session=session, character_id=character_id)
-    await session.commit()
     return new_iteration
+
+
+async def rename_character(session: AsyncSession, character_id: UUID, new_name: str) -> None:
+    """Rename a character in the DB.
+
+    Raises ValueError if new_name is already taken for the same (user_id, game_name) pair,
+    which would violate the unique constraint.
+    """
+    char_stmt = select(CharacterRecord).where(and_(CharacterRecord.id == character_id))
+    char_result = await session.execute(char_stmt)
+    record = char_result.scalar_one()
+
+    dup_stmt = select(CharacterRecord).where(
+        and_(
+            CharacterRecord.user_id == record.user_id,
+            CharacterRecord.game_name == record.game_name,
+            CharacterRecord.name == new_name,
+            CharacterRecord.id != character_id,
+        )
+    )
+    dup_result = await session.execute(dup_stmt)
+    if dup_result.scalar_one_or_none() is not None:
+        raise ValueError(f"Character name {new_name!r} is already taken in game {record.game_name!r}.")
+
+    record.name = new_name
+    await touch_character_updated_at(session=session, character_id=character_id)
 
 
 async def load_all_iterations(

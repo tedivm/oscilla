@@ -39,6 +39,10 @@ spec:
       type: int
       default: 0
       description: "Hidden int. Incremented by condition-lab adventures."
+    - name: legacy_power
+      type: int
+      default: 0
+      description: "Accumulated legacy bonus from previous prestige runs. Carries forward on prestige."
 
   skill_resources:
     - name: mana

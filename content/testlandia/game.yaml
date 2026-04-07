@@ -169,10 +169,14 @@ spec:
       - stat: gold
         threshold: 50
         name: test-threshold-reached
+      - stat: level
+        threshold: 5
+        name: max-level-reached
 
   trigger_adventures:
     on_character_create:
       - test-character-intro
+      - character-creation
     on_level_up:
       - test-level-up-scene
     on_outcome_defeated:
@@ -183,3 +187,15 @@ spec:
       - test-threshold-scene
     test-custom-event:
       - test-custom-trigger-scene
+    max-level-reached:
+      - prestige-ceremony
+
+  # Prestige system: resets the character on max-level-reached but carries forward
+  # legacy_power so accumulated bonuses persist across prestige runs.
+  prestige:
+    carry_stats:
+      - legacy_power
+    pre_prestige_effects:
+      - type: stat_change
+        stat: legacy_power
+        amount: 1

@@ -494,6 +494,104 @@ A `trigger_adventures` key that does not match a known trigger name produces a *
 
 ---
 
+## Character Creation Defaults
+
+The optional `character_creation:` block lets you set game-wide defaults for new characters. These are applied at character creation and can be overridden during gameplay (e.g., by a `set_name` or `set_pronouns` effect in a creation adventure).
+
+```yaml
+spec:
+  character_creation:
+    default_name: "Protagonist"   # optional; bypasses UUID placeholder
+    default_pronouns: they_them   # optional; one of: they_them, she_her, he_him
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `default_name` | `string \| null` | Fixed protagonist name. If set, `SetNameEffect` skips its prompt because the name is not a placeholder. Useful for single-protagonist games. |
+| `default_pronouns` | `string \| null` | Key of the pronoun set to use by default (e.g. `they_them`). If absent, the engine defaults to `they_them`. An unrecognized key generates a warning and falls back to `they_them`. |
+
+### When to use `default_name`
+
+For games where every player controls the same named protagonist (e.g. "Elara"), set `default_name` here so no prompt ever appears. For games where players name their own character, leave it unset and use a `set_name` effect in a character creation adventure.
+
+### When to use `default_pronouns`
+
+If your narrative never varies by pronoun (all static text) or you want a specific default before the player makes a choice, set a value here. Players can still override it mid-game with `set_pronouns` effects.
+
+---
+
+## Prestige
+
+The optional `prestige:` block enables a prestige/new-game-plus system. When an adventure runs a `type: prestige` effect, the character's progression is reset to level 1 defaults and a new DB character iteration is opened — but stats, skills, and milestones listed in the carry lists are preserved.
+
+**Important:** if any adventure in your package uses `type: prestige` but `prestige:` is absent from `game.yaml`, content loading will fail with a validation error.
+
+```yaml
+spec:
+  prestige:
+    carry_stats:
+      - legacy_power        # stat values listed here survive the reset
+    carry_skills: []        # skill refs whose learned status carries forward
+    carry_milestones: []    # milestone refs that are re-granted after the reset
+    pre_prestige_effects:
+      - type: stat_change
+        stat: legacy_power
+        amount: 1           # runs against the OLD state; captured into the carry
+    post_prestige_effects: [] # runs against the NEW (reset + carried) state
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `carry_stats` | `list[string]` | Stat names whose current values are copied to the new iteration. |
+| `carry_skills` | `list[string]` | Skill refs whose membership in `known_skills` carries forward. |
+| `carry_milestones` | `list[string]` | Milestone refs that are re-granted on the new iteration if held at prestige time. |
+| `pre_prestige_effects` | `list[Effect]` | Effects applied to the **old** character state immediately before the carry snapshot. Use this to grant legacy bonuses (e.g. `stat_change` on a carry stat). |
+| `post_prestige_effects` | `list[Effect]` | Effects applied to the **new** (reset + carried) state after the carry is applied. |
+
+### Execution order
+
+1. `pre_prestige_effects` run against old state.
+2. Carry snapshot is taken (after pre-effects, so bonuses are included).
+3. Character state resets to config defaults.
+4. Carry values overwrite the defaults.
+5. `prestige_count` increments by 1.
+6. `post_prestige_effects` run against the new state.
+7. `prestige_pending` is set on the character; the session layer opens a new DB iteration at adventure end.
+
+### Wiring prestige to a trigger
+
+The recommended pattern is to fire a prestige ceremony adventure from a stat threshold trigger rather than placing it in a location pool:
+
+```yaml
+spec:
+  triggers:
+    on_stat_threshold:
+      - stat: level
+        threshold: 10
+        name: max-level-reached
+
+  trigger_adventures:
+    max-level-reached:
+      - prestige-ceremony
+```
+
+The ceremony adventure then uses `type: prestige` and `type: end_adventure` options so the player can confirm or decline.
+
+### Checking prestige count in conditions
+
+Use the `prestige_count` condition to gate content behind at least one prestige:
+
+```yaml
+# Location unlock requiring at least one prestige
+unlock:
+  type: prestige_count
+  gte: 1
+```
+
+See [Conditions](./conditions.md#prestige-count-condition) for full syntax.
+
+---
+
 *Next: [World Building](./world-building.md) — regions, locations, and adventure pools.*
 *See [Templates](./templates.md#pronouns) for using pronoun placeholders in narrative text.*
 *See [Passive Effects](./passive-effects.md) for the full `passive_effects` syntax.*

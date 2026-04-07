@@ -29,6 +29,11 @@ logger = getLogger(__name__)
 _INT64_MIN: int = -(2**63)
 _INT64_MAX: int = (2**63) - 1
 
+# Default name assigned to new characters when no name is provided.  Content
+# authors can use `name_equals` conditions against this value to gate steps that
+# should only run when a player hasn't been named yet.
+DEFAULT_CHARACTER_NAME: str = "Adventurer"
+
 
 def _deserialize_pronoun_set(key: str) -> PronounSet:
     """Return the PronounSet for key, falling back to they_them for unknown keys."""
@@ -102,6 +107,19 @@ class ItemInstance:
 
 
 @dataclass
+class PrestigeCarryForward:
+    """Carry-forward snapshot recorded when a prestige effect fires in-adventure.
+
+    Stored on CharacterState.prestige_pending — ephemeral, never serialized.
+    At adventure_end the session layer reads this and calls prestige_character()
+    with the carried values to create the new iteration row.
+    """
+
+    carry_stats: List[str]
+    carry_skills: List[str]
+
+
+@dataclass
 class CharacterState:
     """Complete in-memory state for a single character.
 
@@ -124,7 +142,7 @@ class CharacterState:
     hp: int
     max_hp: int
     # 0-based prestige run number; maps to character_iterations.iteration
-    iteration: int
+    prestige_count: int
     current_location: str | None
     # Player's chosen pronoun set. Defaults to they/them until explicitly set.
     pronouns: PronounSet = field(default_factory=lambda: DEFAULT_PRONOUN_SET)
@@ -167,6 +185,9 @@ class CharacterState:
     # and effect handlers; drained in order by GameSession.drain_trigger_queue().
     # Persisted to DB at adventure_end so queued triggers survive reconnects.
     pending_triggers: List[str] = field(default_factory=list)
+    # Ephemeral prestige carry-forward snapshot. Set by PrestigeEffect handler and consumed
+    # at adventure_end by the session layer to call prestige_character(). Never serialized.
+    prestige_pending: "PrestigeCarryForward | None" = None
 
     # --- Methods ---
 
@@ -206,6 +227,19 @@ class CharacterState:
         all_stats = character_config.spec.public_stats + character_config.spec.hidden_stats
         initial_stats: Dict[str, int | bool | None] = {s.name: s.default for s in all_stats}
         base_hp = game_manifest.spec.hp_formula.base_hp
+
+        initial_pronouns: PronounSet = DEFAULT_PRONOUN_SET
+        creation_cfg = game_manifest.spec.character_creation
+        if creation_cfg is not None and creation_cfg.default_pronouns is not None:
+            resolved = PRONOUN_SETS.get(creation_cfg.default_pronouns)
+            if resolved is not None:
+                initial_pronouns = resolved
+            else:
+                logger.warning(
+                    "character_creation.default_pronouns %r is not a known pronoun set key — using default.",
+                    creation_cfg.default_pronouns,
+                )
+
         return cls(
             character_id=uuid4(),
             name=name,
@@ -214,7 +248,8 @@ class CharacterState:
             xp=0,
             hp=base_hp,
             max_hp=base_hp,
-            iteration=0,
+            prestige_count=0,
+            pronouns=initial_pronouns,
             current_location=None,
             stats=initial_stats,
         )
@@ -628,7 +663,7 @@ class CharacterState:
             }
         return {
             "character_id": str(self.character_id),
-            "iteration": self.iteration,
+            "prestige_count": self.prestige_count,
             "name": self.name,
             "character_class": self.character_class,
             "level": self.level,
@@ -770,7 +805,7 @@ class CharacterState:
 
         result = cls(
             character_id=UUID(data["character_id"]),
-            iteration=data["iteration"],
+            prestige_count=data.get("prestige_count", data.get("iteration", 0)),
             name=data["name"],
             character_class=data.get("character_class"),
             level=data["level"],
