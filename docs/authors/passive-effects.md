@@ -26,8 +26,7 @@ spec:
         - stat: charisma
           amount: 2
       skill_grants:
-        - skill: inspire
-          slot: passive_1
+        - inspire
 ```
 
 Each entry has three optional fields:
@@ -36,7 +35,7 @@ Each entry has three optional fields:
 | ---------------- | -------------------- | ----------------------------------------------------------------------------------------------- |
 | `condition`      | Condition \| null    | If set, the effect only applies when the condition is true. If null, the effect always applies. |
 | `stat_modifiers` | list of StatModifier | Stat bonuses applied while the condition holds.                                                 |
-| `skill_grants`   | list of SkillGrant   | Skills granted while the condition holds.                                                       |
+| `skill_grants`   | list of string       | Skill manifest names granted while the condition holds.                                         |
 
 ---
 
@@ -130,8 +129,8 @@ The skill must be defined as a [`Skill` manifest](./skills.md#defining-a-skill) 
 
 ```yaml
 skill_grants:
-  - skill: arcane-shield # Skill manifest name
-    slot: passive_1 # Optional: UI display slot
+  - arcane-shield # Skill manifest name
+  - mage-armor
 ```
 
 Skills granted by passive effects appear in `available_skills()` but are not added to
@@ -162,8 +161,7 @@ passive_effects:
       type: milestone
       name: guild-member
     skill_grants:
-      - skill: guild-discount
-        slot: passive_1
+      - guild-discount
 ```
 
 ### Level Threshold Bonus

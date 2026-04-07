@@ -28,7 +28,6 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | ------------------------------------------------------------- | ------ | ----------------------- |
 | [Tick-Anchored State Refactor](#tick-anchored-state-refactor) | L      | Engine Architecture     |
 | [Character Archetypes](#character-archetypes)                 | M      | Character Progression   |
-| [Skill Slot Naming Revisit](#skill-slot-naming-revisit)       | XS     | Character Configuration |
 
 ### All Items
 
@@ -45,7 +44,6 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades)                          | L      | Character Progression   |
 | [Stat Formula Templates](#stat-formula-templates)                                           | M      | Character Progression   |
 | [Player-Defined Pronouns](#player-defined-pronouns)                                         | S      | Character Configuration |
-| [Skill Slot Naming Revisit](#skill-slot-naming-revisit)                                     | XS     | Character Configuration |
 | [Shop and Vendor System](#shop-and-vendor-system)                                           | L      | Economy & NPCs          |
 | [Persistent NPCs and Dialogue](#persistent-npcs-and-dialogue)                               | L      | Economy & NPCs          |
 | [Enhanced Loot Tables](#enhanced-loot-tables)                                               | S      | Item System             |
@@ -259,14 +257,6 @@ The engine currently supports three built-in pronoun sets (`they/them`, `she/her
 Add a pronoun input mode at character creation where players can type in their own subject, object, possessive, possessive standalone, and reflexive forms. The resulting pronoun set behaves identically to author-defined sets — all placeholder shorthand and `player.pronouns.*` template expressions work unchanged.
 
 This feature is already noted as coming in the author documentation for `game-configuration.md`.
-
-### Skill Slot Naming Revisit
-
-**Effort: XS** · **Group: Character Configuration**
-
-The `passive_1`, `passive_2` etc. slot names used in `skill_grants` within passive effects and NPC manifests are confusing. They imply a fixed UI grid that may not match how a given game surfaces skills, and the term "passive" conflicts with the existing "passive effects" concept.
-
-Revisit the slot naming scheme so that it is either author-defined in `game.yaml` (allowing names like `utility`, `combat`, `exploration`) or removed entirely if the TUI does not actually display slots in a position-dependent way.
 
 ### Cross-Iteration Conditions/Templates/Effects
 

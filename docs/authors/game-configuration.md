@@ -118,8 +118,7 @@ passive_effects:
       - stat: charisma
         amount: 2
     skill_grants:
-      - skill: inspire
-        slot: passive_1
+      - inspire
 ```
 
 See [Passive Effects](./passive-effects.md) for the full system.
