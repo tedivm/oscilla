@@ -1,7 +1,5 @@
 # oscilla
 
-
-
 ## Installation
 
 ```bash
@@ -58,11 +56,11 @@ Launches the interactive terminal UI. The game resolves your user identity from 
 uv run oscilla game
 ```
 
-| Option | Short | Description |
-|---|---|---|
-| `--game GAME_NAME` | `-g GAME_NAME` | Load this game directly by its manifest name, skipping the selection screen. |
-| `--character-name NAME` | `-c NAME` | Load or create the character with this name, skipping the selection screen. |
-| `--reset-db` | | Delete all saved characters for the **selected game** before starting. Prompts for confirmation. |
+| Option                  | Short          | Description                                                                                      |
+| ----------------------- | -------------- | ------------------------------------------------------------------------------------------------ |
+| `--game GAME_NAME`      | `-g GAME_NAME` | Load this game directly by its manifest name, skipping the selection screen.                     |
+| `--character-name NAME` | `-c NAME`      | Load or create the character with this name, skipping the selection screen.                      |
+| `--reset-db`            |                | Delete all saved characters for the **selected game** before starting. Prompts for confirmation. |
 
 **Examples**
 
@@ -125,9 +123,9 @@ cp $(uv run oscilla data-path)/oscilla.db ~/Desktop/oscilla-backup.db
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|---|---|---|
-| `GAMES_PATH` | `content/` | Path to the game library root directory. Each immediate subdirectory with a `game.yaml` is treated as a game package. |
+| Variable       | Default                                        | Description                                                                                                                              |
+| -------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `GAMES_PATH`   | `content/`                                     | Path to the game library root directory. Each immediate subdirectory with a `game.yaml` is treated as a game package.                    |
 | `DATABASE_URL` | auto-derived: `<platform data dir>/oscilla.db` | SQLAlchemy async database URL for character persistence. See [docs/dev/database.md](./docs/dev/database.md) for the per-OS default path. |
 
 ## Developer Documentation

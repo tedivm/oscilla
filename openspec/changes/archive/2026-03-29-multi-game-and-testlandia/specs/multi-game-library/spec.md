@@ -2,7 +2,7 @@
 
 ### Requirement: Game library root structure
 
-The `GAMES_PATH` setting SHALL point to a *game library root* — a directory whose immediate subdirectories are individual game packages. Each game package SHALL contain at minimum a `game.yaml` manifest. Subdirectories that do not contain a `game.yaml` SHALL be silently skipped.
+The `GAMES_PATH` setting SHALL point to a _game library root_ — a directory whose immediate subdirectories are individual game packages. Each game package SHALL contain at minimum a `game.yaml` manifest. Subdirectories that do not contain a `game.yaml` SHALL be silently skipped.
 
 #### Scenario: Library root contains two valid game packages
 

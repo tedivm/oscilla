@@ -1,10 +1,11 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: gain-legendary-gem
 spec:
   displayName: "Legendary Gem Drop Test"
-  description: "Awards a Legendary Test Gem (test-legendary label). Once held, the passive effect in game.yaml adds +2 to
+  description:
+    "Awards a Legendary Test Gem (test-legendary label). Once held, the passive effect in game.yaml adds +2 to
     strength. Check your stats panel to confirm."
   steps:
     - type: narrative

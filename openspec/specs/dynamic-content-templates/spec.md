@@ -105,28 +105,28 @@ The `ingame_time` field SHALL expose an `InGameTimeView` when the game has a `ti
 
 Templates SHALL have access to the following built-in functions without any import statement:
 
-| Function | Signature | Description |
-|----------|-----------|-------------|
-| `roll(low, high)` | `(int, int) → int` | Random integer N where `low <= N <= high` |
-| `choice(items)` | `(list) → any` | Random element from a list |
-| `sample(items, k)` | `(list, int) → list` | `k` unique elements from a list, without replacement |
-| `random()` | `() → float` | Random float in `[0.0, 1.0)` — familiar shorthand |
-| `now()` | `() → datetime` | Current date and time in the game's configured timezone (server local time if `timezone` is not set) |
-| `today()` | `() → date` | Current date in the game's configured timezone (server local time if `timezone` is not set) |
-| `clamp(value, lo, hi)` | `(num, num, num) → num` | Clamps `value` to `[lo, hi]` |
-| `round` | Python builtin | `round(value, ndigits=0)` |
-| `sum` | Python builtin | `sum(iterable)` |
-| `max`, `min` | Python builtins | Standard max/min |
-| `floor`, `ceil`, `abs` | Python/math | Standard math functions |
-| `range`, `len`, `int`, `str`, `bool` | Python builtins | Standard utilities |
-| `season(date)` | `(date) → str` | Meteorological season respecting the game's `season_hemisphere` setting: `"spring"`, `"summer"`, `"autumn"`, or `"winter"` |
-| `month_name(n)` | `(int) → str` | English month name (1 = `"January"` … 12 = `"December"`) |
-| `day_name(n)` | `(int) → str` | English weekday name (0 = `"Monday"` … 6 = `"Sunday"`) |
-| `week_number(date)` | `(date) → int` | ISO week number (1–53) |
-| `mean(values)` | `(list) → float` | Arithmetic mean of a list of numbers |
-| `zodiac_sign(date)` | `(date) → str` | Western zodiac sign (e.g. `"Aries"`, `"Scorpio"`) |
-| `chinese_zodiac(year)` | `(int) → str` | Chinese zodiac animal (e.g. `"Rat"`, `"Dragon"`) |
-| `moon_phase(date)` | `(date) → str` | Approximate lunar phase (e.g. `"Full Moon"`, `"Waxing Crescent"`) |
+| Function                             | Signature               | Description                                                                                                                |
+| ------------------------------------ | ----------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `roll(low, high)`                    | `(int, int) → int`      | Random integer N where `low <= N <= high`                                                                                  |
+| `choice(items)`                      | `(list) → any`          | Random element from a list                                                                                                 |
+| `sample(items, k)`                   | `(list, int) → list`    | `k` unique elements from a list, without replacement                                                                       |
+| `random()`                           | `() → float`            | Random float in `[0.0, 1.0)` — familiar shorthand                                                                          |
+| `now()`                              | `() → datetime`         | Current date and time in the game's configured timezone (server local time if `timezone` is not set)                       |
+| `today()`                            | `() → date`             | Current date in the game's configured timezone (server local time if `timezone` is not set)                                |
+| `clamp(value, lo, hi)`               | `(num, num, num) → num` | Clamps `value` to `[lo, hi]`                                                                                               |
+| `round`                              | Python builtin          | `round(value, ndigits=0)`                                                                                                  |
+| `sum`                                | Python builtin          | `sum(iterable)`                                                                                                            |
+| `max`, `min`                         | Python builtins         | Standard max/min                                                                                                           |
+| `floor`, `ceil`, `abs`               | Python/math             | Standard math functions                                                                                                    |
+| `range`, `len`, `int`, `str`, `bool` | Python builtins         | Standard utilities                                                                                                         |
+| `season(date)`                       | `(date) → str`          | Meteorological season respecting the game's `season_hemisphere` setting: `"spring"`, `"summer"`, `"autumn"`, or `"winter"` |
+| `month_name(n)`                      | `(int) → str`           | English month name (1 = `"January"` … 12 = `"December"`)                                                                   |
+| `day_name(n)`                        | `(int) → str`           | English weekday name (0 = `"Monday"` … 6 = `"Sunday"`)                                                                     |
+| `week_number(date)`                  | `(date) → int`          | ISO week number (1–53)                                                                                                     |
+| `mean(values)`                       | `(list) → float`        | Arithmetic mean of a list of numbers                                                                                       |
+| `zodiac_sign(date)`                  | `(date) → str`          | Western zodiac sign (e.g. `"Aries"`, `"Scorpio"`)                                                                          |
+| `chinese_zodiac(year)`               | `(int) → str`           | Chinese zodiac animal (e.g. `"Rat"`, `"Dragon"`)                                                                           |
+| `moon_phase(date)`                   | `(date) → str`          | Approximate lunar phase (e.g. `"Full Moon"`, `"Waxing Crescent"`)                                                          |
 
 All other Python builtins, modules, and dunder attributes SHALL be blocked by the sandbox.
 

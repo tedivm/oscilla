@@ -47,7 +47,7 @@ The reference inspiration is Kingdom of Loathing: a text-based RPG where players
 **Choice**: Each manifest file follows an `apiVersion / kind / metadata / spec` envelope:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Location
 metadata:
   name: dark-forest
@@ -69,7 +69,7 @@ spec:
 
 ### Decision 3: Region / Location inheritance — compile-time aggregation
 
-**Choice**: At content load time, the loader walks the region tree and computes each location's *effective unlock conditions* by merging ancestor conditions with `all` semantics. A location is only accessible if every condition in the merged chain passes.
+**Choice**: At content load time, the loader walks the region tree and computes each location's _effective unlock conditions_ by merging ancestor conditions with `all` semantics. A location is only accessible if every condition in the merged chain passes.
 
 **Alternatives considered**:
 
@@ -154,19 +154,19 @@ unlock:
 
 Every condition value is one of:
 
-| Key | Value type | Semantics |
-|---|---|---|
-| `all` | list of conditions | logical AND |
-| `any` | list of conditions | logical OR |
-| `not` | single condition | logical NOT |
-| `level` | int | `player.level >= value` |
-| `milestone` | string | `name in player.milestones` |
-| `item` | string | `item_ref in player.inventory` |
-| `character_stat` | `{name, gt\|gte\|lt\|lte\|eq\|mod}` | numeric comparison on a CharacterConfig-defined stat |
-| `prestige_count` | `{gt\|gte\|lt\|lte\|eq\|mod}` | numeric comparison on prestige_count |
-| `class` | string | always true (v1 no-op) |
-| `enemies_defeated` | `{name, gt\|gte\|lt\|lte\|eq\|mod}` | comparison on `player.statistics.enemies_defeated[name]` |
-| `locations_visited` | `{name, gt\|gte\|lt\|lte\|eq\|mod}` | comparison on `player.statistics.locations_visited[name]` |
+| Key                    | Value type                          | Semantics                                                    |
+| ---------------------- | ----------------------------------- | ------------------------------------------------------------ |
+| `all`                  | list of conditions                  | logical AND                                                  |
+| `any`                  | list of conditions                  | logical OR                                                   |
+| `not`                  | single condition                    | logical NOT                                                  |
+| `level`                | int                                 | `player.level >= value`                                      |
+| `milestone`            | string                              | `name in player.milestones`                                  |
+| `item`                 | string                              | `item_ref in player.inventory`                               |
+| `character_stat`       | `{name, gt\|gte\|lt\|lte\|eq\|mod}` | numeric comparison on a CharacterConfig-defined stat         |
+| `prestige_count`       | `{gt\|gte\|lt\|lte\|eq\|mod}`       | numeric comparison on prestige_count                         |
+| `class`                | string                              | always true (v1 no-op)                                       |
+| `enemies_defeated`     | `{name, gt\|gte\|lt\|lte\|eq\|mod}` | comparison on `player.statistics.enemies_defeated[name]`     |
+| `locations_visited`    | `{name, gt\|gte\|lt\|lte\|eq\|mod}` | comparison on `player.statistics.locations_visited[name]`    |
 | `adventures_completed` | `{name, gt\|gte\|lt\|lte\|eq\|mod}` | comparison on `player.statistics.adventures_completed[name]` |
 
 A missing or `null` `unlock` block is always satisfied.
@@ -222,7 +222,7 @@ Within this model, steps are split into **events** (things that produce a player
       - type: narrative
         text: "The first seal breaks open."
   on_defeat:
-    goto: shared-defeat    # jumps to the labeled step below
+    goto: shared-defeat # jumps to the labeled step below
   on_flee:
     goto: shared-flee
 
@@ -303,7 +303,7 @@ Within this model, steps are split into **events** (things that produce a player
           text: "You wrench the lid off. The hinges give way with a crack."
 
     - label: "I've seen this before"
-      goto: already-opened    # jump to a labeled step elsewhere in the adventure
+      goto: already-opened # jump to a labeled step elsewhere in the adventure
 
     - label: "Leave it alone"
       steps:
@@ -387,7 +387,7 @@ effects:
 A complete adventure using the events/effects separation: opening narrative, combat with outcome branches that carry effects and a nested stat-check event.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: goblin-ambush
@@ -442,7 +442,7 @@ spec:
   adventures:
     - ref: goblin-ambush
       weight: 50
-    - ref: lost-merchant      # non-combat
+    - ref: lost-merchant # non-combat
       weight: 30
     - ref: ancient-ruins-find
       weight: 15
@@ -454,13 +454,13 @@ spec:
         character_stat:
           name: wisdom
           gte: 20
-    - ref: goblin-veteran-showdown  # only after killing 3+ goblin scouts
+    - ref: goblin-veteran-showdown # only after killing 3+ goblin scouts
       weight: 10
       requires:
         enemies_defeated:
           name: goblin-scout
           gte: 3
-    - ref: bounty-board-weekly   # compound: level 5 AND either a milestone OR kill count
+    - ref: bounty-board-weekly # compound: level 5 AND either a milestone OR kill count
       weight: 8
       requires:
         all:
@@ -538,10 +538,10 @@ Statistics are **per-entity event counters** that record how many times a player
 
 Three counter categories are tracked:
 
-| Category | Incremented when | Key |
-|---|---|---|
-| `enemies_defeated` | A `combat` step ends with player victory | Enemy manifest name |
-| `locations_visited` | A player enters a location (each visit) | Location manifest name |
+| Category               | Incremented when                         | Key                     |
+| ---------------------- | ---------------------------------------- | ----------------------- |
+| `enemies_defeated`     | A `combat` step ends with player victory | Enemy manifest name     |
+| `locations_visited`    | A player enters a location (each visit)  | Location manifest name  |
 | `adventures_completed` | An adventure pipeline runs to completion | Adventure manifest name |
 
 All counters start at 0 (absent keys are implicitly 0) and only ever increase. Example state after a short session:
@@ -580,7 +580,7 @@ A reference for every supported `kind`, showing the full YAML structure with rea
 One per content package. Defines XP thresholds, base HP formula, and flavour metadata. Referenced by the engine at startup; not referenced by other manifests.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Game
 metadata:
   name: the-kingdom
@@ -593,7 +593,7 @@ spec:
   hp_formula:
     base_hp: 20
     hp_per_level: 10
-  base_adventure_count: null   # null = unlimited (Phase 2 default)
+  base_adventure_count: null # null = unlimited (Phase 2 default)
 ```
 
 ---
@@ -605,7 +605,7 @@ One per content package. Defines the full set of stats that player characters ca
 Stat value types: `int`, `float`, `str`, `bool`. All stats default to `null` unless a `default` is explicitly provided.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: CharacterConfig
 metadata:
   name: default-character
@@ -694,7 +694,7 @@ class CharacterConfigSpec(BaseModel):
 Class mechanics are not enforced in v1. The manifest is loaded and stored so that content can reference class names in conditions without errors.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Class
 metadata:
   name: warrior
@@ -711,14 +711,14 @@ spec:
 Regions form a tree. Each region can have a parent reference and its own `unlock` condition. Location accessibility is determined by the full ancestor chain.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Region
 metadata:
   name: wilderness
 spec:
   displayName: "The Wilderness"
   description: "Dense forest and rocky hills beyond the town walls."
-  parent: kingdom          # references Region metadata.name
+  parent: kingdom # references Region metadata.name
   unlock:
     level: 3
 ```
@@ -726,7 +726,7 @@ spec:
 Root region (no parent, no unlock — always accessible):
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Region
 metadata:
   name: kingdom
@@ -742,20 +742,20 @@ spec:
 Locations belong to a region and carry a weighted adventure pool. Effective unlock = own `unlock` AND all ancestor region unlocks.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Location
 metadata:
   name: goblin-caves
 spec:
   displayName: "The Goblin Caves"
   description: "A labyrinth of damp tunnels reeking of goblin."
-  region: wilderness        # references Region metadata.name
+  region: wilderness # references Region metadata.name
   unlock:
     milestone: heard-about-the-caves
   adventures:
     - ref: goblin-ambush
       weight: 50
-    - ref: goblin-campfire   # non-combat
+    - ref: goblin-campfire # non-combat
       weight: 30
     - ref: goblin-chief-fight
       weight: 10
@@ -774,7 +774,7 @@ spec:
 ### `Enemy` — combat opponent
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Enemy
 metadata:
   name: goblin-scout
@@ -782,9 +782,9 @@ spec:
   displayName: "Goblin Scout"
   description: "A wiry goblin with a rusty blade and an unearned confidence."
   hp: 25
-  attack: 8          # base damage per round
-  defense: 3         # damage reduction
-  xp_reward: 80      # granted via xp_grant step or inline on win
+  attack: 8 # base damage per round
+  defense: 3 # damage reduction
+  xp_reward: 80 # granted via xp_grant step or inline on win
   loot:
     - item: goblin-ear
       weight: 80
@@ -803,7 +803,7 @@ Item kinds: `consumable`, `weapon`, `armor`, `accessory`, `quest`, `material`, `
 **Consumable:**
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Item
 metadata:
   name: healing-potion
@@ -812,15 +812,15 @@ spec:
   description: "A bubbling red liquid. Tastes like cherries and regret."
   kind: consumable
   effect:
-    heal: 30          # restores 30 HP when used
+    heal: 30 # restores 30 HP when used
   stackable: true
-  value: 50           # gold value (for future shop use)
+  value: 50 # gold value (for future shop use)
 ```
 
 **Weapon:**
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Item
 metadata:
   name: iron-sword
@@ -838,7 +838,7 @@ spec:
 **Armor:**
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Item
 metadata:
   name: leather-armour
@@ -856,7 +856,7 @@ spec:
 **Quest item:**
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Item
 metadata:
   name: elder-seal
@@ -865,14 +865,14 @@ spec:
   description: "An official wax seal. Whatever it's for, it looks important."
   kind: quest
   stackable: false
-  droppable: false   # cannot be traded or discarded
+  droppable: false # cannot be traded or discarded
   value: 0
 ```
 
 **Crafting material:**
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Item
 metadata:
   name: goblin-ear
@@ -889,7 +889,7 @@ spec:
 ### `Recipe` — crafting formula
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Recipe
 metadata:
   name: brew-healing-potion
@@ -913,7 +913,7 @@ spec:
 Quests are tracked on the player as `{quest_ref: current_stage}`. Stage advancement is triggered by milestone grants within adventures. A stage's `advance_on` field lists milestone names that move the player to `next_stage`.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Quest
 metadata:
   name: the-missing-merchant
@@ -936,7 +936,7 @@ spec:
 
     - name: complete
       description: "Justice served. Report back to the village elder."
-      terminal: true   # quest is complete at this stage
+      terminal: true # quest is complete at this stage
 ```
 
 Quest start is triggered by a `milestone_grant` in an adventure (e.g., `milestone: started-the-missing-merchant-quest`) combined with engine logic that checks quest entry conditions. The precise quest-start trigger mechanism is an implementation detail for the engine's quest manager.
@@ -1013,7 +1013,7 @@ class QuestSpec(BaseModel):
 Showing all field types in one place for reference. An adventure is a `kind: Adventure` manifest whose `steps` list is the core authored content.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: abandoned-shrine
@@ -1077,7 +1077,7 @@ spec:
               gte: 40
           steps:
             - type: combat
-              enemy: shrine-guardian   # awakened by the desecration
+              enemy: shrine-guardian # awakened by the desecration
               on_win:
                 effects:
                   - type: item_drop
@@ -1123,7 +1123,7 @@ class Metadata(BaseModel):
 
 
 class ManifestEnvelope(BaseModel):
-    apiVersion: Literal["game/v1"]
+    apiVersion: Literal["oscilla/v1"]
     kind: str
     metadata: Metadata
     spec: dict  # replaced by each kind's typed spec model
@@ -3045,12 +3045,12 @@ When a fixture scenario needs multiple instances of the same kind, add a descrip
 
 ### Content vs Fixture Boundary
 
-| | `content/` | `tests/fixtures/content/` |
-|---|---|---|
-| Purpose | POC playable game | Engine test scenarios |
-| Audience | Players and content authors | Engine developers |
-| Changed by | Content proposals | Engine proposals |
-| Referenced in tests | **Never** | For all integration tests |
+|                     | `content/`                  | `tests/fixtures/content/` |
+| ------------------- | --------------------------- | ------------------------- |
+| Purpose             | POC playable game           | Engine test scenarios     |
+| Audience            | Players and content authors | Engine developers         |
+| Changed by          | Content proposals           | Engine proposals          |
+| Referenced in tests | **Never**                   | For all integration tests |
 
 ---
 

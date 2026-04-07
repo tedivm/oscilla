@@ -376,13 +376,13 @@ CREATE TABLE character_iteration_item_instance_modifiers (
 
 The targeted service functions for the new tables are:
 
-| Operation | Service function | Table written |
-|---|---|---|
-| Add an instance | `add_item_instance(session, iteration_id, instance)` | `character_iteration_item_instances` — INSERT; `character_iteration_item_instance_modifiers` — INSERT per modifier |
-| Remove an instance | `remove_item_instance(session, iteration_id, instance_id)` | `character_iteration_item_instances` — DELETE (modifiers cascade) |
-| Equip to a slot | `equip_item(session, iteration_id, slot, instance_id)` | `character_iteration_equipment` — UPSERT |
-| Unequip a slot | `unequip_item(session, iteration_id, slot)` | `character_iteration_equipment` — DELETE |
-| Stack inventory | `set_inventory_item(session, iteration_id, item_ref, quantity)` | `character_iteration_inventory` — unchanged |
+| Operation          | Service function                                                | Table written                                                                                                      |
+| ------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Add an instance    | `add_item_instance(session, iteration_id, instance)`            | `character_iteration_item_instances` — INSERT; `character_iteration_item_instance_modifiers` — INSERT per modifier |
+| Remove an instance | `remove_item_instance(session, iteration_id, instance_id)`      | `character_iteration_item_instances` — DELETE (modifiers cascade)                                                  |
+| Equip to a slot    | `equip_item(session, iteration_id, slot, instance_id)`          | `character_iteration_equipment` — UPSERT                                                                           |
+| Unequip a slot     | `unequip_item(session, iteration_id, slot)`                     | `character_iteration_equipment` — DELETE                                                                           |
+| Stack inventory    | `set_inventory_item(session, iteration_id, item_ref, quantity)` | `character_iteration_inventory` — unchanged                                                                        |
 
 `add_item_instance()` and `remove_item_instance()` use `INSERT` / `DELETE` (not upsert) because each `instance_id` is globally unique; duplicate inserts should not be silently ignored.
 

@@ -4,12 +4,12 @@
 
 Testlandia SHALL contain a `template-system` region that allows a developer to manually exercise every major dynamic content template feature. The region SHALL contain the following locations and adventures:
 
-| Location | Adventure | Feature exercised |
-|---|---|---|
-| `pronoun-selection` | `choose-pronouns` | Pronoun set selection (all three built-ins shown as choices) |
-| `narrative-test` | `personalized-greeting` | `{{ player.name }}`, `{{ player.level }}`, `{they}`, `{their}`, `{is}` |
-| `variable-rewards` | `treasure-hunt` | `roll()` in `xp_grant.amount` and `stat_change.amount`; variable reward text |
-| `conditional-narrative` | `fame-check` | `{% if player.milestones.has(...) %}` branching narrative |
+| Location                | Adventure               | Feature exercised                                                            |
+| ----------------------- | ----------------------- | ---------------------------------------------------------------------------- |
+| `pronoun-selection`     | `choose-pronouns`       | Pronoun set selection (all three built-ins shown as choices)                 |
+| `narrative-test`        | `personalized-greeting` | `{{ player.name }}`, `{{ player.level }}`, `{they}`, `{their}`, `{is}`       |
+| `variable-rewards`      | `treasure-hunt`         | `roll()` in `xp_grant.amount` and `stat_change.amount`; variable reward text |
+| `conditional-narrative` | `fame-check`            | `{% if player.milestones.has(...) %}` branching narrative                    |
 
 The region SHALL load cleanly with `oscilla validate --game testlandia` and SHALL exercise all major template features when played by a developer.
 

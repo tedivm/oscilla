@@ -52,7 +52,7 @@ This change replaces the synchronous pipeline and REPL TUI with a fully async pi
 
 **Choice:** The standalone `_select_region` and `_select_location` functions in `cli.py` are absorbed into the Textual app's `_game_loop()` worker method.
 
-**Rationale:** These functions exist solely to implement the region/location flow of the REPL game loop. With no backwards compatibility to preserve, inlining them eliminates two helper functions that only existed as a decomposition of the old `while True` loop. The Textual app *is* the game entry point now; its methods own this logic.
+**Rationale:** These functions exist solely to implement the region/location flow of the REPL game loop. With no backwards compatibility to preserve, inlining them eliminates two helper functions that only existed as a decomposition of the old `while True` loop. The Textual app _is_ the game entry point now; its methods own this logic.
 
 ### Decision: Status sidebar uses reactive refresh, not polling
 
@@ -169,8 +169,8 @@ sequenceDiagram
 
 ## Documentation Plan
 
-| Document | Audience | Topics to cover |
-|---|---|---|
+| Document          | Audience            | Topics to cover                                                                                                                                                                                                                                                                                            |
+| ----------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `docs/dev/tui.md` | Engine contributors | New Textual app architecture; `TextualTUI` class and its async protocol; widget inventory (`NarrativeLog`, `ChoiceMenu`, `StatusPanel`, `RegionPanel`); how the game loop worker interacts with widgets via `asyncio.Event`; how to implement a future `WebSocketTUI`; removed `RichTUI` / `show_status()` |
 
 No new documents are needed. The existing `docs/dev/tui.md` is updated in full.
@@ -179,11 +179,11 @@ No new documents are needed. The existing `docs/dev/tui.md` is updated in full.
 
 ### Test tiers
 
-| Tier | What it covers | Tooling |
-|---|---|---|
-| Unit (step handlers) | Each handler (`run_narrative`, `run_choice`, `run_combat`, `run_stat_check`, `run_effect`) in isolation via `MockTUI` | `pytest` + `pytest-asyncio` |
-| Integration (pipeline) | `AdventurePipeline.run()` against fixture content registries via `MockTUI` | `pytest` + `pytest-asyncio` |
-| Smoke (Textual app) | Not in this change — Textual Pilot tests are future work | — |
+| Tier                   | What it covers                                                                                                        | Tooling                     |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| Unit (step handlers)   | Each handler (`run_narrative`, `run_choice`, `run_combat`, `run_stat_check`, `run_effect`) in isolation via `MockTUI` | `pytest` + `pytest-asyncio` |
+| Integration (pipeline) | `AdventurePipeline.run()` against fixture content registries via `MockTUI`                                            | `pytest` + `pytest-asyncio` |
+| Smoke (Textual app)    | Not in this change — Textual Pilot tests are future work                                                              | —                           |
 
 ### Fixtures
 

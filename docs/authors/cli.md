@@ -41,16 +41,16 @@ oscilla content list <kind> [--game NAME] [--format text|json|yaml]
 
 **Arguments**
 
-| Argument | Description |
-|---|---|
-| `kind` | Plural manifest kind: `regions`, `locations`, `adventures`, `enemies`, `items`, `skills`, `quests`, `recipes`, `loot-tables`, `buffs`, `classes`, `games`, `character-configs` |
+| Argument | Description                                                                                                                                                                    |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `kind`   | Plural manifest kind: `regions`, `locations`, `adventures`, `enemies`, `items`, `skills`, `quests`, `recipes`, `loot-tables`, `buffs`, `classes`, `games`, `character-configs` |
 
 **Options**
 
-| Option | Default | Description |
-|---|---|---|
-| `--game`, `-g` | auto | Game package name |
-| `--format`, `-F` | `text` | Output format: `text`, `json`, `yaml` |
+| Option           | Default | Description                           |
+| ---------------- | ------- | ------------------------------------- |
+| `--game`, `-g`   | auto    | Game package name                     |
+| `--format`, `-F` | `text`  | Output format: `text`, `json`, `yaml` |
 
 **Examples**
 
@@ -77,10 +77,10 @@ oscilla content show <kind> <name> [--game NAME] [--format text|json|yaml]
 
 **Arguments**
 
-| Argument | Description |
-|---|---|
-| `kind` | Singular or plural manifest kind (e.g., `adventure` or `adventures`) |
-| `name` | Manifest name (`metadata.name`) |
+| Argument | Description                                                          |
+| -------- | -------------------------------------------------------------------- |
+| `kind`   | Singular or plural manifest kind (e.g., `adventure` or `adventures`) |
+| `name`   | Manifest name (`metadata.name`)                                      |
 
 **Examples**
 
@@ -106,21 +106,21 @@ oscilla content graph <type> [name] [--game NAME] [--format dot|mermaid|ascii]
 
 **Graph types**
 
-| Type | Description |
-|---|---|
-| `world` | Full world map: game → regions → locations → adventures |
-| `adventure` | Step-by-step flow graph of a single adventure |
-| `deps` | Dependency graph: items, loot tables, enemies, skills, buffs, recipes, quests |
+| Type        | Description                                                                   |
+| ----------- | ----------------------------------------------------------------------------- |
+| `world`     | Full world map: game → regions → locations → adventures                       |
+| `adventure` | Step-by-step flow graph of a single adventure                                 |
+| `deps`      | Dependency graph: items, loot tables, enemies, skills, buffs, recipes, quests |
 
 **Options**
 
-| Option | Default | Description |
-|---|---|---|
-| `--format`, `-f` | `ascii` | Output format: `dot`, `mermaid`, `ascii` |
-| `--focus` | — | For `deps`: center output on this node id, e.g. `item:rusty-sword` |
-| `--include-kinds` | — | For `deps`: comma-separated kinds to include, e.g. `item,enemy` |
-| `--exclude-kinds` | — | For `deps`: comma-separated kinds to exclude, e.g. `quest,milestone` |
-| `--output`, `-o` | stdout | Write output to a file instead of printing it |
+| Option            | Default | Description                                                          |
+| ----------------- | ------- | -------------------------------------------------------------------- |
+| `--format`, `-f`  | `ascii` | Output format: `dot`, `mermaid`, `ascii`                             |
+| `--focus`         | —       | For `deps`: center output on this node id, e.g. `item:rusty-sword`   |
+| `--include-kinds` | —       | For `deps`: comma-separated kinds to include, e.g. `item,enemy`      |
+| `--exclude-kinds` | —       | For `deps`: comma-separated kinds to exclude, e.g. `quest,milestone` |
+| `--output`, `-o`  | stdout  | Write output to a file instead of printing it                        |
 
 **Examples**
 
@@ -151,16 +151,16 @@ oscilla content schema [kind] [--output PATH] [--vscode]
 
 **Arguments**
 
-| Argument | Description |
-|---|---|
+| Argument          | Description                                              |
+| ----------------- | -------------------------------------------------------- |
 | `kind` (optional) | Kind slug (e.g., `adventure`). Omit to export all kinds. |
 
 **Options**
 
-| Option | Description |
-|---|---|
-| `--output`, `-o` | Write to this file (single kind) or directory (all kinds). Prints to stdout otherwise. |
-| `--vscode` | Also update `.vscode/settings.json` with `yaml-language-server` associations (requires `--output`). |
+| Option           | Description                                                                                                                                                    |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--output`, `-o` | Write to this file (single kind) or directory (all kinds). Prints to stdout otherwise.                                                                         |
+| `--vscode`       | Write `.vscode/settings.json` with a `yaml-language-server` schema association. Defaults output to `.vscode/oscilla-schemas/` when `--output` is not provided. |
 
 **Examples**
 
@@ -171,11 +171,33 @@ oscilla content schema adventure
 # Write all schemas to a directory
 oscilla content schema --output schemas/
 
-# Write schemas and configure VS Code editor validation
-oscilla content schema --output schemas/ --vscode
+# Configure VS Code editor validation with a single command (default output path)
+oscilla content schema --vscode
+
+# Configure VS Code with a custom output directory
+oscilla content schema --output my-schemas/ --vscode
 ```
 
-Once schemas are configured for VS Code, your YAML editor will validate manifest fields inline as you type. You can also add a `# yaml-language-server: $schema=./schemas/adventure.json` comment at the top of any adventure file to enable per-file schema validation.
+**What `--vscode` does**
+
+Running `--vscode` writes two things:
+
+1. All per-kind JSON schemas (e.g., `adventure.json`, `item.json`) plus a `manifest.json` umbrella schema that covers every manifest kind using a `kind`-discriminated union.
+2. A `yaml.schemas` entry in `.vscode/settings.json` that associates `**/*.yaml` with `manifest.json`.
+
+The resulting entry in `.vscode/settings.json` looks like this:
+
+```json
+{
+  "yaml.schemas": {
+    ".vscode/oscilla-schemas/manifest.json": "**/*.yaml"
+  }
+}
+```
+
+Because `manifest.json` uses an `if/then` guard on `apiVersion: oscilla/v1`, files that are not Oscilla manifests receive no spurious validation errors — the glob is safe for projects that contain non-Oscilla YAML files.
+
+Once configured, your YAML editor validates manifest fields inline as you type and narrows validation to the correct schema branch based on the `kind` field. You can still add a `# yaml-language-server: $schema=./schemas/adventure.json` comment to a specific file to pin it to a single kind schema.
 
 ---
 
@@ -189,10 +211,10 @@ oscilla content test [--game NAME] [--strict]
 
 **Options**
 
-| Option | Description |
-|---|---|
-| `--game`, `-g` | Test only this game package. Defaults to all. |
-| `--strict` | Treat semantic warnings as errors (exits non-zero if any warnings found). |
+| Option         | Description                                                               |
+| -------------- | ------------------------------------------------------------------------- |
+| `--game`, `-g` | Test only this game package. Defaults to all.                             |
+| `--strict`     | Treat semantic warnings as errors (exits non-zero if any warnings found). |
 
 Semantic checks include:
 
@@ -263,15 +285,15 @@ oscilla content create <kind> [--game NAME] [--name NAME] [--display-name TEXT]
 
 **Options**
 
-| Option | Description |
-|---|---|
-| `--game`, `-g` | Target game package |
-| `--name` | Manifest name (`metadata.name`), used as the directory/file name |
-| `--display-name` | Human-readable display name |
-| `--description` | Short description |
-| `--region` | Parent region name (required for `location` and `adventure`) |
-| `--location` | Parent location name (required for `adventure`) |
-| `--parent` | Parent region name (optional for `region`, creates a nested sub-region) |
+| Option             | Description                                                               |
+| ------------------ | ------------------------------------------------------------------------- |
+| `--game`, `-g`     | Target game package                                                       |
+| `--name`           | Manifest name (`metadata.name`), used as the directory/file name          |
+| `--display-name`   | Human-readable display name                                               |
+| `--description`    | Short description                                                         |
+| `--region`         | Parent region name (required for `location` and `adventure`)              |
+| `--location`       | Parent location name (required for `adventure`)                           |
+| `--parent`         | Parent region name (optional for `region`, creates a nested sub-region)   |
 | `--no-interactive` | Disable interactive prompts; all required options must be passed as flags |
 
 **Examples**

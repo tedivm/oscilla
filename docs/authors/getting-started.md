@@ -35,7 +35,7 @@ All your files will live in or under this directory. The directory name becomes 
 This file defines your game's rules. Create `content/my-first-kingdom/game.yaml`:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Game
 metadata:
   name: my-first-kingdom
@@ -59,7 +59,7 @@ This gives you 5 levels (1 baseline + 4 thresholds). Max HP at level 5: 20 + 4×
 This file defines the player. Create `content/my-first-kingdom/character_config.yaml`:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: CharacterConfig
 metadata:
   name: my-first-kingdom-character
@@ -92,7 +92,7 @@ mkdir -p content/my-first-kingdom/regions/the-village
 Create `content/my-first-kingdom/regions/the-village/the-village.yaml`:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Region
 metadata:
   name: the-village
@@ -114,7 +114,7 @@ mkdir -p content/my-first-kingdom/regions/the-village/locations/market-square
 Create `content/my-first-kingdom/regions/the-village/locations/market-square/market-square.yaml`:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Location
 metadata:
   name: market-square
@@ -142,7 +142,7 @@ mkdir -p content/my-first-kingdom/regions/the-village/locations/market-square/en
 Create `content/my-first-kingdom/regions/the-village/locations/market-square/enemies/street-thug.yaml`:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Enemy
 metadata:
   name: street-bandit
@@ -168,7 +168,7 @@ mkdir -p content/my-first-kingdom/regions/the-village/locations/market-square/ad
 Create `content/my-first-kingdom/regions/the-village/locations/market-square/adventures/bandit-shakedown.yaml`:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: bandit-shakedown
@@ -273,6 +273,43 @@ uv run oscilla validate --game my-first-kingdom --strict
 
 ---
 
+## Multi-Manifest Files
+
+As your content package grows you may want to group related manifests in a single file rather than creating a separate file for each one. Oscilla supports multiple YAML documents in one file using the standard `---` divider.
+
+Each document is validated independently, so you can mix different manifest kinds freely:
+
+```yaml
+apiVersion: oscilla/v1
+kind: Item
+metadata:
+  name: bronze-coin
+spec:
+  displayName: "Bronze Coin"
+  description: "A common copper coin."
+  category: currency
+  stackable: true
+  value: 1
+
+---
+apiVersion: oscilla/v1
+kind: Item
+metadata:
+  name: silver-coin
+spec:
+  displayName: "Silver Coin"
+  description: "Worth ten bronze coins."
+  category: currency
+  stackable: true
+  value: 10
+```
+
+File naming is unrestricted — you can call the file `coins.yaml`, `currency.yaml`, or anything else. Single-manifest files continue to work exactly as before; multi-document support is purely additive.
+
+If a document in a multi-manifest file has an error, the error message includes the document index (e.g., `[doc 2]`) so you can locate the problem without counting `---` dividers manually.
+
+---
+
 ## Step 10: Run the Game
 
 Once validation passes, start the game:
@@ -299,7 +336,7 @@ From this minimal base, the natural next steps are:
 
 ---
 
-*The rest of this documentation covers each of these systems in depth:*
+_The rest of this documentation covers each of these systems in depth:_
 
 - [Conditions](./conditions.md) — branching logic
 - [Effects](./effects.md) — rewards and state changes

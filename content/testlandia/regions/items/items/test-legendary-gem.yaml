@@ -1,4 +1,4 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Item
 metadata:
   name: test-legendary-gem

@@ -1,14 +1,16 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: fame-check
 spec:
   displayName: "Fame Check"
-  description: "Tests milestone-conditional branching. Displays a hero greeting if the player holds 'hero-of-testlandia',
+  description:
+    "Tests milestone-conditional branching. Displays a hero greeting if the player holds 'hero-of-testlandia',
     otherwise a stranger greeting. Run once without the milestone and once after earning it to verify both branches."
   steps:
     - type: narrative
-      text: "{% if player.milestones.has('hero-of-testlandia') %}The crowd cheers as {{ player.name }} approaches! {They}
+      text:
+        "{% if player.milestones.has('hero-of-testlandia') %}The crowd cheers as {{ player.name }} approaches! {They}
         {are} the hero of Testlandia!{% else %}A traveller named {{ player.name }} arrives in town. {They} {are} unknown here.{%
         endif %}"
       effects: []

@@ -1,6 +1,6 @@
 ## Why
 
-Content authors have no way to gate adventures, steps, or effects on real-world time — the date, month, season, day of the week, time of day, moon phase, or zodiac sign. The template engine already exposes `season()`, `moon_phase()`, `zodiac_sign()`, and related functions via `calendar_utils.py`, but the condition evaluator has no corresponding predicates. This means authors can vary *text* based on the calendar but cannot vary *adventure availability* or *branching behavior* — a significant expressive gap. The calendar utilities were explicitly built to be shared with the condition evaluator; this change completes that design intent.
+Content authors have no way to gate adventures, steps, or effects on real-world time — the date, month, season, day of the week, time of day, moon phase, or zodiac sign. The template engine already exposes `season()`, `moon_phase()`, `zodiac_sign()`, and related functions via `calendar_utils.py`, but the condition evaluator has no corresponding predicates. This means authors can vary _text_ based on the calendar but cannot vary _adventure availability_ or _branching behavior_ — a significant expressive gap. The calendar utilities were explicitly built to be shared with the condition evaluator; this change completes that design intent.
 
 ## What Changes
 

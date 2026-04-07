@@ -4,7 +4,7 @@ The engine hard-codes a single game per content directory, making it impossible 
 
 ## What Changes
 
-- **BREAKING** `CONTENT_PATH` is replaced by `GAMES_PATH` and now points to a *game library root* — a directory whose immediate subdirectories are individual game packages. The existing `content/` directory is restructured accordingly.
+- **BREAKING** `CONTENT_PATH` is replaced by `GAMES_PATH` and now points to a _game library root_ — a directory whose immediate subdirectories are individual game packages. The existing `content/` directory is restructured accordingly.
 - **BREAKING** `CharacterRecord` gains a `game_name` column; the uniqueness constraint changes from `(user_id, name)` to `(user_id, game_name, name)`. A migration is required.
 - `oscilla game` gains a `--game GAME_NAME` flag. When multiple games are present and no flag is given, a TUI game-selection screen is shown before character selection.
 - `oscilla validate` validates all games by default; a new `--game` flag restricts it to one.

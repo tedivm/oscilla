@@ -51,12 +51,12 @@ Duplicate `name` values among `triggers.on_stat_threshold` entries SHALL produce
 - **WHEN** `trigger_adventures` contains `{on_unknown_event: [some-adv]}`
 - **THEN** a load warning is emitted for the unknown key and the adventure list is ignored at runtime
 
-#### Scenario: on_outcome_<custom> is valid when outcome is declared
+#### Scenario: on*outcome*<custom> is valid when outcome is declared
 
 - **WHEN** `game.yaml` has `outcomes: [discovered]` and `trigger_adventures: {on_outcome_discovered: [disc-adv]}`
 - **THEN** no load warning is produced for `on_outcome_discovered`
 
-#### Scenario: on_outcome_<custom> without declaration produces warning
+#### Scenario: on*outcome*<custom> without declaration produces warning
 
 - **WHEN** `trigger_adventures: {on_outcome_discovered: [disc-adv]}` but `discovered` is not in `spec.outcomes`
 - **THEN** a load warning is produced for `on_outcome_discovered`
@@ -171,7 +171,7 @@ In the `xp_grant` effect handler, for each level in the `levels_gained` list ret
 
 ---
 
-### Requirement: on_outcome_<name> trigger detection
+### Requirement: on*outcome*<name> trigger detection
 
 After each call to `session.run_adventure()` returns an outcome, the engine SHALL construct the trigger key `f"on_outcome_{outcome.value}"` and call `player.enqueue_trigger(trigger_key)` if that key is in `registry.trigger_index`.
 

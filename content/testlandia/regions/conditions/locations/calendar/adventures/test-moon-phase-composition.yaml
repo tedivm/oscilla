@@ -1,10 +1,11 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-moon-phase-composition
 spec:
   displayName: "Moon Phase — Condition Check"
-  description: "Always available. Tests all 8 moon phases so exactly one PASS fires regardless of the current date. Also demonstrates
+  description:
+    "Always available. Tests all 8 moon phases so exactly one PASS fires regardless of the current date. Also demonstrates
     calendar condition composition (all: with month_is and moon_phase_is)."
   steps:
     - type: narrative
@@ -130,5 +131,6 @@ spec:
       on_fail:
         steps:
           - type: narrative
-            text: "  all: [April + Full Moon]: FAIL — it is {{ month_name(today().month) }} and moon is {{ moon_phase(today())
+            text:
+              "  all: [April + Full Moon]: FAIL — it is {{ month_name(today().month) }} and moon is {{ moon_phase(today())
               }}; both must match"

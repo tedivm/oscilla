@@ -122,4 +122,3 @@ The system SHALL expose a `data-path` command in the `oscilla` CLI that prints t
 
 - **WHEN** `data-path` is invoked
 - **THEN** it completes without requiring an async runtime, database connection, or any external service
-

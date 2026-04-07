@@ -121,7 +121,7 @@ Create a new region when testing functionality that differs significantly from e
 2. **Create Region manifest** (`[region-name].yaml`):
 
    ```yaml
-   apiVersion: game/v1
+   apiVersion: oscilla/v1
    kind: Region
    metadata:
      name: [region-name] # Must match directory name
@@ -216,7 +216,7 @@ Use descriptive names that indicate the test purpose:
 All manifests follow the envelope format:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: [ManifestType]
 metadata:
   name: descriptive-test-name
@@ -361,7 +361,7 @@ If templates below don't match the system, **update this skill immediately**.
 ### Basic Adventure Template
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-[feature-name]
@@ -382,7 +382,7 @@ spec:
 ### Passive Step Template
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-[feature-name]
@@ -411,7 +411,7 @@ spec:
 ### One-Shot / Repeat Controls Template
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-one-shot
@@ -435,7 +435,7 @@ spec:
 ### Basic Item Template
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Item
 metadata:
   name: test-[item-purpose]
@@ -449,7 +449,7 @@ spec:
 ### Basic Enemy Template
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Enemy
 metadata:
   name: test-[enemy-type]

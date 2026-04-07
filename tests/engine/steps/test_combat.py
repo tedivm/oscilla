@@ -18,7 +18,7 @@ def create_test_combat_registry() -> ContentRegistry:
 
     # Add weak enemy for testing
     weak_enemy = EnemyManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Enemy",
         metadata=Metadata(name="weak-enemy"),
         spec=EnemySpec(displayName="Weak Enemy", hp=5, attack=2, defense=0, xp_reward=10),
@@ -27,7 +27,7 @@ def create_test_combat_registry() -> ContentRegistry:
 
     # Add strong enemy for testing defeat
     strong_enemy = EnemyManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Enemy",
         metadata=Metadata(name="strong-enemy"),
         spec=EnemySpec(displayName="Strong Enemy", hp=100, attack=50, defense=0, xp_reward=50),
@@ -232,7 +232,7 @@ async def test_combat_damage_calculation_with_defense(base_player: CharacterStat
     # Enemy with defense (15) higher than player strength (10), so player deals no damage.
     # High attack (20) so the enemy kills the player in one counter-attack.
     high_def_enemy = EnemyManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Enemy",
         metadata=Metadata(name="armored-enemy"),
         spec=EnemySpec(displayName="Armored Enemy", hp=100, attack=20, defense=15, xp_reward=10),

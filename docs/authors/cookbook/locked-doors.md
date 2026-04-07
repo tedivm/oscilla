@@ -11,7 +11,7 @@ The pattern is general — "locked door with a physical key" is just one applica
 Define the key as a non-stackable, non-equippable item:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Item
 metadata:
   name: iron-key
@@ -39,13 +39,13 @@ adventures:
     condition:
       type: milestone
       name: found-iron-key
-      absent: true       # ← only show this adventure if the milestone is NOT set
+      absent: true # ← only show this adventure if the milestone is NOT set
 ```
 
 The adventure itself:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: hidden-alcove
@@ -163,4 +163,4 @@ requires:
 
 ---
 
-*See [Conditions](../conditions.md) · [Effects](../effects.md) · [Items](../items.md)*
+_See [Conditions](../conditions.md) · [Effects](../effects.md) · [Items](../items.md)_

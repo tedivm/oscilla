@@ -369,7 +369,10 @@ def content_schema(
         bool,
         typer.Option(
             "--vscode",
-            help="Write .vscode/settings.json yaml-language-server schema associations (requires --output).",
+            help=(
+                "Write .vscode/settings.json yaml-language-server schema associations. "
+                "Defaults output to .vscode/oscilla-schemas/ when --output is not provided."
+            ),
         ),
     ] = False,
 ) -> None:
@@ -377,15 +380,16 @@ def content_schema(
 
     With no KIND argument, all schemas are printed as a single JSON object keyed by kind.
     With --output and no KIND, writes one file per kind into the specified directory.
-    With --vscode, also updates .vscode/settings.json with yaml-language-server associations.
+    With --vscode, also writes manifest.json and updates .vscode/settings.json with a
+    content-path glob association. Output defaults to .vscode/oscilla-schemas/.
     """
-    from oscilla.engine.schema_export import export_all_schemas, export_schema
+    from oscilla.engine.schema_export import export_all_schemas, export_schema, export_union_schema
 
-    if vscode and not output:
-        _err_console.print("[red]--vscode requires --output to know where schemas are written.[/red]")
-        raise SystemExit(1)
+    # Resolve effective output: --vscode has a default; without --vscode, --output is optional.
+    effective_output = output or (".vscode/oscilla-schemas" if vscode else None)
 
     if kind is not None:
+        # Single-kind export: --vscode is not applicable here.
         try:
             schema = export_schema(kind)
         except ValueError as exc:
@@ -393,36 +397,40 @@ def content_schema(
             raise SystemExit(1)
 
         result = json.dumps(schema, indent=2)
-        if output:
-            Path(output).write_text(result)
-            _console.print(f"[green]Written to {output}[/green]")
+        if effective_output:
+            Path(effective_output).write_text(result)
+            _console.print(f"[green]Written to {effective_output}[/green]")
         else:
             typer.echo(result)
         return
 
     # All schemas
     all_schemas = export_all_schemas()
-    if output:
-        out_dir = Path(output)
+    if effective_output:
+        out_dir = Path(effective_output)
         out_dir.mkdir(parents=True, exist_ok=True)
         for k, schema in all_schemas.items():
-            path = out_dir / f"{k}.json"
-            path.write_text(json.dumps(schema, indent=2))
-        _console.print(f"[green]Wrote {len(all_schemas)} schema files to {out_dir}/[/green]")
-
+            (out_dir / f"{k}.json").write_text(json.dumps(schema, indent=2))
+        # Always write the union schema alongside per-kind schemas.
+        (out_dir / "manifest.json").write_text(json.dumps(export_union_schema(), indent=2))
+        _console.print(f"[green]Wrote {len(all_schemas) + 1} schema files to {out_dir}/[/green]")
         if vscode:
-            _write_vscode_schema_associations(out_dir, all_schemas)
+            _write_vscode_schema_associations(out_dir)
     else:
         typer.echo(json.dumps(all_schemas, indent=2))
 
 
 def _write_vscode_schema_associations(
     schema_dir: Path,
-    schemas: dict,
 ) -> None:
-    """Update .vscode/settings.json with yaml-language-server schema associations.
+    """Update .vscode/settings.json with a content-path glob pointing at manifest.json.
 
-    Creates the file if it does not exist. Merges into any existing yaml.schemas dict.
+    A single glob covers all content files regardless of their filename, and works
+    correctly with multi-document YAML files. The yaml-language-server validates
+    each document independently against the discriminated union schema.
+
+    Creates .vscode/settings.json if it does not exist. Merges into any existing
+    yaml.schemas dict so that other schema associations are preserved.
     """
     import json as _json
 
@@ -432,10 +440,13 @@ def _write_vscode_schema_associations(
         existing: dict = _json.loads(settings_path.read_text()) if settings_path.exists() else {}
     except Exception:
         existing = {}
-    associations = {f"**/{k}.yaml": str(schema_dir / f"{k}.json") for k in sorted(schemas)}
-    existing.setdefault("yaml.schemas", {}).update(associations)
+    # Use a relative path so the association is portable across machines.
+    manifest_schema_path = str(schema_dir / "manifest.json")
+    # **/*.yaml is safe because manifest.json uses an if/then guard on
+    # apiVersion: oscilla/v1 — non-Oscilla files receive no validation.
+    existing.setdefault("yaml.schemas", {})[manifest_schema_path] = "**/*.yaml"
     settings_path.write_text(_json.dumps(existing, indent=2))
-    _console.print(f"[green]Updated {settings_path} with {len(associations)} schema associations.[/green]")
+    _console.print(f"[green]Updated {settings_path} with content glob → {manifest_schema_path}[/green]")
 
 
 # ---------------------------------------------------------------------------

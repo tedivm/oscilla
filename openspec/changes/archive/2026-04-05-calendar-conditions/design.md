@@ -4,7 +4,7 @@
 
 The condition evaluator is the engine's universal gate — any content decision that depends on character or world state should flow through it. This is one of the system's core design principles.
 
-`oscilla/engine/calendar_utils.py` already implements all required calendar logic — `season()`, `moon_phase()`, `zodiac_sign()`, `chinese_zodiac()`, and helpers — as pure functions with no external dependencies. The module docstring explicitly states it was factored out *"so the future condition evaluator can import the same functions without duplication."* That future is now.
+`oscilla/engine/calendar_utils.py` already implements all required calendar logic — `season()`, `moon_phase()`, `zodiac_sign()`, `chinese_zodiac()`, and helpers — as pure functions with no external dependencies. The module docstring explicitly states it was factored out _"so the future condition evaluator can import the same functions without duplication."_ That future is now.
 
 The template engine already exposes every calendar function to Jinja2 templates, so authors can vary narrative text based on the calendar. What is missing is the ability to gate entire adventures, branches, or effects on calendar state. This change adds that capability by adding 8 new condition leaf predicates to `models/base.py` and the corresponding `case` branches to `conditions.py`.
 
@@ -12,11 +12,11 @@ A secondary capability is added alongside: making game configuration available i
 
 **Current state before this change:**
 
-| Gap | Detail |
-|-----|--------|
-| No calendar conditions | Authors can use `season()` in text templates but cannot gate adventure availability on it |
-| `season_is` hemispheres | `season()` is hardcoded Northern Hemisphere in both `calendar_utils` and template engine |
-| Templates have no `game` context | `ExpressionContext` only exposes `player` and `combat` |
+| Gap                              | Detail                                                                                    |
+| -------------------------------- | ----------------------------------------------------------------------------------------- |
+| No calendar conditions           | Authors can use `season()` in text templates but cannot gate adventure availability on it |
+| `season_is` hemispheres          | `season()` is hardcoded Northern Hemisphere in both `calendar_utils` and template engine  |
+| Templates have no `game` context | `ExpressionContext` only exposes `player` and `combat`                                    |
 
 ---
 
@@ -801,17 +801,17 @@ from oscilla.engine.templates import ExpressionContext, GameContext, PlayerConte
 
 ## Edge Cases
 
-| Condition | Edge Case | Handling |
-|-----------|-----------|----------|
-| `season_is` | `registry` is `None` | Defaults to `"northern"`, logs `debug` message |
-| `season_is` | `registry.game` is `None` | Defaults to `"northern"`, no warning (valid game-less test) |
-| All calendar predicates | `timezone` is a valid IANA name | All evaluate using that timezone's current date/time |
-| All calendar predicates | `timezone` is unrecognised IANA key | Logs `warning`, all evaluate using server local time |
-| `time_between` | `start == end` | Always returns `False`, logs `warning` |
-| `time_between` | `start > end` | Midnight-wrap interpretation (true if `now >= start OR now <= end`) |
-| `date_is` | `month=2, day=29` on a non-leap year | Correctly false on non-leap years regardless of timezone |
-| `month_is` | Unknown string name (e.g. `"Octobr"`) | Raises `ValueError` at parse time via Pydantic model validator |
-| `day_of_week_is` | Unknown string name | Raises `ValueError` at parse time via Pydantic model validator |
+| Condition               | Edge Case                             | Handling                                                            |
+| ----------------------- | ------------------------------------- | ------------------------------------------------------------------- |
+| `season_is`             | `registry` is `None`                  | Defaults to `"northern"`, logs `debug` message                      |
+| `season_is`             | `registry.game` is `None`             | Defaults to `"northern"`, no warning (valid game-less test)         |
+| All calendar predicates | `timezone` is a valid IANA name       | All evaluate using that timezone's current date/time                |
+| All calendar predicates | `timezone` is unrecognised IANA key   | Logs `warning`, all evaluate using server local time                |
+| `time_between`          | `start == end`                        | Always returns `False`, logs `warning`                              |
+| `time_between`          | `start > end`                         | Midnight-wrap interpretation (true if `now >= start OR now <= end`) |
+| `date_is`               | `month=2, day=29` on a non-leap year  | Correctly false on non-leap years regardless of timezone            |
+| `month_is`              | Unknown string name (e.g. `"Octobr"`) | Raises `ValueError` at parse time via Pydantic model validator      |
+| `day_of_week_is`        | Unknown string name                   | Raises `ValueError` at parse time via Pydantic model validator      |
 
 ---
 
@@ -827,12 +827,12 @@ from oscilla.engine.templates import ExpressionContext, GameContext, PlayerConte
 
 ## Documentation Plan
 
-| Document | Audience | Topics |
-|----------|----------|--------|
-| `docs/authors/calendar-conditions.md` (new) | Content authors | All 8 new predicates with YAML examples; `season_hemisphere` and `timezone` game config fields; hemisphere effects on `season()`; `time_between` timezone behavior and midnight-wrapping; note that omitting `timezone` falls back to server local time |
-| `docs/authors/README.md` (update) | Content authors | Add `calendar-conditions.md` to table of contents |
-| `openspec/specs/condition-evaluator/spec.md` (delta) | Engine contributors | New `Requirements` and `Scenarios` for each of the 8 new predicates |
-| `openspec/specs/dynamic-content-templates/spec.md` (delta) | Engine contributors | New `GameContext` object in `ExpressionContext`; `game.season_hemisphere` property; updated `season()` description noting hemisphere-aware behavior; `season_hemisphere` field in `GameSpec` |
+| Document                                                   | Audience            | Topics                                                                                                                                                                                                                                                  |
+| ---------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/authors/calendar-conditions.md` (new)                | Content authors     | All 8 new predicates with YAML examples; `season_hemisphere` and `timezone` game config fields; hemisphere effects on `season()`; `time_between` timezone behavior and midnight-wrapping; note that omitting `timezone` falls back to server local time |
+| `docs/authors/README.md` (update)                          | Content authors     | Add `calendar-conditions.md` to table of contents                                                                                                                                                                                                       |
+| `openspec/specs/condition-evaluator/spec.md` (delta)       | Engine contributors | New `Requirements` and `Scenarios` for each of the 8 new predicates                                                                                                                                                                                     |
+| `openspec/specs/dynamic-content-templates/spec.md` (delta) | Engine contributors | New `GameContext` object in `ExpressionContext`; `game.season_hemisphere` property; updated `season()` description noting hemisphere-aware behavior; `season_hemisphere` field in `GameSpec`                                                            |
 
 ### `docs/authors/calendar-conditions.md` must cover
 
@@ -1055,12 +1055,12 @@ def test_calendar_conditions_compose_with_all(freeze_date) -> None:
 
 ### Test tiers summary
 
-| Tier | Files | What is verified |
-|------|-------|-----------------|
-| Unit — `calendar_utils` | `tests/engine/test_calendar_utils.py` | `season()` hemisphere parameter (northern and southern for each of 12 months) |
+| Tier                    | Files                                      | What is verified                                                                                                          |
+| ----------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| Unit — `calendar_utils` | `tests/engine/test_calendar_utils.py`      | `season()` hemisphere parameter (northern and southern for each of 12 months)                                             |
 | Unit — condition models | `tests/engine/test_calendar_conditions.py` | Parse-time normalisation; true/false for each of 8 predicates; midnight-wrap; zero-duration; southern hemisphere registry |
-| Unit — templates | `tests/engine/test_templates.py` | `GameContext` default; custom hemisphere; `season()` override in render context |
-| Integration | `tests/engine/test_calendar_conditions.py` | `all`/`any`/`not` composition with calendar predicates |
+| Unit — templates        | `tests/engine/test_templates.py`           | `GameContext` default; custom hemisphere; `season()` override in render context                                           |
+| Integration             | `tests/engine/test_calendar_conditions.py` | `all`/`any`/`not` composition with calendar predicates                                                                    |
 
 ---
 
@@ -1087,7 +1087,7 @@ content/testlandia/regions/conditions/locations/calendar/
 **`calendar.yaml`** (location manifest):
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Location
 metadata:
   name: test-calendar
@@ -1117,7 +1117,7 @@ spec:
 **`test-season-is.yaml`** (demonstrates `season_is`):
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-season-is
@@ -1126,7 +1126,7 @@ spec:
   description: "Locked to the current season."
   unlock:
     type: season_is
-    value: "{{ season(today()) }}"   # This is a template — for illustration only;
+    value: "{{ season(today()) }}" # This is a template — for illustration only;
     # In practice, the unlock uses a static value like "summer".
     # The adventure below uses no gating — instead it demonstrates by running
     # four sub-adventures (one per season, each locked to that season).
@@ -1142,7 +1142,7 @@ More practically, the adventures should use the `all` composition to test multip
 **`test-moon-phase-show.yaml`** (no gating — always available, shows current values):
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-moon-phase-show

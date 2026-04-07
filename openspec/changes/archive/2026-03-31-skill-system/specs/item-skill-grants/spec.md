@@ -123,4 +123,3 @@ All buff refs in `grants_buffs_equipped` and `grants_buffs_held` SHALL be valida
 
 - **WHEN** an Item manifest declares `grants_buffs_equipped: [{buff_ref: thorns, variables: {bad_key: 60}}]` and `thorns` does not declare `bad_key` in its `variables`
 - **THEN** the content loader raises a validation error naming the item and the unknown key
-

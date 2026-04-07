@@ -50,7 +50,7 @@ def _make_player(registry: ContentRegistry) -> CharacterState:
 def _adjust_ticks_adventure(name: str, delta: int) -> AdventureManifest:
     """Build an adventure that fires adjust_game_ticks with the given delta."""
     return AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name=name),
         spec=AdventureSpec(
@@ -301,7 +301,7 @@ async def test_cooldown_ticks_blocks_after_recent_completion(
 ) -> None:
     """An adventure with cooldown_ticks=3 is ineligible immediately after completion."""
     cooldown_adv = AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name="test-cooldown-integration"),
         spec=AdventureSpec(
@@ -346,7 +346,7 @@ async def test_cooldown_ticks_allows_after_enough_ticks_elapsed(
 ) -> None:
     """An adventure with cooldown_ticks=3 becomes eligible after 3 more ticks pass."""
     cooldown_adv = AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name="test-cooldown-allow"),
         spec=AdventureSpec(

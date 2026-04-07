@@ -42,5 +42,78 @@ def export_all_schemas() -> Dict[str, Dict[str, Any]]:
     return {kind: export_schema(kind) for kind in _MANIFEST_MODELS}
 
 
+def export_union_schema() -> Dict[str, Any]:
+    """Return a JSON Schema that accepts any valid Oscilla manifest.
+
+    The schema is a 'kind'-discriminated oneOf union of all registered manifest
+    kind models wrapped in an if/then guard on apiVersion: oscilla/v1. The guard
+    makes the schema a no-op for non-Oscilla YAML files, enabling the **/*.yaml
+    project-wide glob without generating spurious validation errors in files that
+    don't belong to Oscilla.
+
+    The yaml-language-server uses the kind discriminator to narrow validation to
+    the correct model branch while the author is editing.
+    """
+    from typing import Annotated, Union
+
+    from pydantic import Field, RootModel
+
+    from oscilla.engine.models.adventure import AdventureManifest
+    from oscilla.engine.models.buff import BuffManifest
+    from oscilla.engine.models.character_config import CharacterConfigManifest
+    from oscilla.engine.models.enemy import EnemyManifest
+    from oscilla.engine.models.game import GameManifest
+    from oscilla.engine.models.game_class import ClassManifest
+    from oscilla.engine.models.item import ItemManifest
+    from oscilla.engine.models.location import LocationManifest
+    from oscilla.engine.models.loot_table import LootTableManifest
+    from oscilla.engine.models.quest import QuestManifest
+    from oscilla.engine.models.recipe import RecipeManifest
+    from oscilla.engine.models.region import RegionManifest
+    from oscilla.engine.models.skill import SkillManifest
+
+    # The discriminator field is 'kind'; every manifest model uses Literal["<KindName>"]
+    # for its kind field, so Pydantic can generate a proper discriminated oneOf.
+    AnyManifest = RootModel[
+        Annotated[
+            Union[
+                AdventureManifest,
+                BuffManifest,
+                CharacterConfigManifest,
+                ClassManifest,
+                EnemyManifest,
+                GameManifest,
+                ItemManifest,
+                LocationManifest,
+                LootTableManifest,
+                QuestManifest,
+                RecipeManifest,
+                RegionManifest,
+                SkillManifest,
+            ],
+            Field(discriminator="kind"),
+        ]
+    ]
+
+    inner_schema: Dict[str, Any] = dict(AnyManifest.model_json_schema())
+
+    # Wrap in if/then so the schema is a no-op for files that lack apiVersion: oscilla/v1.
+    # $defs must stay at the top level so $ref paths resolve correctly.
+    then_body = {k: v for k, v in inner_schema.items() if k != "$defs"}
+    schema: Dict[str, Any] = {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://oscilla.tedivm.com/schemas/manifest.json",
+        "title": "Oscilla Manifest",
+        "if": {
+            "properties": {"apiVersion": {"const": "oscilla/v1"}},
+            "required": ["apiVersion"],
+        },
+        "then": then_body,
+    }
+    if "$defs" in inner_schema:
+        schema["$defs"] = inner_schema["$defs"]
+    return schema
+
+
 def valid_kinds() -> list[str]:
     return sorted(_MANIFEST_MODELS)

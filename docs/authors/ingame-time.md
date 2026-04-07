@@ -21,7 +21,7 @@ The time system consists of three parts:
 Add a `time:` block to `game.yaml` under `spec`:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Game
 metadata:
   name: my-game
@@ -43,14 +43,14 @@ spec:
 
 ## `time:` Fields at a Glance
 
-| Field | Default | Description |
-|---|---|---|
-| `ticks_per_adventure` | `1` | How many ticks each completed adventure costs. |
-| `base_unit` | `tick` | Display name for a single tick (used in templates). |
-| `pre_epoch_behavior` | `clamp` | How `adjust_game_ticks` handles negative results: `clamp` (floor at 0) or `allow` (allow negative). |
-| `cycles` | `[]` | Ordered list of cycle definitions. At least one `type: ticks` root cycle is required when using the time system. |
-| `epoch` | `{}` | Starting position of the calendar at `game_ticks = 0`. Keys are cycle names; values are label strings or 1-based integers. |
-| `eras` | `[]` | Named counters that activate and increment automatically. |
+| Field                 | Default | Description                                                                                                                |
+| --------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `ticks_per_adventure` | `1`     | How many ticks each completed adventure costs.                                                                             |
+| `base_unit`           | `tick`  | Display name for a single tick (used in templates).                                                                        |
+| `pre_epoch_behavior`  | `clamp` | How `adjust_game_ticks` handles negative results: `clamp` (floor at 0) or `allow` (allow negative).                        |
+| `cycles`              | `[]`    | Ordered list of cycle definitions. At least one `type: ticks` root cycle is required when using the time system.           |
+| `epoch`               | `{}`    | Starting position of the calendar at `game_ticks = 0`. Keys are cycle names; values are label strings or 1-based integers. |
+| `eras`                | `[]`    | Named counters that activate and increment automatically.                                                                  |
 
 ---
 
@@ -117,14 +117,14 @@ eras:
       state: active
 ```
 
-| Field | Description |
-|---|---|
-| `name` | Unique identifier. Used in `game_calendar_era_is` conditions and the `ingame_time.eras` template variable. |
-| `format` | Python `str.format`-style string with `{count}`. |
-| `epoch_count` | Starting counter value, default 1. |
-| `tracks` | Cycle name or alias whose completed cycles increment the counter. |
-| `start_condition` | When first true, sets `era_started_at_ticks` and activates the era. Absent → always active from tick 0. |
-| `end_condition` | When first true after activation, deactivates the era permanently. Absent → era never ends. |
+| Field             | Description                                                                                                |
+| ----------------- | ---------------------------------------------------------------------------------------------------------- |
+| `name`            | Unique identifier. Used in `game_calendar_era_is` conditions and the `ingame_time.eras` template variable. |
+| `format`          | Python `str.format`-style string with `{count}`.                                                           |
+| `epoch_count`     | Starting counter value, default 1.                                                                         |
+| `tracks`          | Cycle name or alias whose completed cycles increment the counter.                                          |
+| `start_condition` | When first true, sets `era_started_at_ticks` and activates the era. Absent → always active from tick 0.    |
+| `end_condition`   | When first true after activation, deactivates the era permanently. Absent → era never ends.                |
 
 Each condition fires **at most once per character iteration** (latch semantics). Once an era ends, it never restarts.
 
@@ -209,28 +209,28 @@ The year is {{ ingame_time.eras['age-of-the-empire'].count }} AE.
 
 ### `ingame_time` attributes
 
-| Attribute | Type | Description |
-|---|---|---|
-| `internal_ticks` | `int` | Monotone tick counter (never adjusted by effects). |
-| `game_ticks` | `int` | Narrative tick counter (may be adjusted by `adjust_game_ticks`). |
-| `cycles` | `dict[str, CycleState]` | All declared cycles, keyed by name and alias. |
-| `eras` | `dict[str, EraState]` | All declared eras, keyed by name. |
+| Attribute        | Type                    | Description                                                      |
+| ---------------- | ----------------------- | ---------------------------------------------------------------- |
+| `internal_ticks` | `int`                   | Monotone tick counter (never adjusted by effects).               |
+| `game_ticks`     | `int`                   | Narrative tick counter (may be adjusted by `adjust_game_ticks`). |
+| `cycles`         | `dict[str, CycleState]` | All declared cycles, keyed by name and alias.                    |
+| `eras`           | `dict[str, EraState]`   | All declared eras, keyed by name.                                |
 
 ### `CycleState` attributes
 
-| Attribute | Description |
-|---|---|
-| `name` | Canonical cycle name. |
-| `position` | 0-based index within the cycle's label list. |
-| `label` | Display string (label at `position`, or `"name N"` if no labels declared). |
+| Attribute  | Description                                                                |
+| ---------- | -------------------------------------------------------------------------- |
+| `name`     | Canonical cycle name.                                                      |
+| `position` | 0-based index within the cycle's label list.                               |
+| `label`    | Display string (label at `position`, or `"name N"` if no labels declared). |
 
 ### `EraState` attributes
 
-| Attribute | Description |
-|---|---|
-| `name` | Era name. |
-| `count` | Current counter value. |
-| `active` | `true` if the era is currently active. |
+| Attribute | Description                            |
+| --------- | -------------------------------------- |
+| `name`    | Era name.                              |
+| `count`   | Current counter value.                 |
+| `active`  | `true` if the era is currently active. |
 
 ---
 
@@ -284,7 +284,7 @@ The deprecated `cooldown_adventures` field maps to `cooldown_ticks` at load time
 ## Complete Minimal Example
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Game
 metadata:
   name: minimal-time-example

@@ -1,10 +1,11 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-date-between
 spec:
   displayName: "Date Between — Condition Check"
-  description: "Always available. Four non-overlapping quarterly windows cover every day of the year so exactly one PASS fires
+  description:
+    "Always available. Four non-overlapping quarterly windows cover every day of the year so exactly one PASS fires
     regardless of the current date. Also tests year-wrapping syntax."
   steps:
     - type: narrative

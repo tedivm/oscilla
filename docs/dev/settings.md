@@ -727,10 +727,10 @@ DATABASE_URL="postgresql+asyncpg://user:password@localhost:5432/oscilla"
 
 ### TUI vs Web Configuration
 
-| Context | Typical setup |
-|---|---|
-| **TUI (standalone game)** | Leave `DATABASE_URL` unset; SQLite file is auto-derived from `games_path`. |
-| **Web (FastAPI server)** | Set `DATABASE_URL` to a PostgreSQL URL via environment variable or Docker secret. |
+| Context                   | Typical setup                                                                     |
+| ------------------------- | --------------------------------------------------------------------------------- |
+| **TUI (standalone game)** | Leave `DATABASE_URL` unset; SQLite file is auto-derived from `games_path`.        |
+| **Web (FastAPI server)**  | Set `DATABASE_URL` to a PostgreSQL URL via environment variable or Docker secret. |
 
 Both contexts share the same `DatabaseSettings` class and migration path, so schema changes apply identically regardless of the backend.
 

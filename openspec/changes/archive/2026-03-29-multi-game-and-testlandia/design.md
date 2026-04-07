@@ -58,8 +58,8 @@ content/                   ← GAMES_PATH default
 
 **Alternatives considered:**
 
-- *Auto-detect*: If `game.yaml` exists directly under the configured root, treat it as single-game mode; otherwise scan subdirs. Rejected — this creates two code paths in the loader and CLI. Any developer who forgets to restructure gets silent single-game behaviour instead of a clear error.
-- *Explicit index file* (`games.yaml` listing enabled packages): Rejected — directory presence is sufficient; an extra manifest introduces ordering/maintenance overhead with no benefit.
+- _Auto-detect_: If `game.yaml` exists directly under the configured root, treat it as single-game mode; otherwise scan subdirs. Rejected — this creates two code paths in the loader and CLI. Any developer who forgets to restructure gets silent single-game behaviour instead of a clear error.
+- _Explicit index file_ (`games.yaml` listing enabled packages): Rejected — directory presence is sufficient; an extra manifest introduces ordering/maintenance overhead with no benefit.
 
 ### D2 — Loader API: `load_games()` Returns a Dict
 
@@ -389,7 +389,7 @@ def add_xp(
     return levels_gained, levels_lost
 ```
 
-**The level-down loop condition:** `xp_thresholds[self.level - 2]` is the XP needed to *enter* the current level (the threshold for `level - 1 → level`). When XP falls below that value, the character loses a level. The loop continues until XP is enough to be at the current level, or until level 1 is reached.
+**The level-down loop condition:** `xp_thresholds[self.level - 2]` is the XP needed to _enter_ the current level (the threshold for `level - 1 → level`). When XP falls below that value, the character loses a level. The loop continues until XP is enough to be at the current level, or until level 1 is reached.
 
 **XP clamping:** After both loops, if `self.xp < 0`, it is set to 0. This handles the case of being at level 1 with low XP and receiving a large negative grant.
 
@@ -537,7 +537,7 @@ No clamping is applied to stat values at runtime — stat-level floors/ceilings 
 #### `game.yaml`
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Game
 metadata:
   name: testlandia
@@ -556,7 +556,7 @@ High base HP (100) reduces the chance of dying during combat tests. High `hp_per
 #### `character_config.yaml`
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: CharacterConfig
 metadata:
   name: testlandia-character
@@ -776,14 +776,14 @@ The full Alembic migration Python code is specified in **D10** above. Summary:
 
 ## Documentation Plan
 
-| Document | Audience | Topics to cover |
-|---|---|---|
-| `README.md` | Players and developers | Rename `CONTENT_PATH` → `GAMES_PATH`; new `--game` CLI flag; multi-game directory layout example; updated `--reset-db` scope note |
-| `docs/dev/game-engine.md` | Engine developers | `load_games()` API; `stat_change`/`stat_set` effect YAML syntax and validation rules; `add_xp()` return type change; level-down mechanics |
-| `docs/dev/settings.md` | Developers | `games_path` setting; `GAMES_PATH` env var; removal of `CONTENT_PATH` |
-| `docs/dev/testing.md` | Developers | Testlandia usage guide: which realm covers which feature; how to run a manual test session; note that Testlandia YAML is never imported in automated tests |
-| `docs/authors/content-authoring.md` | Content authors | New multi-package library structure; `stat_change`/`stat_set` effect reference with typed examples; level-down XP rules |
-| `ROADMAP.md` | All | Integer overflow/underflow as a future hardening item for XP, stats, and inventory quantities |
+| Document                            | Audience               | Topics to cover                                                                                                                                            |
+| ----------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `README.md`                         | Players and developers | Rename `CONTENT_PATH` → `GAMES_PATH`; new `--game` CLI flag; multi-game directory layout example; updated `--reset-db` scope note                          |
+| `docs/dev/game-engine.md`           | Engine developers      | `load_games()` API; `stat_change`/`stat_set` effect YAML syntax and validation rules; `add_xp()` return type change; level-down mechanics                  |
+| `docs/dev/settings.md`              | Developers             | `games_path` setting; `GAMES_PATH` env var; removal of `CONTENT_PATH`                                                                                      |
+| `docs/dev/testing.md`               | Developers             | Testlandia usage guide: which realm covers which feature; how to run a manual test session; note that Testlandia YAML is never imported in automated tests |
+| `docs/authors/content-authoring.md` | Content authors        | New multi-package library structure; `stat_change`/`stat_set` effect reference with typed examples; level-down XP rules                                    |
+| `ROADMAP.md`                        | All                    | Integer overflow/underflow as a future hardening item for XP, stats, and inventory quantities                                                              |
 
 ## Testing Philosophy
 
@@ -793,49 +793,49 @@ Tests never reference `content/`, `content/the-kingdom/`, or `content/testlandia
 
 Construct Pydantic models and `CharacterState` dataclasses directly. No YAML files. No database.
 
-| Test | File | Assertions |
-|---|---|---|
-| `add_xp` level-down basic | `tests/engine/test_character.py` | Given `level=3`, `xp=250`, applying `-200` XP crosses back below `xp_thresholds[1]` → `levels_lost=[3]`, `level=2` |
-| `add_xp` level-down multi-level | same | Applying enough negative XP to drop two levels → `levels_lost=[3, 2]` in correct order |
-| `add_xp` XP floor clamp | same | At `level=1, xp=10`, apply `-999` → `xp=0`, `level=1`, `levels_lost=[]` |
-| `add_xp` HP clamped after de-level | same | `hp > new_max_hp` after de-level → `hp == new_max_hp` |
-| `add_xp` level-up unchanged | same | Positive XP still produces `levels_gained`, `levels_lost=[]` |
-| `add_xp` no crossing | same | Small negative XP, still above threshold for current level → `([], [])` |
-| `add_xp` return type | same | Return value is `tuple[List[int], List[int]]` not bare list |
-| `StatChangeEffect` non-zero validator | `tests/engine/test_stat_effects.py` (new) | `amount=0` raises `ValidationError` |
-| `StatSetEffect` construction | same | Accepts `int`, `float`, `bool`, `str`, `None` for `value` |
-| `Effect` discriminator routing | same | YAML `type: stat_change` deserializes to `StatChangeEffect`; `type: stat_set` to `StatSetEffect` |
+| Test                                  | File                                      | Assertions                                                                                                         |
+| ------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `add_xp` level-down basic             | `tests/engine/test_character.py`          | Given `level=3`, `xp=250`, applying `-200` XP crosses back below `xp_thresholds[1]` → `levels_lost=[3]`, `level=2` |
+| `add_xp` level-down multi-level       | same                                      | Applying enough negative XP to drop two levels → `levels_lost=[3, 2]` in correct order                             |
+| `add_xp` XP floor clamp               | same                                      | At `level=1, xp=10`, apply `-999` → `xp=0`, `level=1`, `levels_lost=[]`                                            |
+| `add_xp` HP clamped after de-level    | same                                      | `hp > new_max_hp` after de-level → `hp == new_max_hp`                                                              |
+| `add_xp` level-up unchanged           | same                                      | Positive XP still produces `levels_gained`, `levels_lost=[]`                                                       |
+| `add_xp` no crossing                  | same                                      | Small negative XP, still above threshold for current level → `([], [])`                                            |
+| `add_xp` return type                  | same                                      | Return value is `tuple[List[int], List[int]]` not bare list                                                        |
+| `StatChangeEffect` non-zero validator | `tests/engine/test_stat_effects.py` (new) | `amount=0` raises `ValidationError`                                                                                |
+| `StatSetEffect` construction          | same                                      | Accepts `int`, `float`, `bool`, `str`, `None` for `value`                                                          |
+| `Effect` discriminator routing        | same                                      | YAML `type: stat_change` deserializes to `StatChangeEffect`; `type: stat_set` to `StatSetEffect`                   |
 
 ### Tier 2 — Loader Integration Tests (inline fixture YAMLs)
 
 Use minimal YAML files in `tests/fixtures/content/<scenario>/`. Never use `load_games(settings.games_path)` — always pass the fixture directory directly.
 
-| Test | Fixture dir | What is verified |
-|---|---|---|
-| `load_games` returns two registries | `tests/fixtures/content/multi-game-library/` | Two subdirs with valid `game.yaml`; returns `{"test-alpha": registry, "test-beta": registry}` |
-| `load_games` skips non-game subdirs | same (add an `extras/` dir with no `game.yaml`) | `extras/` is absent from the result dict |
-| `load_games` single-game library | `tests/fixtures/content/single-game-library/` | Returns dict with one entry |
-| `load_games` empty library | `tests/fixtures/content/empty-library/` | Returns `{}` |
-| `load_games` propagates errors with prefix | `tests/fixtures/content/broken-game-library/` | `ContentLoadError` message includes the package dir name as prefix |
-| `stat_change` valid int stat | `tests/fixtures/content/stat-effects/` | Adventure with `stat_change: strength, amount: 1` loads without errors |
-| `stat_change` on bool stat → error | same | `stat_change` targeting a `bool` stat emits a `LoadError` for wrong type |
-| `stat_change` unknown stat → error | same | Stat name not in `CharacterConfig` emits a `LoadError` |
-| `stat_set` valid any-type assignment | same | `stat_set` targeting `str`, `bool`, `int`, `float` all load cleanly |
-| `stat_set` type-incompatible value → error | same | Assigning `"hello"` to an `int` stat emits a `LoadError` |
-| `stat_set` unknown stat → error | same | Unknown name emits `LoadError` |
-| `stat_set` null value on nullable stat | same | `null` assigned to a stat with `default: null` loads cleanly |
+| Test                                       | Fixture dir                                     | What is verified                                                                              |
+| ------------------------------------------ | ----------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `load_games` returns two registries        | `tests/fixtures/content/multi-game-library/`    | Two subdirs with valid `game.yaml`; returns `{"test-alpha": registry, "test-beta": registry}` |
+| `load_games` skips non-game subdirs        | same (add an `extras/` dir with no `game.yaml`) | `extras/` is absent from the result dict                                                      |
+| `load_games` single-game library           | `tests/fixtures/content/single-game-library/`   | Returns dict with one entry                                                                   |
+| `load_games` empty library                 | `tests/fixtures/content/empty-library/`         | Returns `{}`                                                                                  |
+| `load_games` propagates errors with prefix | `tests/fixtures/content/broken-game-library/`   | `ContentLoadError` message includes the package dir name as prefix                            |
+| `stat_change` valid int stat               | `tests/fixtures/content/stat-effects/`          | Adventure with `stat_change: strength, amount: 1` loads without errors                        |
+| `stat_change` on bool stat → error         | same                                            | `stat_change` targeting a `bool` stat emits a `LoadError` for wrong type                      |
+| `stat_change` unknown stat → error         | same                                            | Stat name not in `CharacterConfig` emits a `LoadError`                                        |
+| `stat_set` valid any-type assignment       | same                                            | `stat_set` targeting `str`, `bool`, `int`, `float` all load cleanly                           |
+| `stat_set` type-incompatible value → error | same                                            | Assigning `"hello"` to an `int` stat emits a `LoadError`                                      |
+| `stat_set` unknown stat → error            | same                                            | Unknown name emits `LoadError`                                                                |
+| `stat_set` null value on nullable stat     | same                                            | `null` assigned to a stat with `default: null` loads cleanly                                  |
 
 ### Tier 3 — Persistence Tests (in-memory SQLite)
 
 Use the test database fixture (memory-backed SQLite) and the FastAPI/service fixture chain defined in `tests/conftest.py` and `tests/engine/conftest.py`.
 
-| Test | File | Assertions |
-|---|---|---|
-| Character isolation across games | `tests/engine/test_character_persistence.py` | Two characters named `"hero"` in games `"test-alpha"` and `"test-beta"` coexist; UNIQUE constraint not violated |
-| `get_character_by_name` game scoped | same | Returns correct character when `game_name` matches; returns `None` for wrong `game_name` |
-| `list_characters_for_user` game scoped | same | Returns only characters belonging to the specified `game_name` |
-| `delete_user_characters` game scoped | same | Deletes characters from `"test-alpha"` only; `"test-beta"` characters survive |
-| Migration upgrade/downgrade | Alembic test or separate migration test | `upgrade()` runs cleanly on empty DB; `downgrade()` removes the column and restores the old constraint |
+| Test                                   | File                                         | Assertions                                                                                                      |
+| -------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Character isolation across games       | `tests/engine/test_character_persistence.py` | Two characters named `"hero"` in games `"test-alpha"` and `"test-beta"` coexist; UNIQUE constraint not violated |
+| `get_character_by_name` game scoped    | same                                         | Returns correct character when `game_name` matches; returns `None` for wrong `game_name`                        |
+| `list_characters_for_user` game scoped | same                                         | Returns only characters belonging to the specified `game_name`                                                  |
+| `delete_user_characters` game scoped   | same                                         | Deletes characters from `"test-alpha"` only; `"test-beta"` characters survive                                   |
+| Migration upgrade/downgrade            | Alembic test or separate migration test      | `upgrade()` runs cleanly on empty DB; `downgrade()` removes the column and restores the old constraint          |
 
 ### Fixture File Structure
 

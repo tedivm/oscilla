@@ -745,13 +745,13 @@ This project uses [uv](https://docs.astral.sh/uv/) as the primary package manage
 
 ### Commands Comparison
 
-| Task | pip | uv |
-|------|-----|-----|
-| Install package | `pip install package` | `uv pip install package` |
-| Create venv | `python -m venv .venv` | `uv venv` |
-| Install Python | Requires pyenv/installer | `uv venv --python 3.14` (auto-downloads) |
-| Compile requirements | Requires pip-tools | `uv pip compile` (built-in) |
-| Speed | Baseline | 10-100x faster |
+| Task                 | pip                      | uv                                       |
+| -------------------- | ------------------------ | ---------------------------------------- |
+| Install package      | `pip install package`    | `uv pip install package`                 |
+| Create venv          | `python -m venv .venv`   | `uv venv`                                |
+| Install Python       | Requires pyenv/installer | `uv venv --python 3.14` (auto-downloads) |
+| Compile requirements | Requires pip-tools       | `uv pip compile` (built-in)              |
+| Speed                | Baseline                 | 10-100x faster                           |
 
 ## References
 

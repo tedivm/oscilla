@@ -11,7 +11,7 @@ This means you learn conditions once, and everything clicks into place.
 Here's a simple adventure that requires the player to be at least level 3:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: haunted-cellar
@@ -78,7 +78,7 @@ True when the player holds a certain item — counting both stackable piles and 
 requires:
   type: item
   item_ref: ancient-key
-  quantity: 1    # default is 1 if omitted
+  quantity: 1 # default is 1 if omitted
 ```
 
 ### Character Stat
@@ -215,15 +215,15 @@ Calendar conditions gate content on the real-world date and time. All eight pred
 
 True when the current real-world season matches. Uses meteorological seasons (not astronomical). The hemisphere is determined by `season_hemisphere` in `game.yaml` (default `northern`).
 
-| Hemisphere | spring | summer | autumn | winter |
-|---|---|---|---|---|
-| northern | Mar–May | Jun–Aug | Sep–Nov | Dec–Feb |
-| southern | Sep–Nov | Dec–Feb | Mar–May | Jun–Aug |
+| Hemisphere | spring  | summer  | autumn  | winter  |
+| ---------- | ------- | ------- | ------- | ------- |
+| northern   | Mar–May | Jun–Aug | Sep–Nov | Dec–Feb |
+| southern   | Sep–Nov | Dec–Feb | Mar–May | Jun–Aug |
 
 ```yaml
 requires:
   type: season_is
-  value: spring    # spring | summer | autumn | winter
+  value: spring # spring | summer | autumn | winter
 ```
 
 ### moon_phase_is
@@ -437,7 +437,7 @@ requires:
       quantity: 1
 ```
 
-This adventure is only available to level 10+ players who have found the map *and* are carrying a lantern. All three must be true.
+This adventure is only available to level 10+ players who have found the map _and_ are carrying a lantern. All three must be true.
 
 ### Any (OR) — at least one must pass
 
@@ -453,7 +453,7 @@ requires:
       quantity: 1
 ```
 
-The door can be broken down by a strong character *or* by anyone with a battering ram.
+The door can be broken down by a strong character _or_ by anyone with a battering ram.
 
 ### Not — inverts the result
 
@@ -465,7 +465,7 @@ unlock:
     name: "village-destroyed"
 ```
 
-The location is open only if the village has *not* been destroyed. `not` takes a single `condition`, not a list.
+The location is open only if the village has _not_ been destroyed. `not` takes a single `condition`, not a list.
 
 ### Nesting
 
@@ -487,16 +487,16 @@ requires:
 
 ## Where Conditions Appear
 
-| Location | Field | Purpose |
-|---|---|---|
-| Adventure | `requires` | Gates whether the adventure appears at all |
-| Location | `unlock` | Gates whether the location is accessible |
-| Region | `unlock` | Gates whether the region is accessible |
-| Choice option | `requires` | Hides the option unless condition passes |
-| Stat check step | `condition` | Determines which branch runs |
-| Item equip | `equip.requires` | Prevents equipping unless condition passes |
-| Skill activation | `requires` | Blocks skill use if condition fails |
-| Passive effects | `condition` | Applies bonus only while condition holds |
+| Location         | Field            | Purpose                                    |
+| ---------------- | ---------------- | ------------------------------------------ |
+| Adventure        | `requires`       | Gates whether the adventure appears at all |
+| Location         | `unlock`         | Gates whether the location is accessible   |
+| Region           | `unlock`         | Gates whether the region is accessible     |
+| Choice option    | `requires`       | Hides the option unless condition passes   |
+| Stat check step  | `condition`      | Determines which branch runs               |
+| Item equip       | `equip.requires` | Prevents equipping unless condition passes |
+| Skill activation | `requires`       | Blocks skill use if condition fails        |
+| Passive effects  | `condition`      | Applies bonus only while condition holds   |
 
 ---
 
@@ -504,47 +504,47 @@ requires:
 
 ### All Condition Types
 
-| Type | Required fields | Optional fields | Notes |
-|---|---|---|---|
-| `level` | `value` | — | True when player level ≥ value |
-| `milestone` | `name` | — | True when player holds the milestone |
-| `item` | `item_ref` | `quantity` (default 1) | Checks inventory count ≥ quantity |
-| `character_stat` | `stat`, one operator | `stat_source` | Operators: `gte`, `lte`, `eq`, `gt`, `lt` |
-| `item_equipped` | `item` | — | Checks a specific item is equipped |
-| `item_held_label` | `label` | — | Any inventory item has this label |
-| `any_item_equipped` | `label` | — | Any equipped item has this label |
-| `skill` | `skill_ref` | `mode` (default `learned`) | `mode`: `learned` or `available` |
-| `enemies_defeated` | `name`, one operator | — | Operators: `gte`, `lte`, `eq`, `gt`, `lt` |
-| `locations_visited` | `name`, one operator | — | Operators: `gte`, `lte`, `eq`, `gt`, `lt` |
-| `adventures_completed` | `name`, one operator | — | Operators: `gte`, `lte`, `eq`, `gt`, `lt` |
-| `prestige_count` | one operator | — | Operators: `gte`, `lte`, `eq`, `gt`, `lt` |
-| `all` | `conditions` | — | All child conditions must pass (AND) |
-| `any` | `conditions` | — | Any child condition must pass (OR) |
-| `not` | `condition` | — | Inverts the single child condition |
-| `season_is` | `value` | — | True when meteorological season matches; `spring` \| `summer` \| `autumn` \| `winter` |
-| `moon_phase_is` | `value` | — | True when lunar phase matches (approximate ±1 day) |
-| `zodiac_is` | `value` | — | True when Western zodiac sign matches today's date |
-| `chinese_zodiac_is` | `value` | — | True when Chinese zodiac animal matches the current year |
-| `month_is` | `value` | — | Integer 1–12 or full English month name |
-| `day_of_week_is` | `value` | — | Integer 0–6 (Mon=0) or full English weekday name |
-| `date_is` | `month`, `day` | `year` | Annual when `year` omitted; one-off when `year` included |
-| `date_between` | `start`, `end` | — | Each has `month` + `day`; wraps year boundary when `start` > `end` |
-| `time_between` | `start`, `end` | — | `HH:MM` 24-hour format; wraps midnight when `start` > `end` |
+| Type                   | Required fields      | Optional fields            | Notes                                                                                 |
+| ---------------------- | -------------------- | -------------------------- | ------------------------------------------------------------------------------------- |
+| `level`                | `value`              | —                          | True when player level ≥ value                                                        |
+| `milestone`            | `name`               | —                          | True when player holds the milestone                                                  |
+| `item`                 | `item_ref`           | `quantity` (default 1)     | Checks inventory count ≥ quantity                                                     |
+| `character_stat`       | `stat`, one operator | `stat_source`              | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                             |
+| `item_equipped`        | `item`               | —                          | Checks a specific item is equipped                                                    |
+| `item_held_label`      | `label`              | —                          | Any inventory item has this label                                                     |
+| `any_item_equipped`    | `label`              | —                          | Any equipped item has this label                                                      |
+| `skill`                | `skill_ref`          | `mode` (default `learned`) | `mode`: `learned` or `available`                                                      |
+| `enemies_defeated`     | `name`, one operator | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                             |
+| `locations_visited`    | `name`, one operator | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                             |
+| `adventures_completed` | `name`, one operator | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                             |
+| `prestige_count`       | one operator         | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                             |
+| `all`                  | `conditions`         | —                          | All child conditions must pass (AND)                                                  |
+| `any`                  | `conditions`         | —                          | Any child condition must pass (OR)                                                    |
+| `not`                  | `condition`          | —                          | Inverts the single child condition                                                    |
+| `season_is`            | `value`              | —                          | True when meteorological season matches; `spring` \| `summer` \| `autumn` \| `winter` |
+| `moon_phase_is`        | `value`              | —                          | True when lunar phase matches (approximate ±1 day)                                    |
+| `zodiac_is`            | `value`              | —                          | True when Western zodiac sign matches today's date                                    |
+| `chinese_zodiac_is`    | `value`              | —                          | True when Chinese zodiac animal matches the current year                              |
+| `month_is`             | `value`              | —                          | Integer 1–12 or full English month name                                               |
+| `day_of_week_is`       | `value`              | —                          | Integer 0–6 (Mon=0) or full English weekday name                                      |
+| `date_is`              | `month`, `day`       | `year`                     | Annual when `year` omitted; one-off when `year` included                              |
+| `date_between`         | `start`, `end`       | —                          | Each has `month` + `day`; wraps year boundary when `start` > `end`                    |
+| `time_between`         | `start`, `end`       | —                          | `HH:MM` 24-hour format; wraps midnight when `start` > `end`                           |
 
 ### `stat_source` Values
 
-| Value | Meaning |
-|---|---|
-| `effective` (default) | Base stat + all equipment bonuses |
-| `base` | Raw stat only, ignoring equipped-item modifiers |
+| Value                 | Meaning                                         |
+| --------------------- | ----------------------------------------------- |
+| `effective` (default) | Base stat + all equipment bonuses               |
+| `base`                | Raw stat only, ignoring equipped-item modifiers |
 
 ### Skill Condition `mode` Values
 
-| Value | Meaning |
-|---|---|
-| `learned` (default) | Skill is in the player's permanent `known_skills` |
-| `available` | Skill is usable right now (includes item-granted skills) |
+| Value               | Meaning                                                  |
+| ------------------- | -------------------------------------------------------- |
+| `learned` (default) | Skill is in the player's permanent `known_skills`        |
+| `available`         | Skill is usable right now (includes item-granted skills) |
 
 ---
 
-*Next: [Effects](./effects.md) — how to change game state.*
+_Next: [Effects](./effects.md) — how to change game state._

@@ -1,14 +1,16 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: full-reset
 spec:
   displayName: "Full Character Reset"
-  description: "WARNING: Completely resets character to starting state — clears all skills, dispels all buffs, removes all
+  description:
+    "WARNING: Completely resets character to starting state — clears all skills, dispels all buffs, removes all
     items, and resets stats to defaults."
   steps:
     - type: narrative
-      text: "A strange mystical energy washes over you. When it clears, everything feels... different. You are as you were
+      text:
+        "A strange mystical energy washes over you. When it clears, everything feels... different. You are as you were
         when you first arrived in Testlandia."
       effects:
         - type: dispel

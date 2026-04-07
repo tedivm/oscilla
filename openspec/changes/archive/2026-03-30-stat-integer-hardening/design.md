@@ -583,10 +583,10 @@ No rollback strategy is defined: no deployed instances exist and this is a devel
 
 ## Documentation Plan
 
-| Document | Audience | Topics to Cover |
-|---|---|---|
+| Document                            | Audience        | Topics to Cover                                                                                                                                                                                                                                                                                                                                                                                               |
+| ----------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `docs/authors/content-authoring.md` | Content authors | Remove `float` from the stat type reference table; add a `bounds` subsection under stat definitions covering YAML syntax, what happens when bounds are omitted (defaults to INT64 range), the clamp+notify behavior when a stat would violate its bounds, and a concrete YAML example for a gold stat with `min: 0`; add a note that specifying `bounds` on a `bool` stat is an error caught at content load. |
-| `docs/dev/game-engine.md` | Developers | Update the stat type system section: document that `StatType` is now `Literal["int", "bool"]`; describe the `StatBounds` model and its fields; explain the two-tier enforcement (effects.py + CharacterState backstop); note the INT64 default range and why it was chosen (PostgreSQL `BigInteger`/`BIGINT` column ceiling). |
+| `docs/dev/game-engine.md`           | Developers      | Update the stat type system section: document that `StatType` is now `Literal["int", "bool"]`; describe the `StatBounds` model and its fields; explain the two-tier enforcement (effects.py + CharacterState backstop); note the INT64 default range and why it was chosen (PostgreSQL `BigInteger`/`BIGINT` column ceiling).                                                                                 |
 
 ## Testing Philosophy
 
@@ -662,7 +662,7 @@ def test_int_stat_with_bounds_is_valid() -> None:
 
 **Target file:** `tests/engine/test_character.py` (new or added to existing file).
 
-The test constructs a minimal `CharacterState` directly using the dataclass —  no registry or YAML needed.
+The test constructs a minimal `CharacterState` directly using the dataclass — no registry or YAML needed.
 
 ```python
 from uuid import uuid4
@@ -758,7 +758,7 @@ def _make_bounded_registry(bounds: StatBounds | None = None) -> ...:
         ]
     )
     config = CharacterConfigManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="CharacterConfig",
         metadata={"name": "test-config"},
         spec=spec,
@@ -847,7 +847,7 @@ def test_loader_rejects_float_stat_type(tmp_path: Path) -> None:
     """A CharacterConfig with type: float is rejected at parse/load time."""
     (tmp_path / "game.yaml").write_text(MINIMAL_GAME_YAML)
     (tmp_path / "char.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: CharacterConfig
 metadata:
   name: test-config
@@ -865,7 +865,7 @@ def test_loader_rejects_bounds_on_bool_stat(tmp_path: Path) -> None:
     """A CharacterConfig with bounds on a bool stat is rejected at load time."""
     (tmp_path / "game.yaml").write_text(MINIMAL_GAME_YAML)
     (tmp_path / "char.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: CharacterConfig
 metadata:
   name: test-config
@@ -884,19 +884,19 @@ spec:
 
 The `MINIMAL_GAME_YAML` constant already exists in the test file (added as part of earlier `test_str_stat_type_rejected` test setup).
 
-| Test | What it verifies |
-|---|---|
-| `test_stat_bounds_min_gt_max_raises` | `StatBounds(min=10, max=5)` → `ValidationError` |
-| `test_bounds_on_bool_stat_raises` | `StatDefinition(type="bool", bounds=...)` → `ValidationError` |
-| `test_stat_bounds_absent_is_valid` | No `bounds` field on int stat → valid |
-| `test_stat_bounds_min_only_is_valid` | `StatBounds(min=0)` with `max=None` → valid |
-| `test_float_stat_type_rejected` | `StatDefinition(type="float")` → `ValidationError` |
-| `test_set_stat_clamps_above_int32_max` | `set_stat("gold", INT64_MAX + 1)` → stores INT64_MAX, logs warning |
-| `test_set_stat_clamps_below_int32_min` | `set_stat("gold", INT64_MIN - 1)` → stores INT64_MIN, logs warning |
-| `test_set_stat_within_range_is_unchanged` | `set_stat("gold", 500)` → stores 500 exactly |
-| `test_stat_change_clamps_to_content_max` | Delta exceeds bounds.max → clamped, TUI warning shown |
-| `test_stat_change_clamps_to_content_min` | Delta goes below bounds.min → clamped, TUI warning shown |
-| `test_stat_set_clamps_to_content_max` | stat_set value exceeds bounds.max → clamped |
-| `test_stat_change_within_bounds_is_unchanged` | In-range delta applied exactly |
-| `test_loader_rejects_float_stat_type` | Content with `type: float` → `ContentLoadError` |
-| `test_loader_rejects_bounds_on_bool_stat` | Content with bounds on bool stat → `ContentLoadError` |
+| Test                                          | What it verifies                                                   |
+| --------------------------------------------- | ------------------------------------------------------------------ |
+| `test_stat_bounds_min_gt_max_raises`          | `StatBounds(min=10, max=5)` → `ValidationError`                    |
+| `test_bounds_on_bool_stat_raises`             | `StatDefinition(type="bool", bounds=...)` → `ValidationError`      |
+| `test_stat_bounds_absent_is_valid`            | No `bounds` field on int stat → valid                              |
+| `test_stat_bounds_min_only_is_valid`          | `StatBounds(min=0)` with `max=None` → valid                        |
+| `test_float_stat_type_rejected`               | `StatDefinition(type="float")` → `ValidationError`                 |
+| `test_set_stat_clamps_above_int32_max`        | `set_stat("gold", INT64_MAX + 1)` → stores INT64_MAX, logs warning |
+| `test_set_stat_clamps_below_int32_min`        | `set_stat("gold", INT64_MIN - 1)` → stores INT64_MIN, logs warning |
+| `test_set_stat_within_range_is_unchanged`     | `set_stat("gold", 500)` → stores 500 exactly                       |
+| `test_stat_change_clamps_to_content_max`      | Delta exceeds bounds.max → clamped, TUI warning shown              |
+| `test_stat_change_clamps_to_content_min`      | Delta goes below bounds.min → clamped, TUI warning shown           |
+| `test_stat_set_clamps_to_content_max`         | stat_set value exceeds bounds.max → clamped                        |
+| `test_stat_change_within_bounds_is_unchanged` | In-range delta applied exactly                                     |
+| `test_loader_rejects_float_stat_type`         | Content with `type: float` → `ContentLoadError`                    |
+| `test_loader_rejects_bounds_on_bool_stat`     | Content with bounds on bool stat → `ContentLoadError`              |

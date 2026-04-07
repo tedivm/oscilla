@@ -234,7 +234,7 @@ def derive_tui_user_key() -> str:
     return f"{user}@{socket.gethostname()}"
 ```
 
-`users.user_key` has a UNIQUE constraint. `get_or_create_user(session, user_key)` uses an `INSERT ... ON CONFLICT DO NOTHING` upsert so concurrent first-creates are safe. The `--character-name` CLI flag sets the *character name*, not the user key.
+`users.user_key` has a UNIQUE constraint. `get_or_create_user(session, user_key)` uses an `INSERT ... ON CONFLICT DO NOTHING` upsert so concurrent first-creates are safe. The `--character-name` CLI flag sets the _character name_, not the user key.
 
 ### D8: `users` table with deferred web population
 
@@ -273,17 +273,17 @@ Old iteration rows are never deleted. This enables aggregate queries (total XP e
 
 `save_character()` is used only for the initial INSERT (creating a new `CharacterRecord`, the first `CharacterIterationRecord`, and seeding all child rows with defaults). All subsequent updates use dedicated service functions scoped to the data domain that changed:
 
-| Domain | Service function | Table written |
-|---|---|---|
-| Scalar run fields (`level`, `xp`, `hp`, `current_location`, …) | `update_scalar_fields()` | `character_iterations` — triggers `version_id_col` increment |
-| One content-defined stat | `set_stat()` | One `character_iteration_stat_values` upsert |
-| One inventory stack | `set_inventory_item()` | One `character_iteration_inventory` upsert or delete |
-| One equipment slot | `equip_item()` / `unequip_item()` | One `character_iteration_equipment` upsert or delete |
-| One milestone | `add_milestone()` | One `character_iteration_milestones` insert |
-| One quest | `set_quest()` | One `character_iteration_quests` upsert |
-| One entity counter | `increment_statistic()` | One `character_iteration_statistics` upsert-increment |
-| Active adventure progress | `save_adventure_progress()` | `character_iterations` — only function that touches `adventure_step_state` (JSON) |
-| Character last-played timestamp | `touch_character_updated_at()` | `characters.updated_at` — refreshed at `adventure_end` and on prestige |
+| Domain                                                         | Service function                  | Table written                                                                     |
+| -------------------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------- |
+| Scalar run fields (`level`, `xp`, `hp`, `current_location`, …) | `update_scalar_fields()`          | `character_iterations` — triggers `version_id_col` increment                      |
+| One content-defined stat                                       | `set_stat()`                      | One `character_iteration_stat_values` upsert                                      |
+| One inventory stack                                            | `set_inventory_item()`            | One `character_iteration_inventory` upsert or delete                              |
+| One equipment slot                                             | `equip_item()` / `unequip_item()` | One `character_iteration_equipment` upsert or delete                              |
+| One milestone                                                  | `add_milestone()`                 | One `character_iteration_milestones` insert                                       |
+| One quest                                                      | `set_quest()`                     | One `character_iteration_quests` upsert                                           |
+| One entity counter                                             | `increment_statistic()`           | One `character_iteration_statistics` upsert-increment                             |
+| Active adventure progress                                      | `save_adventure_progress()`       | `character_iterations` — only function that touches `adventure_step_state` (JSON) |
+| Character last-played timestamp                                | `touch_character_updated_at()`    | `characters.updated_at` — refreshed at `adventure_end` and on prestige            |
 
 `GameSession._on_state_change()` holds a `_last_saved_state: CharacterState | None` snapshot of the last successfully persisted state. On each `PersistCallback` event it diffs the incoming state against the snapshot and calls only the targeted write functions for fields that differ. Stable data (milestone set, completed quests, unchanged stats) is never re-written during the adventure. At `adventure_end`, `_on_state_change()` also calls `touch_character_updated_at(session, character_id)` so that `list_characters_for_user()` reflects the most recent session. `prestige_character()` likewise updates `characters.updated_at`.
 
@@ -752,11 +752,11 @@ def _enable_wal_if_sqlite(engine: AsyncEngine) -> None:
 
 `to_dict()` returns a single `Dict[str, Any]` passable directly to `json.dumps()`. Python-specific types are normalized to JSON primitives:
 
-| Python type | JSON representation |
-|---|---|
-| `UUID` | string (`"3fa85f64-…"`) |
-| `set[str]` | sorted `list[str]` (deterministic output) |
-| `AdventurePosition` | `{"adventure_ref": str, "step_index": int, "step_state": dict}` |
+| Python type           | JSON representation                                                                |
+| --------------------- | ---------------------------------------------------------------------------------- |
+| `UUID`                | string (`"3fa85f64-…"`)                                                            |
+| `set[str]`            | sorted `list[str]` (deterministic output)                                          |
+| `AdventurePosition`   | `{"adventure_ref": str, "step_index": int, "step_state": dict}`                    |
 | `CharacterStatistics` | `{"enemies_defeated": {…}, "locations_visited": {…}, "adventures_completed": {…}}` |
 
 Example output for a character mid-adventure on iteration 0:
@@ -773,20 +773,20 @@ Example output for a character mid-adventure on iteration 0:
   "max_hp": 50,
   "current_location": "dungeon-entrance",
   "milestones": ["found-the-map", "slew-first-goblin"],
-  "inventory": {"iron-sword": 1, "healing-potion": 3},
-  "equipment": {"main_hand": "iron-sword"},
-  "active_quests": {"retrieve-the-relic": "descended-into-dungeon"},
+  "inventory": { "iron-sword": 1, "healing-potion": 3 },
+  "equipment": { "main_hand": "iron-sword" },
+  "active_quests": { "retrieve-the-relic": "descended-into-dungeon" },
   "completed_quests": ["training-grounds"],
-  "stats": {"strength": 14, "dexterity": 9, "intelligence": 6},
+  "stats": { "strength": 14, "dexterity": 9, "intelligence": 6 },
   "statistics": {
-    "enemies_defeated": {"goblin": 7, "wolf": 2},
-    "locations_visited": {"dungeon-entrance": 3},
-    "adventures_completed": {"scouting-run": 1}
+    "enemies_defeated": { "goblin": 7, "wolf": 2 },
+    "locations_visited": { "dungeon-entrance": 3 },
+    "adventures_completed": { "scouting-run": 1 }
   },
   "active_adventure": {
     "adventure_ref": "goblin-ambush",
     "step_index": 2,
-    "step_state": {"enemy_hp": 12}
+    "step_state": { "enemy_hp": 12 }
   }
 }
 ```
@@ -1303,18 +1303,18 @@ Rollback: `alembic downgrade -1` drops all nine tables (they are created in a si
 
 ## Open Questions
 
-*None — all design questions resolved during exploration.*
+_None — all design questions resolved during exploration._
 
 ---
 
 ## Documentation Plan
 
-| Document | Audience | Topics to Cover |
-|---|---|---|
-| `docs/dev/database.md` (update existing) | Developers | Three-table schema overview with ER diagram; column layout rationale (hybrid scalar/JSON); prestige iteration lifecycle; migration workflow; optimistic locking behavior and retry; SQLite WAL mode |
+| Document                                    | Audience   | Topics to Cover                                                                                                                                                                                                     |
+| ------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/dev/database.md` (update existing)    | Developers | Three-table schema overview with ER diagram; column layout rationale (hybrid scalar/JSON); prestige iteration lifecycle; migration workflow; optimistic locking behavior and retry; SQLite WAL mode                 |
 | `docs/dev/game-engine.md` (update existing) | Developers | `GameSession` class and lifecycle; `PersistCallback` protocol and event taxonomy (`step_start`, `combat_round`, `adventure_end`); `CharacterState.to_dict()` / `from_dict()` API; content-drift resilience behavior |
-| `docs/dev/settings.md` (update existing) | Developers | Auto-derive SQLite URL behavior; `DATABASE_URL` env var override; `content_path` setting; TUI vs web configuration differences |
-| `docs/dev/cli.md` (update existing) | Developers | `--character-name` flag; character selection flow (0/1/N logic); user identity derivation (`USER@hostname`) |
+| `docs/dev/settings.md` (update existing)    | Developers | Auto-derive SQLite URL behavior; `DATABASE_URL` env var override; `content_path` setting; TUI vs web configuration differences                                                                                      |
+| `docs/dev/cli.md` (update existing)         | Developers | `--character-name` flag; character selection flow (0/1/N logic); user identity derivation (`USER@hostname`)                                                                                                         |
 
 ---
 
@@ -1326,23 +1326,23 @@ Fixtures: construct `CharacterState`, `CharacterConfigManifest`, and content mod
 
 **`tests/engine/test_character_persistence.py`**
 
-| Test | What it verifies |
-|---|---|
-| `test_to_dict_round_trip` | `CharacterState.to_dict()` produces JSON-serializable output with all fields present |
-| `test_from_dict_matching_config` | `from_dict()` with matching config produces an identical state |
-| `test_from_dict_new_stat_added` | Stat present in config but absent from save → gets default value (drift: add) |
-| `test_from_dict_stat_removed` | Stat present in save but absent from config → dropped from result (drift: drop) |
-| `test_from_dict_removed_stat_logs_warning` | Dropped stat key → `WARNING` is logged per key |
-| `test_from_dict_unknown_adventure_ref` | Unknown `active_adventure.adventure_ref` → `active_adventure = None`, WARNING logged |
+| Test                                       | What it verifies                                                                     |
+| ------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `test_to_dict_round_trip`                  | `CharacterState.to_dict()` produces JSON-serializable output with all fields present |
+| `test_from_dict_matching_config`           | `from_dict()` with matching config produces an identical state                       |
+| `test_from_dict_new_stat_added`            | Stat present in config but absent from save → gets default value (drift: add)        |
+| `test_from_dict_stat_removed`              | Stat present in save but absent from config → dropped from result (drift: drop)      |
+| `test_from_dict_removed_stat_logs_warning` | Dropped stat key → `WARNING` is logged per key                                       |
+| `test_from_dict_unknown_adventure_ref`     | Unknown `active_adventure.adventure_ref` → `active_adventure = None`, WARNING logged |
 
 **`tests/engine/test_pipeline_persist.py`**
 
-| Test | What it verifies |
-|---|---|
-| `test_no_callback_runs_clean` | Pipeline with `on_state_change=None` completes without error |
-| `test_step_start_fires` | `"step_start"` callback fires before each step dispatch (N steps → N calls) |
-| `test_combat_round_fires` | `"combat_round"` fires after each combat round (M rounds → M calls) |
-| `test_adventure_end_fires` | `"adventure_end"` fires exactly once, after `active_adventure` is cleared |
+| Test                          | What it verifies                                                            |
+| ----------------------------- | --------------------------------------------------------------------------- |
+| `test_no_callback_runs_clean` | Pipeline with `on_state_change=None` completes without error                |
+| `test_step_start_fires`       | `"step_start"` callback fires before each step dispatch (N steps → N calls) |
+| `test_combat_round_fires`     | `"combat_round"` fires after each combat round (M rounds → M calls)         |
+| `test_adventure_end_fires`    | `"adventure_end"` fires exactly once, after `active_adventure` is cleared   |
 
 ### Tier 2 — Service/integration tests (in-memory SQLite)
 
@@ -1350,31 +1350,31 @@ Fixtures: `async_session` fixture using `sqlite+aiosqlite:///:memory:` with all 
 
 **`tests/services/test_user_service.py`**
 
-| Test | What it verifies |
-|---|---|
-| `test_derive_user_key_format` | Returns `USER@hostname` format |
-| `test_derive_user_key_logname_fallback` | Falls back to `LOGNAME` when `USER` is unset |
-| `test_derive_user_key_unknown_fallback` | Returns `unknown@hostname` when neither env var is set |
-| `test_get_or_create_user_creates` | First call inserts a `UserRecord` row |
-| `test_get_or_create_user_idempotent` | Second call with same key returns the same row (no duplicate) |
+| Test                                    | What it verifies                                              |
+| --------------------------------------- | ------------------------------------------------------------- |
+| `test_derive_user_key_format`           | Returns `USER@hostname` format                                |
+| `test_derive_user_key_logname_fallback` | Falls back to `LOGNAME` when `USER` is unset                  |
+| `test_derive_user_key_unknown_fallback` | Returns `unknown@hostname` when neither env var is set        |
+| `test_get_or_create_user_creates`       | First call inserts a `UserRecord` row                         |
+| `test_get_or_create_user_idempotent`    | Second call with same key returns the same row (no duplicate) |
 
 **`tests/services/test_character_service.py`**
 
-| Test | What it verifies |
-|---|---|
-| `test_save_character_initial_insert` | `save_character()` inserts `CharacterRecord` + `CharacterIterationRecord` at iteration 0 |
-| `test_save_character_integrity_error` | Calling `save_character()` a second time for the same `character_id` raises `IntegrityError` |
-| `test_load_character_none` | `load_character()` returns `None` for unknown `character_id` |
-| `test_load_character_round_trip` | Loaded state matches the saved state field-for-field |
-| `test_concurrent_save_raises_stale` | Manually bumping `version` before second save raises `StaleDataError` |
-| `test_prestige_closes_active_iteration` | `prestige_character()` sets `is_active = FALSE` and `completed_at` on iteration 0 |
-| `test_prestige_creates_new_iteration` | New iteration 1 row exists with `is_active = TRUE`, `completed_at = NULL`, and fresh stats |
-| `test_prestige_is_active_flags` | Only the new iteration has `is_active = TRUE`; the old one has `is_active = FALSE` |
-| `test_load_all_iterations_ordered` | `load_all_iterations()` returns all rows ordered by `iteration ASC` |
-| `test_acquire_session_lock_free` | `acquire_session_lock()` sets `session_token` when it is NULL |
-| `test_acquire_session_lock_steal` | Non-NULL token: adventure columns cleared, WARNING logged, new token written |
-| `test_release_session_lock_match` | `release_session_lock()` clears `session_token` when token matches |
-| `test_release_session_lock_no_match` | `release_session_lock()` is a no-op when token does not match |
+| Test                                    | What it verifies                                                                             |
+| --------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `test_save_character_initial_insert`    | `save_character()` inserts `CharacterRecord` + `CharacterIterationRecord` at iteration 0     |
+| `test_save_character_integrity_error`   | Calling `save_character()` a second time for the same `character_id` raises `IntegrityError` |
+| `test_load_character_none`              | `load_character()` returns `None` for unknown `character_id`                                 |
+| `test_load_character_round_trip`        | Loaded state matches the saved state field-for-field                                         |
+| `test_concurrent_save_raises_stale`     | Manually bumping `version` before second save raises `StaleDataError`                        |
+| `test_prestige_closes_active_iteration` | `prestige_character()` sets `is_active = FALSE` and `completed_at` on iteration 0            |
+| `test_prestige_creates_new_iteration`   | New iteration 1 row exists with `is_active = TRUE`, `completed_at = NULL`, and fresh stats   |
+| `test_prestige_is_active_flags`         | Only the new iteration has `is_active = TRUE`; the old one has `is_active = FALSE`           |
+| `test_load_all_iterations_ordered`      | `load_all_iterations()` returns all rows ordered by `iteration ASC`                          |
+| `test_acquire_session_lock_free`        | `acquire_session_lock()` sets `session_token` when it is NULL                                |
+| `test_acquire_session_lock_steal`       | Non-NULL token: adventure columns cleared, WARNING logged, new token written                 |
+| `test_release_session_lock_match`       | `release_session_lock()` clears `session_token` when token matches                           |
+| `test_release_session_lock_no_match`    | `release_session_lock()` is a no-op when token does not match                                |
 
 ### Tier 3 — GameSession integration tests
 
@@ -1382,16 +1382,16 @@ Uses `mock_tui` fixture (from `conftest.py`) and in-memory SQLite. Constructs mi
 
 **`tests/engine/test_game_session.py`**
 
-| Test | What it verifies |
-|---|---|
-| `test_start_no_characters` | `start()` with no existing characters creates user, character, and iteration 0 rows |
-| `test_start_one_character` | `start()` with one character auto-loads it; no TUI selection menu shown |
-| `test_start_multiple_characters` | `start()` with N characters invokes the TUI selection callback |
-| `test_character_name_flag_matches` | `--character-name` matching an existing character loads it without menu |
-| `test_character_name_flag_no_match` | `--character-name` not matching → creates new character with that name |
-| `test_run_adventure_saves_at_events` | DB state updated after `step_start`, `combat_round`, and `adventure_end` callbacks |
-| `test_crash_recovery` | Seed DB with mid-step `active_adventure`; `start()` loads it with `step_state` intact |
-| `test_stale_error_retry` | `_on_state_change()` with forced stale version reloads and retries successfully |
+| Test                                 | What it verifies                                                                      |
+| ------------------------------------ | ------------------------------------------------------------------------------------- |
+| `test_start_no_characters`           | `start()` with no existing characters creates user, character, and iteration 0 rows   |
+| `test_start_one_character`           | `start()` with one character auto-loads it; no TUI selection menu shown               |
+| `test_start_multiple_characters`     | `start()` with N characters invokes the TUI selection callback                        |
+| `test_character_name_flag_matches`   | `--character-name` matching an existing character loads it without menu               |
+| `test_character_name_flag_no_match`  | `--character-name` not matching → creates new character with that name                |
+| `test_run_adventure_saves_at_events` | DB state updated after `step_start`, `combat_round`, and `adventure_end` callbacks    |
+| `test_crash_recovery`                | Seed DB with mid-step `active_adventure`; `start()` loads it with `step_state` intact |
+| `test_stale_error_retry`             | `_on_state_change()` with forced stale version reloads and retries successfully       |
 
 ### What is NOT tested here
 

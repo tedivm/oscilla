@@ -13,7 +13,7 @@ def test_bare_key_condition_is_hard_error(tmp_path: Path) -> None:
     manifest = tmp_path / "bad.yaml"
     manifest.write_text(
         textwrap.dedent("""
-            apiVersion: game/v1
+            apiVersion: oscilla/v1
             kind: Region
             metadata:
               name: test-region
@@ -37,7 +37,7 @@ def test_explicit_condition_loads_cleanly(tmp_path: Path) -> None:
     manifest = tmp_path / "good.yaml"
     manifest.write_text(
         textwrap.dedent("""
-            apiVersion: game/v1
+            apiVersion: oscilla/v1
             kind: Region
             metadata:
               name: test-region

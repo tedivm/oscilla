@@ -55,7 +55,7 @@ pre-commit:
 # Formatting
 #
 .PHONY: chores
-chores: ruff_fixes black_fixes dapperdata_fixes tomlsort_fixes document_schema
+chores: ruff_fixes black_fixes prettier_fixes tomlsort_fixes document_schema
 
 .PHONY: ruff_fixes
 ruff_fixes:
@@ -65,9 +65,9 @@ ruff_fixes:
 black_fixes:
 	$(UV) run ruff format .
 
-.PHONY: dapperdata_fixes
-dapperdata_fixes:
-	$(UV) run python -m dapperdata.cli pretty . --no-dry-run
+.PHONY: prettier_fixes
+prettier_fixes:
+	npx --yes prettier --write .
 
 .PHONY: tomlsort_fixes
 tomlsort_fixes:
@@ -77,7 +77,7 @@ tomlsort_fixes:
 # Testing
 #
 .PHONY: tests
-tests: install pytest ruff_check black_check mypy_check dapperdata_check tomlsort_check paracelsus_check check_ungenerated_migrations validate
+tests: install pytest ruff_check black_check mypy_check prettier_check tomlsort_check paracelsus_check check_ungenerated_migrations validate
 
 .PHONY: pytest
 pytest:
@@ -103,9 +103,9 @@ mypy_check:
 validate:
 	$(UV) run oscilla validate
 
-.PHONY: dapperdata_check
-dapperdata_check:
-	$(UV) run python -m dapperdata.cli pretty .
+.PHONY: prettier_check
+prettier_check:
+	npx --yes prettier --check .
 
 .PHONY: tomlsort_check
 tomlsort_check:

@@ -566,12 +566,12 @@ Warnings appear in yellow. With `--strict` they are re-printed in red and the co
 
 **Exit codes:**
 
-| Condition | Exit code |
-|---|---|
-| No errors, no warnings | `0` |
-| Warnings present, no `--strict` | `0` |
-| Warnings present, `--strict` set | `1` |
-| Load error (malformed content) | `1` |
+| Condition                        | Exit code |
+| -------------------------------- | --------- |
+| No errors, no warnings           | `0`       |
+| Warnings present, no `--strict`  | `0`       |
+| Warnings present, `--strict` set | `1`       |
+| Load error (malformed content)   | `1`       |
 
 ## Game Command
 
@@ -595,11 +595,11 @@ When `--character-name` is supplied:
 
 When omitted, the character selection flow depends on how many characters the user has:
 
-| Characters | Behavior |
-|---|---|
-| 0 | Prompts for a name and creates a new character |
-| 1 | Auto-loads the only character |
-| N | Presents a numbered menu (newest first) with a "New Character" option |
+| Characters | Behavior                                                              |
+| ---------- | --------------------------------------------------------------------- |
+| 0          | Prompts for a name and creates a new character                        |
+| 1          | Auto-loads the only character                                         |
+| N          | Presents a numbered menu (newest first) with a "New Character" option |
 
 ### User Identity
 
@@ -644,15 +644,15 @@ _KIND_MAP: Dict[str, KindInfo] = {k.plural: k for k in ALL_KINDS}
 
 ### Available Commands
 
-| Command | Description |
-|---|---|
-| `content list <kind>` | List all loaded manifests of a kind. |
-| `content show <kind> <name>` | Pretty-print fields of a single manifest. |
-| `content graph` | Render the world dependency graph. |
-| `content schema <kind>` | Export JSON Schema for a manifest kind. |
-| `content test` | Run semantic validation on all content and report issues. |
-| `content trace <adventure>` | Trace all paths through an adventure's step graph. |
-| `content create <kind>` | Scaffold a new manifest YAML file interactively. |
+| Command                      | Description                                               |
+| ---------------------------- | --------------------------------------------------------- |
+| `content list <kind>`        | List all loaded manifests of a kind.                      |
+| `content show <kind> <name>` | Pretty-print fields of a single manifest.                 |
+| `content graph`              | Render the world dependency graph.                        |
+| `content schema <kind>`      | Export JSON Schema for a manifest kind.                   |
+| `content test`               | Run semantic validation on all content and report issues. |
+| `content trace <adventure>`  | Trace all paths through an adventure's step graph.        |
+| `content create <kind>`      | Scaffold a new manifest YAML file interactively.          |
 
 ### Extending the Subapp
 

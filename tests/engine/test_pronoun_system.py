@@ -212,7 +212,7 @@ def test_conflicting_extra_pronoun_set_name_raises_content_load_error(tmp_path: 
     # Overwrite the character config with a conflicting extra_pronoun_sets name.
     (content_dir / "test-character-config.yaml").write_text(
         """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: CharacterConfig
 metadata:
   name: test-character-config

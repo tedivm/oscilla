@@ -1,10 +1,11 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-time-advances
 spec:
   displayName: "Time Advances — Tick Warp"
-  description: "Each completion costs 10 ticks (both clocks). Shows game_ticks before and after so you can observe the counter
+  description:
+    "Each completion costs 10 ticks (both clocks). Shows game_ticks before and after so you can observe the counter
     rise."
   ticks: 10
   steps:

@@ -32,7 +32,7 @@ def _make_state(level: int = 1) -> CharacterState:
 def _make_adventure(name: str, requires: LevelCondition | None = None) -> AdventureManifest:
     """Build a minimal one-step AdventureManifest."""
     return AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name=name),
         spec=AdventureSpec(

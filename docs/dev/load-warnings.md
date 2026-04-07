@@ -40,13 +40,13 @@ missing required field. Loading stops entirely.
 Use `LoadWarning` when the content **will run** but something looks wrong or
 suboptimal:
 
-| Situation | Diagnostic |
-|---|---|
-| Missing required field or broken reference | `ContentLoadError` |
-| Item label not declared in `game.yaml` | `LoadWarning` |
-| Passive effect condition uses `item_held_label` (registry unavailable) | `LoadWarning` |
-| Passive effect condition uses `stat_source: effective` (registry unavailable) | `LoadWarning` |
-| Any other "suspicious but valid" content | `LoadWarning` |
+| Situation                                                                     | Diagnostic         |
+| ----------------------------------------------------------------------------- | ------------------ |
+| Missing required field or broken reference                                    | `ContentLoadError` |
+| Item label not declared in `game.yaml`                                        | `LoadWarning`      |
+| Passive effect condition uses `item_held_label` (registry unavailable)        | `LoadWarning`      |
+| Passive effect condition uses `stat_source: effective` (registry unavailable) | `LoadWarning`      |
+| Any other "suspicious but valid" content                                      | `LoadWarning`      |
 
 The guiding principle: if a human author could plausibly intend the content and the
 game will still work, emit a warning. If the content will produce incorrect behavior
@@ -123,7 +123,7 @@ across all warning conditions.
 
 ## Existing Warning Sources
 
-| Helper | Trigger |
-|---|---|
-| `_validate_labels()` | Item label not declared in `game.item_labels`; close match → "Did you mean X?" suggestion |
+| Helper                        | Trigger                                                                                                                 |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `_validate_labels()`          | Item label not declared in `game.item_labels`; close match → "Did you mean X?" suggestion                               |
 | `_validate_passive_effects()` | Passive effect condition uses `item_held_label`, `any_item_equipped`, or `character_stat` with `stat_source: effective` |

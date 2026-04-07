@@ -70,7 +70,7 @@ adventures:
     condition:
       type: character_stat
       name: reputation
-      gte: 50          # only appear once the player is well regarded
+      gte: 50 # only appear once the player is well regarded
 ```
 
 Or require it at the adventure level:
@@ -82,8 +82,7 @@ spec:
     type: character_stat
     name: reputation
     gte: 75
-  steps:
-    …
+  steps: …
 ```
 
 ---
@@ -143,4 +142,4 @@ Use a `stat_check` step for purely mechanical branching:
 
 ---
 
-*See [Conditions](../conditions.md) · [Effects](../effects.md) · [Templates](../templates.md)*
+_See [Conditions](../conditions.md) · [Effects](../effects.md) · [Templates](../templates.md)_

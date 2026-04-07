@@ -37,19 +37,19 @@ The Character Realm SHALL contain locations that allow a developer to directly m
 
 Required locations and their primary adventures:
 
-| Location | Adventure | Primary mechanic tested |
-|---|---|---|
-| `heal` | `full-heal` | `heal: full` effect |
-| `heal` | `partial-heal` | `heal: 10` effect |
-| `xp-lab` | `gain-xp-small` | small `xp_grant` (50 XP) |
-| `xp-lab` | `gain-xp-level-up` | large `xp_grant` causing level-up |
-| `xp-lab` | `lose-xp-delevel` | large negative `xp_grant` causing de-level |
-| `stat-workshop` | `bump-strength` | `stat_change: strength +1` |
-| `stat-workshop` | `drop-strength` | `stat_change: strength -1` |
-| `stat-workshop` | `bump-speed` | `stat_change: speed +0.5` |
-| `stat-workshop` | `set-strength` | `stat_set: strength 15` |
-| `stat-workshop` | `toggle-blessed` | `stat_set: is_blessed true/false` (two adventures) |
-| `stat-workshop` | `set-title` | `stat_set: title "Champion"` |
+| Location        | Adventure          | Primary mechanic tested                            |
+| --------------- | ------------------ | -------------------------------------------------- |
+| `heal`          | `full-heal`        | `heal: full` effect                                |
+| `heal`          | `partial-heal`     | `heal: 10` effect                                  |
+| `xp-lab`        | `gain-xp-small`    | small `xp_grant` (50 XP)                           |
+| `xp-lab`        | `gain-xp-level-up` | large `xp_grant` causing level-up                  |
+| `xp-lab`        | `lose-xp-delevel`  | large negative `xp_grant` causing de-level         |
+| `stat-workshop` | `bump-strength`    | `stat_change: strength +1`                         |
+| `stat-workshop` | `drop-strength`    | `stat_change: strength -1`                         |
+| `stat-workshop` | `bump-speed`       | `stat_change: speed +0.5`                          |
+| `stat-workshop` | `set-strength`     | `stat_set: strength 15`                            |
+| `stat-workshop` | `toggle-blessed`   | `stat_set: is_blessed true/false` (two adventures) |
+| `stat-workshop` | `set-title`        | `stat_set: title "Champion"`                       |
 
 #### Scenario: Developer can heal to full from Character Realm
 

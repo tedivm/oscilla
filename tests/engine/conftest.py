@@ -157,7 +157,7 @@ def minimal_quest_registry() -> ContentRegistry:
     registry = ContentRegistry()
     quest = QuestManifest.model_validate(
         {
-            "apiVersion": "game/v1",
+            "apiVersion": "oscilla/v1",
             "kind": "Quest",
             "metadata": {"name": "test-quest"},
             "spec": {

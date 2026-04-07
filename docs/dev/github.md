@@ -71,7 +71,7 @@ The project includes the following GitHub Actions workflows in `.github/workflow
 - **Trigger**:
   - Pull requests (build only, no push)
   - Pushes to `main` branch
-  - Version tags (v*.*.*)
+  - Version tags (v*.*.\*)
 - **Purpose**: Builds and publishes Docker images to GitHub Container Registry
 - **Images**:
   - `ghcr.io/tedivm/oscilla.www` - FastAPI web server
@@ -123,7 +123,7 @@ Publishing workflows trigger on version tags:
 on:
   push:
     tags:
-      - "v*.*.*"  # Matches v1.0.0, v2.1.3, etc.
+      - "v*.*.*" # Matches v1.0.0, v2.1.3, etc.
 ```
 
 Create a tag to trigger a release:
@@ -344,7 +344,7 @@ Edit workflow files in `.github/workflows/`:
 # Add a new Python version to test matrix
 strategy:
   matrix:
-    version: ["3.10", "3.11", "3.12", "3.15"]  # Add 3.15
+    version: ["3.10", "3.11", "3.12", "3.15"] # Add 3.15
 ```
 
 ### Conditional Workflow Execution
@@ -374,7 +374,7 @@ jobs:
         run: make test
 
   deploy:
-    needs: test  # Only runs if 'test' succeeds
+    needs: test # Only runs if 'test' succeeds
     runs-on: ubuntu-latest
     steps:
       - name: Deploy
@@ -501,8 +501,8 @@ updates:
    on:
      push:
        paths-ignore:
-         - '**.md'
-         - 'docs/**'
+         - "**.md"
+         - "docs/**"
    ```
 
 ## Best Practices

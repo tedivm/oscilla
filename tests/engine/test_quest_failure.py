@@ -37,7 +37,7 @@ def _make_failable_registry() -> ContentRegistry:
     registry = ContentRegistry()
     quest = QuestManifest.model_validate(
         {
-            "apiVersion": "game/v1",
+            "apiVersion": "oscilla/v1",
             "kind": "Quest",
             "metadata": {"name": "failable-quest"},
             "spec": {
@@ -248,7 +248,7 @@ def test_terminal_stage_with_fail_condition_raises() -> None:
     with pytest.raises(ValidationError, match="terminal"):
         QuestManifest.model_validate(
             {
-                "apiVersion": "game/v1",
+                "apiVersion": "oscilla/v1",
                 "kind": "Quest",
                 "metadata": {"name": "bad-quest"},
                 "spec": {

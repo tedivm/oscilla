@@ -34,7 +34,7 @@ def _make_registry(extra_skills: List[SkillManifest] | None = None) -> ContentRe
     registry = ContentRegistry()
 
     game = GameManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Game",
         metadata=Metadata(name="test-game"),
         spec=GameSpec(
@@ -46,7 +46,7 @@ def _make_registry(extra_skills: List[SkillManifest] | None = None) -> ContentRe
     registry.game = game
 
     char_config = CharacterConfigManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="CharacterConfig",
         metadata=Metadata(name="test-config"),
         spec=CharacterConfigSpec(
@@ -86,7 +86,7 @@ def _overworld_skill(
     use_effects: list | None = None,
 ) -> SkillManifest:
     return SkillManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Skill",
         metadata=Metadata(name=name),
         spec=SkillSpec(
@@ -102,7 +102,7 @@ def _overworld_skill(
 
 def _combat_only_skill(name: str = "test-combat") -> SkillManifest:
     return SkillManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Skill",
         metadata=Metadata(name=name),
         spec=SkillSpec(

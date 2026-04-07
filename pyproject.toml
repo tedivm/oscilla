@@ -34,7 +34,6 @@ oscilla = "oscilla.cli:app"
 [dependency-groups]
 dev = [
   "build",
-  "dapperdata",
   "glom",
   "greenlet",
   "httpx",

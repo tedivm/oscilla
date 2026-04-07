@@ -61,11 +61,10 @@ steps:
     type: stat_check
     condition:
       type: character_stat
-      name: some-always-true-stat    # placeholder technique
+      name: some-always-true-stat # placeholder technique
       gte: 0
     on_pass:
-      steps:
-        …
+      steps: …
 ```
 
 The most authoring-friendly approach is just to write branching narrative. Players experience a coherent world even when the same adventure runs multiple times at different hours.
@@ -125,4 +124,4 @@ Use `today()` — returns an ISO date string (`"2025-06-15"`):
 
 ---
 
-*See [Templates](../templates.md) for the full function and filter reference.*
+_See [Templates](../templates.md) for the full function and filter reference._

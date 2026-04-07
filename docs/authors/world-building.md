@@ -24,7 +24,7 @@ content/my-kingdom/
 ### Minimal Region
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Region
 metadata:
   name: the-forest
@@ -40,7 +40,7 @@ spec:
 Regions can nest inside other regions using the `parent` field. This is useful for representing areas with hierarchical access — you must reach the wilderness before finding the dungeon within it.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Region
 metadata:
   name: dungeon
@@ -57,7 +57,7 @@ spec:
         name: found-dungeon-entrance
 ```
 
-Players can only enter a child region when they meet its unlock condition *and* they can already access the parent region.
+Players can only enter a child region when they meet its unlock condition _and_ they can already access the parent region.
 
 ### Unlocking Regions
 
@@ -66,7 +66,7 @@ The `unlock` field accepts any [condition](./conditions.md). The region is hidde
 ```yaml
 unlock:
   type: level
-  value: 5  # simple: unlock at level 5
+  value: 5 # simple: unlock at level 5
 ```
 
 ```yaml
@@ -76,7 +76,7 @@ unlock:
     - type: level
       value: 10
     - type: milestone
-      name: joined-guild  # all conditions must be true
+      name: joined-guild # all conditions must be true
 ```
 
 ```yaml
@@ -84,7 +84,7 @@ unlock:
   type: any
   conditions:
     - type: milestone
-      name: guild-pass    # either condition is enough
+      name: guild-pass # either condition is enough
     - type: milestone
       name: noble-escort
 ```
@@ -108,7 +108,7 @@ regions/the-forest/
 ### Minimal Location
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Location
 metadata:
   name: dark-clearing
@@ -153,7 +153,7 @@ adventures:
     weight: 30
     condition:
       type: skill
-      name: herbalism        # only available once the player has this skill
+      name: herbalism # only available once the player has this skill
 ```
 
 Adventures whose conditions aren't met are excluded from that visit's pool entirely. If all adventures in a pool are excluded, the player is told there is nothing to do at this location.
@@ -216,38 +216,38 @@ Organize your files however makes sense to you. The nested convention is recomme
 
 ### Region manifest fields
 
-| Field | Required | Description |
-|---|---|---|
-| `apiVersion` | yes | Must be `game/v1` |
-| `kind` | yes | Must be `Region` |
-| `metadata.name` | yes | Unique identifier for this region; used for cross-references |
-| `spec.displayName` | yes | Player-facing region name |
-| `spec.description` | no | Short description shown in navigation |
-| `spec.parent` | no | `metadata.name` of a parent region |
-| `spec.unlock` | no | Condition that controls access; omit for always-available |
+| Field              | Required | Description                                                  |
+| ------------------ | -------- | ------------------------------------------------------------ |
+| `apiVersion`       | yes      | Must be `oscilla/v1`                                         |
+| `kind`             | yes      | Must be `Region`                                             |
+| `metadata.name`    | yes      | Unique identifier for this region; used for cross-references |
+| `spec.displayName` | yes      | Player-facing region name                                    |
+| `spec.description` | no       | Short description shown in navigation                        |
+| `spec.parent`      | no       | `metadata.name` of a parent region                           |
+| `spec.unlock`      | no       | Condition that controls access; omit for always-available    |
 
 ### Location manifest fields
 
-| Field | Required | Description |
-|---|---|---|
-| `apiVersion` | yes | Must be `game/v1` |
-| `kind` | yes | Must be `Location` |
-| `metadata.name` | yes | Unique identifier for this location; used for cross-references |
-| `spec.displayName` | yes | Player-facing location name |
-| `spec.description` | no | Short description shown in navigation |
-| `spec.region` | yes | `metadata.name` of the owning region |
-| `spec.unlock` | no | Condition that controls access |
-| `spec.adventures` | yes | List of adventure pool entries (at least one) |
+| Field              | Required | Description                                                    |
+| ------------------ | -------- | -------------------------------------------------------------- |
+| `apiVersion`       | yes      | Must be `oscilla/v1`                                           |
+| `kind`             | yes      | Must be `Location`                                             |
+| `metadata.name`    | yes      | Unique identifier for this location; used for cross-references |
+| `spec.displayName` | yes      | Player-facing location name                                    |
+| `spec.description` | no       | Short description shown in navigation                          |
+| `spec.region`      | yes      | `metadata.name` of the owning region                           |
+| `spec.unlock`      | no       | Condition that controls access                                 |
+| `spec.adventures`  | yes      | List of adventure pool entries (at least one)                  |
 
 ### Adventure pool entry fields
 
-| Field | Required | Description |
-|---|---|---|
-| `ref` | yes | `metadata.name` of the adventure manifest |
-| `weight` | yes | Relative probability (positive integer) |
-| `condition` | no | Any condition; entry excluded when false |
+| Field       | Required | Description                               |
+| ----------- | -------- | ----------------------------------------- |
+| `ref`       | yes      | `metadata.name` of the adventure manifest |
+| `weight`    | yes      | Relative probability (positive integer)   |
+| `condition` | no       | Any condition; entry excluded when false  |
 
 ---
 
-*Next: [Adventures](./adventures.md) — building individual encounters with branching narrative.*
-*See [Conditions](./conditions.md) for the full unlock and pool-condition syntax.*
+_Next: [Adventures](./adventures.md) — building individual encounters with branching narrative._
+_See [Conditions](./conditions.md) for the full unlock and pool-condition syntax._

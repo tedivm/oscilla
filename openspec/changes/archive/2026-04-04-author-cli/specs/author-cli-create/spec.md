@@ -54,14 +54,14 @@ The scaffolded file SHALL be loadable by `loader.load()` without schema errors.
 
 The system SHALL place scaffolded manifest files at the documented canonical path for each kind. The canonical paths SHALL be:
 
-| Kind | Path |
-|------|------|
-| `region` | `<games_path>/<game>/regions/<name>/<name>.yaml` |
-| `location` | `<games_path>/<game>/regions/<region>/locations/<name>/<name>.yaml` |
+| Kind        | Path                                                                               |
+| ----------- | ---------------------------------------------------------------------------------- |
+| `region`    | `<games_path>/<game>/regions/<name>/<name>.yaml`                                   |
+| `location`  | `<games_path>/<game>/regions/<region>/locations/<name>/<name>.yaml`                |
 | `adventure` | `<games_path>/<game>/regions/<region>/locations/<location>/adventures/<name>.yaml` |
-| `enemy` | `<games_path>/<game>/enemies/<name>.yaml` |
-| `item` | `<games_path>/<game>/items/<name>.yaml` |
-| `quest` | `<games_path>/<game>/quests/<name>.yaml` |
+| `enemy`     | `<games_path>/<game>/enemies/<name>.yaml`                                          |
+| `item`      | `<games_path>/<game>/items/<name>.yaml`                                            |
+| `quest`     | `<games_path>/<game>/quests/<name>.yaml`                                           |
 
 All intermediate directories SHALL be created automatically.
 

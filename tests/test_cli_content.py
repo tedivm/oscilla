@@ -144,3 +144,44 @@ def test_testlandia_character_creation_adventure_has_at_least_three_steps() -> N
     registry, _warnings = load(_TESTLANDIA_PATH)
     adventure = registry.adventures.require("character-creation", "Adventure")
     assert len(adventure.spec.steps) >= 3
+
+
+# ---------------------------------------------------------------------------
+# content schema --vscode tests
+# ---------------------------------------------------------------------------
+
+
+def test_schema_vscode_default_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """--vscode with no --output writes to .vscode/oscilla-schemas/ by default."""
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["content", "schema", "--vscode"])
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / ".vscode" / "oscilla-schemas" / "manifest.json").exists()
+    assert (tmp_path / ".vscode" / "oscilla-schemas" / "adventure.json").exists()
+
+
+def test_schema_vscode_updates_settings_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """--vscode writes a content glob association pointing at manifest.json into settings.json."""
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, ["content", "schema", "--vscode"])
+    settings_path = tmp_path / ".vscode" / "settings.json"
+    assert settings_path.exists()
+    settings = json.loads(settings_path.read_text())
+    assert "yaml.schemas" in settings
+    # The value for the manifest.json key should be the **/*.yaml glob.
+    manifest_entries = {k: v for k, v in settings["yaml.schemas"].items() if "manifest.json" in k}
+    assert manifest_entries, "No manifest.json entry found in yaml.schemas"
+    assert "**/*.yaml" in manifest_entries.values()
+
+
+def test_schema_vscode_preserves_existing_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Existing settings.json content is preserved when --vscode updates the file."""
+    monkeypatch.chdir(tmp_path)
+    vscode_dir = tmp_path / ".vscode"
+    vscode_dir.mkdir()
+    (vscode_dir / "settings.json").write_text(json.dumps({"peacock.color": "#ff0000"}))
+    runner.invoke(app, ["content", "schema", "--vscode"])
+    settings = json.loads((vscode_dir / "settings.json").read_text())
+    assert "peacock.color" in settings
+    assert settings["peacock.color"] == "#ff0000"
+    assert "yaml.schemas" in settings

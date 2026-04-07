@@ -4,19 +4,19 @@ Adventures are currently player-driven: the player navigates to a region → loc
 
 The key files touched are:
 
-| File | Role |
-|---|---|
-| `oscilla/engine/models/game.py` | `GameSpec` gains `triggers` and `trigger_adventures` |
-| `oscilla/engine/models/adventure.py` | New `EmitTriggerEffect` type and `Effect` union update |
-| `oscilla/engine/character.py` | `CharacterState` gains `pending_triggers: List[str]` |
-| `oscilla/engine/registry.py` | `ContentRegistry` gains `trigger_index: Dict[str, List[str]]` |
-| `oscilla/engine/loader.py` | Load-time validation of trigger keys and custom trigger names |
-| `oscilla/engine/steps/effects.py` | New `emit_trigger` effect handler |
-| `oscilla/engine/session.py` | `drain_trigger_queue()` + detection point calls |
-| `oscilla/models/character_iteration.py` | New `CharacterIterationPendingTrigger` table |
-| `db/versions/` | Migration creating `character_iteration_pending_triggers` table |
-| `oscilla/services/character.py` | `pending_triggers` loaded from `pending_trigger_rows` relationship |
-| `oscilla/engine/tui.py` | Drain calls at creation/rejoin and post-adventure |
+| File                                    | Role                                                               |
+| --------------------------------------- | ------------------------------------------------------------------ |
+| `oscilla/engine/models/game.py`         | `GameSpec` gains `triggers` and `trigger_adventures`               |
+| `oscilla/engine/models/adventure.py`    | New `EmitTriggerEffect` type and `Effect` union update             |
+| `oscilla/engine/character.py`           | `CharacterState` gains `pending_triggers: List[str]`               |
+| `oscilla/engine/registry.py`            | `ContentRegistry` gains `trigger_index: Dict[str, List[str]]`      |
+| `oscilla/engine/loader.py`              | Load-time validation of trigger keys and custom trigger names      |
+| `oscilla/engine/steps/effects.py`       | New `emit_trigger` effect handler                                  |
+| `oscilla/engine/session.py`             | `drain_trigger_queue()` + detection point calls                    |
+| `oscilla/models/character_iteration.py` | New `CharacterIterationPendingTrigger` table                       |
+| `db/versions/`                          | Migration creating `character_iteration_pending_triggers` table    |
+| `oscilla/services/character.py`         | `pending_triggers` loaded from `pending_trigger_rows` relationship |
+| `oscilla/engine/tui.py`                 | Drain calls at creation/rejoin and post-adventure                  |
 
 ---
 
@@ -736,13 +736,13 @@ The pending trigger queue is replaced atomically at `adventure_end`: delete all 
 
 ## Risks / Trade-offs
 
-| Risk | Mitigation |
-|---|---|
-| `emit_trigger` cycle causes infinite loop | Max queue depth guard (configurable, default 6) with warning log; authors can raise the limit in `game.yaml` for complex chains |
-| `on_stat_threshold` fires multiple times if stat bounces up and down | Authors use `repeatable: false` or `conditions:` on the triggered adventure; the engine does not dedup threshold crossings |
+| Risk                                                                                                  | Mitigation                                                                                                                                                                 |
+| ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `emit_trigger` cycle causes infinite loop                                                             | Max queue depth guard (configurable, default 6) with warning log; authors can raise the limit in `game.yaml` for complex chains                                            |
+| `on_stat_threshold` fires multiple times if stat bounces up and down                                  | Authors use `repeatable: false` or `conditions:` on the triggered adventure; the engine does not dedup threshold crossings                                                 |
 | `on_game_rejoin` fires on the very first session if `characters.updated_at` is close to creation time | Characters are created with `updated_at` set to creation time; absence check compares against threshold — unlikely to fire on first session unless threshold is very small |
-| Triggered adventure chain is long, making session startup slow | No technical limit on chain depth other than queue guard; a very long chain of non-repeatable adventures drains once and the problem self-resolves |
-| No pending trigger rows in DB for characters created before migration | The relationship defaults to an empty list when no rows exist — no special handling needed for pre-migration characters |
+| Triggered adventure chain is long, making session startup slow                                        | No technical limit on chain depth other than queue guard; a very long chain of non-repeatable adventures drains once and the problem self-resolves                         |
+| No pending trigger rows in DB for characters created before migration                                 | The relationship defaults to an empty list when no rows exist — no special handling needed for pre-migration characters                                                    |
 
 ---
 
@@ -759,16 +759,16 @@ The pending trigger queue is replaced atomically at `adventure_end`: delete all 
 
 ### Author documentation
 
-| Document | Audience | Topics |
-|---|---|---|
+| Document                             | Audience        | Topics                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------ | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `docs/authors/game-configuration.md` | Content authors | New `triggers` and `trigger_adventures` blocks in `game.yaml`; all trigger type names and their meaning; `on_stat_threshold` syntax; `on_game_rejoin` `absence_hours` field; `on_outcome_<name>` family; `custom` trigger names; multiple-adventure ordering; the condition/repeat-control system applies to triggered adventures |
-| `docs/authors/effects.md` | Content authors | New `emit_trigger` effect: field definitions, validation rules, example YAML, note that the trigger name must appear in `game.yaml triggers.custom` |
-| `docs/authors/adventures.md` | Content authors | Note that triggered adventures use the same manifest structure; cross-ref to game-configuration.md for wiring syntax; note that `repeatable`/`max_completions`/`cooldown_*` and `requires` apply to triggered adventures exactly as they do to pool adventures |
+| `docs/authors/effects.md`            | Content authors | New `emit_trigger` effect: field definitions, validation rules, example YAML, note that the trigger name must appear in `game.yaml triggers.custom`                                                                                                                                                                               |
+| `docs/authors/adventures.md`         | Content authors | Note that triggered adventures use the same manifest structure; cross-ref to game-configuration.md for wiring syntax; note that `repeatable`/`max_completions`/`cooldown_*` and `requires` apply to triggered adventures exactly as they do to pool adventures                                                                    |
 
 ### Developer documentation
 
-| Document | Audience | Topics |
-|---|---|---|
+| Document                  | Audience          | Topics                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `docs/dev/game-engine.md` | Engine developers | Trigger queue lifecycle (append → persist → drain); detection points for each trigger type and where they live in the code; `ContentRegistry.trigger_index` and `stat_threshold_index` build process; `drain_trigger_queue()` algorithm and FIFO semantics; max-depth guard; interaction with `is_adventure_eligible()` and the condition evaluator |
 
 ---
@@ -811,7 +811,7 @@ def _make_game_manifest(
 ) -> GameManifest:
     """Build a minimal GameManifest for trigger tests."""
     return GameManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Game",
         metadata=MagicMock(name="test-game"),
         spec=GameSpec(
@@ -831,7 +831,7 @@ def _make_game_manifest(
 def _make_adventure_manifest(name: str) -> AdventureManifest:
     """Build a minimal one-step adventure manifest."""
     return AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=MagicMock(name=name),
         spec=AdventureSpec(
@@ -943,7 +943,7 @@ async def test_drain_skips_ineligible() -> None:
         requires=Condition(type="level", value=99),  # never met at level 1
     )
     adv = AdventureManifest(
-        apiVersion="game/v1", kind="Adventure",
+        apiVersion="oscilla/v1", kind="Adventure",
         metadata=MagicMock(name="gated-adv"),
         spec=adv_spec,
     )
@@ -1058,7 +1058,7 @@ def test_unknown_adventure_ref_is_load_warning() -> None:
 def test_on_outcome_custom_valid_when_declared() -> None:
     """on_outcome_<custom> is valid when the outcome is declared in game.yaml."""
     game = GameManifest(
-        apiVersion="game/v1", kind="Game",
+        apiVersion="oscilla/v1", kind="Game",
         metadata=MagicMock(name="g"),
         spec=GameSpec(
             displayName="g", xp_thresholds=[100], hp_formula=HpFormula(base_hp=20, hp_per_level=5),
@@ -1091,15 +1091,15 @@ All testlandia content lives under `content/testlandia/`. New files are added; n
 
 ### Files to create
 
-| File | Purpose |
-|---|---|
-| `content/testlandia/game.yaml` | Add `triggers` + `trigger_adventures` blocks |
-| `content/testlandia/adventures/triggered/test-character-intro.yaml` | `on_character_create` demo |
-| `content/testlandia/adventures/triggered/test-level-up-scene.yaml` | `on_level_up` demo |
-| `content/testlandia/adventures/triggered/test-defeat-recovery.yaml` | `on_outcome_defeated` demo |
-| `content/testlandia/adventures/triggered/test-threshold-scene.yaml` | `on_stat_threshold` demo |
-| `content/testlandia/adventures/triggered/test-custom-trigger-scene.yaml` | `emit_trigger` demo |
-| `content/testlandia/adventures/triggered/test-rejoin-scene.yaml` | `on_game_rejoin` demo |
+| File                                                                     | Purpose                                      |
+| ------------------------------------------------------------------------ | -------------------------------------------- |
+| `content/testlandia/game.yaml`                                           | Add `triggers` + `trigger_adventures` blocks |
+| `content/testlandia/adventures/triggered/test-character-intro.yaml`      | `on_character_create` demo                   |
+| `content/testlandia/adventures/triggered/test-level-up-scene.yaml`       | `on_level_up` demo                           |
+| `content/testlandia/adventures/triggered/test-defeat-recovery.yaml`      | `on_outcome_defeated` demo                   |
+| `content/testlandia/adventures/triggered/test-threshold-scene.yaml`      | `on_stat_threshold` demo                     |
+| `content/testlandia/adventures/triggered/test-custom-trigger-scene.yaml` | `emit_trigger` demo                          |
+| `content/testlandia/adventures/triggered/test-rejoin-scene.yaml`         | `on_game_rejoin` demo                        |
 
 ### `game.yaml` additions
 
@@ -1108,9 +1108,9 @@ triggers:
   custom:
     - test-custom-event
   on_game_rejoin:
-    absence_hours: 1    # short threshold so QA testers can trigger it within a session break
+    absence_hours: 1 # short threshold so QA testers can trigger it within a session break
   on_stat_threshold:
-    - stat: gold        # testlandia 'gold' integer stat — convenient for QA since gold changes frequently
+    - stat: gold # testlandia 'gold' integer stat — convenient for QA since gold changes frequently
       threshold: 50
       name: test-threshold-reached
 
@@ -1132,7 +1132,7 @@ trigger_adventures:
 ### `test-character-intro.yaml`
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-character-intro
@@ -1160,7 +1160,7 @@ spec:
 ### `test-level-up-scene.yaml`
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-level-up-scene
@@ -1178,7 +1178,7 @@ spec:
 ### `test-defeat-recovery.yaml`
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-defeat-recovery
@@ -1195,7 +1195,7 @@ spec:
 ### `test-threshold-scene.yaml`
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-threshold-scene
@@ -1213,7 +1213,7 @@ spec:
 ### `test-custom-trigger-scene.yaml`
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-custom-trigger-scene
@@ -1227,7 +1227,7 @@ spec:
 ### `test-rejoin-scene.yaml`
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-rejoin-scene

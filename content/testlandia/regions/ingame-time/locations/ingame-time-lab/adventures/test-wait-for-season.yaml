@@ -1,10 +1,11 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-wait-for-season
 spec:
   displayName: "Wait for Season — Summer Gate"
-  description: "Requires Summer. Unavailable during Spring (game_ticks 0-95). Becomes available once game_ticks >= 96 (after
+  description:
+    "Requires Summer. Unavailable during Spring (game_ticks 0-95). Becomes available once game_ticks >= 96 (after
     10 completions of test-time-advances at 10 ticks each, for a total of 100 ticks)."
   requires:
     type: game_calendar_cycle_is

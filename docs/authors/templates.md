@@ -18,14 +18,14 @@ text: |
   You are level {{ player.level }} with {{ player.hp }}/{{ player.max_hp }} HP.
 ```
 
-| Expression | Type | Description |
-|---|---|---|
-| `{{ player.name }}` | str | Character name |
-| `{{ player.level }}` | int | Current level |
-| `{{ player.hp }}` | int | Current hit points |
-| `{{ player.max_hp }}` | int | Maximum hit points |
-| `{{ player.stats.<name> }}` | int/bool | Any stat defined in `CharacterConfig` |
-| `{{ player.milestones.has("name") }}` | bool | True if player holds that milestone |
+| Expression                            | Type     | Description                           |
+| ------------------------------------- | -------- | ------------------------------------- |
+| `{{ player.name }}`                   | str      | Character name                        |
+| `{{ player.level }}`                  | int      | Current level                         |
+| `{{ player.hp }}`                     | int      | Current hit points                    |
+| `{{ player.max_hp }}`                 | int      | Maximum hit points                    |
+| `{{ player.stats.<name> }}`           | int/bool | Any stat defined in `CharacterConfig` |
+| `{{ player.milestones.has("name") }}` | bool     | True if player holds that milestone   |
 
 ### Accessing Stats
 
@@ -99,24 +99,24 @@ text: "Your accuracy is {{ (random() * 100) | round }}%."
 
 ## Math and Utility Functions
 
-| Function | Description | Example |
-|---|---|---|
-| `roll(low, high)` | Random integer inclusive | `{{ roll(1, 20) }}` |
-| `choice(seq)` | Pick one at random | `{{ choice(["fire","ice","wind"]) }}` |
-| `random()` | Float in [0.0, 1.0) | `{{ random() }}` |
-| `sample(seq, n)` | Pick n without repeats | `{{ sample(items, 2) }}` |
-| `clamp(val, lo, hi)` | Clamp to range [lo, hi] | `{{ clamp(player.stats.strength, 0, 20) }}` |
-| `min(a, b)` | Minimum of two values | `{{ min(10, player.stats.speed) }}` |
-| `max(a, b)` | Maximum of two values | `{{ max(0, player.stats.gold) }}` |
-| `round(n)` | Round to nearest integer | `{{ round(x) }}` |
-| `floor(n)` | Round down | `{{ floor(x) }}` |
-| `ceil(n)` | Round up | `{{ ceil(x) }}` |
-| `abs(n)` | Absolute value | `{{ abs(player.stats.debt) }}` |
-| `int(x)` | Convert to integer | `{{ int(x) }}` |
-| `str(x)` | Convert to string | `{{ str(player.level) }}` |
-| `len(seq)` | Length of a sequence | `{{ len(items) }}` |
-| `range(n)` | Integer range for loops | `{% for i in range(3) %}` |
-| `sum(seq)` | Sum a sequence | `{{ sum(values) }}` |
+| Function             | Description              | Example                                     |
+| -------------------- | ------------------------ | ------------------------------------------- |
+| `roll(low, high)`    | Random integer inclusive | `{{ roll(1, 20) }}`                         |
+| `choice(seq)`        | Pick one at random       | `{{ choice(["fire","ice","wind"]) }}`       |
+| `random()`           | Float in [0.0, 1.0)      | `{{ random() }}`                            |
+| `sample(seq, n)`     | Pick n without repeats   | `{{ sample(items, 2) }}`                    |
+| `clamp(val, lo, hi)` | Clamp to range [lo, hi]  | `{{ clamp(player.stats.strength, 0, 20) }}` |
+| `min(a, b)`          | Minimum of two values    | `{{ min(10, player.stats.speed) }}`         |
+| `max(a, b)`          | Maximum of two values    | `{{ max(0, player.stats.gold) }}`           |
+| `round(n)`           | Round to nearest integer | `{{ round(x) }}`                            |
+| `floor(n)`           | Round down               | `{{ floor(x) }}`                            |
+| `ceil(n)`            | Round up                 | `{{ ceil(x) }}`                             |
+| `abs(n)`             | Absolute value           | `{{ abs(player.stats.debt) }}`              |
+| `int(x)`             | Convert to integer       | `{{ int(x) }}`                              |
+| `str(x)`             | Convert to string        | `{{ str(player.level) }}`                   |
+| `len(seq)`           | Length of a sequence     | `{{ len(items) }}`                          |
+| `range(n)`           | Integer range for loops  | `{% for i in range(3) %}`                   |
+| `sum(seq)`           | Sum a sequence           | `{{ sum(values) }}`                         |
 
 ---
 
@@ -130,18 +130,18 @@ text: |
   Tonight is a {{ moon_phase(today()) }}.
 ```
 
-| Function | Returns | Example output |
-|---|---|---|
-| `now()` | Current datetime in the game timezone (server local if not set) | `now().year` → `2026` |
-| `today()` | Current date in the game timezone (server local if not set) | Use as argument to functions below |
-| `season(date)` | `"spring"`, `"summer"`, `"autumn"`, or `"winter"` (respects `game.season_hemisphere`) | `"winter"` |
-| `month_name(n)` | Full month name from an integer month number | `month_name(12)` → `"December"` |
-| `day_name(n)` | Day-of-week name from an integer (0=Monday … 6=Sunday) | `day_name(today().weekday())` → `"Friday"` |
-| `week_number(date)` | ISO week number 1–53 | `51` |
-| `zodiac_sign(date)` | Western zodiac sign | `"Sagittarius"` |
-| `chinese_zodiac(year)` | Chinese zodiac animal from an integer year | `chinese_zodiac(today().year)` → `"Horse"` |
-| `moon_phase(date)` | Moon phase description | `"Waxing Gibbous"` |
-| `mean(values)` | Arithmetic mean | `{{ mean([10, 20, 30]) }}` → `20.0` |
+| Function               | Returns                                                                               | Example output                             |
+| ---------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `now()`                | Current datetime in the game timezone (server local if not set)                       | `now().year` → `2026`                      |
+| `today()`              | Current date in the game timezone (server local if not set)                           | Use as argument to functions below         |
+| `season(date)`         | `"spring"`, `"summer"`, `"autumn"`, or `"winter"` (respects `game.season_hemisphere`) | `"winter"`                                 |
+| `month_name(n)`        | Full month name from an integer month number                                          | `month_name(12)` → `"December"`            |
+| `day_name(n)`          | Day-of-week name from an integer (0=Monday … 6=Sunday)                                | `day_name(today().weekday())` → `"Friday"` |
+| `week_number(date)`    | ISO week number 1–53                                                                  | `51`                                       |
+| `zodiac_sign(date)`    | Western zodiac sign                                                                   | `"Sagittarius"`                            |
+| `chinese_zodiac(year)` | Chinese zodiac animal from an integer year                                            | `chinese_zodiac(today().year)` → `"Horse"` |
+| `moon_phase(date)`     | Moon phase description                                                                | `"Waxing Gibbous"`                         |
+| `mean(values)`         | Arithmetic mean                                                                       | `{{ mean([10, 20, 30]) }}` → `20.0`        |
 
 > **Timezone note:** `now()` and `today()` — and all calendar conditions — use the `timezone` field set in `game.yaml`. Without it they fall back to server local time, which may differ from your players' clock. See [Game Configuration](./game-configuration.md#timezone-configuration).
 
@@ -157,13 +157,13 @@ text: "You found {{ count }} {{ count | pluralize('wolf', 'wolves') }}."
 text: "Strength modifier: {{ player.stats.strength | stat_modifier }}"
 ```
 
-| Filter | Description | Example |
-|---|---|---|
-| `stat_modifier` | Format as `+n` or `-n` | `12 \| stat_modifier` → `+2` (relative to 10) |
-| `pluralize(singular, plural)` | `singular` if value is 1, else `plural` | `1 \| pluralize("wolf","wolves")` → `"wolf"` |
-| `upper` | Uppercase | `"hero" \| upper` → `"HERO"` |
-| `lower` | Lowercase | `"HERO" \| lower` → `"hero"` |
-| `capitalize` | First letter uppercase | `"they" \| capitalize` → `"They"` |
+| Filter                        | Description                             | Example                                       |
+| ----------------------------- | --------------------------------------- | --------------------------------------------- |
+| `stat_modifier`               | Format as `+n` or `-n`                  | `12 \| stat_modifier` → `+2` (relative to 10) |
+| `pluralize(singular, plural)` | `singular` if value is 1, else `plural` | `1 \| pluralize("wolf","wolves")` → `"wolf"`  |
+| `upper`                       | Uppercase                               | `"hero" \| upper` → `"HERO"`                  |
+| `lower`                       | Lowercase                               | `"HERO" \| lower` → `"hero"`                  |
+| `capitalize`                  | First letter uppercase                  | `"they" \| capitalize` → `"They"`             |
 
 ---
 
@@ -236,12 +236,12 @@ text: |
 
 Templates are supported in these fields:
 
-| Field | Example |
-|---|---|
-| Narrative step `text` | `"Hello, {{ player.name }}!"` |
-| `xp_grant.amount` | `"{{ roll(50, 150) }}"` |
-| `stat_change.amount` | `"{{ player.stats.luck * 2 }}"` |
-| `item_drop.count` | `"{{ roll(1, 3) }}"` |
+| Field                 | Example                         |
+| --------------------- | ------------------------------- |
+| Narrative step `text` | `"Hello, {{ player.name }}!"`   |
+| `xp_grant.amount`     | `"{{ roll(50, 150) }}"`         |
+| `stat_change.amount`  | `"{{ player.stats.luck * 2 }}"` |
+| `item_drop.count`     | `"{{ roll(1, 3) }}"`            |
 
 Fields that don't support templates will treat the string literally.
 
@@ -263,29 +263,29 @@ Template syntax errors and unknown context references are reported with the file
 
 ### Player Context Object
 
-| Expression | Type | Description |
-|---|---|---|
-| `player.name` | str | Character name |
-| `player.level` | int | Current level |
-| `player.hp` | int | Current hit points |
-| `player.max_hp` | int | Maximum hit points |
-| `player.stats.<name>` | int/bool | Any declared stat by name |
-| `player.milestones.has("<name>")` | bool | True if player holds the milestone |
-| `player.pronouns.subject` | str | Subject pronoun (they/she/he) |
-| `player.pronouns.object` | str | Object pronoun (them/her/him) |
-| `player.pronouns.possessive` | str | Possessive adjective (their/her/his) |
-| `player.pronouns.possessive_standalone` | str | Standalone possessive (theirs/hers/his) |
-| `player.pronouns.reflexive` | str | Reflexive (themselves/herself/himself) |
-| `player.pronouns.uses_plural_verbs` | bool | True for they/them pronoun sets |
+| Expression                              | Type     | Description                             |
+| --------------------------------------- | -------- | --------------------------------------- |
+| `player.name`                           | str      | Character name                          |
+| `player.level`                          | int      | Current level                           |
+| `player.hp`                             | int      | Current hit points                      |
+| `player.max_hp`                         | int      | Maximum hit points                      |
+| `player.stats.<name>`                   | int/bool | Any declared stat by name               |
+| `player.milestones.has("<name>")`       | bool     | True if player holds the milestone      |
+| `player.pronouns.subject`               | str      | Subject pronoun (they/she/he)           |
+| `player.pronouns.object`                | str      | Object pronoun (them/her/him)           |
+| `player.pronouns.possessive`            | str      | Possessive adjective (their/her/his)    |
+| `player.pronouns.possessive_standalone` | str      | Standalone possessive (theirs/hers/his) |
+| `player.pronouns.reflexive`             | str      | Reflexive (themselves/herself/himself)  |
+| `player.pronouns.uses_plural_verbs`     | bool     | True for they/them pronoun sets         |
 
 ### Game Context Object
 
 The `game` object exposes game-wide settings configured in `game.yaml`. Use it when your narrative needs to reference the game's configured locale or hemisphere.
 
-| Expression | Type | Description |
-|---|---|---|
-| `game.season_hemisphere` | str | `"northern"` or `"southern"` — the hemisphere used for season calculations |
-| `game.timezone` | str \| None | IANA timezone name (e.g. `"America/New_York"`), or `None` if not set |
+| Expression               | Type        | Description                                                                |
+| ------------------------ | ----------- | -------------------------------------------------------------------------- |
+| `game.season_hemisphere` | str         | `"northern"` or `"southern"` — the hemisphere used for season calculations |
+| `game.timezone`          | str \| None | IANA timezone name (e.g. `"America/New_York"`), or `None` if not set       |
 
 ```yaml
 text: |
@@ -299,18 +299,18 @@ text: |
 
 ### Pronoun Placeholder Reference
 
-| Placeholder | Expands to | they/them | she/her | he/him |
-|---|---|---|---|---|
-| `{they}` | subject | they | she | he |
-| `{They}` | subject, capitalized | They | She | He |
-| `{THEY}` | subject, uppercase | THEY | SHE | HE |
-| `{them}` | object | them | her | him |
-| `{their}` | possessive adjective | their | her | his |
-| `{is}` / `{are}` | linking verb | are | is | is |
-| `{was}` / `{were}` | past linking verb | were | was | was |
-| `{has}` / `{have}` | auxiliary verb | have | has | has |
+| Placeholder        | Expands to           | they/them | she/her | he/him |
+| ------------------ | -------------------- | --------- | ------- | ------ |
+| `{they}`           | subject              | they      | she     | he     |
+| `{They}`           | subject, capitalized | They      | She     | He     |
+| `{THEY}`           | subject, uppercase   | THEY      | SHE     | HE     |
+| `{them}`           | object               | them      | her     | him    |
+| `{their}`          | possessive adjective | their     | her     | his    |
+| `{is}` / `{are}`   | linking verb         | are       | is      | is     |
+| `{was}` / `{were}` | past linking verb    | were      | was     | was    |
+| `{has}` / `{have}` | auxiliary verb       | have      | has     | has    |
 
 ---
 
-*See [Game Configuration](./game-configuration.md#custom-pronoun-sets) for defining custom pronoun sets in `CharacterConfig`.*
-*See the [Jinja2 Template Designer Documentation](https://jinja.palletsprojects.com/en/stable/templates/) for the full Jinja2 syntax reference.*
+_See [Game Configuration](./game-configuration.md#custom-pronoun-sets) for defining custom pronoun sets in `CharacterConfig`._
+_See the [Jinja2 Template Designer Documentation](https://jinja.palletsprojects.com/en/stable/templates/) for the full Jinja2 syntax reference._

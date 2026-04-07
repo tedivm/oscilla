@@ -74,7 +74,7 @@ def test_quest_stage_false_when_quest_completed() -> None:
 # ---------------------------------------------------------------------------
 
 _GAME_YAML = """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Game
 metadata:
   name: test-game
@@ -87,7 +87,7 @@ spec:
 """
 
 _CHAR_CONFIG_YAML = """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: CharacterConfig
 metadata:
   name: test-config
@@ -96,7 +96,7 @@ spec:
 """
 
 _REGION_YAML = """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Region
 metadata:
   name: test-region-root
@@ -105,7 +105,7 @@ spec:
 """
 
 _LOCATION_YAML_TEMPLATE = """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Location
 metadata:
   name: test-location
@@ -115,7 +115,7 @@ spec:
 {extra}"""
 
 _QUEST_YAML = """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Quest
 metadata:
   name: test-quest

@@ -1,10 +1,11 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-month-is
 spec:
   displayName: "Month Is — Condition Check"
-  description: "Always available. Tests all 12 months so exactly one PASS fires regardless of the current date. Also verifies
+  description:
+    "Always available. Tests all 12 months so exactly one PASS fires regardless of the current date. Also verifies
     integer and string forms agree."
   steps:
     - type: narrative

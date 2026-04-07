@@ -74,7 +74,7 @@ def test_loader_rejects_unknown_skill_ref_in_item(tmp_path: Path) -> None:
     _write_base_manifests(tmp_path)
     (tmp_path / "bad-item.yaml").write_text(
         """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Item
 metadata:
   name: bad-item
@@ -97,7 +97,7 @@ def test_loader_rejects_unknown_skill_ref_in_enemy(tmp_path: Path) -> None:
     _write_base_manifests(tmp_path)
     (tmp_path / "bad-enemy.yaml").write_text(
         """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Enemy
 metadata:
   name: bad-enemy
@@ -129,7 +129,7 @@ def test_loader_rejects_apply_buff_with_unknown_buff_ref(tmp_path: Path) -> None
     _write_base_manifests(tmp_path)
     (tmp_path / "bad-skill.yaml").write_text(
         """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Skill
 metadata:
   name: bad-skill
@@ -159,7 +159,7 @@ def test_loader_rejects_apply_buff_with_unknown_variable_key(tmp_path: Path) -> 
     _write_base_manifests(tmp_path)
     (tmp_path / "test-buff-rage.yaml").write_text(
         """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Buff
 metadata:
   name: test-buff-rage
@@ -177,7 +177,7 @@ spec:
     )
     (tmp_path / "bad-skill-var.yaml").write_text(
         """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Skill
 metadata:
   name: bad-skill-var
@@ -208,7 +208,7 @@ def test_loader_rejects_grants_buffs_with_unknown_buff_ref(tmp_path: Path) -> No
     _write_base_manifests(tmp_path)
     (tmp_path / "bad-buffgrant-item.yaml").write_text(
         """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Item
 metadata:
   name: bad-buffgrant-item
@@ -232,7 +232,7 @@ def test_loader_rejects_grants_buffs_with_unknown_variable_key(tmp_path: Path) -
     _write_base_manifests(tmp_path)
     (tmp_path / "test-buff-shield.yaml").write_text(
         """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Buff
 metadata:
   name: test-buff-shield
@@ -249,7 +249,7 @@ spec:
     )
     (tmp_path / "bad-var-item.yaml").write_text(
         """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Item
 metadata:
   name: bad-var-item
@@ -444,7 +444,7 @@ def _write_base_manifests(tmp_path: Path) -> None:
     """Write the minimum manifests needed for a valid content directory."""
     (tmp_path / "game.yaml").write_text(
         """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Game
 metadata:
   name: test-game
@@ -459,7 +459,7 @@ spec:
     )
     (tmp_path / "char-config.yaml").write_text(
         """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: CharacterConfig
 metadata:
   name: test-config
@@ -473,7 +473,7 @@ spec:
     )
     (tmp_path / "region.yaml").write_text(
         """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Region
 metadata:
   name: test-region
@@ -486,7 +486,7 @@ spec:
     )
     (tmp_path / "location.yaml").write_text(
         """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Location
 metadata:
   name: test-location

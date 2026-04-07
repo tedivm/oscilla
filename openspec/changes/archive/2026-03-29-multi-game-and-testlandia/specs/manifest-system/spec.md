@@ -2,7 +2,7 @@
 
 ### Requirement: Content directory scanning
 
-The content loader SHALL accept a configurable game *library root* path via the `GAMES_PATH` setting (env var `GAMES_PATH`). The `load_games(library_root: Path)` function SHALL scan immediate subdirectories of `library_root` for game packages (directories containing a `game.yaml`). Subdirectories without a `game.yaml` are silently skipped. The single-game `load(content_dir: Path)` function is retained as an internal helper. The `CONTENT_PATH` / `content_path` setting is removed.
+The content loader SHALL accept a configurable game _library root_ path via the `GAMES_PATH` setting (env var `GAMES_PATH`). The `load_games(library_root: Path)` function SHALL scan immediate subdirectories of `library_root` for game packages (directories containing a `game.yaml`). Subdirectories without a `game.yaml` are silently skipped. The single-game `load(content_dir: Path)` function is retained as an internal helper. The `CONTENT_PATH` / `content_path` setting is removed.
 
 #### Scenario: GAMES_PATH is used as library root
 

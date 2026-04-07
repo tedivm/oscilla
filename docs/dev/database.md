@@ -921,18 +921,18 @@ The character persistence layer uses nine tables. Three are the core identity ta
 
 ### Table Overview
 
-| Table | Purpose |
-|---|---|
-| `users` | One row per unique TUI identity; keyed by `user_key` (derived from OS `USER`/`LOGNAME`). |
-| `characters` | One row per character name; identity survives across prestige resets. |
-| `character_iterations` | One row per prestige run. Scalar stats (`level`, `xp`, `hp`, `max_hp`, etc.), current adventure progress, and the session soft-lock live here. |
-| `character_iteration_stat_values` | EAV table; one row per content-defined stat per iteration. `stat_value` is REAL (nullable for unset optional stats). |
-| `character_iteration_inventory` | One row per item held; `(iteration_id, item_ref)` composite PK with `quantity`. |
-| `character_iteration_equipment` | One row per equipment slot; `(iteration_id, slot)` composite PK with `item_ref`. |
-| `character_iteration_milestones` | One row per milestone held; `(iteration_id, milestone_ref)` composite PK. |
-| `character_iteration_quests` | One row per quest; `(iteration_id, quest_ref)` composite PK; `status` is "active" or "completed". |
-| `character_iteration_statistics` | Aggregate counters; `(iteration_id, stat_type, entity_ref)` composite PK. `stat_type` is one of `enemies_defeated`, `locations_visited`, or `adventures_completed`. |
-| `character_iteration_era_state` | One row per era that has ever been active; records `started_at_game_ticks` and `ended_at_game_ticks`. Used for era latch logic and era `count` queries. |
+| Table                             | Purpose                                                                                                                                                             |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users`                           | One row per unique TUI identity; keyed by `user_key` (derived from OS `USER`/`LOGNAME`).                                                                            |
+| `characters`                      | One row per character name; identity survives across prestige resets.                                                                                               |
+| `character_iterations`            | One row per prestige run. Scalar stats (`level`, `xp`, `hp`, `max_hp`, etc.), current adventure progress, and the session soft-lock live here.                      |
+| `character_iteration_stat_values` | EAV table; one row per content-defined stat per iteration. `stat_value` is REAL (nullable for unset optional stats).                                                |
+| `character_iteration_inventory`   | One row per item held; `(iteration_id, item_ref)` composite PK with `quantity`.                                                                                     |
+| `character_iteration_equipment`   | One row per equipment slot; `(iteration_id, slot)` composite PK with `item_ref`.                                                                                    |
+| `character_iteration_milestones`  | One row per milestone held; `(iteration_id, milestone_ref)` composite PK.                                                                                           |
+| `character_iteration_quests`      | One row per quest; `(iteration_id, quest_ref)` composite PK; `status` is "active" or "completed".                                                                   |
+| `character_iteration_statistics`  | Aggregate counters; `(iteration_id, stat_type, entity_ref)` composite PK. `stat_type` is one of `enemies_defeated`, `locations_visited`, or `adventures_completed`. |
+| `character_iteration_era_state`   | One row per era that has ever been active; records `started_at_game_ticks` and `ended_at_game_ticks`. Used for era latch logic and era `count` queries.             |
 
 ### Iteration Model and Prestige Lifecycle
 
@@ -971,10 +971,10 @@ Adventure progress columns (`adventure_ref`, `adventure_step_index`, `adventure_
 
 When the [in-game time system](../authors/ingame-time.md) is active, two monotonically non-decreasing BIGINT columns on `character_iterations` track the dual clocks:
 
-| Column | Description |
-|---|---|
-| `internal_ticks` | The monotone play-time counter. Advances by tick cost on every adventure completion. Never decremented. Used for cooldown eligibility checks. |
-| `game_ticks` | The narrative clock. Advances with `internal_ticks` but can be reduced by `adjust_game_ticks` effects (clamped at 0). Drives in-game calendar conditions and era progression. |
+| Column           | Description                                                                                                                                                                   |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `internal_ticks` | The monotone play-time counter. Advances by tick cost on every adventure completion. Never decremented. Used for cooldown eligibility checks.                                 |
+| `game_ticks`     | The narrative clock. Advances with `internal_ticks` but can be reduced by `adjust_game_ticks` effects (clamped at 0). Drives in-game calendar conditions and era progression. |
 
 Both default to 0 and remain 0 when the time system is not configured.
 

@@ -8,7 +8,7 @@ The manifest system provides the foundational content loading infrastructure for
 
 ### Requirement: YAML manifest envelope structure
 
-All content manifests SHALL use a four-field top-level envelope: `apiVersion`, `kind`, `metadata`, and `spec`. The `apiVersion` field SHALL be `game/v1`. The `kind` field SHALL be one of the registered entity kinds. The `metadata` field SHALL contain at minimum a `name` string that is unique within its kind. The `spec` field SHALL contain kind-specific configuration.
+All content manifests SHALL use a four-field top-level envelope: `apiVersion`, `kind`, `metadata`, and `spec`. The `apiVersion` field SHALL be `oscilla/v1`. The `kind` field SHALL be one of the registered entity kinds. The `metadata` field SHALL contain at minimum a `name` string that is unique within its kind. The `spec` field SHALL contain kind-specific configuration.
 
 #### Scenario: Valid manifest is parsed
 
@@ -86,7 +86,7 @@ The `CharacterConfig` manifest SHALL define `public_stats` and `hidden_stats` as
 
 ### Requirement: Content directory scanning
 
-The content loader SHALL accept a configurable game *library root* path via the `GAMES_PATH` setting (env var `GAMES_PATH`). The `load_games(library_root: Path)` function SHALL scan immediate subdirectories of `library_root` for game packages (directories containing a `game.yaml`). Subdirectories without a `game.yaml` are silently skipped. The single-game `load(content_dir: Path)` function is retained as an internal helper. The `CONTENT_PATH` / `content_path` setting is removed.
+The content loader SHALL accept a configurable game _library root_ path via the `GAMES_PATH` setting (env var `GAMES_PATH`). The `load_games(library_root: Path)` function SHALL scan immediate subdirectories of `library_root` for game packages (directories containing a `game.yaml`). Subdirectories without a `game.yaml` are silently skipped. The single-game `load(content_path: Path)` function is retained as an internal helper and accepts either a directory path or a path to a single YAML file.
 
 #### Scenario: GAMES_PATH is used as library root
 
@@ -102,6 +102,11 @@ The content loader SHALL accept a configurable game *library root* path via the 
 
 - **WHEN** a subdirectory contains a `game.yaml` but no other manifests
 - **THEN** the package loads without error and the registry contains only the `Game` manifest
+
+#### Scenario: load() accepts a single file path
+
+- **WHEN** `load()` is called with a path to a single YAML file (not a directory)
+- **THEN** all documents in that file are used as the complete manifest set and a ContentRegistry is returned
 
 ---
 
@@ -218,3 +223,40 @@ The `CharacterConfig` manifest SHALL accept an optional `extra_pronoun_sets` lis
 
 - **WHEN** `oscilla validate --game mygame` is run on a package with template errors
 - **THEN** the command exits with a non-zero code and prints each template error with its path
+
+---
+
+### Requirement: Schema export provides an umbrella union schema
+
+The schema export system SHALL provide an `export_union_schema()` function that returns a JSON Schema covering all registered manifest kinds as a `kind`-discriminated `oneOf` union. This schema SHALL be written as `manifest.json` alongside per-kind schema files when `oscilla content schema --output` is invoked.
+
+#### Scenario: Union schema covers all registered kinds
+
+- **WHEN** `export_union_schema()` is called
+- **THEN** the returned schema contains references to every kind registered in `ALL_KINDS`
+
+#### Scenario: Union schema is written as manifest.json
+
+- **WHEN** `oscilla content schema --output <dir>` is invoked
+- **THEN** a `manifest.json` file is written to `<dir>` alongside the per-kind schema files
+
+---
+
+### Requirement: `content schema --vscode` uses a content-path glob association
+
+When `--vscode` is passed to `oscilla content schema`, the `.vscode/settings.json` `yaml.schemas` entry SHALL use a content-path glob (`./content/**/*.yaml`) pointing at `manifest.json`, rather than per-filename globs. The default output directory when `--output` is not provided SHALL be `.vscode/oscilla-schemas/`.
+
+#### Scenario: --vscode without --output defaults to .vscode/oscilla-schemas/
+
+- **WHEN** `oscilla content schema --vscode` is run without `--output`
+- **THEN** schemas are written to `.vscode/oscilla-schemas/` and `settings.json` is updated
+
+#### Scenario: settings.json contains content glob pointing at manifest.json
+
+- **WHEN** `oscilla content schema --vscode` completes
+- **THEN** `.vscode/settings.json` contains a `yaml.schemas` entry mapping `./content/**/*.yaml` to the path of `manifest.json`
+
+#### Scenario: Existing settings.json content is preserved
+
+- **WHEN** `.vscode/settings.json` already contains other keys (e.g., theme or extension settings)
+- **THEN** those keys are unchanged after the command runs; only `yaml.schemas` is updated

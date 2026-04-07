@@ -93,29 +93,29 @@ docker compose exec service_name bash # Open a bash shell in a running service c
 
 ### General
 
-* Assume the minimum version of Python is 3.12.
-* Prefer async libraries and functions over synchronous ones.
-* Always define dependencies and tool settings in `pyproject.toml`: never use `setup.py` or `setup.cfg` files.
-* Prefer existing dependencies over adding new ones when possible.
-* For complex code, always consider using third-party libraries instead of writing new code that has to be maintained.
-* Use keyword arguments instead of positional arguments when calling functions and methods.
-* Do not put `import` statements inside functions unless necessary to prevent circular imports. Imports must be at the top of the file.
+- Assume the minimum version of Python is 3.12.
+- Prefer async libraries and functions over synchronous ones.
+- Always define dependencies and tool settings in `pyproject.toml`: never use `setup.py` or `setup.cfg` files.
+- Prefer existing dependencies over adding new ones when possible.
+- For complex code, always consider using third-party libraries instead of writing new code that has to be maintained.
+- Use keyword arguments instead of positional arguments when calling functions and methods.
+- Do not put `import` statements inside functions unless necessary to prevent circular imports. Imports must be at the top of the file.
 
 ### Personality
 
-* Always use American English Spelling conventions (ie, normalizes instead of normalises).
-* Treat the developer as a partner with deep subject matter expertise, but assume they are fallible and challenge requests or guidance that appears wrong.
-* Do not make assumptions. When confronted with ambiguity or multiple options seek guidance from the developer.
-* Speak concisely while still communicating: over communicate but avoid being overly verbose.
+- Always use American English Spelling conventions (ie, normalizes instead of normalises).
+- Treat the developer as a partner with deep subject matter expertise, but assume they are fallible and challenge requests or guidance that appears wrong.
+- Do not make assumptions. When confronted with ambiguity or multiple options seek guidance from the developer.
+- Speak concisely while still communicating: over communicate but avoid being overly verbose.
 
 ### Security
 
-* Always write secure code.
-* Never hardcode sensitive data.
-* Do not log sensitive data.
-* All user input must be validated.
-* Never roll your own cryptography system.
-* Always load YAML files in safe mode to prevent arbitrary Python object deserialization.
+- Always write secure code.
+- Never hardcode sensitive data.
+- Do not log sensitive data.
+- All user input must be validated.
+- Never roll your own cryptography system.
+- Always load YAML files in safe mode to prevent arbitrary Python object deserialization.
 
 ```python
 # Good: safe mode prevents arbitrary Python object deserialization
@@ -131,17 +131,17 @@ YAML().load(text)        # unsafe — ruamel default is not safe mode
 
 ### Production Ready
 
-* All generated code must be production ready.
-* There must be no stubs "for production".
-* There must not be any non-production logic branches in the main code package itself.
-* Any code or package differences between Development and Production must be avoided unless absolutely necessary.
+- All generated code must be production ready.
+- There must be no stubs "for production".
+- There must not be any non-production logic branches in the main code package itself.
+- Any code or package differences between Development and Production must be avoided unless absolutely necessary.
 
 ### Logging
 
-* Do not use `print` for logging or debugging: use the `getLogger` logger instead.
-* Each file must get its own logger using the `__name__` variable for a name.
-* Use logging levels to allow developers to enable richer logging while testing than in production.
-* Most caught exceptions must be logged with `logger.exception`.
+- Do not use `print` for logging or debugging: use the `getLogger` logger instead.
+- Each file must get its own logger using the `__name__` variable for a name.
+- Use logging levels to allow developers to enable richer logging while testing than in production.
+- Most caught exceptions must be logged with `logger.exception`.
 
 ```python
 from logging import getLogger
@@ -161,15 +161,15 @@ def process_data(data: Dict[str, str]) -> None:
 
 ### Commenting
 
-* Comments must improve code readability and understandability.
-* Comments must not simply exist for the sake of existing.
-* Examples of good comments include unclear function names/parameters, decisions about settings or function choices, logic descriptions, variable definitions, security risks, edge cases, and advice for developers refactoring or expanding code.
-* Comments must be concise, accurate, and add value to the codebase.
+- Comments must improve code readability and understandability.
+- Comments must not simply exist for the sake of existing.
+- Examples of good comments include unclear function names/parameters, decisions about settings or function choices, logic descriptions, variable definitions, security risks, edge cases, and advice for developers refactoring or expanding code.
+- Comments must be concise, accurate, and add value to the codebase.
 
 ### Error Handling
 
-* Do not suppress exceptions unless expected, and handle them properly when suppressing.
-* When suppressing exceptions, log them using `logger.exception`.
+- Do not suppress exceptions unless expected, and handle them properly when suppressing.
+- When suppressing exceptions, log them using `logger.exception`.
 
 ```python
 # Bad: Suppressing without handling
@@ -191,12 +191,12 @@ except FileNotFoundError:
 
 ### Typing
 
-* Everything must be typed: function signatures (including return values), variables, and anything else.
-* Use the union operator for multiple allowed types.
-* Do not use `Optional`: use a union with `None` (i.e., `str | None`).
-* Use typing library metaclasses instead of native types for objects and lists (i.e., `Dict[str, str]` and `List[str]` instead of `dict` or `list`).
-* Avoid using `Any` unless absolutely necessary.
-* If the schema is defined, use a `dataclass` with properly typed parameters instead of a `dict`.
+- Everything must be typed: function signatures (including return values), variables, and anything else.
+- Use the union operator for multiple allowed types.
+- Do not use `Optional`: use a union with `None` (i.e., `str | None`).
+- Use typing library metaclasses instead of native types for objects and lists (i.e., `Dict[str, str]` and `List[str]` instead of `dict` or `list`).
+- Avoid using `Any` unless absolutely necessary.
+- If the schema is defined, use a `dataclass` with properly typed parameters instead of a `dict`.
 
 ```python
 from dataclasses import dataclass
@@ -222,11 +222,11 @@ def process_users_bad(users: list[dict], config: dict) -> list:
 
 ### Settings
 
-* Manage application settings with the `pydantic-settings` library.
-* The main Settings class is located in `oscilla/conf/settings.py` - update this existing class rather than creating new ones.
-* Sensitive configuration data must always use Pydantic `SecretStr` or `SecretBytes` types.
-* Settings that are allowed to be unset must default to `None` instead of empty strings.
-* Define settings with the Pydantic `Field` function and include descriptions for users.
+- Manage application settings with the `pydantic-settings` library.
+- The main Settings class is located in `oscilla/conf/settings.py` - update this existing class rather than creating new ones.
+- Sensitive configuration data must always use Pydantic `SecretStr` or `SecretBytes` types.
+- Settings that are allowed to be unset must default to `None` instead of empty strings.
+- Define settings with the Pydantic `Field` function and include descriptions for users.
 
 ```python
 # File: oscilla/conf/settings.py
@@ -262,10 +262,10 @@ class Settings(BaseSettings):
 
 ### FastAPI
 
-* APIs must adhere as closely as possible to REST principles, including appropriate use of GET/PUT/POST/DELETE HTTP verbs.
-* All routes must use Pydantic models for input and output.
-* Use different Pydantic models for inputs and outputs (i.e., creating a `Post` must require a `PostCreate` and return a `PostRead` model, not reuse the same model).
-* Parameters in Pydantic models for user input must use the Field function with validation and descriptions.
+- APIs must adhere as closely as possible to REST principles, including appropriate use of GET/PUT/POST/DELETE HTTP verbs.
+- All routes must use Pydantic models for input and output.
+- Use different Pydantic models for inputs and outputs (i.e., creating a `Post` must require a `PostCreate` and return a `PostRead` model, not reuse the same model).
+- Parameters in Pydantic models for user input must use the Field function with validation and descriptions.
 
 ```python
 from uuid import UUID
@@ -309,12 +309,12 @@ async def delete_post(post_id: UUID) -> None:
 
 ### SQLAlchemy
 
-* Always use async SQLAlchemy APIs with SQLAlchemy 2.0 syntax.
-* Represent database tables with the declarative class system.
-* Use Alembic to define migrations.
-* Migrations must be compatible with both SQLite and PostgreSQL.
-* Never use JSON as a field unless explicitly asked by the developer.
-* When creating queries, do not use implicit `and`: instead use the `and_` function (instead of `where(Model.parameter_a == A, Model.parameter_b == B)` do `where(and_(Model.parameter_a == A, Model.parameter_b == B))`).
+- Always use async SQLAlchemy APIs with SQLAlchemy 2.0 syntax.
+- Represent database tables with the declarative class system.
+- Use Alembic to define migrations.
+- Migrations must be compatible with both SQLite and PostgreSQL.
+- Never use JSON as a field unless explicitly asked by the developer.
+- When creating queries, do not use implicit `and`: instead use the `and_` function (instead of `where(Model.parameter_a == A, Model.parameter_b == B)` do `where(and_(Model.parameter_a == A, Model.parameter_b == B))`).
 
 ```python
 from uuid import UUID, uuid4
@@ -354,9 +354,9 @@ async def get_user_bad(session: AsyncSession, email: str, name: str) -> User | N
 
 ### Typer
 
-* Any CLI command or script that must be accessible to users must be exposed via the Typer library.
-* The main CLI entrypoint must be `PACKAGE_NAME/cli.py`.
-* For async commands, use the `@syncify` decorator provided in `cli.py` to convert async functions to sync for Typer compatibility.
+- Any CLI command or script that must be accessible to users must be exposed via the Typer library.
+- The main CLI entrypoint must be `PACKAGE_NAME/cli.py`.
+- For async commands, use the `@syncify` decorator provided in `cli.py` to convert async functions to sync for Typer compatibility.
 
 ```python
 import typer
@@ -393,53 +393,53 @@ if __name__ == "__main__":
 
 ### Testing
 
-* Do not wrap test functions in classes unless there is a specific technical reason: instead prefer single functions.
-* All fixtures must be defined or imported in `conftest.py` so they are available to all tests.
-* Do not use mocks to replace simple dataclasses or Pydantic models unless absolutely necessary: instead create an instance of the appropriate class with desired parameters.
-* Use the FastAPI Test Client (preferably with a fixture) rather than calling FastAPI router classes directly.
-* Use a test database fixture with memory-backed SQLite for tests requiring a database. Including a dependency override for this test database as part of the FastAPI App fixture is extremely useful.
-* When adding new code, you must also add appropriate tests to cover that new code.
-* The test suite file structure must mirror the main code file structure.
+- Do not wrap test functions in classes unless there is a specific technical reason: instead prefer single functions.
+- All fixtures must be defined or imported in `conftest.py` so they are available to all tests.
+- Do not use mocks to replace simple dataclasses or Pydantic models unless absolutely necessary: instead create an instance of the appropriate class with desired parameters.
+- Use the FastAPI Test Client (preferably with a fixture) rather than calling FastAPI router classes directly.
+- Use a test database fixture with memory-backed SQLite for tests requiring a database. Including a dependency override for this test database as part of the FastAPI App fixture is extremely useful.
+- When adding new code, you must also add appropriate tests to cover that new code.
+- The test suite file structure must mirror the main code file structure.
 
 #### Game Engine Testing
 
-* Engine tests must never reference the `content/` directory. Changing or replacing the POC content package must never break any test.
-* For unit tests on already-loaded objects (conditions, player state, step handlers), construct Pydantic models and dataclasses directly in Python — no YAML loading required.
-* For integration tests that exercise the loader or full pipeline, use a minimal fixture set from `tests/fixtures/content/<scenario>/` containing only the manifests needed for that test.
-* Each distinct test scenario gets its own fixture subdirectory. Fixture manifests use a `test-` name prefix followed by the **kind or role** (e.g. `test-enemy`, `test-item`, `test-region-root`), never a content-flavoured name (e.g. never `test-goblin` or `test-sword`). This keeps fixtures unambiguously structural and prevents building narrative coherence inside test fixtures.
-* The `mock_tui` fixture in `conftest.py` must be used to drive all pipeline tests. No test should produce real terminal output.
+- Engine tests must never reference the `content/` directory. Changing or replacing the POC content package must never break any test.
+- For unit tests on already-loaded objects (conditions, player state, step handlers), construct Pydantic models and dataclasses directly in Python — no YAML loading required.
+- For integration tests that exercise the loader or full pipeline, use a minimal fixture set from `tests/fixtures/content/<scenario>/` containing only the manifests needed for that test.
+- Each distinct test scenario gets its own fixture subdirectory. Fixture manifests use a `test-` name prefix followed by the **kind or role** (e.g. `test-enemy`, `test-item`, `test-region-root`), never a content-flavoured name (e.g. never `test-goblin` or `test-sword`). This keeps fixtures unambiguously structural and prevents building narrative coherence inside test fixtures.
+- The `mock_tui` fixture in `conftest.py` must be used to drive all pipeline tests. No test should produce real terminal output.
 
 ### Proposals
 
 A proposal is an openspec change consisting of `proposal.md`, `design.md`, and `tasks.md`. Documentation and testing are **first-class deliverables**, not afterthoughts. Every proposal must address them at the same level of detail and specificity as the feature itself.
 
-* Before writing a proposal or specification, you **must** use Context7 to pull current documentation for every library involved — both newly introduced libraries and existing dependencies whose APIs are relevant to the change. Design decisions must reflect the actual, up-to-date API rather than assumptions or stale knowledge.
-* You *must* review at least one recent `design.md` file to understand the expected level of detail and complexity of the design that you are proposing.
-* `design.md` must include a **Documentation Plan** section that names every document to be created or updated, identifies its intended audience, and lists the specific topics it must cover. Vague statements like "update the docs" are not acceptable.
-* `design.md` must include a **Testing Philosophy** section (or equivalent) that describes what tiers of tests apply, what fixtures are needed, and which behaviours are verified by tests. It must call out any constraints (e.g. no tests may reference `content/`).
-* `tasks.md` must include dedicated sections for documentation tasks and testing tasks, at the same granularity as implementation tasks. Each doc and each meaningful test scenario must be its own line item.
-* New developer documents must follow `docs/dev/` placement and naming rules and must be added to the table of contents in `docs/dev/README.md`. New content author documents must follow `docs/authors/` placement and naming rules and must be added to `docs/authors/README.md`.
-* The documentation and testing sections of a proposal are reviewed with the same rigour as the implementation sections. A proposal that fully specifies the code but leaves documentation or testing vague is incomplete.
-* When archiving proposals you **must** always sync deltas first, and you **must** update the Roadmap if you completed an item in it.
+- Before writing a proposal or specification, you **must** use Context7 to pull current documentation for every library involved — both newly introduced libraries and existing dependencies whose APIs are relevant to the change. Design decisions must reflect the actual, up-to-date API rather than assumptions or stale knowledge.
+- You _must_ review at least one recent `design.md` file to understand the expected level of detail and complexity of the design that you are proposing.
+- `design.md` must include a **Documentation Plan** section that names every document to be created or updated, identifies its intended audience, and lists the specific topics it must cover. Vague statements like "update the docs" are not acceptable.
+- `design.md` must include a **Testing Philosophy** section (or equivalent) that describes what tiers of tests apply, what fixtures are needed, and which behaviours are verified by tests. It must call out any constraints (e.g. no tests may reference `content/`).
+- `tasks.md` must include dedicated sections for documentation tasks and testing tasks, at the same granularity as implementation tasks. Each doc and each meaningful test scenario must be its own line item.
+- New developer documents must follow `docs/dev/` placement and naming rules and must be added to the table of contents in `docs/dev/README.md`. New content author documents must follow `docs/authors/` placement and naming rules and must be added to `docs/authors/README.md`.
+- The documentation and testing sections of a proposal are reviewed with the same rigour as the implementation sections. A proposal that fully specifies the code but leaves documentation or testing vague is incomplete.
+- When archiving proposals you **must** always sync deltas first, and you **must** update the Roadmap if you completed an item in it.
 
 ### Files
 
-* Filenames must always be lowercase for better compatibility with case-insensitive filesystems.
-* This includes documentation files, except standard files (like `README.md`, `LICENSE`, etc.).
-* Developer documentation must live in `docs/dev`.
-* New developer documents must be added to the table of contents in `docs/dev/README.md`.
-* Content author documentation must live in `docs/authors`.
-* New content author documents must be added to the table of contents in `docs/authors/README.md`.
-* Files only meant for building containers must live in the `docker/` folder.
-* Database models must live in `PACKAGE_NAME/models/`.
-* The primary settings file must live in `PACKAGE_NAME/conf/settings.py`.
+- Filenames must always be lowercase for better compatibility with case-insensitive filesystems.
+- This includes documentation files, except standard files (like `README.md`, `LICENSE`, etc.).
+- Developer documentation must live in `docs/dev`.
+- New developer documents must be added to the table of contents in `docs/dev/README.md`.
+- Content author documentation must live in `docs/authors`.
+- New content author documents must be added to the table of contents in `docs/authors/README.md`.
+- Files only meant for building containers must live in the `docker/` folder.
+- Database models must live in `PACKAGE_NAME/models/`.
+- The primary settings file must live in `PACKAGE_NAME/conf/settings.py`.
 
 ### Developer Environments
 
-* Common developer tasks must be defined in the `makefile` to easy reuse.
-* Developers must always be able to start a fully functional developer instance with `docker compose up`.
-* Developer environments must be initialized with fake data for easy use.
-* Developer settings must live in the `.env` file, which must be in `.gitignore`.
-* A `.env.example` file must exist as a template for new developers to create their `.env` file and learn what variables to set.
-* Python projects must always use virtual environments at `.venv` in the project root. This must be activated before running tests.
-* Use `uv` for Python version management and package installation instead of pyenv and pip for significantly faster installations and automatic Python version handling.
+- Common developer tasks must be defined in the `makefile` to easy reuse.
+- Developers must always be able to start a fully functional developer instance with `docker compose up`.
+- Developer environments must be initialized with fake data for easy use.
+- Developer settings must live in the `.env` file, which must be in `.gitignore`.
+- A `.env.example` file must exist as a template for new developers to create their `.env` file and learn what variables to set.
+- Python projects must always use virtual environments at `.venv` in the project root. This must be activated before running tests.
+- Use `uv` for Python version management and package installation instead of pyenv and pip for significantly faster installations and automatic Python version handling.

@@ -17,7 +17,7 @@ class Metadata(BaseModel):
 
 
 class ManifestEnvelope(BaseModel):
-    apiVersion: Literal["game/v1"]
+    apiVersion: Literal["oscilla/v1"]
     kind: str
     metadata: Metadata
     spec: object  # overridden by each kind with a strongly-typed spec model

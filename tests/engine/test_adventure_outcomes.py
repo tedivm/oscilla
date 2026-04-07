@@ -15,7 +15,7 @@ from oscilla.engine.loader import ContentLoadError, load
 # ---------------------------------------------------------------------------
 
 _MINIMAL_GAME_YAML = """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Game
 metadata:
   name: test-game
@@ -28,7 +28,7 @@ spec:
 """
 
 _GAME_YAML_WITH_OUTCOMES = """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Game
 metadata:
   name: test-game
@@ -44,7 +44,7 @@ spec:
 """
 
 _CHAR_CONFIG_YAML = """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: CharacterConfig
 metadata:
   name: test-config
@@ -53,7 +53,7 @@ spec:
 """
 
 _REGION_YAML = """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Region
 metadata:
   name: test-region-root
@@ -62,7 +62,7 @@ spec:
 """
 
 _LOCATION_YAML = """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Location
 metadata:
   name: test-location
@@ -82,7 +82,7 @@ def _write_base_content(tmp_path: Path, game_yaml: str = _MINIMAL_GAME_YAML) -> 
 
 def _adventure_yaml(outcome: str) -> str:
     return f"""\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-adventure

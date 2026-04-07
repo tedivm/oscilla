@@ -25,7 +25,7 @@ def _build_prestige_registry(
     registry = ContentRegistry()
 
     registry.game = GameManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Game",
         metadata=Metadata(name="test-prestige-game"),
         spec=GameSpec(
@@ -43,7 +43,7 @@ def _build_prestige_registry(
     )
 
     registry.character_config = CharacterConfigManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="CharacterConfig",
         metadata=Metadata(name="test-prestige-char-config"),
         spec=CharacterConfigSpec(
@@ -140,7 +140,7 @@ async def test_prestige_no_config_logs_error(prestige_player: CharacterState, ca
     """When no prestige config is declared in game.yaml, the handler logs an error and skips."""
     registry = ContentRegistry()
     game_without_prestige = GameManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Game",
         metadata=Metadata(name="no-prestige-game"),
         spec=GameSpec(

@@ -103,36 +103,50 @@ def scan(content_dir: Path) -> List[Path]:
 
 
 def parse(paths: List[Path]) -> Tuple[List[ManifestEnvelope], List[LoadError]]:
-    """Parse YAML files and validate against Pydantic models. Accumulates errors."""
+    """Parse YAML files and validate against Pydantic models. Accumulates errors.
+
+    Each path may contain multiple YAML documents separated by '---' dividers.
+    Every document is validated independently. Errors include a document index
+    suffix (e.g. '[doc 2]') for files with more than one document.
+    """
     manifests: List[ManifestEnvelope] = []
     errors: List[LoadError] = []
 
     for path in paths:
         try:
-            raw = _yaml.load(path.read_text(encoding="utf-8"))
-        except YAMLError as exc:
-            errors.append(LoadError(file=path, message=f"YAML parse error: {exc}"))
-            continue
+            text = path.read_text(encoding="utf-8")
         except OSError as exc:
             errors.append(LoadError(file=path, message=f"File read error: {exc}"))
             continue
 
-        if not isinstance(raw, dict):
-            errors.append(LoadError(file=path, message="Manifest must be a YAML mapping"))
-            continue
-
-        kind = raw.get("kind", "<missing>")
-        model_cls = MANIFEST_REGISTRY.get(str(kind))
-        if model_cls is None:
-            errors.append(LoadError(file=path, message=f"Unknown kind: {kind!r}"))
-            continue
-
         try:
-            manifests.append(model_cls.model_validate(raw))
-        except ValidationError as exc:
-            for err in exc.errors():
-                loc = " → ".join(str(x) for x in err["loc"])
-                errors.append(LoadError(file=path, message=f"{loc}: {err['msg']}"))
+            # Wrap in list() to eagerly evaluate so parse errors are caught here.
+            docs = list(_yaml.load_all(text))
+        except YAMLError as exc:
+            errors.append(LoadError(file=path, message=f"YAML parse error: {exc}"))
+            continue
+
+        for doc_index, raw in enumerate(docs):
+            # Suffix added only when there is more than one document to keep
+            # single-document error messages identical to the existing format.
+            label = f"{path} [doc {doc_index + 1}]" if len(docs) > 1 else str(path)
+
+            if not isinstance(raw, dict):
+                errors.append(LoadError(file=path, message=f"{label}: Manifest must be a YAML mapping"))
+                continue
+
+            kind = raw.get("kind", "<missing>")
+            model_cls = MANIFEST_REGISTRY.get(str(kind))
+            if model_cls is None:
+                errors.append(LoadError(file=path, message=f"{label}: Unknown kind: {kind!r}"))
+                continue
+
+            try:
+                manifests.append(model_cls.model_validate(raw))
+            except ValidationError as exc:
+                for err in exc.errors():
+                    loc = " → ".join(str(x) for x in err["loc"])
+                    errors.append(LoadError(file=path, message=f"{label}: {loc}: {err['msg']}"))
 
     return manifests, errors
 
@@ -1347,8 +1361,12 @@ def _build_stat_threshold_index(game: GameManifest) -> Dict[str, List[tuple[int,
     return index
 
 
-def load(content_dir: Path) -> Tuple[ContentRegistry, List[LoadWarning]]:
+def load(content_path: Path) -> Tuple[ContentRegistry, List[LoadWarning]]:
     """Orchestrate scan → parse → validate_references → build_effective_conditions → template validation.
+
+    content_path may be either a directory (scanned recursively for .yaml/.yml files)
+    or a path to a single YAML file (all documents in that file are used directly).
+    Single-file mode is the path taken by compiled content archives.
 
     Returns a tuple of (ContentRegistry, warnings). Warnings are non-fatal issues
     that are surfaced in `oscilla validate` output but do not prevent the game from running.
@@ -1358,7 +1376,11 @@ def load(content_dir: Path) -> Tuple[ContentRegistry, List[LoadWarning]]:
     from oscilla.engine.templates import GameTemplateEngine
 
     t0 = time.perf_counter()
-    paths = scan(content_dir)
+    # Single-file mode: treat the file itself as the complete manifest list.
+    if content_path.is_file():
+        paths = [content_path]
+    else:
+        paths = scan(content_path)
     manifests, parse_errors = parse(paths)
 
     ref_errors = validate_references(manifests) if manifests else []

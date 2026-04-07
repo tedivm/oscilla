@@ -30,13 +30,13 @@ def _meta(name: str) -> Metadata:
 def _make_minimal_registry() -> ContentRegistry:
     """Build a minimal ContentRegistry with one region, location, and adventure."""
     region = RegionManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Region",
         metadata=_meta("forest"),
         spec=RegionSpec(displayName="The Forest"),
     )
     location = LocationManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Location",
         metadata=_meta("clearing"),
         spec=LocationSpec(
@@ -46,7 +46,7 @@ def _make_minimal_registry() -> ContentRegistry:
         ),
     )
     adventure = AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=_meta("goblin-fight"),
         spec=AdventureSpec(
@@ -114,13 +114,13 @@ def test_world_graph_region_links_to_root_when_no_parent() -> None:
 
 def test_world_graph_sub_region_links_to_parent() -> None:
     parent_region = RegionManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Region",
         metadata=_meta("outer"),
         spec=RegionSpec(displayName="Outer"),
     )
     child_region = RegionManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Region",
         metadata=_meta("inner"),
         spec=RegionSpec(displayName="Inner", parent="outer"),
@@ -152,7 +152,7 @@ def test_adventure_graph_has_narrative_node() -> None:
 def test_adventure_graph_combat_branches() -> None:
     """CombatStep generates on_win, on_defeat, on_flee branches."""
     adventure = AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=_meta("combat-adv"),
         spec=AdventureSpec(
@@ -171,7 +171,7 @@ def test_adventure_graph_combat_branches() -> None:
 def test_adventure_graph_choice_branches() -> None:
     """ChoiceStep generates one edge per option."""
     adventure = AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=_meta("choice-adv"),
         spec=AdventureSpec(
@@ -198,7 +198,7 @@ def test_adventure_graph_choice_branches() -> None:
 def test_adventure_graph_stat_check_branches() -> None:
     """StatCheckStep generates on_pass and on_fail branches."""
     adventure = AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=_meta("stat-adv"),
         spec=AdventureSpec(

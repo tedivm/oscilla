@@ -145,7 +145,7 @@ def test_invalid_template_raises_content_load_error(tmp_path: Path) -> None:
     # Replace the narrative adventure with one containing a syntax-invalid template.
     (content_dir / "test-template-narrative.yaml").write_text(
         """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-template-narrative

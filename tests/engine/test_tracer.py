@@ -19,7 +19,7 @@ from oscilla.engine.tracer import trace_adventure
 def _two_option_adventure() -> AdventureManifest:
     """Adventure with one ChoiceStep offering two options, each ending the adventure."""
     return AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name="two-roads"),
         spec=AdventureSpec(
@@ -60,7 +60,7 @@ def _two_option_adventure() -> AdventureManifest:
 def _linear_adventure() -> AdventureManifest:
     """Adventure with a single narrative then end."""
     return AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name="simple-quest"),
         spec=AdventureSpec(
@@ -79,7 +79,7 @@ def _linear_adventure() -> AdventureManifest:
 def _combat_adventure() -> AdventureManifest:
     """Adventure with a CombatStep — should fork into 3 branches."""
     return AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name="combat-quest"),
         spec=AdventureSpec(

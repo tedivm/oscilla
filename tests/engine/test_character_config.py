@@ -74,7 +74,7 @@ def test_character_config_duplicate_within_hidden_stats() -> None:
 def test_character_config_manifest_complete() -> None:
     """Test complete CharacterConfigManifest creation."""
     manifest = CharacterConfigManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="CharacterConfig",
         metadata={"name": "test-config"},
         spec=CharacterConfigSpec(

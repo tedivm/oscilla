@@ -83,10 +83,10 @@ condition:
 
 **Decision:** The three new types follow the existing `_LEAF_MAPPINGS` pattern where a bare key maps to a `{type, name/label}` dict.
 
-| YAML (bare) | Normalised form |
-|---|---|
-| `item_equipped: rangers-cloak` | `{type: item_equipped, name: rangers-cloak}` |
-| `item_held_label: cursed` | `{type: item_held_label, label: cursed}` |
+| YAML (bare)                     | Normalised form                                |
+| ------------------------------- | ---------------------------------------------- |
+| `item_equipped: rangers-cloak`  | `{type: item_equipped, name: rangers-cloak}`   |
+| `item_held_label: cursed`       | `{type: item_held_label, label: cursed}`       |
 | `any_item_equipped: ranger-bow` | `{type: any_item_equipped, label: ranger-bow}` |
 
 **Rationale:** Consistent with all other single-value leaf conditions. Authors see a minimal, readable syntax.
@@ -136,10 +136,10 @@ case ItemCondition(name=n):
 
 **Decision:** `CharacterStatCondition` grows a `stat_source: Literal["base", "effective"] = "effective"` field. The `evaluate()` function grows an `exclude_item: str | None = None` parameter. `CharacterState.effective_stats()` grows a matching `exclude_item: str | None = None` parameter.
 
-| `stat_source` | What is compared |
-|---|---|
+| `stat_source`           | What is compared                                                                                                                          |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `"effective"` (default) | `player.effective_stats(registry, exclude_item=exclude_item)` — full gear and passive bonuses, minus any contribution from the named item |
-| `"base"` | `player.stats` — raw character stats only, regardless of equipped items or passive effects |
+| `"base"`                | `player.stats` — raw character stats only, regardless of equipped items or passive effects                                                |
 
 **Why expose `stat_source` as an author field:**
 
@@ -249,12 +249,12 @@ spec:
 A compound requirement (strength AND a milestone):
 
 ```yaml
-    requires:
-      all:
-        - character_stat:
-            name: strength
-            gte: 15
-        - milestone: trained-in-blades
+requires:
+  all:
+    - character_stat:
+        name: strength
+        gte: 15
+    - milestone: trained-in-blades
 ```
 
 A ring that enables the sword via a stat bonus:
@@ -481,7 +481,7 @@ passive_effects:
       character_stat:
         name: strength
         gte: 18
-        stat_source: base  # explicit; "effective" would silently degrade to the same
+        stat_source: base # explicit; "effective" would silently degrade to the same
     stat_modifiers:
       - stat: attack
         amount: 4
@@ -494,7 +494,7 @@ passive_effects:
       character_stat:
         name: power
         gte: 20
-        stat_source: effective  # emits LoadWarning; will behave as stat_source: base
+        stat_source: effective # emits LoadWarning; will behave as stat_source: base
 
   # ⚠ Warning at load time: item_held_label inside a passive condition
   #   will always return False because it needs registry to look up labels,
@@ -502,7 +502,7 @@ passive_effects:
   # Use item_equipped instead, or file a feature request.
   - name: broken-effect
     condition:
-      item_held_label: legendary   # emits LoadWarning; will never activate
+      item_held_label: legendary # emits LoadWarning; will never activate
     stat_modifiers:
       - stat: luck
         amount: 10
@@ -1338,30 +1338,30 @@ def add_instance(self, item_ref: str, charges_remaining: int | None = None) -> I
 
 ### `effective_stats()` and `available_skills()` with passive effects
 
-| Situation | Handling |
-|---|---|
-| `registry` is `None` | Passive effects loop is skipped entirely; result is base stats / known skills only |
-| `registry.game` is `None` | Same: passive effects loop skipped |
-| Passive effect `condition` references a label condition with `registry=None` | `item_held_label` and `any_item_equipped` return `False` (logged warning) — effect does not activate |
-| Passive effect `stat_modifiers` reference an unknown stat | Silently ignored (`result.get(modifier.stat, 0)` returns 0; stat not mutated) — caught at load time by reference validation |
-| Two passive effects both modify the same stat | Both applied additively, same as equipped item modifiers |
+| Situation                                                                    | Handling                                                                                                                    |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `registry` is `None`                                                         | Passive effects loop is skipped entirely; result is base stats / known skills only                                          |
+| `registry.game` is `None`                                                    | Same: passive effects loop skipped                                                                                          |
+| Passive effect `condition` references a label condition with `registry=None` | `item_held_label` and `any_item_equipped` return `False` (logged warning) — effect does not activate                        |
+| Passive effect `stat_modifiers` reference an unknown stat                    | Silently ignored (`result.get(modifier.stat, 0)` returns 0; stat not mutated) — caught at load time by reference validation |
+| Two passive effects both modify the same stat                                | Both applied additively, same as equipped item modifiers                                                                    |
 
 ### Charges
 
-| Situation | Handling |
-|---|---|
-| `charges_remaining` is `None` on instance | Not a charged item; `consumed_on_use` path applies as before |
-| `charges_remaining` reaches 0 | Instance removed immediately after use |
-| Existing serialized `ItemInstance` without `charges_remaining` key | Deserializes to `None` (default); treated as uncharged |
+| Situation                                                          | Handling                                                                                           |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `charges_remaining` is `None` on instance                          | Not a charged item; `consumed_on_use` path applies as before                                       |
+| `charges_remaining` reaches 0                                      | Instance removed immediately after use                                                             |
+| Existing serialized `ItemInstance` without `charges_remaining` key | Deserializes to `None` (default); treated as uncharged                                             |
 | `UseItemEffect` targets a non-stackable charged item by `item_ref` | First matching instance is used (consistent with existing non-stackable `UseItemEffect` behaviour) |
 
 ### Load warnings
 
-| Situation | Handling |
-|---|---|
-| `item_labels` not declared in `game.yaml` | `declared` set is empty; every label on every item produces a `LoadWarning` |
-| Same undeclared label used on 10 items | 10 separate warnings, one per item manifest |
-| `--strict` with no warnings | Exit code 0, no output change |
+| Situation                                        | Handling                                                                              |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `item_labels` not declared in `game.yaml`        | `declared` set is empty; every label on every item produces a `LoadWarning`           |
+| Same undeclared label used on 10 items           | 10 separate warnings, one per item manifest                                           |
+| `--strict` with no warnings                      | Exit code 0, no output change                                                         |
 | `load()` caller ignores the warning return value | Python allows this; warning is silently discarded. Only `validate` CLI surfaces them. |
 
 ---
@@ -1370,12 +1370,12 @@ def add_instance(self, item_ref: str, charges_remaining: int | None = None) -> I
 
 Every call site for `load()` must be updated to unpack `(registry, warnings)`:
 
-| File | Location | Change needed |
-|---|---|---|
-| `oscilla/cli.py` | `validate()` command | Unpack tuple; display warnings; honour `--strict` |
-| `oscilla/cli.py` | `play()` / game start | Unpack tuple; log warnings at `WARNING` level; continue |
-| `oscilla/engine/loader.py` | `load_games()` | Unpack tuple; accumulate per-package warnings |
-| `tests/` | Any test calling `load()` directly | Unpack tuple |
+| File                       | Location                           | Change needed                                           |
+| -------------------------- | ---------------------------------- | ------------------------------------------------------- |
+| `oscilla/cli.py`           | `validate()` command               | Unpack tuple; display warnings; honour `--strict`       |
+| `oscilla/cli.py`           | `play()` / game start              | Unpack tuple; log warnings at `WARNING` level; continue |
+| `oscilla/engine/loader.py` | `load_games()`                     | Unpack tuple; accumulate per-package warnings           |
+| `tests/`                   | Any test calling `load()` directly | Unpack tuple                                            |
 
 ---
 

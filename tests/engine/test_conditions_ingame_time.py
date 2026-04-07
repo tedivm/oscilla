@@ -93,7 +93,7 @@ def _time_registry(
         time=spec,
     )
     game_manifest = GameManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Game",
         metadata=Metadata(name="test-time-game"),
         spec=game_spec,

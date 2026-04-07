@@ -6,13 +6,13 @@ Ideas and future directions that are explicitly out of scope for current work bu
 
 ## Effort Scale
 
-| Label | Meaning |
-|-------|---------|
-| **XS** | Trivial addition — touches one file or a narrow code path, no design required |
-| **S** | Small, well-scoped feature — limited to a single subsystem with minimal interface changes |
-| **M** | Moderate feature — requires design work and touches a few interconnected components |
-| **L** | Significant feature — spans multiple engine subsystems and requires coordinated changes |
-| **XL** | Major system — requires full architectural design and changes across the entire stack |
+| Label  | Meaning                                                                                   |
+| ------ | ----------------------------------------------------------------------------------------- |
+| **XS** | Trivial addition — touches one file or a narrow code path, no design required             |
+| **S**  | Small, well-scoped feature — limited to a single subsystem with minimal interface changes |
+| **M**  | Moderate feature — requires design work and touches a few interconnected components       |
+| **L**  | Significant feature — spans multiple engine subsystems and requires coordinated changes   |
+| **XL** | Major system — requires full architectural design and changes across the entire stack     |
 
 ## Summary
 
@@ -24,43 +24,41 @@ These items fix existing bugs, remove technical debt that actively misleads auth
 
 Since this project has not had a v1 release yet it is acceptable to break backwards compatibility, but we want to prioritize those features before the v1 release.
 
-| Item | Effort | Group |
-|------|--------|-------|
-| [Tick-Anchored State Refactor](#tick-anchored-state-refactor) | L | Engine Architecture |
-| [Character Archetypes](#character-archetypes) | M | Character Progression |
-| [Skill Slot Naming Revisit](#skill-slot-naming-revisit) | XS | Character Configuration |
-
+| Item                                                          | Effort | Group                   |
+| ------------------------------------------------------------- | ------ | ----------------------- |
+| [Tick-Anchored State Refactor](#tick-anchored-state-refactor) | L      | Engine Architecture     |
+| [Character Archetypes](#character-archetypes)                 | M      | Character Progression   |
+| [Skill Slot Naming Revisit](#skill-slot-naming-revisit)       | XS     | Character Configuration |
 
 ### All Items
 
-| Item | Effort | Group |
-|------|--------|-------|
-| [Full TUI Upgrade](#full-tui-upgrade) | L | — |
-| [Cross-Iteration Conditions/Templates/Effects](#cross-iteration-conditionstemplateseffects) | M | Character Progression |
-| [Tick-Anchored State Refactor](#tick-anchored-state-refactor) | L | Engine Architecture |
-| [Adventure-Scoped Variables](#adventure-scoped-variables) | M | Adventure Authoring |
-| [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems) | XL | Combat Overhaul |
-| [Buff Blocking and Priority](#buff-blocking-and-priority) | S | Combat Refinement |
-| [Buff Persistence Between Adventures](#buff-persistence-between-adventures) | S | Combat Refinement |
-| [Character Archetypes](#character-archetypes) | M | Character Progression |
-| [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades) | L | Character Progression |
-| [Stat Formula Templates](#stat-formula-templates) | M | Character Progression |
-| [Player-Defined Pronouns](#player-defined-pronouns) | S | Character Configuration |
-| [Skill Slot Naming Revisit](#skill-slot-naming-revisit) | XS | Character Configuration |
-| [Shop and Vendor System](#shop-and-vendor-system) | L | Economy & NPCs |
-| [Persistent NPCs and Dialogue](#persistent-npcs-and-dialogue) | L | Economy & NPCs |
-| [Enhanced Loot Tables](#enhanced-loot-tables) | S | Item System |
-| [Inventory Storage](#inventory-storage) | L | Item System |
-| [Quest Branching](#quest-branching) | M | Quest Depth & Factions |
-| [Quest Progress Panel](#quest-progress-panel) | M | Quest Depth |
-| [Faction and Reputation System](#faction-and-reputation-system) | M | Quest Depth & Factions |
-| [Content Inheritance / Prototypes](#content-inheritance--prototypes) | M | Content Reuse |
-| [Multi-Manifest YAML Files](#multi-manifest-yaml-files) | S | Authoring Tooling |
-| [Plugin and Extension System](#plugin-and-extension-system) | L | Engine Architecture |
-| [HTTP API for Multi-User Support](#http-api-for-multi-user-support) | XL | Multi-User Platform |
-| [Front End Website](#front-end-website) | XL | Multi-User Platform |
-| [Picture Selection and ASCII Art](#picture-selection-and-ascii-art) | M | — |
-| [Region Maps](#region-maps) | M | — |
+| Item                                                                                        | Effort | Group                   |
+| ------------------------------------------------------------------------------------------- | ------ | ----------------------- |
+| [Full TUI Upgrade](#full-tui-upgrade)                                                       | L      | —                       |
+| [Cross-Iteration Conditions/Templates/Effects](#cross-iteration-conditionstemplateseffects) | M      | Character Progression   |
+| [Tick-Anchored State Refactor](#tick-anchored-state-refactor)                               | L      | Engine Architecture     |
+| [Adventure-Scoped Variables](#adventure-scoped-variables)                                   | M      | Adventure Authoring     |
+| [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems)        | XL     | Combat Overhaul         |
+| [Buff Blocking and Priority](#buff-blocking-and-priority)                                   | S      | Combat Refinement       |
+| [Buff Persistence Between Adventures](#buff-persistence-between-adventures)                 | S      | Combat Refinement       |
+| [Character Archetypes](#character-archetypes)                                               | M      | Character Progression   |
+| [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades)                          | L      | Character Progression   |
+| [Stat Formula Templates](#stat-formula-templates)                                           | M      | Character Progression   |
+| [Player-Defined Pronouns](#player-defined-pronouns)                                         | S      | Character Configuration |
+| [Skill Slot Naming Revisit](#skill-slot-naming-revisit)                                     | XS     | Character Configuration |
+| [Shop and Vendor System](#shop-and-vendor-system)                                           | L      | Economy & NPCs          |
+| [Persistent NPCs and Dialogue](#persistent-npcs-and-dialogue)                               | L      | Economy & NPCs          |
+| [Enhanced Loot Tables](#enhanced-loot-tables)                                               | S      | Item System             |
+| [Inventory Storage](#inventory-storage)                                                     | L      | Item System             |
+| [Quest Branching](#quest-branching)                                                         | M      | Quest Depth & Factions  |
+| [Quest Progress Panel](#quest-progress-panel)                                               | M      | Quest Depth             |
+| [Faction and Reputation System](#faction-and-reputation-system)                             | M      | Quest Depth & Factions  |
+| [Content Inheritance / Prototypes](#content-inheritance--prototypes)                        | M      | Content Reuse           |
+| [Plugin and Extension System](#plugin-and-extension-system)                                 | L      | Engine Architecture     |
+| [HTTP API for Multi-User Support](#http-api-for-multi-user-support)                         | XL     | Multi-User Platform     |
+| [Front End Website](#front-end-website)                                                     | XL     | Multi-User Platform     |
+| [Picture Selection and ASCII Art](#picture-selection-and-ascii-art)                         | M      | —                       |
+| [Region Maps](#region-maps)                                                                 | M      | —                       |
 
 ---
 
@@ -132,8 +130,8 @@ Add a priority or exclusion mechanism to buff manifests. Buffs in the same exclu
 ```yaml
 spec:
   name: thorns
-  exclusion_group: thorns   # only the highest-priority instance in this group applies
-  priority: 60              # numeric priority; higher wins
+  exclusion_group: thorns # only the highest-priority instance in this group applies
+  priority: 60 # numeric priority; higher wins
 ```
 
 When a buff is applied, the engine checks for existing active effects in the same `exclusion_group` and skips the new application if a higher-priority instance is already running.
@@ -168,10 +166,10 @@ Authors define their archetype vocabulary in `game.yaml`:
 archetypes:
   warrior:
     label: "Warrior"
-    stat_growth:          # per-level stat bonuses stack across all held archetypes
+    stat_growth: # per-level stat bonuses stack across all held archetypes
       hp: 3
       strength: 1
-    skill_categories:     # union of all held archetypes' lists determines what can be learned
+    skill_categories: # union of all held archetypes' lists determines what can be learned
       - melee
       - defense
   mage:
@@ -182,9 +180,9 @@ archetypes:
     skill_categories:
       - arcane
       - support
-  guild_member:           # a social archetype with no mechanical stat growth
+  guild_member: # a social archetype with no mechanical stat growth
     label: "Guild Member"
-  wanderer:               # open archetype — no restrictions added or removed
+  wanderer: # open archetype — no restrictions added or removed
     label: "Wanderer"
 ```
 
@@ -208,19 +206,19 @@ A system for spending an author-defined resource to permanently unlock nodes tha
 The spending currency is any stat the author declares in `character_config.yaml`. A game using talent points names the stat `talent_points`; a game using favor calls it `favor`; a game with no distinct talent resource can gate nodes purely on level, milestones, or archetypes with no currency cost at all.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: TalentNode
 metadata:
   name: iron-constitution
 spec:
   displayName: "Iron Constitution"
   cost:
-    stat: talent_points   # any author-defined stat; omit entirely for free nodes
+    stat: talent_points # any author-defined stat; omit entirely for free nodes
     amount: 1
-  requires:               # standard condition — prerequisite nodes, stats, milestones, archetypes
+  requires: # standard condition — prerequisite nodes, stats, milestones, archetypes
     type: talent_unlocked
     name: basic-endurance
-  effects:                # standard effect list — the same as used everywhere else
+  effects: # standard effect list — the same as used everywhere else
     - type: stat_change
       stat: max_hp
       amount: 10
@@ -245,7 +243,7 @@ Allow `character_config.yaml` stat definitions and level-up tables to declare te
 stats:
   - name: max_hp
     type: int
-    formula: "{{ base_hp + player.stats.constitution * 3 }}"   # recalculated on level-up
+    formula: "{{ base_hp + player.stats.constitution * 3 }}" # recalculated on level-up
 
 level_xp_formula: "{{ 100 * player.level ** 2 }}"
 ```
@@ -445,32 +443,6 @@ This is largely syntactic sugar over what already exists — authors could manua
 
 ## Content Organization
 
-### Multi-Manifest YAML Files
-
-**Effort: S** · **Group: Authoring Tooling**
-
-Allow multiple manifests to be defined in a single YAML file, separated by `---` document dividers. This is the standard Kubernetes-style multi-document YAML pattern and significantly reduces file clutter for small or closely related manifests.
-
-```yaml
-apiVersion: game/v1
-kind: Item
-metadata:
-  name: rusty-sword
-spec:
-  displayName: "Rusty Sword"
-  base_damage: 5
----
-apiVersion: game/v1
-kind: Item
-metadata:
-  name: iron-sword
-spec:
-  displayName: "Iron Sword"
-  base_damage: 10
-```
-
-The directory scanner and manifest loader need to use a multi-document YAML parser (the `ruamel.yaml` library already supports this via `load_all`). File naming and directory layout remain unchanged — authors can continue using one-manifest-per-file if they prefer.
-
 ### Content Inheritance / Prototypes
 
 **Effort: M** · **Group: Content Reuse**
@@ -479,7 +451,7 @@ Allow manifests to declare a `base:` reference and inherit all unspecified field
 
 ```yaml
 # base manifest
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Enemy
 metadata:
   name: goblin-base
@@ -490,7 +462,7 @@ spec:
       weight: 80
 
 # variant inherits and overrides
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Enemy
 metadata:
   name: goblin-chief

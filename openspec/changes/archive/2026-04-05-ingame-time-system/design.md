@@ -8,14 +8,14 @@ The roadmap item "In-Game Time System" calls for an opt-in system that allows ea
 
 **Current state before this change:**
 
-| Element | Current State |
-|---|---|
-| `game.yaml` time config | Not present |
-| In-game tick counters | Not present |
-| Condition predicates for in-game time | Not present |
-| `adjust_game_ticks` effect | Not present |
-| `ingame_time` template variable | Not present |
-| `cooldown_adventures` repeat control | Present; tick-unaware |
+| Element                                             | Current State                         |
+| --------------------------------------------------- | ------------------------------------- |
+| `game.yaml` time config                             | Not present                           |
+| In-game tick counters                               | Not present                           |
+| Condition predicates for in-game time               | Not present                           |
+| `adjust_game_ticks` effect                          | Not present                           |
+| `ingame_time` template variable                     | Not present                           |
+| `cooldown_adventures` repeat control                | Present; tick-unaware                 |
 | `adventure_last_completed_at_total` character state | Present; counts adventures, not ticks |
 
 ---
@@ -200,7 +200,7 @@ class InGameTimeResolver:
 
 All new Pydantic models for the time system live in a dedicated module to keep `game.py` tractable.
 
-```python
+````python
 """In-game time system manifest models.
 
 All models are Pydantic BaseModel subclasses following the same conventions
@@ -330,7 +330,7 @@ class GameSpec(BaseModel):
     outcomes: List[str] = Field(default_factory=list)
     season_hemisphere: Literal["northern", "southern"] = "northern"
     timezone: str | None = None
-```
+````
 
 **After:**
 
@@ -1329,12 +1329,12 @@ def compute_epoch_offset(spec: "GameTimeSpec") -> int:
 
 ## Documentation Plan
 
-| Document | Audience | Topics |
-|---|---|---|
-| `docs/authors/ingame-time.md` (new) | Content authors | What the time system is; when to use it; full `game.yaml time:` schema reference with annotated examples; cycle DAG authoring guide; era definition with condition examples; epoch configuration; per-adventure ticks; repeat control migration from `cooldown_adventures`; template access via `ingame_time`; condition predicate reference for all three new types |
-| `docs/authors/game-configuration.md` (update) | Content authors | Add `time:` to the game configuration reference table; link to the new ingame-time guide |
-| `docs/dev/game-engine.md` (update) | Engine developers | Add "Dual Clock Model" section explaining `internal_ticks` vs `game_ticks`, reset behavior, tick advancement in the pipeline, and the `InGameTimeResolver` architecture |
-| `docs/dev/database.md` (update) | Engine developers | Document the two new `character_iterations` columns |
+| Document                                      | Audience          | Topics                                                                                                                                                                                                                                                                                                                                                               |
+| --------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/authors/ingame-time.md` (new)           | Content authors   | What the time system is; when to use it; full `game.yaml time:` schema reference with annotated examples; cycle DAG authoring guide; era definition with condition examples; epoch configuration; per-adventure ticks; repeat control migration from `cooldown_adventures`; template access via `ingame_time`; condition predicate reference for all three new types |
+| `docs/authors/game-configuration.md` (update) | Content authors   | Add `time:` to the game configuration reference table; link to the new ingame-time guide                                                                                                                                                                                                                                                                             |
+| `docs/dev/game-engine.md` (update)            | Engine developers | Add "Dual Clock Model" section explaining `internal_ticks` vs `game_ticks`, reset behavior, tick advancement in the pipeline, and the `InGameTimeResolver` architecture                                                                                                                                                                                              |
+| `docs/dev/database.md` (update)               | Engine developers | Document the two new `character_iterations` columns                                                                                                                                                                                                                                                                                                                  |
 
 ---
 
@@ -1643,10 +1643,10 @@ time:
 
 ## Risks / Trade-offs
 
-| Risk | Mitigation |
-|---|---|
-| Cycle DAG validation complexity — cycles that reference each other by alias can produce subtle validation errors | The semantic validator runs DFS cycle detection before any other check; aliases are resolved to canonical names before DFS |
-| `game_ticks` manipulation creates unintuitive cooldown behavior (time-travel bypasses `cooldown_game_ticks`) | This is documented as intentional; `cooldown_ticks` (internal clock) is the default for exactly this reason |
-| Era condition evaluation calls `evaluate()` recursively during `InGameTimeResolver.resolve()`, which itself may be called during condition evaluation | Evaluate era conditions only when the condition predicate is `game_calendar_era_is`; era activation is not re-evaluated during cycle position computation. This breaks the recursion. |
-| Authors writing `cooldown_adventures` get a load warning but no hard error — they may not notice | The load warning uses `logger.warning` which is visible in both dev and production logs; deprecation is mentioned prominently in the author documentation |
-| `internal_ticks` and `game_ticks` start at 0 on new iteration regardless of epoch — this is correct but may surprise authors who expect the epoch to set the starting count | The epoch is a display-only concept for tick 0; the author documentation explicitly states "epoch is what tick 0 looks like, not what tick 0 is" |
+| Risk                                                                                                                                                                        | Mitigation                                                                                                                                                                            |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cycle DAG validation complexity — cycles that reference each other by alias can produce subtle validation errors                                                            | The semantic validator runs DFS cycle detection before any other check; aliases are resolved to canonical names before DFS                                                            |
+| `game_ticks` manipulation creates unintuitive cooldown behavior (time-travel bypasses `cooldown_game_ticks`)                                                                | This is documented as intentional; `cooldown_ticks` (internal clock) is the default for exactly this reason                                                                           |
+| Era condition evaluation calls `evaluate()` recursively during `InGameTimeResolver.resolve()`, which itself may be called during condition evaluation                       | Evaluate era conditions only when the condition predicate is `game_calendar_era_is`; era activation is not re-evaluated during cycle position computation. This breaks the recursion. |
+| Authors writing `cooldown_adventures` get a load warning but no hard error — they may not notice                                                                            | The load warning uses `logger.warning` which is visible in both dev and production logs; deprecation is mentioned prominently in the author documentation                             |
+| `internal_ticks` and `game_ticks` start at 0 on new iteration regardless of epoch — this is correct but may surprise authors who expect the epoch to set the starting count | The epoch is a display-only concept for tick 0; the author documentation explicitly states "epoch is what tick 0 looks like, not what tick 0 is"                                      |

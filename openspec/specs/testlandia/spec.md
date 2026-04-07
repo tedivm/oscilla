@@ -43,18 +43,18 @@ The Character Realm SHALL contain locations that allow a developer to directly m
 
 Required locations and their primary adventures:
 
-| Location | Adventure | Primary mechanic tested |
-|---|---|---|
-| `heal` | `full-heal` | `heal: full` effect |
-| `heal` | `partial-heal` | `heal: 10` effect |
-| `xp-lab` | `gain-xp-small` | small `xp_grant` (50 XP) |
-| `xp-lab` | `gain-xp-level-up` | large `xp_grant` causing level-up |
-| `xp-lab` | `lose-xp-delevel` | large negative `xp_grant` causing de-level |
-| `stat-workshop` | `bump-strength` | `stat_change: strength +1` |
-| `stat-workshop` | `drop-strength` | `stat_change: strength -1` |
-| `stat-workshop` | `bump-speed` | `stat_change: speed +0.5` |
-| `stat-workshop` | `set-strength` | `stat_set: strength 15` |
-| `stat-workshop` | `toggle-blessed` | `stat_set: is_blessed true/false` (two adventures: `bless` and `unbless`) |
+| Location        | Adventure          | Primary mechanic tested                                                   |
+| --------------- | ------------------ | ------------------------------------------------------------------------- |
+| `heal`          | `full-heal`        | `heal: full` effect                                                       |
+| `heal`          | `partial-heal`     | `heal: 10` effect                                                         |
+| `xp-lab`        | `gain-xp-small`    | small `xp_grant` (50 XP)                                                  |
+| `xp-lab`        | `gain-xp-level-up` | large `xp_grant` causing level-up                                         |
+| `xp-lab`        | `lose-xp-delevel`  | large negative `xp_grant` causing de-level                                |
+| `stat-workshop` | `bump-strength`    | `stat_change: strength +1`                                                |
+| `stat-workshop` | `drop-strength`    | `stat_change: strength -1`                                                |
+| `stat-workshop` | `bump-speed`       | `stat_change: speed +0.5`                                                 |
+| `stat-workshop` | `set-strength`     | `stat_set: strength 15`                                                   |
+| `stat-workshop` | `toggle-blessed`   | `stat_set: is_blessed true/false` (two adventures: `bless` and `unbless`) |
 
 #### Scenario: Developer can heal to full from Character Realm
 
@@ -139,12 +139,12 @@ Required adventures: `gain-item` (guaranteed single item drop), `multi-item` (it
 
 Testlandia SHALL contain a `template-system` region that allows a developer to manually exercise every major dynamic content template feature. The region SHALL contain the following locations and adventures:
 
-| Location | Adventure | Feature exercised |
-|---|---|---|
-| `pronoun-selection` | `choose-pronouns` | Pronoun set selection (all three built-ins shown as choices) |
-| `narrative-test` | `personalized-greeting` | `{{ player.name }}`, `{{ player.level }}`, `{they}`, `{their}`, `{is}` |
-| `variable-rewards` | `treasure-hunt` | `roll()` in `xp_grant.amount` and `stat_change.amount`; variable reward text |
-| `conditional-narrative` | `fame-check` | `{% if player.milestones.has(...) %}` branching narrative |
+| Location                | Adventure               | Feature exercised                                                            |
+| ----------------------- | ----------------------- | ---------------------------------------------------------------------------- |
+| `pronoun-selection`     | `choose-pronouns`       | Pronoun set selection (all three built-ins shown as choices)                 |
+| `narrative-test`        | `personalized-greeting` | `{{ player.name }}`, `{{ player.level }}`, `{they}`, `{their}`, `{is}`       |
+| `variable-rewards`      | `treasure-hunt`         | `roll()` in `xp_grant.amount` and `stat_change.amount`; variable reward text |
+| `conditional-narrative` | `fame-check`            | `{% if player.milestones.has(...) %}` branching narrative                    |
 
 The region SHALL load cleanly with `oscilla validate --game testlandia` and SHALL exercise all major template features when played by a developer.
 

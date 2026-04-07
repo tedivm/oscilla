@@ -34,7 +34,7 @@ def _make_loot_registry_with_table() -> ContentRegistry:
     """Registry containing a LootTable manifest named 'test-loot'."""
     registry = ContentRegistry()
     loot_table = LootTableManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="LootTable",
         metadata=Metadata(name="test-loot"),
         spec=LootTableSpec(
@@ -50,7 +50,7 @@ def _make_loot_registry_with_enemy() -> ContentRegistry:
     """Registry containing an Enemy manifest named 'test-enemy' with loot."""
     registry = ContentRegistry()
     enemy = EnemyManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Enemy",
         metadata=Metadata(name="test-enemy"),
         spec=EnemySpec(
@@ -70,7 +70,7 @@ def _make_loot_registry_with_quantity() -> ContentRegistry:
     """Registry with a LootTable where the entry has quantity > 1."""
     registry = ContentRegistry()
     loot_table = LootTableManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="LootTable",
         metadata=Metadata(name="quantity-loot"),
         spec=LootTableSpec(
@@ -158,7 +158,7 @@ def test_unknown_loot_ref_raises_content_load_error(tmp_path: Path) -> None:
     game_yaml = tmp_path / "game.yaml"
     game_yaml.write_text(
         textwrap.dedent("""\
-            apiVersion: game/v1
+            apiVersion: oscilla/v1
             kind: Game
             metadata:
               name: test-game
@@ -175,7 +175,7 @@ def test_unknown_loot_ref_raises_content_load_error(tmp_path: Path) -> None:
     cc_yaml = tmp_path / "character_config.yaml"
     cc_yaml.write_text(
         textwrap.dedent("""\
-            apiVersion: game/v1
+            apiVersion: oscilla/v1
             kind: CharacterConfig
             metadata:
               name: default
@@ -188,7 +188,7 @@ def test_unknown_loot_ref_raises_content_load_error(tmp_path: Path) -> None:
     adv_yaml = tmp_path / "bad-loot-ref.yaml"
     adv_yaml.write_text(
         textwrap.dedent("""\
-            apiVersion: game/v1
+            apiVersion: oscilla/v1
             kind: Adventure
             metadata:
               name: bad-loot-ref

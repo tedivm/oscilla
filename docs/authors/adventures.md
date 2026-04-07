@@ -7,7 +7,7 @@ An adventure is a single interactive encounter: a conversation, a fight, a myste
 ## Basic Structure
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: rat-infestation
@@ -46,9 +46,8 @@ spec:
   description: "A master warrior offers advanced lessons."
   requires:
     type: level
-    value: 10  # only appears for players level 10 or above
-  steps:
-    …
+    value: 10 # only appears for players level 10 or above
+  steps: …
 ```
 
 ---
@@ -79,7 +78,7 @@ Turn-based combat against an [enemy](./enemies.md). The player and enemy trade a
 
 ```yaml
 - type: combat
-  enemy: town-rat          # must match an Enemy manifest's metadata.name
+  enemy: town-rat # must match an Enemy manifest's metadata.name
   on_win:
     effects:
       - type: xp_grant
@@ -147,7 +146,7 @@ Each option has:
 - `steps` — nested step sequence to run when the option is selected
 - `goto` — jump to a labeled top-level step instead of running nested steps
 
-`goto` and `steps` are mutually exclusive in a single option. Use `steps` when the option leads to its own short sequence of narrative, combat, or further choices. Use `goto` when the option should converge on a step that already exists elsewhere in the adventure — for example, multiple choices that all lead to the same "you were caught" scene. You cannot combine them because the engine would have no way to determine which to run first or whether to run both. If you need to both run some steps *and* then continue at a label, add your steps inline and place the label on the step you want to reach; inline steps naturally fall through to whatever follows them in the adventure.
+`goto` and `steps` are mutually exclusive in a single option. Use `steps` when the option leads to its own short sequence of narrative, combat, or further choices. Use `goto` when the option should converge on a step that already exists elsewhere in the adventure — for example, multiple choices that all lead to the same "you were caught" scene. You cannot combine them because the engine would have no way to determine which to run first or whether to run both. If you need to both run some steps _and_ then continue at a label, add your steps inline and place the label on the step you want to reach; inline steps naturally fall through to whatever follows them in the adventure.
 
 ```yaml
 # Scenario: two options both end up at a shared "alarm raised" scene,
@@ -163,7 +162,7 @@ Each option has:
         # Falls through to the next top-level step (alarm-raised) automatically.
 
     - label: "Kick down the door"
-      goto: alarm-raised    # skip straight to the shared scene
+      goto: alarm-raised # skip straight to the shared scene
 
 - label: alarm-raised
   type: narrative
@@ -269,7 +268,7 @@ Any step can carry a `label`. This makes it a target for `goto` jumps from outco
       - type: narrative
         text: "The first guardian falls."
   on_defeat:
-    goto: shared-defeat      # jumps to the labeled step below
+    goto: shared-defeat # jumps to the labeled step below
 
 - type: combat
   enemy: boss-two
@@ -278,7 +277,7 @@ Any step can carry a `label`. This makes it a target for `goto` jumps from outco
       - type: narrative
         text: "The second guardian falls."
   on_defeat:
-    goto: shared-defeat      # both combats share the same defeat text
+    goto: shared-defeat # both combats share the same defeat text
 
 - label: shared-defeat
   type: narrative
@@ -316,11 +315,11 @@ Effects appearing before `end_adventure` in the same list still fire.
 
 Adventures report an outcome when they end. Three outcome names are built into the engine and are always valid:
 
-| Outcome | Meaning |
-|---------|---------|
+| Outcome     | Meaning                                     |
+| ----------- | ------------------------------------------- |
 | `completed` | The adventure ran to its normal conclusion. |
-| `defeated` | The player was beaten in combat. |
-| `fled` | The player retreated via a flee option. |
+| `defeated`  | The player was beaten in combat.            |
+| `fled`      | The player retreated via a flee option.     |
 
 You can define additional outcome names in `game.yaml` to track story-specific results:
 
@@ -352,7 +351,7 @@ The loader enforces this: using an outcome name that is not built-in and not dec
 This adventure uses all four step types and demonstrates goto:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: forest-shrine
@@ -435,43 +434,43 @@ spec:
 
 ### Adventure manifest fields
 
-| Field | Required | Description |
-|---|---|---|
-| `metadata.name` | yes | Identifier used in location pool `ref` fields |
-| `spec.displayName` | yes | Player-facing title |
-| `spec.description` | no | Short description |
-| `spec.requires` | no | Condition that prevents this adventure appearing in any pool |
-| `spec.steps` | yes | Ordered list of steps (at least one) |
+| Field              | Required | Description                                                  |
+| ------------------ | -------- | ------------------------------------------------------------ |
+| `metadata.name`    | yes      | Identifier used in location pool `ref` fields                |
+| `spec.displayName` | yes      | Player-facing title                                          |
+| `spec.description` | no       | Short description                                            |
+| `spec.requires`    | no       | Condition that prevents this adventure appearing in any pool |
+| `spec.steps`       | yes      | Ordered list of steps (at least one)                         |
 
 ### Step types
 
-| Type | Description |
-|---|---|
-| `narrative` | Display text; optional silent effects |
-| `combat` | Turn-based fight with win/defeat/flee branches |
-| `choice` | Player-facing menu; options may have conditions |
-| `stat_check` | Automatic condition branch; no player input |
-| `passive` | Silent auto-apply effects; optional bypass condition |
+| Type         | Description                                          |
+| ------------ | ---------------------------------------------------- |
+| `narrative`  | Display text; optional silent effects                |
+| `combat`     | Turn-based fight with win/defeat/flee branches       |
+| `choice`     | Player-facing menu; options may have conditions      |
+| `stat_check` | Automatic condition branch; no player input          |
+| `passive`    | Silent auto-apply effects; optional bypass condition |
 
 ### Outcome branch fields (on_win, on_defeat, on_flee, on_pass, on_fail)
 
-| Field | Type | Description |
-|---|---|---|
-| `effects` | list | Effects that fire silently |
-| `steps` | list | Nested steps to run |
-| `goto` | string | Label of a top-level step to jump to |
+| Field     | Type   | Description                          |
+| --------- | ------ | ------------------------------------ |
+| `effects` | list   | Effects that fire silently           |
+| `steps`   | list   | Nested steps to run                  |
+| `goto`    | string | Label of a top-level step to jump to |
 
 `steps` and `goto` are mutually exclusive. Both are optional (an empty branch is valid).
 
 ### Choice option fields
 
-| Field | Required | Description |
-|---|---|---|
-| `label` | yes | Player-facing option text |
-| `requires` | no | Condition; option hidden when false |
-| `effects` | no | Fire before steps or goto |
-| `steps` | no | Nested steps to run |
-| `goto` | no | Step label to jump to (exclusive with `steps`) |
+| Field      | Required | Description                                    |
+| ---------- | -------- | ---------------------------------------------- |
+| `label`    | yes      | Player-facing option text                      |
+| `requires` | no       | Condition; option hidden when false            |
+| `effects`  | no       | Fire before steps or goto                      |
+| `steps`    | no       | Nested steps to run                            |
+| `goto`     | no       | Step label to jump to (exclusive with `steps`) |
 
 ---
 
@@ -481,12 +480,12 @@ By default, every adventure can be run as many times as the player likes. Use th
 
 All four fields are optional and default to unrestricted behavior. Setting none of them is equivalent to `repeatable: true` with no caps.
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `repeatable` | bool | `true` | Set to `false` to make an adventure a one-shot that disappears after the first completion. |
-| `max_completions` | int | none | Hard cap: the adventure is hidden once the player has completed it this many times. |
-| `cooldown_days` | int | none | The adventure is hidden for this many calendar days after the most recent completion. |
-| `cooldown_adventures` | int | none | The adventure is hidden until this many total adventures have been completed since the last run. |
+| Field                 | Type | Default | Description                                                                                      |
+| --------------------- | ---- | ------- | ------------------------------------------------------------------------------------------------ |
+| `repeatable`          | bool | `true`  | Set to `false` to make an adventure a one-shot that disappears after the first completion.       |
+| `max_completions`     | int  | none    | Hard cap: the adventure is hidden once the player has completed it this many times.              |
+| `cooldown_days`       | int  | none    | The adventure is hidden for this many calendar days after the most recent completion.            |
+| `cooldown_adventures` | int  | none    | The adventure is hidden until this many total adventures have been completed since the last run. |
 
 `repeatable: false` and `max_completions` are mutually exclusive — choose one or the other.
 
@@ -547,7 +546,7 @@ A triggered adventure uses exactly the same manifest structure as any other adve
 spec:
   trigger_adventures:
     on_level_up:
-      - level-up-fanfare    # runs every time the player levels up
+      - level-up-fanfare # runs every time the player levels up
 ```
 
 Triggered adventures respect the same `requires`, `repeatable`, `max_completions`, `cooldown_days`, and `cooldown_ticks` controls as pool adventures. If the condition is not met, that adventure is silently skipped; others in the list still run.
@@ -619,7 +618,7 @@ Give players a small starting advantage via stat changes or milestone grants ins
 ### Complete creation adventure example
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: character-creation
@@ -698,6 +697,6 @@ See [Game Configuration — Prestige](./game-configuration.md#prestige) for the 
 
 ---
 
-*See [Effects](./effects.md) for the full list of effect types.*
-*See [Conditions](./conditions.md) for the full condition syntax used in `requires` and `stat_check`.*
-*See [Enemies](./enemies.md) for enemy manifest syntax.*
+_See [Effects](./effects.md) for the full list of effect types._
+_See [Conditions](./conditions.md) for the full condition syntax used in `requires` and `stat_check`._
+_See [Enemies](./enemies.md) for enemy manifest syntax._

@@ -6,19 +6,19 @@ A secondary issue is an existing naming bug: `PrestigeCountCondition` uses `type
 
 **Key files:**
 
-| File | Role |
-|---|---|
-| `oscilla/engine/character.py` | Rename `iteration` → `prestige_count`; add `prestige_pending: PrestigeCarryForward | None` |
-| `oscilla/engine/models/base.py` | Fix `PrestigeCountCondition.type` Literal from `"iteration"` to `"prestige_count"` |
-| `oscilla/engine/models/game.py` | Add `PrestigeConfig`, `CharacterCreationDefaults`, and updated `GameSpec` |
-| `oscilla/engine/models/adventure.py` | Add `PrestigeEffect` and `SetNameEffect` to the `Effect` union |
-| `oscilla/engine/steps/effects.py` | Add `PrestigeEffect` and `SetNameEffect` dispatch handlers |
-| `oscilla/engine/templates.py` | Rename `PlayerContext.iteration` → `prestige_count` |
-| `oscilla/engine/session.py` | Handle `prestige_pending` at `adventure_end` persist; update `_persist_diff`; use placeholder name in `_create_new_character()` |
-| `oscilla/services/character.py` | Update `prestige_character()` to accept carry-forward; add `rename_character()` |
-| `docs/authors/adventures.md` | Document `on_character_create` usage with full examples; document `type: set_name` |
-| `docs/authors/game-configuration.md` | Document `prestige:` block and `character_creation:` block in `game.yaml` |
-| `content/testlandia/` | Character-creation adventure; prestige ceremony adventure; updated `game.yaml` |
+| File                                 | Role                                                                                                                            |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| `oscilla/engine/character.py`        | Rename `iteration` → `prestige_count`; add `prestige_pending: PrestigeCarryForward                                              | None` |
+| `oscilla/engine/models/base.py`      | Fix `PrestigeCountCondition.type` Literal from `"iteration"` to `"prestige_count"`                                              |
+| `oscilla/engine/models/game.py`      | Add `PrestigeConfig`, `CharacterCreationDefaults`, and updated `GameSpec`                                                       |
+| `oscilla/engine/models/adventure.py` | Add `PrestigeEffect` and `SetNameEffect` to the `Effect` union                                                                  |
+| `oscilla/engine/steps/effects.py`    | Add `PrestigeEffect` and `SetNameEffect` dispatch handlers                                                                      |
+| `oscilla/engine/templates.py`        | Rename `PlayerContext.iteration` → `prestige_count`                                                                             |
+| `oscilla/engine/session.py`          | Handle `prestige_pending` at `adventure_end` persist; update `_persist_diff`; use placeholder name in `_create_new_character()` |
+| `oscilla/services/character.py`      | Update `prestige_character()` to accept carry-forward; add `rename_character()`                                                 |
+| `docs/authors/adventures.md`         | Document `on_character_create` usage with full examples; document `type: set_name`                                              |
+| `docs/authors/game-configuration.md` | Document `prestige:` block and `character_creation:` block in `game.yaml`                                                       |
+| `content/testlandia/`                | Character-creation adventure; prestige ceremony adventure; updated `game.yaml`                                                  |
 
 ---
 
@@ -40,7 +40,7 @@ A secondary issue is an existing naming bug: `PrestigeCountCondition` uses `type
 - Cross-iteration template expressions (e.g., `{{ player.past_iterations | length }}`).
 - Cross-iteration effects.
 - Item carry-over on prestige — carrying items and equipment across iterations is out of scope here and will be addressed as part of the Inventory Storage roadmap item.
-- Player-defined custom pronoun forms at creation time — good roadmap item, no new step type needed now; `set_pronouns` covers built-in and author-defined sets. Author-defined *default* pronouns for biographic games are in scope via `character_creation.default_pronouns` in `game.yaml`.
+- Player-defined custom pronoun forms at creation time — good roadmap item, no new step type needed now; `set_pronouns` covers built-in and author-defined sets. Author-defined _default_ pronouns for biographic games are in scope via `character_creation.default_pronouns` in `game.yaml`.
 - TUI character-sheet panel improvements (prestige count in UI) — separate TUI change.
 - `--character-name` CLI flag behavior is unchanged: when a name is provided at the CLI, it is used directly and the `type: set_name` effect in the adventure does nothing (the player already has a real name, not a placeholder).
 
@@ -52,7 +52,7 @@ A secondary issue is an existing naming bug: `PrestigeCountCondition` uses `type
 
 The internal DB column `character_iterations.iteration` keeps its name — it is an ordinal row identifier, not a concept authors see. Every Python field and every YAML key seen by content authors adopts `prestige_count`.
 
-**Rationale:** The original `PrestigeCountCondition` type key was `"iteration"` — an implementation detail leaking into the authoring surface. Standardizing on `prestige_count` matches the spec, the roadmap prose, and the intuition that authors care about *how many times they have prestiged*, not the structural row number.
+**Rationale:** The original `PrestigeCountCondition` type key was `"iteration"` — an implementation detail leaking into the authoring surface. Standardizing on `prestige_count` matches the spec, the roadmap prose, and the intuition that authors care about _how many times they have prestiged_, not the structural row number.
 
 **Migration:** No live content packages use this feature yet (the prestige service function was always unwired). The only changes needed are in code and specs.
 
@@ -269,8 +269,6 @@ class CharacterCreationDefaults(BaseModel):
         description="Initial pronoun-set key (e.g. 'she_her'). Overrides the system default (they/them).",
     )
 ```
-
-
 
 ### `PrestigeEffect` in the Effect union
 
@@ -1424,8 +1422,6 @@ def test_character_creation_defaults_default_name_bypasses_placeholder():
     assert not _is_placeholder_name(cfg.default_name)
 ```
 
-
-
 The `testlandia` content package is loaded in `test_cli_content.py` and `test_www.py`. These run the loader and validate all manifests. They will catch:
 
 - Missing `legacy_power` stat definition
@@ -1439,12 +1435,12 @@ No new test files for testlandia content — it is exercised by the existing con
 
 ## Risks / Trade-offs
 
-| Risk | Mitigation |
-|------|-----------|
-| `CharacterState.iteration` rename touches many test files | Mechanical grep-and-replace; `make mypy_check` catches any missed refs |
-| `mid-adventure prestige_pending` skips checkpoints — crash recovery replays from pre-prestige | Acceptable: prestige adventures are short narrative sequences; authors are advised not to include combat after `type: prestige` |
-| `prestige_character()` no longer commits — relies on caller pattern | The adventure_end path in `session.py` already owns the commit; removing the premature commit is strictly correct |
-| hard error for missing `prestige:` block | Failing loudly prevents silent runtime no-ops that would confuse authors; the check is cheap and the misconfiguration is always a content bug |
-| Placeholder name in DB between creation start and `SetNameEffect` firing | Placeholder names use `new-{uuid4()}` and are never unique-constrained by a user — the rename path enforces uniqueness only on real names |
-| `rename_character()` raises `ValueError` if name already taken | The TUI should catch `ValueError` and re-prompt; exact UX is left to the TUI change that wires this end-to-end |
-| `character_creation.default_pronouns` key not validated at parse time by Pydantic | Add a `model_validator` on `CharacterCreationDefaults` that checks the key against `PRONOUN_SETS` at load time; `new_character()` also has a runtime fallback with a warning |
+| Risk                                                                                          | Mitigation                                                                                                                                                                   |
+| --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CharacterState.iteration` rename touches many test files                                     | Mechanical grep-and-replace; `make mypy_check` catches any missed refs                                                                                                       |
+| `mid-adventure prestige_pending` skips checkpoints — crash recovery replays from pre-prestige | Acceptable: prestige adventures are short narrative sequences; authors are advised not to include combat after `type: prestige`                                              |
+| `prestige_character()` no longer commits — relies on caller pattern                           | The adventure_end path in `session.py` already owns the commit; removing the premature commit is strictly correct                                                            |
+| hard error for missing `prestige:` block                                                      | Failing loudly prevents silent runtime no-ops that would confuse authors; the check is cheap and the misconfiguration is always a content bug                                |
+| Placeholder name in DB between creation start and `SetNameEffect` firing                      | Placeholder names use `new-{uuid4()}` and are never unique-constrained by a user — the rename path enforces uniqueness only on real names                                    |
+| `rename_character()` raises `ValueError` if name already taken                                | The TUI should catch `ValueError` and re-prompt; exact UX is left to the TUI change that wires this end-to-end                                                               |
+| `character_creation.default_pronouns` key not validated at parse time by Pydantic             | Add a `model_validator` on `CharacterCreationDefaults` that checks the key against `PRONOUN_SETS` at load time; `new_character()` also has a runtime fallback with a warning |

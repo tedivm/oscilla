@@ -1,10 +1,11 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-time-between
 spec:
   displayName: "Time Between — Condition Check"
-  description: "Always available. Four non-overlapping windows cover every minute of the day so exactly one PASS fires regardless
+  description:
+    "Always available. Four non-overlapping windows cover every minute of the day so exactly one PASS fires regardless
     of the current time. Also tests midnight-wrap syntax."
   steps:
     - type: narrative

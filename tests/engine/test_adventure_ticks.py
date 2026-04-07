@@ -35,7 +35,7 @@ def _make_player(registry: ContentRegistry) -> CharacterState:
 def _simple_adventure(name: str = "test-tick-adventure") -> AdventureManifest:
     """Build a minimal one-step adventure that ends as 'completed'."""
     return AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name=name),
         spec=AdventureSpec(
@@ -54,7 +54,7 @@ def _simple_adventure(name: str = "test-tick-adventure") -> AdventureManifest:
 def _tick_adventure(ticks: int, name: str = "test-tick-adventure") -> AdventureManifest:
     """Build an adventure with a configured ticks cost."""
     return AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name=name),
         spec=AdventureSpec(
@@ -74,7 +74,7 @@ def _tick_adventure(ticks: int, name: str = "test-tick-adventure") -> AdventureM
 def _adjust_ticks_adventure(delta: int, name: str = "test-adjust-adventure") -> AdventureManifest:
     """Build an adventure that adjusts game_ticks and ends."""
     return AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name=name),
         spec=AdventureSpec(
@@ -181,7 +181,7 @@ async def test_custom_ticks_cost_advances_by_spec_value(
 
     adv = _tick_adventure(ticks=5, name="test-five-tick-adv")
     loc = LocationManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Location",
         metadata=Metadata(name="test-location-extra"),
         spec=LocationSpec(
@@ -225,7 +225,7 @@ async def test_adjust_game_ticks_positive_delta(
 
     adv = _adjust_ticks_adventure(delta=10, name="test-adjust-pos")
     loc = LocationManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Location",
         metadata=Metadata(name="test-loc-adjust-pos"),
         spec=LocationSpec(
@@ -261,7 +261,7 @@ async def test_adjust_game_ticks_negative_delta_clamp(
     # delta=-100 on tick 0 — net game_ticks would go negative; clamp kicks in
     adv = _adjust_ticks_adventure(delta=-100, name="test-adjust-neg")
     loc = LocationManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Location",
         metadata=Metadata(name="test-loc-adjust-neg"),
         spec=LocationSpec(
@@ -298,7 +298,7 @@ async def test_adjust_game_ticks_does_not_affect_internal_ticks(
 
     adv = _adjust_ticks_adventure(delta=50, name="test-adjust-internal")
     loc = LocationManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Location",
         metadata=Metadata(name="test-loc-adjust-internal"),
         spec=LocationSpec(

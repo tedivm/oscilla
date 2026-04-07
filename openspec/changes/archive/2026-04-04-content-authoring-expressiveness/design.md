@@ -6,13 +6,13 @@ Five gaps in the content authoring language prevent authors from expressing comm
 
 **Current state before this change:**
 
-| Feature | Problem |
-|---------|---------|
-| Passive effects in adventures | No dedicated step type — authors must fake a single-option combat or choice step to apply automatic effects |
-| Repeat controls | Adventures are implicitly always repeatable; there is no way to mark an adventure as one-shot, add a cooldown, or cap completions |
-| Custom outcome names | `end_adventure` is locked to `Literal["completed", "defeated", "fled"]`; custom outcome types are impossible; no per-outcome count tracking |
-| Quest stage condition | No condition type can check what stage an active quest is on — authors use milestone proxies which break in multi-path quests |
-| Quest failure | Quests can only advance forward; there is no fail condition, no `failed_quests` state, and no way to manually fail a quest via an effect |
+| Feature                       | Problem                                                                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Passive effects in adventures | No dedicated step type — authors must fake a single-option combat or choice step to apply automatic effects                                 |
+| Repeat controls               | Adventures are implicitly always repeatable; there is no way to mark an adventure as one-shot, add a cooldown, or cap completions           |
+| Custom outcome names          | `end_adventure` is locked to `Literal["completed", "defeated", "fled"]`; custom outcome types are impossible; no per-outcome count tracking |
+| Quest stage condition         | No condition type can check what stage an active quest is on — authors use milestone proxies which break in multi-path quests               |
+| Quest failure                 | Quests can only advance forward; there is no fail condition, no `failed_quests` state, and no way to manually fail a quest via an effect    |
 
 ---
 
@@ -503,21 +503,21 @@ One new migration required. Changes:
 
 ## Risks / Trade-offs
 
-| Risk | Mitigation |
-|------|-----------|
-| `cooldown_adventures` uses total adventures across all locations as the counter, not just adventures at the same location. This is simpler but can surprise authors. | Document clearly in `adventures.md`. |
-| `increment_statistic` stat_type widened from `Literal` to `str` allows arbitrary strings in the stats table. | The loader validates outcome names against `game.yaml` before any runtime execution. |
-| `fail_condition` evaluated on every milestone grant could be expensive for long quest lists. | Failure is checked only for active quests; most games will have < 10 active quests at a time. |
-| `end_adventure` outcome is now `str`, breaking type-level exhaustiveness checks. | Loader validates all outcome strings at load time. Runtime uses the string value directly with no matching. |
+| Risk                                                                                                                                                                 | Mitigation                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `cooldown_adventures` uses total adventures across all locations as the counter, not just adventures at the same location. This is simpler but can surprise authors. | Document clearly in `adventures.md`.                                                                        |
+| `increment_statistic` stat_type widened from `Literal` to `str` allows arbitrary strings in the stats table.                                                         | The loader validates outcome names against `game.yaml` before any runtime execution.                        |
+| `fail_condition` evaluated on every milestone grant could be expensive for long quest lists.                                                                         | Failure is checked only for active quests; most games will have < 10 active quests at a time.               |
+| `end_adventure` outcome is now `str`, breaking type-level exhaustiveness checks.                                                                                     | Loader validates all outcome strings at load time. Runtime uses the string value directly with no matching. |
 
 ---
 
 ## Documentation Plan
 
-| Document | Audience | Topics |
-|----------|----------|--------|
+| Document                     | Audience        | Topics                                                                                                                                                                                                                                                                      |
+| ---------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `docs/authors/adventures.md` | Content authors | Passive step (text, effects, bypass, bypass_text examples); repeat control fields (repeatable, max_completions, cooldown_days, cooldown_adventures, units, reset-on-prestige note); outcome definitions (declare in game.yaml, end_adventure usage, custom outcome example) |
-| `docs/authors/quests.md` | Content authors | Quest stage condition (syntax, worked example); quest failure states (fail_condition, fail_effects, failed_quests state, quest_fail effect, model validator constraints) |
+| `docs/authors/quests.md`     | Content authors | Quest stage condition (syntax, worked example); quest failure states (fail_condition, fail_effects, failed_quests state, quest_fail effect, model validator constraints)                                                                                                    |
 
 ---
 

@@ -1,10 +1,11 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Quest
 metadata:
   name: test-failable-quest
 spec:
   displayName: "Failable Test Quest"
-  description: "Quest with a fail_condition. QA fixture for quest failure mechanics. Fails if the player grants the test-quest-fail-trigger
+  description:
+    "Quest with a fail_condition. QA fixture for quest failure mechanics. Fails if the player grants the test-quest-fail-trigger
     milestone while active."
   entry_stage: active
   stages:

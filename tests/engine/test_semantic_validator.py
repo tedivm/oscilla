@@ -21,7 +21,7 @@ from oscilla.engine.semantic_validator import SemanticIssue, validate_semantic
 
 def _base_region(name: str = "forest") -> RegionManifest:
     return RegionManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Region",
         metadata=Metadata(name=name),
         spec=RegionSpec(displayName=name.title()),
@@ -30,7 +30,7 @@ def _base_region(name: str = "forest") -> RegionManifest:
 
 def _base_location(name: str = "clearing", region: str = "forest") -> LocationManifest:
     return LocationManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Location",
         metadata=Metadata(name=name),
         spec=LocationSpec(displayName=name.title(), region=region),
@@ -39,7 +39,7 @@ def _base_location(name: str = "clearing", region: str = "forest") -> LocationMa
 
 def _base_adventure(name: str = "find-sword") -> AdventureManifest:
     return AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name=name),
         spec=AdventureSpec(
@@ -63,7 +63,7 @@ def test_no_issues_on_clean_registry() -> None:
     region = _base_region()
     adventure = _base_adventure()
     location = LocationManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Location",
         metadata=Metadata(name="clearing"),
         spec=LocationSpec(
@@ -85,7 +85,7 @@ def test_undefined_adventure_ref_in_pool() -> None:
 
     region = _base_region()
     location = LocationManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Location",
         metadata=Metadata(name="clearing"),
         spec=LocationSpec(
@@ -103,13 +103,13 @@ def test_undefined_adventure_ref_in_pool() -> None:
 def test_circular_region_parents() -> None:
     """Two regions that are each other's parent create a cycle."""
     region_a = RegionManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Region",
         metadata=Metadata(name="forest"),
         spec=RegionSpec(displayName="Forest", parent="mountains"),
     )
     region_b = RegionManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Region",
         metadata=Metadata(name="mountains"),
         spec=RegionSpec(displayName="Mountains", parent="forest"),
@@ -156,7 +156,7 @@ def test_undefined_enemy_in_combat_step() -> None:
     region = _base_region()
     location = _base_location()
     adventure = AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name="fight"),
         spec=AdventureSpec(
@@ -188,7 +188,7 @@ def _time_game(cycles: list, epoch: dict | None = None, eras: list | None = None
     from oscilla.engine.models.game import GameManifest, GameSpec
 
     return GameManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Game",
         metadata=Metadata(name="test-game"),
         spec=GameSpec(
@@ -373,7 +373,7 @@ def test_time_condition_cycle_is_unknown_cycle_raises_error() -> None:
     """game_calendar_cycle_is referencing an unknown cycle name must produce an error."""
     game = _time_game(cycles=[{"type": "ticks", "name": "tick"}])
     adventure = AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name="gated"),
         spec=AdventureSpec(
@@ -402,7 +402,7 @@ def test_time_condition_cycle_is_invalid_label_raises_error() -> None:
         ]
     )
     adventure = AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name="gated"),
         spec=AdventureSpec(
@@ -420,7 +420,7 @@ def test_time_condition_era_is_unknown_era_raises_error() -> None:
     """game_calendar_era_is referencing an unknown era name must produce an error."""
     game = _time_game(cycles=[{"type": "ticks", "name": "tick"}])
     adventure = AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name="gated"),
         spec=AdventureSpec(

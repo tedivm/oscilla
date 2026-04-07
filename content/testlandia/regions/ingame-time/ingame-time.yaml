@@ -1,8 +1,9 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Region
 metadata:
   name: ingame-time
 spec:
   displayName: "In-Game Time Testing Lab"
-  description: "A lab for manually testing all in-game time features: dual clocks, cycle conditions, era conditions, tick-advancing
+  description:
+    "A lab for manually testing all in-game time features: dual clocks, cycle conditions, era conditions, tick-advancing
     adventures, and the adjust_game_ticks effect."

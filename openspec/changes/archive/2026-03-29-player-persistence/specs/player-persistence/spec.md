@@ -127,16 +127,16 @@ All child tables SHALL have `cascade="all, delete-orphan"` on the SQLAlchemy rel
 
 `oscilla/services/character.py` SHALL provide one write function per child data domain. Each function MUST write only the database rows relevant to the domain it manages — it MUST NOT re-write unrelated tables.
 
-| Function | Write behavior |
-|---|---|
-| `update_scalar_fields(session, iteration_id, **fields)` | UPDATE `character_iterations` scalars; triggers `version_id_col` increment |
-| `set_stat(session, iteration_id, stat_name, value)` | Upsert one `character_iteration_stat_values` row; `value` is `int \| float \| None`, stored as REAL |
-| `set_inventory_item(session, iteration_id, item_ref, quantity)` | Upsert (quantity > 0) or delete (quantity == 0) one `character_iteration_inventory` row |
-| `equip_item(session, iteration_id, slot, item_ref)` | Upsert one `character_iteration_equipment` row |
-| `unequip_item(session, iteration_id, slot)` | Delete one `character_iteration_equipment` row if it exists |
-| `add_milestone(session, iteration_id, milestone_ref)` | Idempotent insert into `character_iteration_milestones` |
-| `set_quest(session, iteration_id, quest_ref, status, stage)` | Upsert one `character_iteration_quests` row |
-| `increment_statistic(session, iteration_id, stat_type, entity_ref, delta=1)` | Atomic upsert-increment on `character_iteration_statistics` |
+| Function                                                                                | Write behavior                                                                                                         |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `update_scalar_fields(session, iteration_id, **fields)`                                 | UPDATE `character_iterations` scalars; triggers `version_id_col` increment                                             |
+| `set_stat(session, iteration_id, stat_name, value)`                                     | Upsert one `character_iteration_stat_values` row; `value` is `int \| float \| None`, stored as REAL                    |
+| `set_inventory_item(session, iteration_id, item_ref, quantity)`                         | Upsert (quantity > 0) or delete (quantity == 0) one `character_iteration_inventory` row                                |
+| `equip_item(session, iteration_id, slot, item_ref)`                                     | Upsert one `character_iteration_equipment` row                                                                         |
+| `unequip_item(session, iteration_id, slot)`                                             | Delete one `character_iteration_equipment` row if it exists                                                            |
+| `add_milestone(session, iteration_id, milestone_ref)`                                   | Idempotent insert into `character_iteration_milestones`                                                                |
+| `set_quest(session, iteration_id, quest_ref, status, stage)`                            | Upsert one `character_iteration_quests` row                                                                            |
+| `increment_statistic(session, iteration_id, stat_type, entity_ref, delta=1)`            | Atomic upsert-increment on `character_iteration_statistics`                                                            |
 | `save_adventure_progress(session, iteration_id, adventure_ref, step_index, step_state)` | UPDATE the three adventure columns on `character_iterations`; only service function that writes `adventure_step_state` |
 
 #### Scenario: Inventory upsert removes row when quantity reaches zero

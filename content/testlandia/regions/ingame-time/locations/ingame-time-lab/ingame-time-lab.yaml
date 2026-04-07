@@ -1,10 +1,11 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Location
 metadata:
   name: ingame-time-lab
 spec:
   displayName: "Time Lab"
-  description: "Exercise in-game time features. Adventures here test tick advancement, cycle conditions, era conditions, and
+  description:
+    "Exercise in-game time features. Adventures here test tick advancement, cycle conditions, era conditions, and
     the adjust_game_ticks effect."
   region: ingame-time
   adventures:

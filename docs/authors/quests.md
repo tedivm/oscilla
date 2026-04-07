@@ -9,7 +9,7 @@ Quests create a sense of longer-term purpose — the difference between scattere
 ## Basic Structure
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Quest
 metadata:
   name: missing-merchant
@@ -59,7 +59,7 @@ A non-terminal stage advances when any milestone in its `advance_on` list is gra
 - name: search-begun
   description: "Find clues in the wilderness."
   advance_on:
-    - found-tracks        # either of these milestones will advance the stage
+    - found-tracks # either of these milestones will advance the stage
     - found-campfire
   next_stage: clues-found
 ```
@@ -137,13 +137,12 @@ Any [effect](./effects.md) is valid in `completion_effects`. The engine runs the
 
 ---
 
-
 Quests work through milestones, and milestones are granted by adventure effects. This means:
 
 1. Write the adventures that make up your questline
 2. Each adventure's key moments grant milestones
 3. Map those milestones to quest stage advancement in the quest manifest
-gate later [adventures](./adventures.md) behind [conditions](./conditions.md) that check the current quest stage or milestone
+   gate later [adventures](./adventures.md) behind [conditions](./conditions.md) that check the current quest stage or milestone
 
 A quest stage condition uses the standard [milestone condition](./conditions.md#milestone):
 
@@ -161,7 +160,7 @@ For more precise stage gating, use a [location's adventure pool `condition` fiel
 ## A Complete Example
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Quest
 metadata:
   name: lich-of-the-deep
@@ -210,13 +209,13 @@ requires:
   stage: searching
 ```
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `type` | yes | Must be `quest_stage` |
-| `quest` | yes | Quest manifest name |
-| `stage` | yes | Stage name that must be the player's current active stage |
+| Field   | Required | Description                                               |
+| ------- | -------- | --------------------------------------------------------- |
+| `type`  | yes      | Must be `quest_stage`                                     |
+| `quest` | yes      | Quest manifest name                                       |
+| `stage` | yes      | Stage name that must be the player's current active stage |
 
-**When it evaluates to true:** The quest is in `active_quests` *and* the player's current stage matches `stage`.
+**When it evaluates to true:** The quest is in `active_quests` _and_ the player's current stage matches `stage`.
 
 **When it evaluates to false:** The quest is not active, is completed, or is at a different stage.
 
@@ -285,10 +284,10 @@ This immediately moves the quest to `failed_quests` and runs its current stage's
 If the quest is not active, it is a no-op (with a log warning). If the quest is not found in
 the registry, an error is logged and shown to the player.
 
-| Field | Required | Description |
-|---|---|---|
-| `fail_condition` | no | Condition checked after every milestone grant; if true, the quest fails |
-| `fail_effects` | no | Effects that run when the quest fails at runtime (not during silent correction) |
+| Field            | Required | Description                                                                     |
+| ---------------- | -------- | ------------------------------------------------------------------------------- |
+| `fail_condition` | no       | Condition checked after every milestone grant; if true, the quest fails         |
+| `fail_effects`   | no       | Effects that run when the quest fails at runtime (not during silent correction) |
 
 ---
 
@@ -296,26 +295,26 @@ the registry, an error is logged and shown to the player.
 
 ### Quest manifest fields
 
-| Field | Required | Description |
-|---|---|---|
-| `metadata.name` | yes | Unique identifier |
-| `spec.displayName` | yes | Player-facing quest title |
-| `spec.description` | no | Summary shown in the quest log |
-| `spec.entry_stage` | yes | Stage name the player starts in when the quest activates |
-| `spec.stages` | yes | List of stage definitions (at least one, must include a terminal stage) |
+| Field              | Required | Description                                                             |
+| ------------------ | -------- | ----------------------------------------------------------------------- |
+| `metadata.name`    | yes      | Unique identifier                                                       |
+| `spec.displayName` | yes      | Player-facing quest title                                               |
+| `spec.description` | no       | Summary shown in the quest log                                          |
+| `spec.entry_stage` | yes      | Stage name the player starts in when the quest activates                |
+| `spec.stages`      | yes      | List of stage definitions (at least one, must include a terminal stage) |
 
 ### QuestStage fields
 
-| Field | Required | Default | Description |
-|---|---|---|---|
-| `name` | yes | — | Unique stage identifier within this quest |
-| `description` | no | `""` | Player-facing stage objective |
-| `advance_on` | required (non-terminal) | `[]` | Milestone names that trigger advancement |
-| `next_stage` | required (non-terminal) | — | Stage name to advance to |
-| `terminal` | no | `false` | If `true`, this stage is the quest completion state |
-| `completion_effects` | no | `[]` | Effects that fire when this stage is reached (terminal only) |
-| `fail_condition` | no | `null` | Condition checked after each milestone grant; if true, the quest fails (non-terminal only) |
-| `fail_effects` | no | `[]` | Effects that run when the quest fails via `fail_condition` at runtime (non-terminal only) |
+| Field                | Required                | Default | Description                                                                                |
+| -------------------- | ----------------------- | ------- | ------------------------------------------------------------------------------------------ |
+| `name`               | yes                     | —       | Unique stage identifier within this quest                                                  |
+| `description`        | no                      | `""`    | Player-facing stage objective                                                              |
+| `advance_on`         | required (non-terminal) | `[]`    | Milestone names that trigger advancement                                                   |
+| `next_stage`         | required (non-terminal) | —       | Stage name to advance to                                                                   |
+| `terminal`           | no                      | `false` | If `true`, this stage is the quest completion state                                        |
+| `completion_effects` | no                      | `[]`    | Effects that fire when this stage is reached (terminal only)                               |
+| `fail_condition`     | no                      | `null`  | Condition checked after each milestone grant; if true, the quest fails (non-terminal only) |
+| `fail_effects`       | no                      | `[]`    | Effects that run when the quest fails via `fail_condition` at runtime (non-terminal only)  |
 
 ### Validation rules
 
@@ -328,5 +327,5 @@ the registry, an error is logged and shown to the player.
 
 ---
 
-*See [Effects](./effects.md) for `milestone_grant` and `quest_activate` syntax.*
-*See [Conditions](./conditions.md) for the `milestone` condition type used to gate adventures.*
+_See [Effects](./effects.md) for `milestone_grant` and `quest_activate` syntax._
+_See [Conditions](./conditions.md) for the `milestone` condition type used to gate adventures._

@@ -1286,13 +1286,13 @@ def downgrade() -> None:
 
 ### Test tiers
 
-| Tier | Location | What it covers |
-|------|----------|----------------|
-| Unit | `tests/engine/test_templates.py` | `preprocess_pronouns`, `GameTemplateEngine`, mock context builder, all built-in functions and filters |
-| Unit | `tests/engine/test_template_validation.py` | Load-time validation of invalid/valid templates, template errors become `ContentLoadError` |
-| Integration | `tests/engine/test_template_integration.py` | Templates in narrative text, effect amounts, round-trip through pipeline |
-| Integration | `tests/engine/test_pronoun_system.py` | Pronoun set selection, serialization, template rendering with different sets |
-| Content | Testlandia fixtures (manual QA) | End-to-end with TUI (see Testlandia Integration section) |
+| Tier        | Location                                    | What it covers                                                                                        |
+| ----------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Unit        | `tests/engine/test_templates.py`            | `preprocess_pronouns`, `GameTemplateEngine`, mock context builder, all built-in functions and filters |
+| Unit        | `tests/engine/test_template_validation.py`  | Load-time validation of invalid/valid templates, template errors become `ContentLoadError`            |
+| Integration | `tests/engine/test_template_integration.py` | Templates in narrative text, effect amounts, round-trip through pipeline                              |
+| Integration | `tests/engine/test_pronoun_system.py`       | Pronoun set selection, serialization, template rendering with different sets                          |
+| Content     | Testlandia fixtures (manual QA)             | End-to-end with TUI (see Testlandia Integration section)                                              |
 
 All test fixtures live under `tests/fixtures/content/template-system/`. Engine tests **never reference `content/`**.
 
@@ -1451,13 +1451,13 @@ def test_stat_modifier_filter() -> None:
 
 ## Risks / Trade-offs
 
-| Risk | Mitigation |
-|------|-----------|
-| Mock render may not exercise all code paths (e.g. an `{% if %}` branch that only fires for she/her pronouns) | Mock milestones always return `True` so `has()` branches fire; mock pronouns use they/them which exercises plural-verb path. Content authors are responsible for testing the other branches via testlandia. |
-| `id(effect)` as template cache key is fragile (same id can be reused after GC) | Template IDs for inline effect templates are generated at precompile time using manifest name + step path, not object identity. `id()` only used as fallback for dynamically constructed effects, which are never templates. Reviewed and safe. |
-| Jinja2 sandbox can be escaped by creative content | Templates go through PR review. The SandboxedEnvironment blocks all module access and dunder traversal. Safety is defense in depth, not a single layer. |
-| Template errors in numeric fields produce confusing messages | `render_int()` produces a specific error message including the resolved string value and expected type. |
-| Wide `int | str` type on effect fields complicates mypy | All `str` branches are template strings; Pydantic discriminates on type at load. mypy sees both branches but all code paths are handled. |
+| Risk                                                                                                         | Mitigation                                                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Mock render may not exercise all code paths (e.g. an `{% if %}` branch that only fires for she/her pronouns) | Mock milestones always return `True` so `has()` branches fire; mock pronouns use they/them which exercises plural-verb path. Content authors are responsible for testing the other branches via testlandia.                                     |
+| `id(effect)` as template cache key is fragile (same id can be reused after GC)                               | Template IDs for inline effect templates are generated at precompile time using manifest name + step path, not object identity. `id()` only used as fallback for dynamically constructed effects, which are never templates. Reviewed and safe. |
+| Jinja2 sandbox can be escaped by creative content                                                            | Templates go through PR review. The SandboxedEnvironment blocks all module access and dunder traversal. Safety is defense in depth, not a single layer.                                                                                         |
+| Template errors in numeric fields produce confusing messages                                                 | `render_int()` produces a specific error message including the resolved string value and expected type.                                                                                                                                         |
+| Wide `int                                                                                                    | str` type on effect fields complicates mypy                                                                                                                                                                                                     | All `str` branches are template strings; Pydantic discriminates on type at load. mypy sees both branches but all code paths are handled. |
 
 ---
 
@@ -1480,12 +1480,12 @@ def test_stat_modifier_filter() -> None:
 
 ## Documentation Plan
 
-| Document | Audience | Topics to cover |
-|----------|----------|-----------------|
-| `docs/authors/content-authoring.md` (update) | Content authors | Template syntax overview; `{{ player.name }}` interpolation; `{% if %}` conditionals; all built-in functions (`roll`, `choice`, `sample`, `random`, `now`, `today`, `clamp`, `round`, `sum`, math, `season`, `month_name`, `day_name`, `week_number`, `mean`, `zodiac_sign`, `chinese_zodiac`, `moon_phase`); all filters (`stat_modifier`, `pluralize`); pronoun placeholder reference table with every supported word and capitalisation example; `oscilla validate` output for template errors |
-| `docs/authors/pronouns.md` (new) | Content authors | Pronoun system overview; how players select pronouns; complete placeholder reference; verb agreement table; example adventures; how to add custom pronoun sets to `CharacterConfig` |
-| `docs/dev/game-engine.md` (update) | Engine developers | `GameTemplateEngine` class and lifecycle; `ExpressionContext` and `PlayerContext` structure; how templates are precompiled and cached; how `_validate_templates()` integrates with `load()`; how to add new built-in functions or filters |
-| `docs/dev/testing.md` (update) | Engine developers | Template test fixtures; how to construct `ExpressionContext` in tests; note that templates must never reference `content/` |
+| Document                                     | Audience          | Topics to cover                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/authors/content-authoring.md` (update) | Content authors   | Template syntax overview; `{{ player.name }}` interpolation; `{% if %}` conditionals; all built-in functions (`roll`, `choice`, `sample`, `random`, `now`, `today`, `clamp`, `round`, `sum`, math, `season`, `month_name`, `day_name`, `week_number`, `mean`, `zodiac_sign`, `chinese_zodiac`, `moon_phase`); all filters (`stat_modifier`, `pluralize`); pronoun placeholder reference table with every supported word and capitalisation example; `oscilla validate` output for template errors |
+| `docs/authors/pronouns.md` (new)             | Content authors   | Pronoun system overview; how players select pronouns; complete placeholder reference; verb agreement table; example adventures; how to add custom pronoun sets to `CharacterConfig`                                                                                                                                                                                                                                                                                                               |
+| `docs/dev/game-engine.md` (update)           | Engine developers | `GameTemplateEngine` class and lifecycle; `ExpressionContext` and `PlayerContext` structure; how templates are precompiled and cached; how `_validate_templates()` integrates with `load()`; how to add new built-in functions or filters                                                                                                                                                                                                                                                         |
+| `docs/dev/testing.md` (update)               | Engine developers | Template test fixtures; how to construct `ExpressionContext` in tests; note that templates must never reference `content/`                                                                                                                                                                                                                                                                                                                                                                        |
 
 ---
 
@@ -1495,17 +1495,17 @@ All content added to `content/testlandia/` under a new `template-system` region.
 
 **Manifest files:**
 
-| File | Purpose |
-|------|---------|
-| `regions/template-system/template-system.yaml` | Region manifest |
-| `regions/template-system/locations/pronoun-selection/pronoun-selection.yaml` | Location |
-| `regions/template-system/locations/pronoun-selection/adventures/choose-pronouns.yaml` | Choice adventure that sets `pronoun_set` stat and demonstrates all three built-in sets |
-| `regions/template-system/locations/narrative-test/narrative-test.yaml` | Location |
+| File                                                                                     | Purpose                                                                                |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `regions/template-system/template-system.yaml`                                           | Region manifest                                                                        |
+| `regions/template-system/locations/pronoun-selection/pronoun-selection.yaml`             | Location                                                                               |
+| `regions/template-system/locations/pronoun-selection/adventures/choose-pronouns.yaml`    | Choice adventure that sets `pronoun_set` stat and demonstrates all three built-in sets |
+| `regions/template-system/locations/narrative-test/narrative-test.yaml`                   | Location                                                                               |
 | `regions/template-system/locations/narrative-test/adventures/personalized-greeting.yaml` | Uses `{{ player.name }}`, `{{ player.level }}`, `{they}`, `{their}`, `{is}`, `{Their}` |
-| `regions/template-system/locations/variable-rewards/variable-rewards.yaml` | Location |
-| `regions/template-system/locations/variable-rewards/adventures/treasure-hunt.yaml` | Uses `roll()` in XP and gold effects; shows context-sensitive reward text |
-| `regions/template-system/locations/conditional-narrative/conditional-narrative.yaml` | Location |
-| `regions/template-system/locations/conditional-narrative/adventures/fame-check.yaml` | Uses `{% if player.milestones.has('hero-of-testlandia') %}` to branch narrative |
+| `regions/template-system/locations/variable-rewards/variable-rewards.yaml`               | Location                                                                               |
+| `regions/template-system/locations/variable-rewards/adventures/treasure-hunt.yaml`       | Uses `roll()` in XP and gold effects; shows context-sensitive reward text              |
+| `regions/template-system/locations/conditional-narrative/conditional-narrative.yaml`     | Location                                                                               |
+| `regions/template-system/locations/conditional-narrative/adventures/fame-check.yaml`     | Uses `{% if player.milestones.has('hero-of-testlandia') %}` to branch narrative        |
 
 **Manual QA checklist (covers all major features):**
 

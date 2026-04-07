@@ -25,7 +25,7 @@ def _make_game_manifest(
 ) -> GameManifest:
     """Build a minimal GameManifest for validation tests."""
     return GameManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Game",
         metadata=Metadata(name="test-game"),
         spec=GameSpec(
@@ -45,7 +45,7 @@ def _make_game_manifest(
 def _make_adventure_manifest(name: str) -> AdventureManifest:
     """Build a minimal one-step AdventureManifest."""
     return AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name=name),
         spec=AdventureSpec(
@@ -167,7 +167,7 @@ def test_emit_trigger_undeclared_custom_name_is_load_warning() -> None:
     from oscilla.engine.models.adventure import AdventureSpec, NarrativeStep
 
     adv = AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name="emitting-adv"),
         spec=AdventureSpec(

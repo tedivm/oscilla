@@ -38,7 +38,7 @@ def create_test_game_registry() -> ContentRegistry:
     registry = ContentRegistry()
 
     game = GameManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Game",
         metadata=Metadata(name="test-game"),
         spec=GameSpec(
@@ -271,7 +271,7 @@ def _make_bounded_registry(bounds: StatBounds | None = None) -> ContentRegistry:
     stat = StatDefinition(name="gold", type="int", default=100, bounds=bounds)
     spec = CharacterConfigSpec(public_stats=[stat])
     config = CharacterConfigManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="CharacterConfig",
         metadata=Metadata(name="test-config"),
         spec=spec,

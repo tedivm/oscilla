@@ -48,7 +48,7 @@ def _make_game_registry(enemy_attack: int = 3, enemy_hp: int = 5, enemy_defense:
     registry = ContentRegistry()
 
     game = GameManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Game",
         metadata=Metadata(name="test-game"),
         spec=GameSpec(
@@ -60,7 +60,7 @@ def _make_game_registry(enemy_attack: int = 3, enemy_hp: int = 5, enemy_defense:
     registry.game = game
 
     char_config = CharacterConfigManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="CharacterConfig",
         metadata=Metadata(name="test-config"),
         spec=CharacterConfigSpec(
@@ -74,7 +74,7 @@ def _make_game_registry(enemy_attack: int = 3, enemy_hp: int = 5, enemy_defense:
     registry.character_config = char_config
 
     enemy = EnemyManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Enemy",
         metadata=Metadata(name="test-enemy"),
         spec=EnemySpec(
@@ -121,7 +121,7 @@ def _add_skill_to_registry(
     cost = SkillCost(stat=cost_stat, amount=cost_amount) if cost_stat else None
     cooldown = SkillCooldown(scope=cooldown_scope, count=cooldown_count) if cooldown_scope else None
     skill = SkillManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Skill",
         metadata=Metadata(name=name),
         spec=SkillSpec(
@@ -145,7 +145,7 @@ def _add_buff_to_registry(
 ) -> None:
     """Helper to add a Buff manifest to the registry."""
     buff = BuffManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Buff",
         metadata=Metadata(name=name),
         spec=BuffSpec(
@@ -356,7 +356,7 @@ async def test_enemy_skill_fires_on_scheduled_turn() -> None:
 
     # Give the enemy this skill.
     skill_enemy = EnemyManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Enemy",
         metadata=Metadata(name="skill-enemy"),
         spec=EnemySpec(
@@ -487,7 +487,7 @@ async def test_grants_buffs_equipped_applies_buff_at_combat_start() -> None:
 
     # Add an item that grants the buff when equipped.
     armor_item = ItemManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Item",
         metadata=Metadata(name="magic-armor"),
         spec=ItemSpec(
@@ -539,7 +539,7 @@ async def test_grants_buffs_held_applies_buff_at_combat_start() -> None:
 
     # Add a stackable item with grants_buffs_held.
     charm_item = ItemManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Item",
         metadata=Metadata(name="magic-charm"),
         spec=ItemSpec(
@@ -593,7 +593,7 @@ async def test_grants_buffs_equipped_with_variable_override() -> None:
 
     # Add item that equips with variable override reflect_percent=60.
     thorns_sword = ItemManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Item",
         metadata=Metadata(name="master-thorns-sword"),
         spec=ItemSpec(

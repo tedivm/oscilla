@@ -47,13 +47,13 @@ Two deployment contexts exist and have different behaviors today and after this 
 
 The XDG Base Directory Specification carves out four distinct categories. Save data — game characters, progress, run history — is persistent, user-created data:
 
-| `platformdirs` function | XDG variable | macOS | Linux (default) | Correct for saves? |
-|---|---|---|---|---|
-| `user_data_path` | `XDG_DATA_HOME` | `~/Library/Application Support/oscilla/` | `~/.local/share/oscilla/` | ✅ |
-| `user_config_path` | `XDG_CONFIG_HOME` | `~/Library/Application Support/oscilla/` | `~/.config/oscilla/` | ❌ config is preferences |
-| `user_state_path` | `XDG_STATE_HOME` | `~/Library/Application Support/oscilla/` | `~/.local/state/oscilla/` | ❌ state is logs/history |
-| `user_cache_path` | `XDG_CACHE_HOME` | `~/Library/Caches/oscilla/` | `~/.cache/oscilla/` | ❌ cache is regeneratable |
-| `~/.oscilla/` (manual) | — | `~/.oscilla/` | `~/.oscilla/` | ❌ dotfile convention, no XDG |
+| `platformdirs` function | XDG variable      | macOS                                    | Linux (default)           | Correct for saves?            |
+| ----------------------- | ----------------- | ---------------------------------------- | ------------------------- | ----------------------------- |
+| `user_data_path`        | `XDG_DATA_HOME`   | `~/Library/Application Support/oscilla/` | `~/.local/share/oscilla/` | ✅                            |
+| `user_config_path`      | `XDG_CONFIG_HOME` | `~/Library/Application Support/oscilla/` | `~/.config/oscilla/`      | ❌ config is preferences      |
+| `user_state_path`       | `XDG_STATE_HOME`  | `~/Library/Application Support/oscilla/` | `~/.local/state/oscilla/` | ❌ state is logs/history      |
+| `user_cache_path`       | `XDG_CACHE_HOME`  | `~/Library/Caches/oscilla/`              | `~/.cache/oscilla/`       | ❌ cache is regeneratable     |
+| `~/.oscilla/` (manual)  | —                 | `~/.oscilla/`                            | `~/.oscilla/`             | ❌ dotfile convention, no XDG |
 
 On macOS, `user_data_path`, `user_config_path`, and `user_state_path` all resolve to the same physical path (`~/Library/Application Support/oscilla/`). The distinction is meaningful on Linux, where they diverge. Using the semantically correct category ensures Oscilla integrates correctly with package managers, backup tools, and dotfile managers that respect XDG.
 
@@ -208,13 +208,13 @@ No Alembic migration is needed. The SQLite file at the new path is created fresh
 
 ## Documentation Plan
 
-| Document | Audience | Topics to Cover |
-|---|---|---|
-| `.env.example` | Developers | Update the `DATABASE_URL` comment to describe the new default: "auto-derived as `sqlite+aiosqlite:///<user_data_path>/oscilla.db`"; give the concrete example path for macOS (`~/Library/Application Support/oscilla/oscilla.db`) and Linux (`~/.local/share/oscilla/oscilla.db`); note that the directory is created automatically on first run. Update the `DEBUG` comment to state that `oscilla.log` is written to the same platform data directory, not the project root. |
-| `README.md` — Environment Variables table | End users, developers | Change the `DATABASE_URL` "Default" cell from "auto-derived SQLite path" to "auto-derived: `<platform data dir>/oscilla.db`"; link to `docs/dev/database.md` for full explanation |
-| `README.md` — CLI section | End users, developers | Add a `data-path` subsection documenting the command, its output format, and a usage example showing how to use it in a shell pipeline (e.g., `ls $(oscilla data-path)`) |
-| `docs/dev/database.md` | Developers | Update the "Development Configuration" section: replace the `export DATABASE_URL="sqlite:///./dev.db"` example with the new auto-derived path; add a paragraph explaining that the default SQLite path is `platformdirs.user_data_path('oscilla')/oscilla.db` and that the directory is created automatically; remove any references to `saves.db` |
-| `docs/dev/settings.md` | Developers | Update the `DATABASE_URL` setting description to reference the new default derivation via `platformdirs`; specify the per-OS paths |
+| Document                                  | Audience              | Topics to Cover                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `.env.example`                            | Developers            | Update the `DATABASE_URL` comment to describe the new default: "auto-derived as `sqlite+aiosqlite:///<user_data_path>/oscilla.db`"; give the concrete example path for macOS (`~/Library/Application Support/oscilla/oscilla.db`) and Linux (`~/.local/share/oscilla/oscilla.db`); note that the directory is created automatically on first run. Update the `DEBUG` comment to state that `oscilla.log` is written to the same platform data directory, not the project root. |
+| `README.md` — Environment Variables table | End users, developers | Change the `DATABASE_URL` "Default" cell from "auto-derived SQLite path" to "auto-derived: `<platform data dir>/oscilla.db`"; link to `docs/dev/database.md` for full explanation                                                                                                                                                                                                                                                                                              |
+| `README.md` — CLI section                 | End users, developers | Add a `data-path` subsection documenting the command, its output format, and a usage example showing how to use it in a shell pipeline (e.g., `ls $(oscilla data-path)`)                                                                                                                                                                                                                                                                                                       |
+| `docs/dev/database.md`                    | Developers            | Update the "Development Configuration" section: replace the `export DATABASE_URL="sqlite:///./dev.db"` example with the new auto-derived path; add a paragraph explaining that the default SQLite path is `platformdirs.user_data_path('oscilla')/oscilla.db` and that the directory is created automatically; remove any references to `saves.db`                                                                                                                             |
+| `docs/dev/settings.md`                    | Developers            | Update the `DATABASE_URL` setting description to reference the new default derivation via `platformdirs`; specify the per-OS paths                                                                                                                                                                                                                                                                                                                                             |
 
 ## Testing Philosophy
 
@@ -231,21 +231,21 @@ Each test constructs a `DatabaseSettings` instance directly. To avoid writing to
 
 **Tests to add:**
 
-| Test | What it verifies |
-|---|---|
-| `test_derives_oscilla_db_filename` | With no `DATABASE_URL`, the derived URL contains `oscilla.db` |
-| `test_does_not_derive_saves_db` | With no `DATABASE_URL`, the derived URL does not contain `saves.db` |
-| `test_derived_url_under_user_data_dir` | With no `DATABASE_URL`, the derived URL path is under `user_data_path('oscilla')` |
-| `test_explicit_database_url_not_overridden` | When `database_url="sqlite+aiosqlite:///foo.db"` is passed, it is not changed by the validator |
-| `test_games_path_does_not_affect_db_url` | Constructing `DatabaseSettings(games_path=Path("/custom/library"))` with no `DATABASE_URL` still derives a URL under `user_data_path('oscilla')` |
-| `test_data_directory_is_created` | After constructing `DatabaseSettings()` (with `user_data_path` monkeypatched to a `tmp_path`), the directory exists on disk |
+| Test                                        | What it verifies                                                                                                                                 |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `test_derives_oscilla_db_filename`          | With no `DATABASE_URL`, the derived URL contains `oscilla.db`                                                                                    |
+| `test_does_not_derive_saves_db`             | With no `DATABASE_URL`, the derived URL does not contain `saves.db`                                                                              |
+| `test_derived_url_under_user_data_dir`      | With no `DATABASE_URL`, the derived URL path is under `user_data_path('oscilla')`                                                                |
+| `test_explicit_database_url_not_overridden` | When `database_url="sqlite+aiosqlite:///foo.db"` is passed, it is not changed by the validator                                                   |
+| `test_games_path_does_not_affect_db_url`    | Constructing `DatabaseSettings(games_path=Path("/custom/library"))` with no `DATABASE_URL` still derives a URL under `user_data_path('oscilla')` |
+| `test_data_directory_is_created`            | After constructing `DatabaseSettings()` (with `user_data_path` monkeypatched to a `tmp_path`), the directory exists on disk                      |
 
 **Target file for log/crash path tests:** `tests/test_cli.py` (for `_configure_logging`) and `tests/services/test_crash.py` (for `write_crash_report`), or co-located with the CLI tests if a crash service test file does not yet exist.
 
-| Test | What it verifies |
-|---|---|
-| `test_log_path_uses_data_dir` | `_configure_logging()` (with `debug=True` and `user_data_path` monkeypatched to `tmp_path`) writes `oscilla.log` inside the monkeypatched data directory |
-| `test_crash_report_written_to_data_dir` | `write_crash_report()` (with `user_data_path` monkeypatched) writes the crash file inside the data directory, not `games_path.parent` |
+| Test                                    | What it verifies                                                                                                                                         |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test_log_path_uses_data_dir`           | `_configure_logging()` (with `debug=True` and `user_data_path` monkeypatched to `tmp_path`) writes `oscilla.log` inside the monkeypatched data directory |
+| `test_crash_report_written_to_data_dir` | `write_crash_report()` (with `user_data_path` monkeypatched) writes the crash file inside the data directory, not `games_path.parent`                    |
 
 ### Tier 2 — CLI integration: `oscilla data-path`
 
@@ -255,11 +255,11 @@ Uses the existing `CliRunner` fixture pattern already present in `tests/test_cli
 
 **Tests to add:**
 
-| Test | What it verifies |
-|---|---|
-| `test_data_path_exits_zero` | `oscilla data-path` exits with code 0 |
+| Test                                         | What it verifies                                                       |
+| -------------------------------------------- | ---------------------------------------------------------------------- |
+| `test_data_path_exits_zero`                  | `oscilla data-path` exits with code 0                                  |
 | `test_data_path_output_matches_platformdirs` | The printed path matches `str(platformdirs.user_data_path('oscilla'))` |
-| `test_data_path_output_is_parseable_as_path` | `Path(result.output.strip())` does not raise |
+| `test_data_path_output_is_parseable_as_path` | `Path(result.output.strip())` does not raise                           |
 
 ## Open Questions
 

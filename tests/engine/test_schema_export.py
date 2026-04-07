@@ -70,6 +70,36 @@ def test_export_schema_case_insensitive() -> None:
     assert lower["$id"] == upper["$id"]
 
 
+# ---------------------------------------------------------------------------
+# Union schema tests
+# ---------------------------------------------------------------------------
+
+
+def test_export_union_schema_structure() -> None:
+    """Union schema has the required JSON Schema metadata, title, and oneOf or anyOf."""
+    from oscilla.engine.schema_export import export_union_schema
+
+    schema = export_union_schema()
+    assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+    assert schema.get("title") == "Oscilla Manifest"
+    # Pydantic may emit either oneOf or anyOf for a discriminated union; accept both.
+    then_body = schema.get("then", schema)
+    assert "oneOf" in then_body or "anyOf" in then_body
+
+
+def test_export_union_schema_all_kinds_present() -> None:
+    """Every registered kind appears somewhere in the union schema."""
+    from oscilla.engine.schema_export import export_union_schema
+
+    schema = export_union_schema()
+    schema_str = str(schema).lower()
+    for kind_slug in valid_kinds():
+        # Slug may use hyphens (e.g., 'character-config') while the schema stores
+        # the TitleCase kind name ('CharacterConfig'). Check both forms.
+        normalized = kind_slug.replace("-", "")
+        assert kind_slug in schema_str or normalized in schema_str, f"Kind {kind_slug!r} not found in union schema"
+
+
 def test_export_schema_adventure_has_properties() -> None:
     schema = export_schema("adventure")
     # The schema should have 'properties' or '$defs' at minimum

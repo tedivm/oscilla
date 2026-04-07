@@ -15,7 +15,7 @@ from oscilla.engine.templates import DEFAULT_PRONOUN_SET, PRONOUN_SETS
 
 def _make_game(character_creation: CharacterCreationDefaults | None = None) -> GameManifest:
     return GameManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Game",
         metadata=Metadata(name="cc-test-game"),
         spec=GameSpec(
@@ -29,7 +29,7 @@ def _make_game(character_creation: CharacterCreationDefaults | None = None) -> G
 
 def _make_char_config() -> CharacterConfigManifest:
     return CharacterConfigManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="CharacterConfig",
         metadata=Metadata(name="cc-test-char-config"),
         spec=CharacterConfigSpec(

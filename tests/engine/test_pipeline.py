@@ -143,7 +143,7 @@ def _make_requires_registry(
     """
     registry = minimal_registry  # reuse existing game/char_config
     adventure = AdventureManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Adventure",
         metadata=Metadata(name="test-requires-adventure"),
         spec=AdventureSpec(

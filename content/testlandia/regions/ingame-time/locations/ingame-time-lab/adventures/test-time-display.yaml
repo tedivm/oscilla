@@ -1,10 +1,11 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-time-display
 spec:
   displayName: "Time Display — Read-Out"
-  description: "Always available. Shows the current values of both clocks, the current season, the current moon phase, and
+  description:
+    "Always available. Shows the current values of both clocks, the current season, the current moon phase, and
     the active era count. No side effects."
   steps:
     - type: narrative

@@ -72,7 +72,7 @@ def test_stat_set_bool() -> None:
 def test_str_stat_type_rejected(tmp_path: Path) -> None:
     """CharacterConfig with type: str should be rejected at load time."""
     (tmp_path / "game.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Game
 metadata:
   name: test-game
@@ -84,7 +84,7 @@ spec:
     hp_per_level: 5
 """)
     (tmp_path / "character-config.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: CharacterConfig
 metadata:
   name: config
@@ -104,7 +104,7 @@ def test_invalid_stat_change_on_bool_fails(tmp_path: Path) -> None:
     """stat_change on bool stat should fail validation."""
     # Create a broken adventure with stat_change on bool stat
     (tmp_path / "game.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Game
 metadata:
   name: broken-game
@@ -117,7 +117,7 @@ spec:
 """)
 
     (tmp_path / "character-config.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: CharacterConfig
 metadata:
   name: config
@@ -130,7 +130,7 @@ spec:
 """)
 
     (tmp_path / "region.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Region
 metadata:
   name: r
@@ -139,7 +139,7 @@ spec:
 """)
 
     (tmp_path / "location.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Location
 metadata:
   name: l
@@ -152,7 +152,7 @@ spec:
 """)
 
     (tmp_path / "adventure.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: broken-adventure
@@ -178,7 +178,7 @@ def test_invalid_stat_set_type_mismatch_fails(tmp_path: Path) -> None:
     """stat_set with a string value should fail validation — strings are not a valid stat type."""
     # Create adventure with stat_set using a string value (strings were removed as a stat type)
     (tmp_path / "game.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Game
 metadata:
   name: broken-game
@@ -191,7 +191,7 @@ spec:
 """)
 
     (tmp_path / "character-config.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: CharacterConfig
 metadata:
   name: config
@@ -204,7 +204,7 @@ spec:
 """)
 
     (tmp_path / "region.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Region
 metadata:
   name: r
@@ -213,7 +213,7 @@ spec:
 """)
 
     (tmp_path / "location.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Location
 metadata:
   name: l
@@ -226,7 +226,7 @@ spec:
 """)
 
     (tmp_path / "adventure.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: broken-adventure
@@ -249,7 +249,7 @@ spec:
 def test_unknown_stat_in_effect_fails(tmp_path: Path) -> None:
     """stat effects referencing non-existent stats should fail validation."""
     (tmp_path / "game.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Game
 metadata:
   name: broken-game
@@ -262,7 +262,7 @@ spec:
 """)
 
     (tmp_path / "character-config.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: CharacterConfig
 metadata:
   name: config
@@ -275,7 +275,7 @@ spec:
 """)
 
     (tmp_path / "region.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Region
 metadata:
   name: r
@@ -284,7 +284,7 @@ spec:
 """)
 
     (tmp_path / "location.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Location
 metadata:
   name: l
@@ -297,7 +297,7 @@ spec:
 """)
 
     (tmp_path / "adventure.yaml").write_text("""
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: broken-adventure

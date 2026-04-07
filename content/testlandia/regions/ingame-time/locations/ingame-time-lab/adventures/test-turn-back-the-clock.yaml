@@ -1,10 +1,11 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-turn-back-the-clock
 spec:
   displayName: "Turn Back the Clock — Rewind"
-  description: "Applies adjust_game_ticks with delta -10. Shows game_ticks before the effect fires. internal_ticks is unchanged.
+  description:
+    "Applies adjust_game_ticks with delta -10. Shows game_ticks before the effect fires. internal_ticks is unchanged.
     game_ticks is clamped at 0."
   steps:
     - type: narrative

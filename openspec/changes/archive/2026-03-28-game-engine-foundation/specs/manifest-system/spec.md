@@ -2,7 +2,7 @@
 
 ### Requirement: YAML manifest envelope structure
 
-All content manifests SHALL use a four-field top-level envelope: `apiVersion`, `kind`, `metadata`, and `spec`. The `apiVersion` field SHALL be `game/v1`. The `kind` field SHALL be one of the registered entity kinds. The `metadata` field SHALL contain at minimum a `name` string that is unique within its kind. The `spec` field SHALL contain kind-specific configuration.
+All content manifests SHALL use a four-field top-level envelope: `apiVersion`, `kind`, `metadata`, and `spec`. The `apiVersion` field SHALL be `oscilla/v1`. The `kind` field SHALL be one of the registered entity kinds. The `metadata` field SHALL contain at minimum a `name` string that is unique within its kind. The `spec` field SHALL contain kind-specific configuration.
 
 #### Scenario: Valid manifest is parsed
 

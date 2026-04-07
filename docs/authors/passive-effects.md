@@ -11,7 +11,7 @@ Use passive effects when a game-wide rule should apply without any authoring at 
 Add `passive_effects` to `game.yaml` under `spec`:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Game
 metadata:
   name: my-game
@@ -32,11 +32,11 @@ spec:
 
 Each entry has three optional fields:
 
-| Field | Type | Description |
-|---|---|---|
-| `condition` | Condition \| null | If set, the effect only applies when the condition is true. If null, the effect always applies. |
-| `stat_modifiers` | list of StatModifier | Stat bonuses applied while the condition holds. |
-| `skill_grants` | list of SkillGrant | Skills granted while the condition holds. |
+| Field            | Type                 | Description                                                                                     |
+| ---------------- | -------------------- | ----------------------------------------------------------------------------------------------- |
+| `condition`      | Condition \| null    | If set, the effect only applies when the condition is true. If null, the effect always applies. |
+| `stat_modifiers` | list of StatModifier | Stat bonuses applied while the condition holds.                                                 |
+| `skill_grants`   | list of SkillGrant   | Skills granted while the condition holds.                                                       |
 
 ---
 
@@ -93,7 +93,7 @@ All other condition types work fully:
 
 # ⚠ Not safe: item_held_label
 - condition:
-    type: item_held_label   # triggers LoadWarning
+    type: item_held_label # triggers LoadWarning
     label: legendary
 
 # ⚠ Not safe: stat_source: effective
@@ -101,7 +101,7 @@ All other condition types work fully:
     type: character_stat
     stat: strength
     gte: 15
-    stat_source: effective  # triggers LoadWarning
+    stat_source: effective # triggers LoadWarning
 ```
 
 ---
@@ -115,7 +115,7 @@ stat_modifiers:
   - stat: strength
     amount: 3
   - stat: defense
-    amount: -1       # negative amounts reduce the stat
+    amount: -1 # negative amounts reduce the stat
 ```
 
 Stats used here must be declared in [`character_config.yaml`](./game-configuration.md#stats). The modifier applies every time
@@ -130,8 +130,8 @@ The skill must be defined as a [`Skill` manifest](./skills.md#defining-a-skill) 
 
 ```yaml
 skill_grants:
-  - skill: arcane-shield    # Skill manifest name
-    slot: passive_1         # Optional: UI display slot
+  - skill: arcane-shield # Skill manifest name
+    slot: passive_1 # Optional: UI display slot
 ```
 
 Skills granted by passive effects appear in `available_skills()` but are not added to
@@ -159,8 +159,8 @@ Grant a skill after the player earns a specific milestone:
 ```yaml
 passive_effects:
   - condition:
-        type: milestone
-        name: guild-member
+      type: milestone
+      name: guild-member
     skill_grants:
       - skill: guild-discount
         slot: passive_1
@@ -173,8 +173,8 @@ Apply a bonus once the player reaches level 10:
 ```yaml
 passive_effects:
   - condition:
-        type: level
-        gte: 10
+      type: level
+      gte: 10
     stat_modifiers:
       - stat: max_hp_bonus
         amount: 20
@@ -188,22 +188,22 @@ Each one that matches adds its bonuses:
 ```yaml
 passive_effects:
   - condition:
-        type: level
-        gte: 5
+      type: level
+      gte: 5
     stat_modifiers:
       - stat: strength
         amount: 1
 
   - condition:
-        type: level
-        gte: 10
+      type: level
+      gte: 10
     stat_modifiers:
       - stat: strength
-        amount: 1    # stacks: level 10+ players get +2 total
+        amount: 1 # stacks: level 10+ players get +2 total
 ```
 
 ---
 
-*See [Game Configuration](./game-configuration.md) for where `passive_effects` lives in `game.yaml`.*
-*See [Conditions](./conditions.md) for the full condition syntax — and which condition types are safe to use here.*
-*See [Skills](./skills.md) for skill manifest syntax.*
+_See [Game Configuration](./game-configuration.md) for where `passive_effects` lives in `game.yaml`._
+_See [Conditions](./conditions.md) for the full condition syntax — and which condition types are safe to use here._
+_See [Skills](./skills.md) for skill manifest syntax._

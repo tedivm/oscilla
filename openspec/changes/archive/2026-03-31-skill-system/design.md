@@ -182,12 +182,12 @@ The codebase has solid foundations to build on:
 
 **The four modifier types and their combat semantics:**
 
-| Type | `target` meaning | Applied during |
-|---|---|---|
-| `damage_reduction` | target absorbs N% less incoming damage | Enemy attack phase — reduces `incoming` |
-| `damage_amplify` | target deals N% more outgoing damage | Player/enemy attack phase — scales `player_damage` or enemy basic attack |
-| `damage_reflect` | when target takes damage, N% bounces to attacker | After damage is applied — reduces `enemy_hp` or `player.hp` |
-| `damage_vulnerability` | target takes N% more incoming damage | Enemy attack phase — stacks with (and opposes) `damage_reduction` |
+| Type                   | `target` meaning                                 | Applied during                                                           |
+| ---------------------- | ------------------------------------------------ | ------------------------------------------------------------------------ |
+| `damage_reduction`     | target absorbs N% less incoming damage           | Enemy attack phase — reduces `incoming`                                  |
+| `damage_amplify`       | target deals N% more outgoing damage             | Player/enemy attack phase — scales `player_damage` or enemy basic attack |
+| `damage_reflect`       | when target takes damage, N% bounces to attacker | After damage is applied — reduces `enemy_hp` or `player.hp`              |
+| `damage_vulnerability` | target takes N% more incoming damage             | Enemy attack phase — stacks with (and opposes) `damage_reduction`        |
 
 **Examples of what each enables (inspired by Terraria buff potions):**
 
@@ -2224,7 +2224,7 @@ The following YAML examples cover all four `CombatModifier` types plus a burn Do
 A 3-turn burn applied by the enemy Fireball skill. The buff manifest name `"on-fire"` is the stable identifier used by counter-items (`dispel` label must match exactly).
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Buff
 metadata:
   name: on-fire
@@ -2248,7 +2248,7 @@ spec:
 A pure modifier buff — no tick effects, `modifiers` alone satisfies the `require_tick_or_modifier` validator. Reduces all incoming player damage by 40%.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Buff
 metadata:
   name: shielded
@@ -2271,7 +2271,7 @@ During combat, `_apply_incoming_modifiers(base=raw_incoming, target="player", ct
 Increases all outgoing player damage by 50% for 2 turns.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Buff
 metadata:
   name: battle-rage
@@ -2294,7 +2294,7 @@ During the player's basic attack, `_apply_damage_amplify(base=base_damage, targe
 A debuff applied by the enemy Weakness Curse. Makes the player take 25% more incoming damage.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Buff
 metadata:
   name: weakened
@@ -2317,7 +2317,7 @@ In `_apply_incoming_modifiers`, the 25% vulnerability is combined additively: `f
 Reflects 30% of all incoming damage back to the attacker for 3 turns. Because this is a first-class buff manifest, it can be granted by a skill, a potion, or a piece of equipment — all via `apply_buff`.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Buff
 metadata:
   name: thorns
@@ -2329,7 +2329,7 @@ spec:
     reflect_percent: 30
   modifiers:
     - type: damage_reflect
-      percent: reflect_percent    # resolved to 30 by default, or overridden at call site
+      percent: reflect_percent # resolved to 30 by default, or overridden at call site
       target: player
 ```
 
@@ -2342,7 +2342,7 @@ The `variables` block declares `reflect_percent` with a default of 30. Any `Appl
 Deals 10 immediate impact damage, then applies the `on-fire` buff.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Skill
 metadata:
   name: enemy-fireball
@@ -2373,7 +2373,7 @@ spec:
 Applies the `shielded` buff for 3 turns.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Skill
 metadata:
   name: player-arcane-shield
@@ -2395,7 +2395,7 @@ spec:
 Applies the `battle-rage` buff. Costs 10 mana per use.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Skill
 metadata:
   name: player-battle-rage
@@ -2420,7 +2420,7 @@ spec:
 Applies the `weakened` debuff. Cast by the fire-mage enemy.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Skill
 metadata:
   name: enemy-weakness-curse
@@ -2445,7 +2445,7 @@ spec:
 Applies the `thorns` buff for 3 turns using a skill at the default 30% reflection. The same buff can also be passively granted by equipment (see below), demonstrating reuse across content types.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Skill
 metadata:
   name: player-thorns-aura
@@ -2468,7 +2468,7 @@ spec:
 Uses Fireball every 3 turns and Weakness Curse every 4 turns from a shared mana pool.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Enemy
 metadata:
   name: fire-mage
@@ -2502,7 +2502,7 @@ With `mana: 80`, the mage can cast Fireball (20 mana) at most 4 times, Weakness 
 Dispels the `on-fire` burn and heals 15 HP. The `dispel` label matches the buff manifest name exactly.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Item
 metadata:
   name: water
@@ -2530,7 +2530,7 @@ spec:
 Dispels the `weakened` debuff and heals 10 HP.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Item
 metadata:
   name: clarity-potion
@@ -2555,7 +2555,7 @@ spec:
 A melee weapon that passively grants the `thorns` buff at the start of every combat while equipped. The same `thorns` buff manifest used by the `player-thorns-aura` skill — no duplication, just two different grant paths.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Item
 metadata:
   name: thorns-sword
@@ -2580,7 +2580,7 @@ spec:
 The same `thorns` buff manifest, but with `reflect_percent` overridden to 60. No new buff manifest is needed — the variable controls the resolved modifier at combat start.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Item
 metadata:
   name: master-thorns-sword
@@ -2596,7 +2596,7 @@ spec:
   grants_buffs_equipped:
     - buff_ref: thorns
       variables:
-        reflect_percent: 60    # doubles the default reflection
+        reflect_percent: 60 # doubles the default reflection
 ```
 
 At load time `_validate_buff_refs()` checks that `reflect_percent` is declared in `thorns.spec.variables` — unknown keys are a load error. At combat start, `run_combat()` dispatches `ApplyBuffEffect(buff_ref="thorns", target="player", variables={"reflect_percent": 60})`, the handler merges `{reflect_percent: 30}` with `{reflect_percent: 60}`, and the `ActiveCombatEffect` is stored with a concrete `percent=60` modifier.
@@ -2611,21 +2611,21 @@ At load time `_validate_buff_refs()` checks that `reflect_percent` is declared i
 
 A representative 6-round exchange against the fire mage. The player is carrying Water and has the Thorns Sword equipped (granting `thorns` automatically at combat start).
 
-| Round | Event | Player HP | Enemy HP | Active effects on player |
-|---|---|---|---|---|
-| 0 | **Combat start**: Thorns Sword applies `thorns` | — | — | `thorns` (3 turns) |
-| 1 | Player uses **Arcane Shield** | — | — | `thorns`, `shielded` (3 turns) |
-| 1 | Enemy basic attacks (6 raw → 4 after 40% reduction → 1 reflected) | −4 | −1 | `thorns`, `shielded` |
-| 2 | Player uses **Battle Rage** | — | — | `thorns`, `shielded`, `battle-rage` |
-| 2 | Player basic attacks: 10 raw → 15 after 50% amplify | — | −15 | — |
-| 2 | Enemy basic attacks: 6 raw → 4 after reduction → 1 reflected | −4 | −1 | all three active |
-| 3 | Tick: all effects decremented; `thorns` expires; `battle-rage` expires | — | — | `shielded` (1 turn) |
-| 3 | Enemy fires **Fireball** (turn 3): −10 impact, applies `on-fire` | −10 | — | `shielded` (1 turn), `on-fire` (3 turns) |
-| 3 | Enemy basic attacks: 6 raw → 4 after shield (no thorns remaining) | −4 | — | — |
-| 4 | Tick: burn −10, shield expires | −10 | — | `on-fire` (2 turns) |
-| 4 | Player uses **Thorns Aura** | — | — | `on-fire`, `thorns` (3 turns) |
-| 4 | Enemy attacks: 6 raw, 30% reflected → 2 back | −6 | −2 | `on-fire`, `thorns` |
-| 5 | Player uses **Water**: dispels `on-fire`; +15 heal | +15 | — | `thorns` (2 turns), burn cleared |
+| Round | Event                                                                  | Player HP | Enemy HP | Active effects on player                 |
+| ----- | ---------------------------------------------------------------------- | --------- | -------- | ---------------------------------------- |
+| 0     | **Combat start**: Thorns Sword applies `thorns`                        | —         | —        | `thorns` (3 turns)                       |
+| 1     | Player uses **Arcane Shield**                                          | —         | —        | `thorns`, `shielded` (3 turns)           |
+| 1     | Enemy basic attacks (6 raw → 4 after 40% reduction → 1 reflected)      | −4        | −1       | `thorns`, `shielded`                     |
+| 2     | Player uses **Battle Rage**                                            | —         | —        | `thorns`, `shielded`, `battle-rage`      |
+| 2     | Player basic attacks: 10 raw → 15 after 50% amplify                    | —         | −15      | —                                        |
+| 2     | Enemy basic attacks: 6 raw → 4 after reduction → 1 reflected           | −4        | −1       | all three active                         |
+| 3     | Tick: all effects decremented; `thorns` expires; `battle-rage` expires | —         | —        | `shielded` (1 turn)                      |
+| 3     | Enemy fires **Fireball** (turn 3): −10 impact, applies `on-fire`       | −10       | —        | `shielded` (1 turn), `on-fire` (3 turns) |
+| 3     | Enemy basic attacks: 6 raw → 4 after shield (no thorns remaining)      | −4        | —        | —                                        |
+| 4     | Tick: burn −10, shield expires                                         | −10       | —        | `on-fire` (2 turns)                      |
+| 4     | Player uses **Thorns Aura**                                            | —         | —        | `on-fire`, `thorns` (3 turns)            |
+| 4     | Enemy attacks: 6 raw, 30% reflected → 2 back                           | −6        | −2       | `on-fire`, `thorns`                      |
+| 5     | Player uses **Water**: dispels `on-fire`; +15 heal                     | +15       | —        | `thorns` (2 turns), burn cleared         |
 
 **Key interactions illustrated:**
 
@@ -2643,71 +2643,71 @@ A representative 6-round exchange against the fire mage. The player is carrying 
 
 ### Effect Dispatch Edge Cases
 
-| Case | Handling |
-|---|---|
-| `target="enemy"` with `combat=None` | Log WARNING, skip effect, adventure continues |
-| `target="enemy"` with `HealEffect(amount="full")` | Log WARNING, skip effect |
-| `SkillGrantEffect` for unknown skill ref | No-op; skill added to `known_skills` regardless (ref may be from future content) — log INFO |
-| `SkillGrantEffect` blocked by category rule | `grant_skill()` returns False, no TUI message (grant was attempted by content, not player choice) |
-| `DispelEffect` with `combat=None` | Silent no-op (`logger.debug`); valid for overworld items like Water |
-| `DispelEffect` with no matching active effects | Silent no-op (`logger.debug`); not an error — the buff may already have expired |
-| `DispelEffect` with `label=""` | Rejected at load time by `min_length=1` on the field; empty-label effects can never be targeted |
-| `ApplyBuffEffect` with unknown `buff_ref` | Log ERROR, skip, continue; TUI shows a red error message — adventure does not crash |
-| `ApplyBuffEffect` outside combat | Log WARNING, skip silently — buffs have no meaning outside the combat turn loop |
+| Case                                              | Handling                                                                                          |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `target="enemy"` with `combat=None`               | Log WARNING, skip effect, adventure continues                                                     |
+| `target="enemy"` with `HealEffect(amount="full")` | Log WARNING, skip effect                                                                          |
+| `SkillGrantEffect` for unknown skill ref          | No-op; skill added to `known_skills` regardless (ref may be from future content) — log INFO       |
+| `SkillGrantEffect` blocked by category rule       | `grant_skill()` returns False, no TUI message (grant was attempted by content, not player choice) |
+| `DispelEffect` with `combat=None`                 | Silent no-op (`logger.debug`); valid for overworld items like Water                               |
+| `DispelEffect` with no matching active effects    | Silent no-op (`logger.debug`); not an error — the buff may already have expired                   |
+| `DispelEffect` with `label=""`                    | Rejected at load time by `min_length=1` on the field; empty-label effects can never be targeted   |
+| `ApplyBuffEffect` with unknown `buff_ref`         | Log ERROR, skip, continue; TUI shows a red error message — adventure does not crash               |
+| `ApplyBuffEffect` outside combat                  | Log WARNING, skip silently — buffs have no meaning outside the combat turn loop                   |
 
 ### Combat Modifier Edge Cases
 
-| Case | Handling |
-|---|---|
-| `damage_reduction` and `damage_vulnerability` both active simultaneously | Percentages are combined additively: `factor = 1.0 - reduction/100 + vulnerability/100`. Result is clamped to `max(0.0, factor)`. If base > 0, final damage is at least 1. |
-| `damage_amplify` with `base_damage=0` (attacker has 0 strength and enemy has high defense) | `_apply_damage_amplify` returns `int(0 * factor) = 0`; amplify has no effect on zero-damage hits |
-| `damage_reflect` percent ≥ 100 | Allowed by design (Literal `le=100` on `DamageReflectModifier`); reflected damage equals or exceeds taken |
-| Multiple `damage_reflect` modifiers stacked on same target | Percents summed; total may exceed 100. A 60% + 60% stack reflects 120% — more damage bounced than received. Use `le=100` per-modifier to prevent single-source excess; stacking is intentional for rare builds. |
-| `BuffSpec` with neither `per_turn_effects` nor `modifiers` | Rejected by `require_tick_or_modifier` model validator at load time with a clear `ValueError` |
-| `ActiveCombatEffect` with no `per_turn_effects` (pure modifier effect) | `_tick_active_effects` skips the per-turn dispatch loop (empty list); still ticks the `remaining_turns` counter and removes on expiry — no special-casing needed |
+| Case                                                                                       | Handling                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `damage_reduction` and `damage_vulnerability` both active simultaneously                   | Percentages are combined additively: `factor = 1.0 - reduction/100 + vulnerability/100`. Result is clamped to `max(0.0, factor)`. If base > 0, final damage is at least 1.                                      |
+| `damage_amplify` with `base_damage=0` (attacker has 0 strength and enemy has high defense) | `_apply_damage_amplify` returns `int(0 * factor) = 0`; amplify has no effect on zero-damage hits                                                                                                                |
+| `damage_reflect` percent ≥ 100                                                             | Allowed by design (Literal `le=100` on `DamageReflectModifier`); reflected damage equals or exceeds taken                                                                                                       |
+| Multiple `damage_reflect` modifiers stacked on same target                                 | Percents summed; total may exceed 100. A 60% + 60% stack reflects 120% — more damage bounced than received. Use `le=100` per-modifier to prevent single-source excess; stacking is intentional for rare builds. |
+| `BuffSpec` with neither `per_turn_effects` nor `modifiers`                                 | Rejected by `require_tick_or_modifier` model validator at load time with a clear `ValueError`                                                                                                                   |
+| `ActiveCombatEffect` with no `per_turn_effects` (pure modifier effect)                     | `_tick_active_effects` skips the per-turn dispatch loop (empty list); still ticks the `remaining_turns` counter and removes on expiry — no special-casing needed                                                |
 
 ### Combat Edge Cases
 
-| Case | Handling |
-|---|---|
-| Skill not in registry at combat invocation | Show TUI error, return False, player can try again |
-| Resource stat is bool / None type | Show TUI error, block use |
-| Enemy HP already 0 when periodic ticks | Periodic effects still fire (DoT on a dying enemy); win condition checked after all ticks |
-| Turn-scope cooldown on a skill just used | Exact turn check: `turn_number - last_used < cooldown.count` |
-| Player uses skill that reduces their own HP to 0 (cursed skill) | After effects fire, check `player.hp <= 0` → on_defeat branch |
-| All combat skills on cooldown | Skill menu slots show cooldown remaining in display, player must Attack or Flee |
-| `combat_skills` list empty | "Use Skill" option is not added to menu — menu is just Attack, Flee |
-| `grants_buffs_equipped` buff not in registry at combat start | `apply_buff` handler logs ERROR, skips, continues — same as any bad `ApplyBuffEffect` ref |
+| Case                                                              | Handling                                                                                                                                                                                                                                      |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Skill not in registry at combat invocation                        | Show TUI error, return False, player can try again                                                                                                                                                                                            |
+| Resource stat is bool / None type                                 | Show TUI error, block use                                                                                                                                                                                                                     |
+| Enemy HP already 0 when periodic ticks                            | Periodic effects still fire (DoT on a dying enemy); win condition checked after all ticks                                                                                                                                                     |
+| Turn-scope cooldown on a skill just used                          | Exact turn check: `turn_number - last_used < cooldown.count`                                                                                                                                                                                  |
+| Player uses skill that reduces their own HP to 0 (cursed skill)   | After effects fire, check `player.hp <= 0` → on_defeat branch                                                                                                                                                                                 |
+| All combat skills on cooldown                                     | Skill menu slots show cooldown remaining in display, player must Attack or Flee                                                                                                                                                               |
+| `combat_skills` list empty                                        | "Use Skill" option is not added to menu — menu is just Attack, Flee                                                                                                                                                                           |
+| `grants_buffs_equipped` buff not in registry at combat start      | `apply_buff` handler logs ERROR, skips, continues — same as any bad `ApplyBuffEffect` ref                                                                                                                                                     |
 | `grants_buffs_held` applied for multiple held copies of same item | Each copy (stack count > 1 / multiple instances) triggers `apply_buff` once per entry — authors should avoid listing the same buff in both `grants_buffs_equipped` and `grants_buffs_held` for equippable items to prevent double-application |
 
 ### Skill Grant Edge Cases
 
-| Case | Handling |
-|---|---|
-| Skill already known | `grant_skill()` returns False; silent no-op in both effect handler and adventure |
-| max_known limit reached | Log WARNING, return False, no TUI message |
-| exclusive_with conflict | Log WARNING, return False, no TUI message |
-| SkillCondition mode=available, registry=None | Falls back to `known_skills` only; logs nothing (acceptable degradation) |
+| Case                                         | Handling                                                                         |
+| -------------------------------------------- | -------------------------------------------------------------------------------- |
+| Skill already known                          | `grant_skill()` returns False; silent no-op in both effect handler and adventure |
+| max_known limit reached                      | Log WARNING, return False, no TUI message                                        |
+| exclusive_with conflict                      | Log WARNING, return False, no TUI message                                        |
+| SkillCondition mode=available, registry=None | Falls back to `known_skills` only; logs nothing (acceptable degradation)         |
 
 ### Serialization Edge Cases
 
-| Case | Handling |
-|---|---|
-| `known_skills` key absent in saved dict | Defaults to `set()` via `data.get("known_skills", [])` |
-| `skill_cooldowns` key absent in saved dict | Defaults to `{}` via `data.get("skill_cooldowns", {})` |
+| Case                                        | Handling                                                                     |
+| ------------------------------------------- | ---------------------------------------------------------------------------- |
+| `known_skills` key absent in saved dict     | Defaults to `set()` via `data.get("known_skills", [])`                       |
+| `skill_cooldowns` key absent in saved dict  | Defaults to `{}` via `data.get("skill_cooldowns", {})`                       |
 | Skill ref in `known_skills` not in registry | Kept in `known_skills` (content drift resilience; same policy as milestones) |
-| Cooldown ref not in registry | Kept in `skill_cooldowns` (same resilience policy) |
+| Cooldown ref not in registry                | Kept in `skill_cooldowns` (same resilience policy)                           |
 
 ---
 
 ## Documentation Plan
 
-| Document | Audience | Location | Topics |
-|---|---|---|---|
-| `docs/authors/skills.md` | Content authors | `docs/authors/` | Skill manifest reference, Buff manifest reference, YAML examples (combat, overworld, DoT, mana-based, equipment buffs), `grants_skills_equipped`/`held` and `grants_buffs_equipped`/`held` on items, `skill_resources` in CharacterConfig, `skill_category_rules`, enemy skills |
-| `docs/authors/content-authoring.md` | Content authors | Update | Add Skills section linking to new doc; update manifest kind table |
-| `docs/dev/game-engine.md` | Developers | Update | CombatContext lifecycle, available_skills() contract, cooldown tracking (turn vs adventure), SkillCondition modes, run_effect() combat parameter |
-| `docs/authors/README.md` | Content authors | Update | Add row for `skills.md` in the table of contents |
+| Document                            | Audience        | Location        | Topics                                                                                                                                                                                                                                                                          |
+| ----------------------------------- | --------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/authors/skills.md`            | Content authors | `docs/authors/` | Skill manifest reference, Buff manifest reference, YAML examples (combat, overworld, DoT, mana-based, equipment buffs), `grants_skills_equipped`/`held` and `grants_buffs_equipped`/`held` on items, `skill_resources` in CharacterConfig, `skill_category_rules`, enemy skills |
+| `docs/authors/content-authoring.md` | Content authors | Update          | Add Skills section linking to new doc; update manifest kind table                                                                                                                                                                                                               |
+| `docs/dev/game-engine.md`           | Developers      | Update          | CombatContext lifecycle, available_skills() contract, cooldown tracking (turn vs adventure), SkillCondition modes, run_effect() combat parameter                                                                                                                                |
+| `docs/authors/README.md`            | Content authors | Update          | Add row for `skills.md` in the table of contents                                                                                                                                                                                                                                |
 
 ---
 
@@ -2852,7 +2852,7 @@ def test_character_state_roundtrip_includes_skills() -> None:
     from oscilla.engine.models.base import Metadata, ManifestEnvelope
 
     cc = CharacterConfigManifest.model_validate({
-        "apiVersion": "game/v1",
+        "apiVersion": "oscilla/v1",
         "kind": "CharacterConfig",
         "metadata": {"name": "test"},
         "spec": {"public_stats": [], "hidden_stats": []},
@@ -3111,13 +3111,13 @@ async def test_combat_skill_turn_cooldown_blocks_reuse(mage_player, skill_combat
 
 ## Risks / Trade-offs
 
-| Risk | Mitigation |
-|---|---|
-| `run_effect()` signature change (new `combat` param) impacts many call sites | `combat=None` default makes it backward-compatible; no existing call site needs updating |
+| Risk                                                                                        | Mitigation                                                                                                      |
+| ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `run_effect()` signature change (new `combat` param) impacts many call sites                | `combat=None` default makes it backward-compatible; no existing call site needs updating                        |
 | `CombatContext.active_effects` is not persisted; re-entering a saved mid-combat clears DoTs | Documented limitation; acceptable for current scope. Step_state could hold active_effects in a future iteration |
-| `available_skills()` iterates all instances and stacks on each combat menu render | Sets are small; no measurable impact. If content packages grow to thousands of items, memoize per-request |
-| Enemy skill validation requires Skill manifests to be loaded before Enemy manifests | `validate_references()` runs after all manifests are loaded, so order is irrelevant |
-| `skill_category_rules` logic in `grant_skill()` uses quadratic scan for exclusive_with | At most a few dozen skills; not performance-sensitive |
+| `available_skills()` iterates all instances and stacks on each combat menu render           | Sets are small; no measurable impact. If content packages grow to thousands of items, memoize per-request       |
+| Enemy skill validation requires Skill manifests to be loaded before Enemy manifests         | `validate_references()` runs after all manifests are loaded, so order is irrelevant                             |
+| `skill_category_rules` logic in `grant_skill()` uses quadratic scan for exclusive_with      | At most a few dozen skills; not performance-sensitive                                                           |
 
 ## Migration Plan
 

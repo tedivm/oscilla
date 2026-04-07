@@ -157,7 +157,7 @@ def test_completion_effects_on_non_terminal_stage_raises() -> None:
     with pytest.raises(ValidationError, match="not terminal"):
         QuestManifest.model_validate(
             {
-                "apiVersion": "game/v1",
+                "apiVersion": "oscilla/v1",
                 "kind": "Quest",
                 "metadata": {"name": "bad-quest"},
                 "spec": {

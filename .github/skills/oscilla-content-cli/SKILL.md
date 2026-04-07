@@ -36,7 +36,7 @@ Content authors write YAML manifests. The following `kind` values are used by th
 Every manifest follows the standard structure:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: <Kind> # e.g. Adventure, Region, Item, Enemy
 metadata:
   name: my-manifest # kebab-case identifier; used for all cross-references
@@ -152,7 +152,7 @@ Add a comment at the top of any YAML manifest file to enable schema validation f
 
 ```yaml
 # yaml-language-server: $schema=./schemas/adventure.json
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 ...
 ```

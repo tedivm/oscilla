@@ -21,7 +21,7 @@ def test_kind_registry_basic_operations() -> None:
 
     # Create a test item
     item = ItemManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Item",
         metadata=Metadata(name="test-item"),
         spec=ItemSpec(displayName="Test Item", category="consumable"),
@@ -50,7 +50,7 @@ def test_kind_registry_require_success() -> None:
     registry: KindRegistry[ItemManifest] = KindRegistry()
 
     item = ItemManifest(
-        apiVersion="game/v1",
+        apiVersion="oscilla/v1",
         kind="Item",
         metadata=Metadata(name="test-item"),
         spec=ItemSpec(displayName="Test Item", category="consumable"),
@@ -89,37 +89,37 @@ def test_content_registry_build_with_all_kinds() -> None:
     """Test ContentRegistry.build() processes all manifest kinds."""
     manifests: list[ManifestEnvelope] = [
         RegionManifest(
-            apiVersion="game/v1",
+            apiVersion="oscilla/v1",
             kind="Region",
             metadata=Metadata(name="test-region"),
             spec=RegionSpec(displayName="Test Region"),
         ),
         LocationManifest(
-            apiVersion="game/v1",
+            apiVersion="oscilla/v1",
             kind="Location",
             metadata=Metadata(name="test-location"),
             spec=LocationSpec(displayName="Test Location", region="test-region", adventures=[]),
         ),
         AdventureManifest(
-            apiVersion="game/v1",
+            apiVersion="oscilla/v1",
             kind="Adventure",
             metadata=Metadata(name="test-adventure"),
             spec=AdventureSpec(displayName="Test Adventure", steps=[]),
         ),
         EnemyManifest(
-            apiVersion="game/v1",
+            apiVersion="oscilla/v1",
             kind="Enemy",
             metadata=Metadata(name="test-enemy"),
             spec=EnemySpec(displayName="Test Enemy", hp=10, attack=5, defense=2, xp_reward=10),
         ),
         ItemManifest(
-            apiVersion="game/v1",
+            apiVersion="oscilla/v1",
             kind="Item",
             metadata=Metadata(name="test-item"),
             spec=ItemSpec(displayName="Test Item", category="consumable"),
         ),
         RecipeManifest(
-            apiVersion="game/v1",
+            apiVersion="oscilla/v1",
             kind="Recipe",
             metadata=Metadata(name="test-recipe"),
             spec=RecipeSpec(
@@ -129,7 +129,7 @@ def test_content_registry_build_with_all_kinds() -> None:
             ),
         ),
         QuestManifest(
-            apiVersion="game/v1",
+            apiVersion="oscilla/v1",
             kind="Quest",
             metadata=Metadata(name="test-quest"),
             spec=QuestSpec(
@@ -137,7 +137,7 @@ def test_content_registry_build_with_all_kinds() -> None:
             ),
         ),
         GameManifest(
-            apiVersion="game/v1",
+            apiVersion="oscilla/v1",
             kind="Game",
             metadata=Metadata(name="test-game"),
             spec=GameSpec(
@@ -145,7 +145,7 @@ def test_content_registry_build_with_all_kinds() -> None:
             ),
         ),
         CharacterConfigManifest(
-            apiVersion="game/v1",
+            apiVersion="oscilla/v1",
             kind="CharacterConfig",
             metadata=Metadata(name="test-character-config"),
             spec=CharacterConfigSpec(public_stats=[], hidden_stats=[]),

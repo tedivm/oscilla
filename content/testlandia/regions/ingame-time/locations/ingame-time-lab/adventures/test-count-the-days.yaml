@@ -1,10 +1,11 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-count-the-days
 spec:
   displayName: "Count the Days — Internal Clock Gate"
-  description: "Multi-step adventure. Step 1 shows travel hours. Step 2 is gated on internal_ticks >= 5 — reachable after
+  description:
+    "Multi-step adventure. Step 1 shows travel hours. Step 2 is gated on internal_ticks >= 5 — reachable after
     at least 5 completions of any tick-advancing adventure."
   steps:
     - type: narrative

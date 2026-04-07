@@ -1,10 +1,11 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-fail-quest
 spec:
   displayName: "Trigger Quest Failure"
-  description: "Grants the test-quest-fail-trigger milestone, causing test-failable-quest to fail (if active). Validates that
+  description:
+    "Grants the test-quest-fail-trigger milestone, causing test-failable-quest to fail (if active). Validates that
     fail_condition fires and fail_effects (hp -5) run."
   steps:
     - type: narrative

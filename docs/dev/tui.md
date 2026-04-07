@@ -6,11 +6,11 @@ The terminal user interface provides the full-screen, async interactive experien
 
 The TUI stack has three layers:
 
-| Layer | File | Responsibility |
-|---|---|---|
-| CLI entry point | `oscilla/cli.py` | Command parsing, content loading |
-| Textual application | `oscilla/engine/tui.py` | Full-screen UI, async game loop |
-| Engine protocol | `oscilla/engine/pipeline.py` | `TUICallbacks` interface consumed by the pipeline |
+| Layer               | File                         | Responsibility                                    |
+| ------------------- | ---------------------------- | ------------------------------------------------- |
+| CLI entry point     | `oscilla/cli.py`             | Command parsing, content loading                  |
+| Textual application | `oscilla/engine/tui.py`      | Full-screen UI, async game loop                   |
+| Engine protocol     | `oscilla/engine/pipeline.py` | `TUICallbacks` interface consumed by the pipeline |
 
 `OscillaApp` (a Textual `App`) owns the game loop as a worker coroutine. It drives `AdventurePipeline` via the `TextualTUI` adapter, which implements the async `TUICallbacks` protocol using Textual's widget API.
 
@@ -109,10 +109,10 @@ The root Textual application.
 
 **Key bindings**:
 
-| Key | Action |
-|---|---|
-| `ctrl+q` | Quit application |
-| `?` | Toggle `HelpOverlay` |
+| Key      | Action               |
+| -------- | -------------------- |
+| `ctrl+q` | Quit application     |
+| `?`      | Toggle `HelpOverlay` |
 
 **Name prompt**: `_prompt_name()` shows the `Input` widget, suspends on an `asyncio.Event`, and returns the entered name (defaulting to `"Hero"` if empty).
 
@@ -124,12 +124,12 @@ Concrete implementation of `TUICallbacks` backed by `OscillaApp` widgets. Constr
 tui = TextualTUI(self)  # self = OscillaApp instance
 ```
 
-| Protocol method | Widget used |
-|---|---|
-| `show_text` | `NarrativeLog.append_text()` |
-| `show_menu` | `NarrativeLog.append_text()` (prompt) + `ChoiceMenu.wait_for_selection()` |
-| `show_combat_round` | `NarrativeLog` (Rich `Table` showing HP) |
-| `wait_for_ack` | `ChoiceMenu.wait_for_selection(["▶  Press Enter to continue"])` |
+| Protocol method     | Widget used                                                               |
+| ------------------- | ------------------------------------------------------------------------- |
+| `show_text`         | `NarrativeLog.append_text()`                                              |
+| `show_menu`         | `NarrativeLog.append_text()` (prompt) + `ChoiceMenu.wait_for_selection()` |
+| `show_combat_round` | `NarrativeLog` (Rich `Table` showing HP)                                  |
+| `wait_for_ack`      | `ChoiceMenu.wait_for_selection(["▶  Press Enter to continue"])`           |
 
 ## Game Loop Detail
 

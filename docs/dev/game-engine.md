@@ -349,12 +349,12 @@ Each step type has a dedicated handler module:
 ```yaml
 effects:
   - type: stat_change
-    stat: "strength"         # Must exist in character_config.yaml
-    amount: 2              # Integer; negative values subtract
+    stat: "strength" # Must exist in character_config.yaml
+    amount: 2 # Integer; negative values subtract
 
   - type: stat_change
     stat: "gold"
-    amount: -25            # Spend gold
+    amount: -25 # Spend gold
 ```
 
 **StatSetEffect** assigns player stats to specific values:
@@ -363,11 +363,11 @@ effects:
 effects:
   - type: stat_set
     stat: "is_blessed"
-    value: true               # Boolean assignment
+    value: true # Boolean assignment
 
   - type: stat_set
     stat: "strength"
-    value: 20                # Override current value
+    value: 20 # Override current value
 ```
 
 **Stat Bounds** — `StatDefinition` accepts an optional `bounds` field with `min` and/or `max` integer constraints. The engine enforces these at effect application time in `effects.py` (first-line enforcement) and inside `CharacterState.set_stat()` (INT64 backstop):
@@ -402,11 +402,11 @@ Called after every `MilestoneGrantEffect` and after every `QuestActivateEffect` 
 
 ### Call sites
 
-| Location | Function called | When |
-|----------|----------------|------|
-| `session.py` — `_select_or_create_character()` | `_advance_quests_silent` | After loading a saved character |
-| `effects.py` — `MilestoneGrantEffect` case | `evaluate_quest_advancements` | After granting any milestone |
-| `effects.py` — `QuestActivateEffect` case | `evaluate_quest_advancements` | After activating a quest |
+| Location                                       | Function called               | When                            |
+| ---------------------------------------------- | ----------------------------- | ------------------------------- |
+| `session.py` — `_select_or_create_character()` | `_advance_quests_silent`      | After loading a saved character |
+| `effects.py` — `MilestoneGrantEffect` case     | `evaluate_quest_advancements` | After granting any milestone    |
+| `effects.py` — `QuestActivateEffect` case      | `evaluate_quest_advancements` | After activating a quest        |
 
 ### `QuestActivateEffect`
 
@@ -501,10 +501,10 @@ async with GameSession(
 
 `PersistCallback` (in `oscilla/engine/pipeline.py`) is an async callable that `AdventurePipeline` fires at three lifecycle points:
 
-| Event | When fired |
-|---|---|
-| `step_start` | Before each adventure step is dispatched |
-| `combat_round` | After each pair of player/enemy attacks |
+| Event           | When fired                                              |
+| --------------- | ------------------------------------------------------- |
+| `step_start`    | Before each adventure step is dispatched                |
+| `combat_round`  | After each pair of player/enemy attacks                 |
 | `adventure_end` | After `active_adventure` is cleared on the player state |
 
 `GameSession._on_state_change()` implements it. At each event it diffs `_character` against `_last_saved_state` and writes only the changed domains (stats, inventory, equipment, milestones, quests, statistics scalars, and adventure progress). Unmodified data is never re-written.
@@ -531,13 +531,13 @@ Skills and buffs are first-class manifest kinds processed by the content loader 
 
 `CombatContext` (`oscilla/engine/combat_context.py`) is constructed at the start of `run_combat()` and torn down when combat ends (win, defeat, or flee). It carries all per-combat state that is too transient for `CharacterState`:
 
-| Field | Type | Purpose |
-|---|---|---|
-| `enemy_hp` | `int` | Current enemy HP; mirrored back to `step_state` each round |
-| `turn` | `int` | Current turn number (1-indexed, incremented after each round) |
-| `active_effects` | `List[ActiveCombatEffect]` | Active buffs on player and enemy |
-| `skill_uses_this_combat` | `Dict[str, int]` | Turn-scope cooldown tracking: skill_ref → last turn used |
-| `enemy_resources` | `Dict[str, int]` | Live resource values for enemy skill costs (initialized from `EnemySpec.skill_resources`) |
+| Field                    | Type                       | Purpose                                                                                   |
+| ------------------------ | -------------------------- | ----------------------------------------------------------------------------------------- |
+| `enemy_hp`               | `int`                      | Current enemy HP; mirrored back to `step_state` each round                                |
+| `turn`                   | `int`                      | Current turn number (1-indexed, incremented after each round)                             |
+| `active_effects`         | `List[ActiveCombatEffect]` | Active buffs on player and enemy                                                          |
+| `skill_uses_this_combat` | `Dict[str, int]`           | Turn-scope cooldown tracking: skill_ref → last turn used                                  |
+| `enemy_resources`        | `Dict[str, int]`           | Live resource values for enemy skill costs (initialized from `EnemySpec.skill_resources`) |
 
 On combat exit, `CombatContext` is discarded. Only `CharacterState.skill_cooldowns` (adventure-scope cooldowns) is written back to the player state.
 
@@ -545,13 +545,13 @@ On combat exit, `CombatContext` is discarded. Only `CharacterState.skill_cooldow
 
 Each active buff is represented as an `ActiveCombatEffect`:
 
-| Field | Type | Purpose |
-|---|---|---|
-| `label` | `str` | Buff manifest `name` — stable identity used by `DispelEffect` |
-| `target` | `"player"` \| `"enemy"` | Who the buff is applied to |
-| `turns_remaining` | `int` | Decremented at round start; removed when 0 |
-| `per_turn_effects` | `List[Effect]` | Dispatched through `run_effect()` each round |
-| `modifiers` | `List[CombatModifier]` | Passive damage-arithmetic modifiers queried during attack/defense |
+| Field              | Type                    | Purpose                                                           |
+| ------------------ | ----------------------- | ----------------------------------------------------------------- |
+| `label`            | `str`                   | Buff manifest `name` — stable identity used by `DispelEffect`     |
+| `target`           | `"player"` \| `"enemy"` | Who the buff is applied to                                        |
+| `turns_remaining`  | `int`                   | Decremented at round start; removed when 0                        |
+| `per_turn_effects` | `List[Effect]`          | Dispatched through `run_effect()` each round                      |
+| `modifiers`        | `List[CombatModifier]`  | Passive damage-arithmetic modifiers queried during attack/defense |
 
 ### `available_skills()` Contract
 
@@ -704,7 +704,6 @@ class PlayerContext:
 - Both `SAFE_GLOBALS` and `SAFE_FILTERS` are injected into the `SandboxedEnvironment` and also merged into the render context dict, making them available both as globals and as `{% set %}` assignments.
 - The mock context (`build_mock_context`) must also expose any new stat names or nested attributes that the new function may reference; otherwise valid uses will fail load-time validation.
 
-
 ## Item System Enhancements
 
 ### Item Labels
@@ -788,10 +787,10 @@ and trigger a `LoadWarning` at load time. Similarly, `character_stat` conditions
 
 The engine maintains two independent integer counters on each character iteration:
 
-| Clock | Field | Behavior |
-|---|---|---|
-| Internal | `internal_ticks` | Monotone, strictly non-decreasing. Represents the character's total play-time in ticks. Used for cooldown checks. |
-| Game | `game_ticks` | Narrative clock. Advances with adventures but can be adjusted backward by `adjust_game_ticks` effects. Drives in-game calendar conditions and era progression. |
+| Clock    | Field            | Behavior                                                                                                                                                       |
+| -------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Internal | `internal_ticks` | Monotone, strictly non-decreasing. Represents the character's total play-time in ticks. Used for cooldown checks.                                              |
+| Game     | `game_ticks`     | Narrative clock. Advances with adventures but can be adjusted backward by `adjust_game_ticks` effects. Drives in-game calendar conditions and era progression. |
 
 Both clocks start at 0 and advance by the adventure's tick cost on completion.
 
@@ -809,7 +808,7 @@ The `adjust_game_ticks` step effect adjusts `game_ticks` by a signed delta:
 
 ```yaml
 - type: adjust_game_ticks
-  delta: -10        # reduce game_ticks by 10 (clamped at 0)
+  delta: -10 # reduce game_ticks by 10 (clamped at 0)
 ```
 
 The delta is applied during adventure step execution — before the pipeline's end-of-adventure tick advance. `internal_ticks` is never affected.
@@ -843,7 +842,7 @@ The position of a derived cycle advances whenever the parent completes a full re
 
 ```yaml
 epoch:
-  season: Spring     # start in the Spring slot
+  season: Spring # start in the Spring slot
 ```
 
 The loader calls `compute_epoch_offset()` to translate the cycle position (label or 1-based integer) into the equivalent number of root ticks to subtract from the query.
@@ -863,11 +862,11 @@ Era `count` tracks completed `epoch_count` × `tracks` cycle revolutions since t
 
 Three conditions operate against the dual clock state:
 
-| Type | Description |
-|---|---|
-| `game_calendar_time_is` | Numeric comparison (gt/gte/lt/lte/eq/mod) against `internal_ticks` or `game_ticks` |
-| `game_calendar_cycle_is` | Tests the current label of a named cycle |
-| `game_calendar_era_is` | Tests whether a named era is active or inactive |
+| Type                     | Description                                                                        |
+| ------------------------ | ---------------------------------------------------------------------------------- |
+| `game_calendar_time_is`  | Numeric comparison (gt/gte/lt/lte/eq/mod) against `internal_ticks` or `game_ticks` |
+| `game_calendar_cycle_is` | Tests the current label of a named cycle                                           |
+| `game_calendar_era_is`   | Tests whether a named era is active or inactive                                    |
 
 All three evaluate to `False` with a log warning when the time system is not configured in `game.yaml`.
 
@@ -879,7 +878,6 @@ Tick state is saved by `update_character_tick_state()` in `services/character.py
 - `character_iterations.game_ticks`
 - `character_iteration_adventure_state.last_completed_at_ticks` (per adventure)
 - `character_iteration_era_state` rows (insert/update for each era with a changed state)
-
 
 ---
 
@@ -899,14 +897,14 @@ Triggered adventures fire automatically in response to game events without the p
 
 Each event type is detected at a specific point in the engine and results in `CharacterState.enqueue_trigger()` being called:
 
-| Trigger key | Detection location | Condition |
-|---|---|---|
-| `on_character_create` | `GameSession._create_new_character()` | Always, if wired |
-| `on_game_rejoin` | `GameSession.start()` after character load | `characters.updated_at` absence ≥ `absence_hours` |
-| `on_level_up` | `xp_grant` effect handler in `effects.py` | Once per level in `levels_gained` |
-| `on_outcome_<name>` | `GameSession.run_adventure()` after outcome | Outcome value matches key suffix |
-| `on_stat_threshold` | `stat_change` and `stat_set` effect handlers | `old_value < threshold ≤ new_value` (upward only) |
-| `<custom>` | `emit_trigger` effect handler in `effects.py` | When the effect fires |
+| Trigger key           | Detection location                            | Condition                                         |
+| --------------------- | --------------------------------------------- | ------------------------------------------------- |
+| `on_character_create` | `GameSession._create_new_character()`         | Always, if wired                                  |
+| `on_game_rejoin`      | `GameSession.start()` after character load    | `characters.updated_at` absence ≥ `absence_hours` |
+| `on_level_up`         | `xp_grant` effect handler in `effects.py`     | Once per level in `levels_gained`                 |
+| `on_outcome_<name>`   | `GameSession.run_adventure()` after outcome   | Outcome value matches key suffix                  |
+| `on_stat_threshold`   | `stat_change` and `stat_set` effect handlers  | `old_value < threshold ≤ new_value` (upward only) |
+| `<custom>`            | `emit_trigger` effect handler in `effects.py` | When the effect fires                             |
 
 All callsites pass `max_depth=registry.game.spec.triggers.max_trigger_queue_depth` to `enqueue_trigger()`.
 

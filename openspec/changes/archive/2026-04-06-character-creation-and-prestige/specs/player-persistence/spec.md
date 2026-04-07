@@ -32,7 +32,7 @@ The carry-forward (copying specific stat values and skill memberships from the o
 
 ## ADDED Requirements
 
-### Requirement: _persist_diff handles prestige_pending at adventure_end
+### Requirement: \_persist_diff handles prestige_pending at adventure_end
 
 When `_persist_diff(state, event="adventure_end")` is called and `state.prestige_pending is not None`, the session layer SHALL perform the prestige iteration transition before writing the updated state:
 
@@ -52,7 +52,7 @@ When `_persist_diff(state, event="adventure_end")` is called and `state.prestige
 - **WHEN** the prestige transition and state write happen in the same `_persist_diff` call
 - **THEN** both the `prestige_character()` flush and the state diff writes are committed atomically in the `adventure_end` transaction
 
-### Requirement: _persist_diff skips checkpoints during prestige_pending
+### Requirement: \_persist_diff skips checkpoints during prestige_pending
 
 When `state.prestige_pending is not None` and `event` is `"step_start"` or `"combat_round"`, `_persist_diff` SHALL return immediately without writing anything. This prevents the in-memory reset state from being written to the old iteration row before the `adventure_end` transition is finalized.
 

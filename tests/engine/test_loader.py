@@ -48,7 +48,7 @@ def test_parse_bad_yaml_accumulates_error(tmp_path: Path) -> None:
 def test_parse_unknown_kind_accumulates_error(tmp_path: Path) -> None:
     unknown = tmp_path / "unknown.yaml"
     unknown.write_text(
-        "apiVersion: game/v1\nkind: NotARealKind\nmetadata:\n  name: x\nspec: {}\n",
+        "apiVersion: oscilla/v1\nkind: NotARealKind\nmetadata:\n  name: x\nspec: {}\n",
         encoding="utf-8",
     )
     _, errors = parse([unknown])
@@ -77,7 +77,7 @@ def test_region_root_has_no_effective_unlock(
 
 
 _MINIMAL_GAME_YAML = """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Game
 metadata:
   name: test-game
@@ -95,7 +95,7 @@ def test_loader_rejects_float_stat_type(tmp_path: Path) -> None:
     (tmp_path / "game.yaml").write_text(_MINIMAL_GAME_YAML, encoding="utf-8")
     (tmp_path / "char.yaml").write_text(
         """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: CharacterConfig
 metadata:
   name: test-config
@@ -116,7 +116,7 @@ def test_loader_rejects_bounds_on_bool_stat(tmp_path: Path) -> None:
     (tmp_path / "game.yaml").write_text(_MINIMAL_GAME_YAML, encoding="utf-8")
     (tmp_path / "char.yaml").write_text(
         """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: CharacterConfig
 metadata:
   name: test-config
@@ -136,7 +136,7 @@ spec:
 
 
 _GAME_YAML_WITHOUT_PRESTIGE = """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Game
 metadata:
   name: test-game
@@ -149,7 +149,7 @@ spec:
 """
 
 _GAME_YAML_WITH_PRESTIGE = """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Game
 metadata:
   name: test-game
@@ -164,7 +164,7 @@ spec:
 """
 
 _ADVENTURE_WITH_PRESTIGE_EFFECT = """\
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-prestige-adventure
@@ -193,3 +193,148 @@ def test_loader_accepts_prestige_effect_when_prestige_config_declared(tmp_path: 
     (tmp_path / "adventure.yaml").write_text(_ADVENTURE_WITH_PRESTIGE_EFFECT, encoding="utf-8")
     # Should not raise — warnings are fine.
     load(tmp_path)
+
+
+# ---------------------------------------------------------------------------
+# Multi-document YAML parsing tests
+# ---------------------------------------------------------------------------
+
+_ITEM_DOC_SWORD = """\
+apiVersion: oscilla/v1
+kind: Item
+metadata:
+  name: sword
+spec:
+  displayName: "Sword"
+  description: "A sharp sword."
+  category: weapon
+  stackable: false
+  value: 10
+"""
+
+_ITEM_DOC_SHIELD = """\
+apiVersion: oscilla/v1
+kind: Item
+metadata:
+  name: shield
+spec:
+  displayName: "Shield"
+  description: "A sturdy shield."
+  category: armor
+  stackable: false
+  value: 8
+"""
+
+_ENEMY_DOC_GOBLIN = """\
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: goblin
+spec:
+  displayName: "Goblin"
+  description: "A small goblin."
+  hp: 10
+  attack: 3
+  defense: 0
+  xp_reward: 5
+  loot: []
+"""
+
+
+def test_parse_multi_document_file(tmp_path: Path) -> None:
+    """Two valid documents in one file both load successfully."""
+    multi = tmp_path / "items.yaml"
+    multi.write_text(_ITEM_DOC_SWORD + "---\n" + _ITEM_DOC_SHIELD, encoding="utf-8")
+    manifests, errors = parse([multi])
+    assert errors == []
+    assert len(manifests) == 2
+    names = {m.metadata.name for m in manifests}
+    assert names == {"sword", "shield"}
+
+
+def test_parse_multi_document_mixed_kinds(tmp_path: Path) -> None:
+    """Documents of different kinds in one file both load successfully."""
+    multi = tmp_path / "mixed.yaml"
+    multi.write_text(_ITEM_DOC_SWORD + "---\n" + _ENEMY_DOC_GOBLIN, encoding="utf-8")
+    manifests, errors = parse([multi])
+    assert errors == []
+    assert len(manifests) == 2
+    kinds = {m.kind for m in manifests}
+    assert kinds == {"Item", "Enemy"}
+
+
+def test_parse_multi_document_error_attribution(tmp_path: Path) -> None:
+    """An error in doc 2 of a multi-doc file cites [doc 2] in the error message."""
+    # doc 2 has displayName as a number — invalid (must be a string)
+    bad_doc = """\
+apiVersion: oscilla/v1
+kind: Item
+metadata:
+  name: bad-item
+spec:
+  displayName: 999
+  description: "Bad"
+  category: material
+  stackable: false
+  value: 1
+"""
+    multi = tmp_path / "items.yaml"
+    multi.write_text(_ITEM_DOC_SWORD + "---\n" + bad_doc, encoding="utf-8")
+    manifests, errors = parse([multi])
+    assert len(errors) >= 1
+    assert any("[doc 2]" in e.message for e in errors)
+
+
+def test_parse_single_document_no_doc_index_suffix(tmp_path: Path) -> None:
+    """Single-document files do not include [doc N] in error messages."""
+    bad_doc = """\
+apiVersion: oscilla/v1
+kind: Item
+metadata:
+  name: bad-item
+spec:
+  displayName: 999
+  description: "Bad"
+  category: material
+  stackable: false
+  value: 1
+"""
+    single = tmp_path / "item.yaml"
+    single.write_text(bad_doc, encoding="utf-8")
+    _, errors = parse([single])
+    assert all("[doc" not in e.message for e in errors)
+
+
+def test_parse_empty_document_in_multi_doc_file(tmp_path: Path) -> None:
+    """An empty document between --- dividers is reported as an error, not silently skipped."""
+    multi = tmp_path / "items.yaml"
+    multi.write_text(_ITEM_DOC_SWORD + "---\n" + "---\n" + _ITEM_DOC_SHIELD, encoding="utf-8")
+    manifests, errors = parse([multi])
+    # The two valid documents load; the empty one produces an error.
+    assert len(manifests) == 2
+    assert len(errors) == 1
+    assert "Manifest must be a YAML mapping" in errors[0].message
+
+
+_MINIMAL_CHAR_CONFIG_YAML = """\
+apiVersion: oscilla/v1
+kind: CharacterConfig
+metadata:
+  name: test-char-config
+spec:
+  public_stats:
+    - name: strength
+      type: int
+      default: 10
+      description: "Physical power"
+  hidden_stats: []
+"""
+
+
+def test_load_single_file_path(tmp_path: Path) -> None:
+    """load() accepts a path to a single YAML file and processes all documents in it."""
+    content_file = tmp_path / "content.yaml"
+    content_file.write_text(_MINIMAL_GAME_YAML + "---\n" + _MINIMAL_CHAR_CONFIG_YAML, encoding="utf-8")
+    registry, warnings = load(content_file)
+    assert registry.game is not None
+    assert registry.character_config is not None

@@ -68,22 +68,22 @@ Three built-in sets SHALL be predefined: `they_them`, `she_her`, `he_him`.
 
 Content templates MAY use curly-brace pronoun placeholders that are easier to write than raw Jinja2. Before a template string is compiled, a preprocessing pass SHALL replace:
 
-| Placeholder | Expands to | Notes |
-|-------------|------------|-------|
-| `{they}` | subject, lowercase | |
-| `{them}` | object, lowercase | |
-| `{their}` | possessive, lowercase | |
-| `{theirs}` | possessive_standalone, lowercase | |
-| `{themselves}` | reflexive, lowercase | |
-| `{They}` / `{Them}` / etc. | subject/object/etc., capitalized | First letter upper |
-| `{THEY}` / `{THEM}` / etc. | subject/object/etc., uppercased | All caps |
-| `{is}` | correct verb form | `"is"` or `"are"` per `uses_plural_verbs` |
-| `{are}` | same as `{is}` | interchangeable |
-| `{Is}` / `{Are}` | verb form, capitalized | |
-| `{was}` | `"was"` or `"were"` | |
-| `{were}` | same as `{was}` | interchangeable |
-| `{has}` | `"has"` or `"have"` | |
-| `{have}` | same as `{has}` | interchangeable |
+| Placeholder                | Expands to                       | Notes                                     |
+| -------------------------- | -------------------------------- | ----------------------------------------- |
+| `{they}`                   | subject, lowercase               |                                           |
+| `{them}`                   | object, lowercase                |                                           |
+| `{their}`                  | possessive, lowercase            |                                           |
+| `{theirs}`                 | possessive_standalone, lowercase |                                           |
+| `{themselves}`             | reflexive, lowercase             |                                           |
+| `{They}` / `{Them}` / etc. | subject/object/etc., capitalized | First letter upper                        |
+| `{THEY}` / `{THEM}` / etc. | subject/object/etc., uppercased  | All caps                                  |
+| `{is}`                     | correct verb form                | `"is"` or `"are"` per `uses_plural_verbs` |
+| `{are}`                    | same as `{is}`                   | interchangeable                           |
+| `{Is}` / `{Are}`           | verb form, capitalized           |                                           |
+| `{was}`                    | `"was"` or `"were"`              |                                           |
+| `{were}`                   | same as `{was}`                  | interchangeable                           |
+| `{has}`                    | `"has"` or `"have"`              |                                           |
+| `{have}`                   | same as `{has}`                  | interchangeable                           |
 
 Capitalisation of the placeholder SHALL determine capitalisation of the output: lowercase → lowercase, `TitleCase` → capitalize filter, `UPPER` → upper filter.
 
@@ -104,7 +104,7 @@ Unrecognised `{word}` patterns that are not pronoun or verb forms SHALL be left 
 - **WHEN** a template `"Praise {THEY}!"` is rendered for a he/him player
 - **THEN** the output is `"Praise HIM!"` (object form, uppercased)
 
-    Note: `{THEY}` resolves to `{subject}`, so output is `"HE"` not `"HIM"`.
+  Note: `{THEY}` resolves to `{subject}`, so output is `"HE"` not `"HIM"`.
 
 #### Scenario: {is} and {are} are interchangeable and produce correct verb agreement
 

@@ -6,12 +6,12 @@ Four independent tech debt items are addressed together because they share a com
 
 **Current state before this change:**
 
-| Item | Problem |
-|------|---------|
-| Quest activation | Quests can be modeled but never progress; `advance_on` is parsed but not evaluated; no `quest_activate` effect exists |
-| Condition shorthand | Two authoring syntaxes produce identical models; one is documented in some files and the other is not; `normalise_condition()` maintains dead translation logic |
-| Loot tables | `EnemySpec.loot` is a model field that is never read by any effect handler; `LootEntry` and `ItemDropEntry` are separate classes with no reconciliation; no cross-reference is possible |
-| `base_adventure_count` | Field exists in model and both content packages, reads as `None` everywhere, and is never consumed by the engine |
+| Item                   | Problem                                                                                                                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Quest activation       | Quests can be modeled but never progress; `advance_on` is parsed but not evaluated; no `quest_activate` effect exists                                                                   |
+| Condition shorthand    | Two authoring syntaxes produce identical models; one is documented in some files and the other is not; `normalise_condition()` maintains dead translation logic                         |
+| Loot tables            | `EnemySpec.loot` is a model field that is never read by any effect handler; `LootEntry` and `ItemDropEntry` are separate classes with no reconciliation; no cross-reference is possible |
+| `base_adventure_count` | Field exists in model and both content packages, reads as `None` everywhere, and is never consumed by the engine                                                                        |
 
 ---
 
@@ -397,17 +397,17 @@ _advance_quests_silent(player=state, registry=registry)
 
 #### Edge cases
 
-| Case | Handling |
-|------|----------|
-| `quest_activate` on an already-active quest | `logger.warning`, silent no-op, no state change |
-| `quest_activate` on a completed quest | `logger.warning`, silent no-op |
-| `quest_activate` with unknown `quest_ref` | `logger.error`, TUI red error message, no state change |
-| `advance_on` milestone already held at activation time | `evaluate_quest_advancements` called immediately after activation; quest advances in same tick |
-| Multiple chained advancements | Inner `while True` loop follows the chain until it either hits a stage blocked on a milestone or reaches terminal |
-| Terminal stage has unknown `completion_effects` item | `run_effect` handles unknown effect types gracefully via match fallthrough (logs warning) |
-| Quest stage name in `active_quests` not found in registry | `logger.warning`, advancement skipped |
-| Stage name in `active_quests` not found in stage map | `logger.error`, advancement stopped |
-| `completion_effects` on non-terminal stage | Pydantic model validator raises `ValueError` at load time |
+| Case                                                      | Handling                                                                                                          |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `quest_activate` on an already-active quest               | `logger.warning`, silent no-op, no state change                                                                   |
+| `quest_activate` on a completed quest                     | `logger.warning`, silent no-op                                                                                    |
+| `quest_activate` with unknown `quest_ref`                 | `logger.error`, TUI red error message, no state change                                                            |
+| `advance_on` milestone already held at activation time    | `evaluate_quest_advancements` called immediately after activation; quest advances in same tick                    |
+| Multiple chained advancements                             | Inner `while True` loop follows the chain until it either hits a stage blocked on a milestone or reaches terminal |
+| Terminal stage has unknown `completion_effects` item      | `run_effect` handles unknown effect types gracefully via match fallthrough (logs warning)                         |
+| Quest stage name in `active_quests` not found in registry | `logger.warning`, advancement skipped                                                                             |
+| Stage name in `active_quests` not found in stage map      | `logger.error`, advancement stopped                                                                               |
+| `completion_effects` on non-terminal stage                | Pydantic model validator raises `ValueError` at load time                                                         |
 
 ---
 
@@ -511,12 +511,12 @@ unlock:
 
 #### Edge cases
 
-| Case | Handling |
-|------|----------|
-| Bare-key condition `{level: 3}` | Pydantic discriminated union raises `ValidationError` — loader wraps in `LoadError` with file path |
-| Bare-key nested inside `all`/`any` | Same — the nested list element fails Pydantic validation with field path |
-| Already-explicit `{type: level, value: 3}` | Unchanged; Pydantic accepts it as before |
-| `advance_on` in quest stages (plain strings, not conditions) | Unaffected — `advance_on` is `Set[str]`, not `List[Condition]` |
+| Case                                                         | Handling                                                                                           |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Bare-key condition `{level: 3}`                              | Pydantic discriminated union raises `ValidationError` — loader wraps in `LoadError` with file path |
+| Bare-key nested inside `all`/`any`                           | Same — the nested list element fails Pydantic validation with field path                           |
+| Already-explicit `{type: level, value: 3}`                   | Unchanged; Pydantic accepts it as before                                                           |
+| `advance_on` in quest stages (plain strings, not conditions) | Unaffected — `advance_on` is `Set[str]`, not `List[Condition]`                                     |
 
 ---
 
@@ -828,14 +828,14 @@ Also register `LootTable` in the `kind` dispatch inside `parse`:
 
 #### Edge cases
 
-| Case | Handling |
-|------|----------|
-| `loot_ref` pointing to unknown table/enemy | Load-time `LoadError` from `_validate_loot_refs`; content package fails to load |
+| Case                                                  | Handling                                                                          |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `loot_ref` pointing to unknown table/enemy            | Load-time `LoadError` from `_validate_loot_refs`; content package fails to load   |
 | Enemy with empty `loot: []` referenced via `loot_ref` | `resolve_loot_entries` returns `None` for empty list; treated same as unknown ref |
-| Both `loot` and `loot_ref` declared | Pydantic model validator raises `ValueError` at load time |
-| Neither `loot` nor `loot_ref` declared | Pydantic model validator raises `ValueError` at load time |
-| `loot_ref` with `quantity > 1` entry | `add_item` called with the entry's `quantity`; TUI announces total quantity |
-| Inline `loot` entries — existing content | Unchanged; `ItemDropEffect.loot` still valid when `loot_ref` is None |
+| Both `loot` and `loot_ref` declared                   | Pydantic model validator raises `ValueError` at load time                         |
+| Neither `loot` nor `loot_ref` declared                | Pydantic model validator raises `ValueError` at load time                         |
+| `loot_ref` with `quantity > 1` entry                  | `add_item` called with the entry's `quantity`; TUI announces total quantity       |
+| Inline `loot` entries — existing content              | Unchanged; `ItemDropEffect.loot` still valid when `loot_ref` is None              |
 
 ---
 
@@ -904,16 +904,16 @@ The loot changes add `loot_ref` and `quantity` — two new fields on existing ma
 
 ### Document inventory
 
-| Document | Audience | Action | Topics to Cover |
-|----------|----------|--------|-----------------|
-| `docs/authors/conditions.md` | Content authors | Update | Remove all shorthand examples; add a callout that `type:` is required; show only explicit form throughout |
-| `docs/authors/world-building.md` | Content authors | Update | Audit `unlock:` examples; replace any `{level: 3}` shorthand with explicit form; confirm all condition examples are explicit |
-| `docs/authors/adventures.md` | Content authors | Update | Audit `requires:` examples; replace any shorthands; add `quest_activate` effect documentation with YAML example |
-| `docs/authors/quests.md` | Content authors | Create | Full quest authoring reference: manifest structure, stages, `advance_on` (Set semantics — duplicates silently ignored), `completion_effects`, `quest_activate` effect, stage graph rules, worked multi-stage example |
-| `docs/authors/items.md` | Content authors | Update | Document `loot_ref` on `item_drop`; explain named `LootTable` manifests; explain enemy-name references and resolution order; document `quantity` field on loot entries |
-| `docs/authors/README.md` | Content authors | Update | Add `quests.md` entry to table of contents |
-| `docs/dev/game-engine.md` | Developers | Update | Quest activation engine section: `quest_engine.py` purpose, `_advance_quests_silent` vs `evaluate_quest_advancements`, call sites in `effects.py` and `session.py`; `LootTable` registry kind; shorthand removal rationale |
-| `docs/dev/README.md` | Developers | Audit | Verify table of contents is complete and accurate after changes |
+| Document                         | Audience        | Action | Topics to Cover                                                                                                                                                                                                            |
+| -------------------------------- | --------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/authors/conditions.md`     | Content authors | Update | Remove all shorthand examples; add a callout that `type:` is required; show only explicit form throughout                                                                                                                  |
+| `docs/authors/world-building.md` | Content authors | Update | Audit `unlock:` examples; replace any `{level: 3}` shorthand with explicit form; confirm all condition examples are explicit                                                                                               |
+| `docs/authors/adventures.md`     | Content authors | Update | Audit `requires:` examples; replace any shorthands; add `quest_activate` effect documentation with YAML example                                                                                                            |
+| `docs/authors/quests.md`         | Content authors | Create | Full quest authoring reference: manifest structure, stages, `advance_on` (Set semantics — duplicates silently ignored), `completion_effects`, `quest_activate` effect, stage graph rules, worked multi-stage example       |
+| `docs/authors/items.md`          | Content authors | Update | Document `loot_ref` on `item_drop`; explain named `LootTable` manifests; explain enemy-name references and resolution order; document `quantity` field on loot entries                                                     |
+| `docs/authors/README.md`         | Content authors | Update | Add `quests.md` entry to table of contents                                                                                                                                                                                 |
+| `docs/dev/game-engine.md`        | Developers      | Update | Quest activation engine section: `quest_engine.py` purpose, `_advance_quests_silent` vs `evaluate_quest_advancements`, call sites in `effects.py` and `session.py`; `LootTable` registry kind; shorthand removal rationale |
+| `docs/dev/README.md`             | Developers      | Audit  | Verify table of contents is complete and accurate after changes                                                                                                                                                            |
 
 ---
 
@@ -921,13 +921,13 @@ The loot changes add `loot_ref` and `quantity` — two new fields on existing ma
 
 ### Test tiers
 
-| Tier | What it covers | Tools |
-|------|---------------|-------|
-| Unit — model validation | Pydantic schema rules: `completion_effects` on non-terminal rejected, `loot`/`loot_ref` mutual exclusion | `pytest`, direct model instantiation |
-| Unit — quest engine | `_advance_quests_silent` and `evaluate_quest_advancements` logic in isolation | `pytest`, `AsyncMock` TUI, direct `CharacterState` construction |
-| Unit — effect dispatch | `quest_activate`, `milestone_grant`→advancement, `item_drop` with `loot_ref` | `pytest`, `AsyncMock` TUI, minimal fixture registry |
-| Unit — loader | Shorthand condition hard error, `loot_ref` cross-reference validation, `LootTable` kind parsed | `pytest`, inline YAML strings |
-| Integration — full pipeline | Quest starts, advances through two stages, fires completion effects; loot_ref resolves end-to-end | `pytest`, `mock_tui` fixture, fixture content in `tests/fixtures/content/` |
+| Tier                        | What it covers                                                                                           | Tools                                                                      |
+| --------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Unit — model validation     | Pydantic schema rules: `completion_effects` on non-terminal rejected, `loot`/`loot_ref` mutual exclusion | `pytest`, direct model instantiation                                       |
+| Unit — quest engine         | `_advance_quests_silent` and `evaluate_quest_advancements` logic in isolation                            | `pytest`, `AsyncMock` TUI, direct `CharacterState` construction            |
+| Unit — effect dispatch      | `quest_activate`, `milestone_grant`→advancement, `item_drop` with `loot_ref`                             | `pytest`, `AsyncMock` TUI, minimal fixture registry                        |
+| Unit — loader               | Shorthand condition hard error, `loot_ref` cross-reference validation, `LootTable` kind parsed           | `pytest`, inline YAML strings                                              |
+| Integration — full pipeline | Quest starts, advances through two stages, fires completion effects; loot_ref resolves end-to-end        | `pytest`, `mock_tui` fixture, fixture content in `tests/fixtures/content/` |
 
 ### Required fixtures
 
@@ -942,7 +942,7 @@ def minimal_quest_registry() -> ContentRegistry:
     registry = ContentRegistry.__new__(ContentRegistry)
     registry.__init__()
     quest = QuestManifest.model_validate({
-        "apiVersion": "game/v1",
+        "apiVersion": "oscilla/v1",
         "kind": "Quest",
         "metadata": {"name": "test-quest"},
         "spec": {
@@ -1088,7 +1088,7 @@ def make_loot_registry() -> ContentRegistry:
     registry.__init__()
 
     loot_table = LootTableManifest.model_validate({
-        "apiVersion": "game/v1",
+        "apiVersion": "oscilla/v1",
         "kind": "LootTable",
         "metadata": {"name": "test-loot"},
         "spec": {
@@ -1138,7 +1138,7 @@ def test_bare_key_condition_is_hard_error(tmp_path: Path) -> None:
     """A manifest with shorthand condition syntax must produce a LoadError, not silently load."""
     manifest = tmp_path / "bad.yaml"
     manifest.write_text(textwrap.dedent("""
-        apiVersion: game/v1
+        apiVersion: oscilla/v1
         kind: Region
         metadata:
           name: test-region
@@ -1166,7 +1166,7 @@ All files below are new additions to `content/testlandia/`.
 **`content/testlandia/quests/test-quest.yaml`**
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Quest
 metadata:
   name: test-quest
@@ -1199,7 +1199,7 @@ spec:
 **`content/testlandia/loot-tables/test-loot.yaml`**
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: LootTable
 metadata:
   name: test-loot
@@ -1218,7 +1218,7 @@ spec:
 **`content/testlandia/adventures/test-quest-start.yaml`**
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-quest-start
@@ -1241,7 +1241,7 @@ spec:
 **`content/testlandia/adventures/test-quest-finish.yaml`**
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: test-quest-finish
@@ -1281,10 +1281,10 @@ The `base_adventure_count:` line is removed from `content/testlandia/game.yaml`.
 
 ## Risks / Trade-offs
 
-| Risk | Likelihood | Mitigation |
-|------|-----------|------------|
-| Condition shorthand removal breaks existing community content | Low (field was never documented as the preferred form; only one use in bundled content) | Hard error has clear message; `--strict` flag is unchanged; migration is mechanical |
-| Quest completion effects run twice if same milestone granted twice | Low (milestone grant is idempotent — `milestones.add` is a set) | The `while True` loop in advancement checks `advance_on`, not just existence; once advanced, stage no longer references the same milestone |
-| `loot_ref` to enemy with empty loot list silently skips drop | Medium (authors may not realize empty loot = error path) | `resolve_loot_entries` returns `None` for empty enemy loot; loader cross-reference validation catches this at load time |
-| Circular import via `quest_engine.py` importing `run_effect` | Avoided | Local import inside `evaluate_quest_advancements` function body defers import until call time, same pattern used elsewhere in effects.py |
-| `ItemDropEffect` schema change breaks deserialized saved states | Not applicable | Effects are not persisted; they live only in manifest YAML and are re-parsed on load |
+| Risk                                                               | Likelihood                                                                              | Mitigation                                                                                                                                 |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Condition shorthand removal breaks existing community content      | Low (field was never documented as the preferred form; only one use in bundled content) | Hard error has clear message; `--strict` flag is unchanged; migration is mechanical                                                        |
+| Quest completion effects run twice if same milestone granted twice | Low (milestone grant is idempotent — `milestones.add` is a set)                         | The `while True` loop in advancement checks `advance_on`, not just existence; once advanced, stage no longer references the same milestone |
+| `loot_ref` to enemy with empty loot list silently skips drop       | Medium (authors may not realize empty loot = error path)                                | `resolve_loot_entries` returns `None` for empty enemy loot; loader cross-reference validation catches this at load time                    |
+| Circular import via `quest_engine.py` importing `run_effect`       | Avoided                                                                                 | Local import inside `evaluate_quest_advancements` function body defers import until call time, same pattern used elsewhere in effects.py   |
+| `ItemDropEffect` schema change breaks deserialized saved states    | Not applicable                                                                          | Effects are not persisted; they live only in manifest YAML and are re-parsed on load                                                       |

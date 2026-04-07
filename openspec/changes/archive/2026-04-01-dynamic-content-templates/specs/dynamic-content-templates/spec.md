@@ -73,28 +73,28 @@ The `PlayerContext` SHALL expose:
 
 Templates SHALL have access to the following built-in functions without any import statement:
 
-| Function | Signature | Description |
-|----------|-----------|-------------|
-| `roll(low, high)` | `(int, int) → int` | Random integer N where `low <= N <= high` |
-| `choice(items)` | `(list) → any` | Random element from a list |
-| `sample(items, k)` | `(list, int) → list` | `k` unique elements from a list, without replacement |
-| `random()` | `() → float` | Random float in `[0.0, 1.0)` — familiar shorthand |
-| `now()` | `() → datetime` | Current local date and time |
-| `today()` | `() → date` | Current local date |
-| `clamp(value, lo, hi)` | `(num, num, num) → num` | Clamps `value` to `[lo, hi]` |
-| `round` | Python builtin | `round(value, ndigits=0)` |
-| `sum` | Python builtin | `sum(iterable)` |
-| `max`, `min` | Python builtins | Standard max/min |
-| `floor`, `ceil`, `abs` | Python/math | Standard math functions |
-| `range`, `len`, `int`, `str`, `bool` | Python builtins | Standard utilities |
-| `season(date)` | `(date) → str` | Meteorological season: `"spring"`, `"summer"`, `"autumn"`, or `"winter"` |
-| `month_name(n)` | `(int) → str` | English month name (1 = `"January"` … 12 = `"December"`) |
-| `day_name(n)` | `(int) → str` | English weekday name (0 = `"Monday"` … 6 = `"Sunday"`) |
-| `week_number(date)` | `(date) → int` | ISO week number (1–53) |
-| `mean(values)` | `(list) → float` | Arithmetic mean of a list of numbers |
-| `zodiac_sign(date)` | `(date) → str` | Western zodiac sign (e.g. `"Aries"`, `"Scorpio"`) |
-| `chinese_zodiac(year)` | `(int) → str` | Chinese zodiac animal (e.g. `"Rat"`, `"Dragon"`) |
-| `moon_phase(date)` | `(date) → str` | Approximate lunar phase (e.g. `"Full Moon"`, `"Waxing Crescent"`) |
+| Function                             | Signature               | Description                                                              |
+| ------------------------------------ | ----------------------- | ------------------------------------------------------------------------ |
+| `roll(low, high)`                    | `(int, int) → int`      | Random integer N where `low <= N <= high`                                |
+| `choice(items)`                      | `(list) → any`          | Random element from a list                                               |
+| `sample(items, k)`                   | `(list, int) → list`    | `k` unique elements from a list, without replacement                     |
+| `random()`                           | `() → float`            | Random float in `[0.0, 1.0)` — familiar shorthand                        |
+| `now()`                              | `() → datetime`         | Current local date and time                                              |
+| `today()`                            | `() → date`             | Current local date                                                       |
+| `clamp(value, lo, hi)`               | `(num, num, num) → num` | Clamps `value` to `[lo, hi]`                                             |
+| `round`                              | Python builtin          | `round(value, ndigits=0)`                                                |
+| `sum`                                | Python builtin          | `sum(iterable)`                                                          |
+| `max`, `min`                         | Python builtins         | Standard max/min                                                         |
+| `floor`, `ceil`, `abs`               | Python/math             | Standard math functions                                                  |
+| `range`, `len`, `int`, `str`, `bool` | Python builtins         | Standard utilities                                                       |
+| `season(date)`                       | `(date) → str`          | Meteorological season: `"spring"`, `"summer"`, `"autumn"`, or `"winter"` |
+| `month_name(n)`                      | `(int) → str`           | English month name (1 = `"January"` … 12 = `"December"`)                 |
+| `day_name(n)`                        | `(int) → str`           | English weekday name (0 = `"Monday"` … 6 = `"Sunday"`)                   |
+| `week_number(date)`                  | `(date) → int`          | ISO week number (1–53)                                                   |
+| `mean(values)`                       | `(list) → float`        | Arithmetic mean of a list of numbers                                     |
+| `zodiac_sign(date)`                  | `(date) → str`          | Western zodiac sign (e.g. `"Aries"`, `"Scorpio"`)                        |
+| `chinese_zodiac(year)`               | `(int) → str`           | Chinese zodiac animal (e.g. `"Rat"`, `"Dragon"`)                         |
+| `moon_phase(date)`                   | `(date) → str`          | Approximate lunar phase (e.g. `"Full Moon"`, `"Waxing Crescent"`)        |
 
 All other Python builtins, modules, and dunder attributes SHALL be blocked by the sandbox.
 
@@ -214,10 +214,10 @@ All other Python builtins, modules, and dunder attributes SHALL be blocked by th
 
 Templates SHALL have access to the following custom filters:
 
-| Filter | Signature | Description |
-|--------|-----------|-------------|
-| `stat_modifier` | `(int) → str` | Converts stat value to signed modifier (e.g. `"+3"`, `"-1"`) |
-| `pluralize` | `(int, str, str|None) → str` | Returns singular or plural form based on count |
+| Filter          | Signature       | Description                                                  |
+| --------------- | --------------- | ------------------------------------------------------------ | ---------------------------------------------- |
+| `stat_modifier` | `(int) → str`   | Converts stat value to signed modifier (e.g. `"+3"`, `"-1"`) |
+| `pluralize`     | `(int, str, str | None) → str`                                                 | Returns singular or plural form based on count |
 
 Standard Jinja2 filters (`capitalize`, `upper`, `lower`, `title`, `replace`, `default`, etc.) SHALL also be available.
 

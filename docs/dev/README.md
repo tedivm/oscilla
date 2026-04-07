@@ -57,8 +57,8 @@ The oscilla project is designed with clear separation between interface layers:
 
 - **Game Engine** - Core game logic and content processing (above)
 - **CLI Interface** - Terminal user interface and commands (above)
-- **REST API** - Web service endpoints *(future)*
-- **Frontend** - Web browser interface *(future)*
+- **REST API** - Web service endpoints _(future)_
+- **Frontend** - Web browser interface _(future)_
 
 ## Development Practices
 
@@ -109,4 +109,4 @@ All documentation in this project follows the standards outlined in [documentati
 
 ---
 
-*This documentation is maintained by the development team. If you find issues or have suggestions, please contribute improvements!*
+_This documentation is maintained by the development team. If you find issues or have suggestions, please contribute improvements!_

@@ -517,4 +517,4 @@ After each completed `solar_year` cycle (365 ticks), `ingame_time.eras['zodiac-a
 
 ---
 
-*See also: [In-Game Time](../ingame-time.md) for the full system reference, and [Day-Night Narrative](./day-night-narrative.md) for the real-world clock equivalent of these patterns.*
+_See also: [In-Game Time](../ingame-time.md) for the full system reference, and [Day-Night Narrative](./day-night-narrative.md) for the real-world clock equivalent of these patterns._

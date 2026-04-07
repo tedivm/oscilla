@@ -13,14 +13,14 @@ The loaded `ContentRegistry` already contains fully parsed, validated, cross-ref
 
 **Current `oscilla/cli.py` commands:**
 
-| Command | Function |
-|---------|----------|
-| `game` | Launches TUI |
-| `validate` | Loads content, reports schema errors + manifest counts |
-| `version` | Prints version |
-| `hello` | Greeting |
-| `data-path` | Prints data directory |
-| `test-data` | Installs dev test data |
+| Command     | Function                                               |
+| ----------- | ------------------------------------------------------ |
+| `game`      | Launches TUI                                           |
+| `validate`  | Loads content, reports schema errors + manifest counts |
+| `version`   | Prints version                                         |
+| `hello`     | Greeting                                               |
+| `data-path` | Prints data directory                                  |
+| `test-data` | Installs dev test data                                 |
 
 The `_load_games()` helper in `cli.py` already wraps `load_games()` with clean error reporting and `SystemExit(1)` on failure. All new `content` commands will reuse this.
 
@@ -2093,17 +2093,17 @@ The `create` command generates a valid minimal YAML manifest at the conventional
 
 The conventional paths mirror the existing content packages:
 
-| Kind | Path template |
-|------|--------------|
-| region | `<games_path>/<game>/regions/<name>/<name>.yaml` |
-| location | `<games_path>/<game>/regions/<region>/locations/<name>/<name>.yaml` |
+| Kind      | Path template                                                                      |
+| --------- | ---------------------------------------------------------------------------------- |
+| region    | `<games_path>/<game>/regions/<name>/<name>.yaml`                                   |
+| location  | `<games_path>/<game>/regions/<region>/locations/<name>/<name>.yaml`                |
 | adventure | `<games_path>/<game>/regions/<region>/locations/<location>/adventures/<name>.yaml` |
-| enemy | `<games_path>/<game>/enemies/<name>.yaml` |
-| item | `<games_path>/<game>/items/<name>.yaml` |
-| skill | `<games_path>/<game>/skills/<name>.yaml` |
-| buff | `<games_path>/<game>/buffs/<name>.yaml` |
-| quest | `<games_path>/<game>/quests/<name>.yaml` |
-| recipe | `<games_path>/<game>/recipes/<name>.yaml` |
+| enemy     | `<games_path>/<game>/enemies/<name>.yaml`                                          |
+| item      | `<games_path>/<game>/items/<name>.yaml`                                            |
+| skill     | `<games_path>/<game>/skills/<name>.yaml`                                           |
+| buff      | `<games_path>/<game>/buffs/<name>.yaml`                                            |
+| quest     | `<games_path>/<game>/quests/<name>.yaml`                                           |
+| recipe    | `<games_path>/<game>/recipes/<name>.yaml`                                          |
 
 ```python
 # oscilla/engine/scaffolder.py
@@ -2136,7 +2136,7 @@ def scaffold_region(
     parent: str | None = None,
 ) -> Path:
     data = {
-        "apiVersion": "game/v1",
+        "apiVersion": "oscilla/v1",
         "kind": "Region",
         "metadata": {"name": name},
         "spec": {"displayName": display_name, "description": description},
@@ -2157,7 +2157,7 @@ def scaffold_location(
     description: str = "",
 ) -> Path:
     data = {
-        "apiVersion": "game/v1",
+        "apiVersion": "oscilla/v1",
         "kind": "Location",
         "metadata": {"name": name},
         "spec": {
@@ -2182,7 +2182,7 @@ def scaffold_adventure(
     description: str = "",
 ) -> Path:
     data = {
-        "apiVersion": "game/v1",
+        "apiVersion": "oscilla/v1",
         "kind": "Adventure",
         "metadata": {"name": name},
         "spec": {
@@ -2223,7 +2223,7 @@ def scaffold_enemy(
     description: str = "",
 ) -> Path:
     data = {
-        "apiVersion": "game/v1",
+        "apiVersion": "oscilla/v1",
         "kind": "Enemy",
         "metadata": {"name": name},
         "spec": {
@@ -2250,7 +2250,7 @@ def scaffold_item(
     description: str = "",
 ) -> Path:
     data = {
-        "apiVersion": "game/v1",
+        "apiVersion": "oscilla/v1",
         "kind": "Item",
         "metadata": {"name": name},
         "spec": {
@@ -2274,7 +2274,7 @@ def scaffold_quest(
     description: str = "",
 ) -> Path:
     data = {
-        "apiVersion": "game/v1",
+        "apiVersion": "oscilla/v1",
         "kind": "Quest",
         "metadata": {"name": name},
         "spec": {
@@ -2445,16 +2445,16 @@ dependencies = [
   - `content create` interaction walkthrough (interactive + non-interactive examples)
   - Table of all flags and when they apply:
 
-    | Flag | Commands | Notes |
-    |------|----------|-------|
-    | `--format text\|json\|yaml` | `list`, `show`, `test`, `trace` | Machine-readable output |
-    | `--no-semantic` | `validate` | Skip semantic checks (semantic runs by default) |
-    | `--no-interactive` | `create` | Scripting / CI use |
-    | `--vscode` | `schema` | Writes `.vscode/settings.json` associations (requires `--output`) |
-    | `--include-kinds` | `graph deps` | Comma-separated kind slugs to keep |
-    | `--exclude-kinds` | `graph deps` | Comma-separated kind slugs to drop |
-    | `--focus` | `graph deps` | Restrict to neighborhood of one node |
-    | `--strict` | `validate`, `test` | Treat warnings as errors |
+    | Flag                        | Commands                        | Notes                                                             |
+    | --------------------------- | ------------------------------- | ----------------------------------------------------------------- |
+    | `--format text\|json\|yaml` | `list`, `show`, `test`, `trace` | Machine-readable output                                           |
+    | `--no-semantic`             | `validate`                      | Skip semantic checks (semantic runs by default)                   |
+    | `--no-interactive`          | `create`                        | Scripting / CI use                                                |
+    | `--vscode`                  | `schema`                        | Writes `.vscode/settings.json` associations (requires `--output`) |
+    | `--include-kinds`           | `graph deps`                    | Comma-separated kind slugs to keep                                |
+    | `--exclude-kinds`           | `graph deps`                    | Comma-separated kind slugs to drop                                |
+    | `--focus`                   | `graph deps`                    | Restrict to neighborhood of one node                              |
+    | `--strict`                  | `validate`, `test`              | Treat warnings as errors                                          |
 
 - **Must be added to** `docs/authors/README.md` table of contents
 
@@ -2474,15 +2474,15 @@ dependencies = [
 
 ### Test Tiers
 
-| Tier | What it tests | Location |
-|------|---------------|----------|
-| Unit — graph builders | `build_world_graph`, `build_adventure_graph`, `build_deps_graph` produce correct nodes/edges from a minimal in-memory registry | `tests/engine/test_graph.py` |
-| Unit — graph renderers | DOT/Mermaid/ASCII output from a fixed `ContentGraph` matches expected structure | `tests/engine/test_graph_renderers.py` |
-| Unit — semantic validator | Each check function catches exactly the condition it is designed for; clean content produces zero issues | `tests/engine/test_semantic_validator.py` |
-| Unit — tracer | Trace of a known multi-branch adventure produces correct path count and effects | `tests/engine/test_tracer.py` |
-| Unit — schema export | `export_schema` returns valid JSON Schema for each kind; `export_all_schemas` returns all kinds | `tests/engine/test_schema_export.py` |
-| Unit — scaffolder | Each `scaffold_*` function creates a file with valid YAML at the expected path; content validates without error | `tests/engine/test_scaffolder.py` |
-| Integration — CLI | All `content` commands succeed against the testlandia package via `CliRunner` | `tests/test_cli_content.py` |
+| Tier                      | What it tests                                                                                                                  | Location                                  |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
+| Unit — graph builders     | `build_world_graph`, `build_adventure_graph`, `build_deps_graph` produce correct nodes/edges from a minimal in-memory registry | `tests/engine/test_graph.py`              |
+| Unit — graph renderers    | DOT/Mermaid/ASCII output from a fixed `ContentGraph` matches expected structure                                                | `tests/engine/test_graph_renderers.py`    |
+| Unit — semantic validator | Each check function catches exactly the condition it is designed for; clean content produces zero issues                       | `tests/engine/test_semantic_validator.py` |
+| Unit — tracer             | Trace of a known multi-branch adventure produces correct path count and effects                                                | `tests/engine/test_tracer.py`             |
+| Unit — schema export      | `export_schema` returns valid JSON Schema for each kind; `export_all_schemas` returns all kinds                                | `tests/engine/test_schema_export.py`      |
+| Unit — scaffolder         | Each `scaffold_*` function creates a file with valid YAML at the expected path; content validates without error                | `tests/engine/test_scaffolder.py`         |
+| Integration — CLI         | All `content` commands succeed against the testlandia package via `CliRunner`                                                  | `tests/test_cli_content.py`               |
 
 ### Fixture: Minimal `ContentRegistry`
 
@@ -2502,12 +2502,12 @@ def _meta(name: str) -> ManifestMetadata:
 def make_minimal_registry() -> ContentRegistry:
     """Build a minimal ContentRegistry with one of each type for graph tests."""
     region = RegionManifest(
-        apiVersion="game/v1", kind="Region",
+        apiVersion="oscilla/v1", kind="Region",
         metadata=_meta("forest"),
         spec=RegionSpec(displayName="The Forest"),
     )
     location = LocationManifest(
-        apiVersion="game/v1", kind="Location",
+        apiVersion="oscilla/v1", kind="Location",
         metadata=_meta("clearing"),
         spec=LocationSpec(
             displayName="The Clearing",
@@ -2516,7 +2516,7 @@ def make_minimal_registry() -> ContentRegistry:
         ),
     )
     adventure = AdventureManifest(
-        apiVersion="game/v1", kind="Adventure",
+        apiVersion="oscilla/v1", kind="Adventure",
         metadata=_meta("goblin-fight"),
         spec=AdventureSpec(
             displayName="Goblin Fight",
@@ -2645,7 +2645,7 @@ def test_undefined_adventure_ref_in_pool() -> None:
     from oscilla.engine.models.location import LocationManifest, LocationSpec, AdventurePoolEntry
     registry = ContentRegistry()
     loc = LocationManifest(
-        apiVersion="game/v1", kind="Location",
+        apiVersion="oscilla/v1", kind="Location",
         metadata=_meta("loc"),
         spec=LocationSpec(
             displayName="Loc", region="nowhere",
@@ -2660,12 +2660,12 @@ def test_undefined_adventure_ref_in_pool() -> None:
 def test_circular_region_parents() -> None:
     registry = ContentRegistry()
     r1 = RegionManifest(
-        apiVersion="game/v1", kind="Region",
+        apiVersion="oscilla/v1", kind="Region",
         metadata=_meta("alpha"),
         spec=RegionSpec(displayName="Alpha", parent="beta"),
     )
     r2 = RegionManifest(
-        apiVersion="game/v1", kind="Region",
+        apiVersion="oscilla/v1", kind="Region",
         metadata=_meta("beta"),
         spec=RegionSpec(displayName="Beta", parent="alpha"),
     )
@@ -2679,7 +2679,7 @@ def test_orphaned_adventure_is_warning() -> None:
     from oscilla.engine.models.adventure import AdventureManifest, AdventureSpec, NarrativeStep
     registry = ContentRegistry()
     adv = AdventureManifest(
-        apiVersion="game/v1", kind="Adventure",
+        apiVersion="oscilla/v1", kind="Adventure",
         metadata=_meta("orphan"),
         spec=AdventureSpec(displayName="Orphan", steps=[
             NarrativeStep(type="narrative", text="Hello", effects=[])
@@ -2709,7 +2709,7 @@ def _meta(name: str) -> ManifestMetadata:
 def _simple_adventure() -> AdventureManifest:
     """Adventure with a two-option choice leading to different outcomes."""
     return AdventureManifest(
-        apiVersion="game/v1", kind="Adventure",
+        apiVersion="oscilla/v1", kind="Adventure",
         metadata=_meta("test-adventure"),
         spec=AdventureSpec(
             displayName="Test Adventure",
@@ -2764,7 +2764,7 @@ Add a **`tooling-lab`** region to the testlandia content package with one locati
 **`content/testlandia/regions/tooling-lab/tooling-lab.yaml`**
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Region
 metadata:
   name: tooling-lab
@@ -2776,7 +2776,7 @@ spec:
 **`content/testlandia/regions/tooling-lab/locations/trace-demo/trace-demo.yaml`**
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Location
 metadata:
   name: trace-demo
@@ -2792,7 +2792,7 @@ spec:
 **`content/testlandia/regions/tooling-lab/locations/trace-demo/adventures/trace-demo.yaml`**
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: trace-demo
@@ -2879,13 +2879,13 @@ oscilla content create enemy \
 
 ## Risks / Trade-offs
 
-| Risk | Mitigation |
-|------|-----------|
-| `pydot` API may differ across versions | Constrained to `>=4,<5` in pyproject.toml; exact version locked by `uv.lock`; API changed between 3.x and 4.x — design verified against v4 source and uses only v4-compatible API |
-| Adventure tracer combinatorial explosion on very large adventures | Tracer is a static analysis tool, not a game execution; path count equals the product of branch counts at each step; document that very large adventures may produce many paths |
-| `export_schema` for complex discriminated unions (e.g., `Condition`) may produce schemas too large for some editors | No mitigation needed for MVP; schema output is already useful for simpler kinds; complex union schemas are a known Pydantic limitation |
-| Scaffolded YAML uses `ruamel-yaml` style; may differ from author's preferred style | Files are valid and load correctly; authors can reformat with their editor; `make chores` handles project YAML via dapperdata |
-| `content create` for `adventure` places the file under `regions/<region>/locations/<location>/adventures/`; if those directories don't exist, `mkdir(parents=True)` creates them silently | This is the desired behavior; the convention is the convention |
+| Risk                                                                                                                                                                                      | Mitigation                                                                                                                                                                        |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pydot` API may differ across versions                                                                                                                                                    | Constrained to `>=4,<5` in pyproject.toml; exact version locked by `uv.lock`; API changed between 3.x and 4.x — design verified against v4 source and uses only v4-compatible API |
+| Adventure tracer combinatorial explosion on very large adventures                                                                                                                         | Tracer is a static analysis tool, not a game execution; path count equals the product of branch counts at each step; document that very large adventures may produce many paths   |
+| `export_schema` for complex discriminated unions (e.g., `Condition`) may produce schemas too large for some editors                                                                       | No mitigation needed for MVP; schema output is already useful for simpler kinds; complex union schemas are a known Pydantic limitation                                            |
+| Scaffolded YAML uses `ruamel-yaml` style; may differ from author's preferred style                                                                                                        | Files are valid and load correctly; authors can reformat with their editor; `make chores` handles project YAML via dapperdata                                                     |
+| `content create` for `adventure` places the file under `regions/<region>/locations/<location>/adventures/`; if those directories don't exist, `mkdir(parents=True)` creates them silently | This is the desired behavior; the convention is the convention                                                                                                                    |
 
 ## Open Questions
 

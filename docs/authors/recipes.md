@@ -9,7 +9,7 @@ Recipes are a straightforward way to let players convert raw materials from adve
 ## Basic Structure
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Recipe
 metadata:
   name: brew-healing-potion
@@ -87,7 +87,7 @@ A well-designed recipe system creates a loop: adventures drop raw materials, rec
 # (wolf-tooth is an item_drop in a combat adventure)
 
 # Step 2 — combine with leather to make protective gear
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Recipe
 metadata:
   name: craft-wolf-tooth-necklace
@@ -110,29 +110,29 @@ spec:
 
 ### Recipe manifest fields
 
-| Field | Required | Description |
-|---|---|---|
-| `metadata.name` | yes | Unique identifier |
-| `spec.displayName` | yes | Player-facing recipe name in the crafting menu |
-| `spec.description` | no | Flavor text explaining the recipe |
-| `spec.inputs` | yes | List of ingredient entries (at least one) |
-| `spec.output` | yes | The item and quantity produced |
+| Field              | Required | Description                                    |
+| ------------------ | -------- | ---------------------------------------------- |
+| `metadata.name`    | yes      | Unique identifier                              |
+| `spec.displayName` | yes      | Player-facing recipe name in the crafting menu |
+| `spec.description` | no       | Flavor text explaining the recipe              |
+| `spec.inputs`      | yes      | List of ingredient entries (at least one)      |
+| `spec.output`      | yes      | The item and quantity produced                 |
 
 ### Input entry fields
 
-| Field | Required | Description |
-|---|---|---|
-| `item` | yes | `metadata.name` of an Item manifest |
-| `quantity` | yes | Number of this item required (positive integer) |
+| Field      | Required | Description                                     |
+| ---------- | -------- | ----------------------------------------------- |
+| `item`     | yes      | `metadata.name` of an Item manifest             |
+| `quantity` | yes      | Number of this item required (positive integer) |
 
 ### Output fields
 
-| Field | Required | Description |
-|---|---|---|
-| `item` | yes | `metadata.name` of an Item manifest |
-| `quantity` | yes | Number of items produced (positive integer) |
+| Field      | Required | Description                                 |
+| ---------- | -------- | ------------------------------------------- |
+| `item`     | yes      | `metadata.name` of an Item manifest         |
+| `quantity` | yes      | Number of items produced (positive integer) |
 
 ---
 
-*See [Items](./items.md) for item manifest syntax.*
-*See [Effects](./effects.md) for `item_drop` — the effect that places items into a player's inventory during an adventure.*
+_See [Items](./items.md) for item manifest syntax._
+_See [Effects](./effects.md) for `item_drop` — the effect that places items into a player's inventory during an adventure._

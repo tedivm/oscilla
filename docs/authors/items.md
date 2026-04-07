@@ -7,7 +7,7 @@ Items are the physical objects of your world — weapons, armor, potions, keys, 
 ## Basic Structure
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Item
 metadata:
   name: healing-potion
@@ -67,7 +67,7 @@ spec:
   description: "Three icy bolts remain."
   category: magic
   stackable: false
-  charges: 3            # item instance starts with 3 uses
+  charges: 3 # item instance starts with 3 uses
   use_effects:
     - type: apply_buff
       buff_ref: frost-bolt
@@ -112,7 +112,7 @@ equip:
   requires:
     type: character_stat
     name: strength
-    gte: 15           # cannot equip until strength reaches 15
+    gte: 15 # cannot equip until strength reaches 15
   stat_modifiers:
     - stat: strength
       amount: 5
@@ -130,9 +130,9 @@ equip:
     - main_hand
   stat_modifiers: []
 grants_skills_equipped:
-  - battle-cry      # skill is available only while this item is equipped
+  - battle-cry # skill is available only while this item is equipped
 grants_skills_held:
-  - appraise-item   # skill is available whenever the item is in the inventory
+  - appraise-item # skill is available whenever the item is in the inventory
 ```
 
 `grants_skills_equipped` grants are ephemeral — they disappear the moment the item is unequipped. `grants_skills_held` grants are active whenever the player has even one copy in inventory, regardless of whether it's equipped.
@@ -147,7 +147,7 @@ Gear can automatically apply [combat buffs](./skills.md#defining-a-buff) at the 
 grants_buffs_equipped:
   - buff_ref: thorns
     variables:
-      reflect_percent: 20   # override a buff variable for this item
+      reflect_percent: 20 # override a buff variable for this item
 
 grants_buffs_held:
   - buff_ref: aura-of-dread
@@ -200,7 +200,7 @@ Items do not automatically appear in the game just because they exist in a manif
 A `LootTable` manifest defines a named, reusable collection of weighted item entries. Instead of repeating loot lists in every adventure, you define the table once and reference it by name using `loot_ref`.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: LootTable
 metadata:
   name: dungeon-treasure
@@ -234,7 +234,7 @@ effects:
 effects:
   - type: item_drop
     count: 1
-    loot_ref: goblin-warrior    # uses EnemyManifest.spec.loot
+    loot_ref: goblin-warrior # uses EnemyManifest.spec.loot
 ```
 
 **Resolution order:** when the engine sees a `loot_ref`, it first checks named `LootTable` manifests, then `Enemy` manifests. Choose names that do not collide between the two kinds if you want predictable resolution.
@@ -249,7 +249,7 @@ Each entry in a loot list (whether inline or in a `LootTable`) supports a `quant
 loot:
   - item: gold-coins
     weight: 100
-    quantity: 10    # player receives 10 gold-coins per roll
+    quantity: 10 # player receives 10 gold-coins per roll
 ```
 
 `quantity` defaults to `1` when omitted. When a roll selects an entry, the player receives `quantity` copies. Combined with `count`, you can build generous reward tables — a `count: 3` drop with `quantity: 5` on the winning entry grants 15 items.
@@ -260,31 +260,31 @@ loot:
 
 ### Item manifest fields
 
-| Field | Required | Default | Description |
-|---|---|---|---|
-| `metadata.name` | yes | — | Identifier used everywhere items are referenced |
-| `spec.displayName` | yes | — | Player-facing name |
-| `spec.description` | no | `""` | Short description shown in inventory |
-| `spec.category` | no | `""` | Display-only category label (free string) |
-| `spec.stackable` | no | `false` | If `true`, multiple copies stack as a count |
-| `spec.value` | no | `0` | Numeric value (for display or shop mechanics) |
-| `spec.labels` | no | `[]` | List of item label names from `game.yaml` |
-| `spec.use_effects` | no | `[]` | Effects that fire when the player activates the item |
-| `spec.consumed_on_use` | no | `false` | Remove after use (stack decrements; instance removed) |
-| `spec.charges` | no | `null` | Per-instance use count; item removed when it reaches 0 |
-| `spec.equip` | no | `null` | If present, item can be equipped into slots |
-| `spec.grants_skills_equipped` | no | `[]` | Skills available only while item is in a slot |
-| `spec.grants_skills_held` | no | `[]` | Skills available whenever item is in inventory |
-| `spec.grants_buffs_equipped` | no | `[]` | Buffs applied at combat start while equipped |
-| `spec.grants_buffs_held` | no | `[]` | Buffs applied at combat start while held |
+| Field                         | Required | Default | Description                                            |
+| ----------------------------- | -------- | ------- | ------------------------------------------------------ |
+| `metadata.name`               | yes      | —       | Identifier used everywhere items are referenced        |
+| `spec.displayName`            | yes      | —       | Player-facing name                                     |
+| `spec.description`            | no       | `""`    | Short description shown in inventory                   |
+| `spec.category`               | no       | `""`    | Display-only category label (free string)              |
+| `spec.stackable`              | no       | `false` | If `true`, multiple copies stack as a count            |
+| `spec.value`                  | no       | `0`     | Numeric value (for display or shop mechanics)          |
+| `spec.labels`                 | no       | `[]`    | List of item label names from `game.yaml`              |
+| `spec.use_effects`            | no       | `[]`    | Effects that fire when the player activates the item   |
+| `spec.consumed_on_use`        | no       | `false` | Remove after use (stack decrements; instance removed)  |
+| `spec.charges`                | no       | `null`  | Per-instance use count; item removed when it reaches 0 |
+| `spec.equip`                  | no       | `null`  | If present, item can be equipped into slots            |
+| `spec.grants_skills_equipped` | no       | `[]`    | Skills available only while item is in a slot          |
+| `spec.grants_skills_held`     | no       | `[]`    | Skills available whenever item is in inventory         |
+| `spec.grants_buffs_equipped`  | no       | `[]`    | Buffs applied at combat start while equipped           |
+| `spec.grants_buffs_held`      | no       | `[]`    | Buffs applied at combat start while held               |
 
 ### EquipSpec fields
 
-| Field | Required | Default | Description |
-|---|---|---|---|
-| `slots` | yes | — | List of slot names (min 1) from `CharacterConfig.equipment_slots` |
-| `stat_modifiers` | no | `[]` | List of `{stat, amount}` pairs active while equipped |
-| `requires` | no | `null` | Condition evaluated against base stats before allowing equip |
+| Field            | Required | Default | Description                                                       |
+| ---------------- | -------- | ------- | ----------------------------------------------------------------- |
+| `slots`          | yes      | —       | List of slot names (min 1) from `CharacterConfig.equipment_slots` |
+| `stat_modifiers` | no       | `[]`    | List of `{stat, amount}` pairs active while equipped              |
+| `requires`       | no       | `null`  | Condition evaluated against base stats before allowing equip      |
 
 ### Constraints
 
@@ -296,7 +296,7 @@ loot:
 
 ---
 
-*See [Effects](./effects.md) for what you can put in `use_effects`.*
-*See [Skills](./skills.md) for skill and buff manifest syntax.*
-*See [Game Configuration](./game-configuration.md) for `item_labels` and equipment slot definitions.*
-*See [Conditions](./conditions.md) for `item_held_label` and `item_equipped` conditions.*
+_See [Effects](./effects.md) for what you can put in `use_effects`._
+_See [Skills](./skills.md) for skill and buff manifest syntax._
+_See [Game Configuration](./game-configuration.md) for `item_labels` and equipment slot definitions._
+_See [Conditions](./conditions.md) for `item_held_label` and `item_equipped` conditions._

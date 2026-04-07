@@ -27,7 +27,7 @@ def scaffold_region(
     parent: str | None = None,
 ) -> Path:
     data: Dict = {
-        "apiVersion": "game/v1",
+        "apiVersion": "oscilla/v1",
         "kind": "Region",
         "metadata": {"name": name},
         "spec": {"displayName": display_name, "description": description},
@@ -48,7 +48,7 @@ def scaffold_location(
     description: str = "",
 ) -> Path:
     data: Dict = {
-        "apiVersion": "game/v1",
+        "apiVersion": "oscilla/v1",
         "kind": "Location",
         "metadata": {"name": name},
         "spec": {
@@ -73,7 +73,7 @@ def scaffold_adventure(
     description: str = "",
 ) -> Path:
     data: Dict = {
-        "apiVersion": "game/v1",
+        "apiVersion": "oscilla/v1",
         "kind": "Adventure",
         "metadata": {"name": name},
         "spec": {
@@ -105,7 +105,7 @@ def scaffold_enemy(
     description: str = "",
 ) -> Path:
     data: Dict = {
-        "apiVersion": "game/v1",
+        "apiVersion": "oscilla/v1",
         "kind": "Enemy",
         "metadata": {"name": name},
         "spec": {
@@ -132,7 +132,7 @@ def scaffold_item(
     description: str = "",
 ) -> Path:
     data: Dict = {
-        "apiVersion": "game/v1",
+        "apiVersion": "oscilla/v1",
         "kind": "Item",
         "metadata": {"name": name},
         "spec": {
@@ -156,7 +156,7 @@ def scaffold_quest(
     description: str = "",
 ) -> Path:
     data: Dict = {
-        "apiVersion": "game/v1",
+        "apiVersion": "oscilla/v1",
         "kind": "Quest",
         "metadata": {"name": name},
         "spec": {

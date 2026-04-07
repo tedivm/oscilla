@@ -11,7 +11,7 @@ Together they let you design encounters where preparation and resource managemen
 Every skill is a manifest. By convention, skills are placed in `skills/` directories, but because the engine discovers manifests by scanning all `.yaml` files recursively, they can live anywhere in your package.
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Skill
 metadata:
   name: quick-heal
@@ -33,23 +33,23 @@ The `contexts` list controls where the skill can be used. A skill with only `com
 
 ### `SkillSpec` Fields
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `displayName` | `str` | required | Player-facing name shown in menus |
-| `description` | `str` | `""` | Flavor text |
-| `category` | `str` | `""` | Informational grouping label; engine enforced only when `skill_category_rules` are configured in `CharacterConfig` |
-| `contexts` | list of `"combat"` \| `"overworld"` | required (min 1) | Contexts where this skill may be activated |
-| `requires` | Condition \| null | `null` | [Condition](./conditions.md) gate checked on every activation attempt (not just at grant time) |
-| `cost` | SkillCost \| null | `null` | Resource consumed on each use |
-| `cooldown` | SkillCooldown \| null | `null` | Cooldown between uses |
-| `use_effects` | list of Effects | `[]` | Effects dispatched once when the skill is activated |
+| Field         | Type                                | Default          | Description                                                                                                        |
+| ------------- | ----------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `displayName` | `str`                               | required         | Player-facing name shown in menus                                                                                  |
+| `description` | `str`                               | `""`             | Flavor text                                                                                                        |
+| `category`    | `str`                               | `""`             | Informational grouping label; engine enforced only when `skill_category_rules` are configured in `CharacterConfig` |
+| `contexts`    | list of `"combat"` \| `"overworld"` | required (min 1) | Contexts where this skill may be activated                                                                         |
+| `requires`    | Condition \| null                   | `null`           | [Condition](./conditions.md) gate checked on every activation attempt (not just at grant time)                     |
+| `cost`        | SkillCost \| null                   | `null`           | Resource consumed on each use                                                                                      |
+| `cooldown`    | SkillCooldown \| null               | `null`           | Cooldown between uses                                                                                              |
+| `use_effects` | list of Effects                     | `[]`             | Effects dispatched once when the skill is activated                                                                |
 
 ### `SkillCost` Fields
 
 ```yaml
 cost:
-  stat: mana          # [Stat](./game-configuration.md#stats) name for the resource pool
-  amount: 20          # Amount deducted per use (minimum 1)
+  stat: mana # [Stat](./game-configuration.md#stats) name for the resource pool
+  amount: 20 # Amount deducted per use (minimum 1)
 ```
 
 If the player lacks sufficient resource, the skill is blocked and an error message is shown.
@@ -58,8 +58,8 @@ If the player lacks sufficient resource, the skill is blocked and an error messa
 
 ```yaml
 cooldown:
-  scope: turn         # "turn" (resets each combat) or "adventure" (persists across adventures)
-  count: 1            # Number of turns/adventures required between uses
+  scope: turn # "turn" (resets each combat) or "adventure" (persists across adventures)
+  count: 1 # Number of turns/adventures required between uses
 ```
 
 - **`turn`** scope: the skill cannot be used more than once per combat turn (handy for once-per-turn abilities).
@@ -74,13 +74,13 @@ use_effects:
   # Deal immediate damage to the enemy
   - type: heal
     amount: -10
-    target: enemy     # "player" (default) or "enemy"
+    target: enemy # "player" (default) or "enemy"
 
   # Apply a timed combat buff (defined as a Buff manifest)
   - type: apply_buff
     buff_ref: thorns
-    target: player    # Who receives the buff (default: "player")
-    variables:        # Optional per-call overrides for the buff's variables
+    target: player # Who receives the buff (default: "player")
+    variables: # Optional per-call overrides for the buff's variables
       reflect_percent: 60
 ```
 
@@ -94,7 +94,7 @@ The `requires` condition is evaluated each time the player tries to activate a s
 requires:
   type: character_stat
   name: hp
-  lte: 20           # Only usable when HP is at or below 20
+  lte: 20 # Only usable when HP is at or below 20
 ```
 
 ---
@@ -108,7 +108,7 @@ The buff's manifest `name` is its stable identity. `DispelEffect` targets buffs 
 ### Minimal Example
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Buff
 metadata:
   name: shielded
@@ -124,14 +124,14 @@ spec:
 
 ### `BuffSpec` Fields
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `displayName` | `str` | required | Player-facing name shown when the buff is applied |
-| `description` | `str` | `""` | Flavor text |
-| `duration_turns` | `int` | required (≥ 1) | Number of combat turns this buff remains active |
-| `per_turn_effects` | list of Effects | `[]` | Effects dispatched at the start of each round while active |
-| `modifiers` | list of CombatModifiers | `[]` | Passive damage-arithmetic adjustments active until the buff expires |
-| `variables` | dict[str, int] | `{}` | Named integer parameters with default values; can be overridden at apply time |
+| Field              | Type                    | Default        | Description                                                                   |
+| ------------------ | ----------------------- | -------------- | ----------------------------------------------------------------------------- |
+| `displayName`      | `str`                   | required       | Player-facing name shown when the buff is applied                             |
+| `description`      | `str`                   | `""`           | Flavor text                                                                   |
+| `duration_turns`   | `int`                   | required (≥ 1) | Number of combat turns this buff remains active                               |
+| `per_turn_effects` | list of Effects         | `[]`           | Effects dispatched at the start of each round while active                    |
+| `modifiers`        | list of CombatModifiers | `[]`           | Passive damage-arithmetic adjustments active until the buff expires           |
+| `variables`        | dict[str, int]          | `{}`           | Named integer parameters with default values; can be overridden at apply time |
 
 **At least one of `per_turn_effects` or `modifiers` must be non-empty.** A buff with neither is rejected at load time.
 
@@ -140,7 +140,7 @@ spec:
 These effects fire once at the start of each round for as long as the buff is active. Usually used for damage-over-time or healing-over-time:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Buff
 metadata:
   name: on-fire
@@ -150,7 +150,7 @@ spec:
   duration_turns: 3
   per_turn_effects:
     - type: heal
-      amount: -10        # negative heal = damage
+      amount: -10 # negative heal = damage
       target: player
 ```
 
@@ -165,8 +165,8 @@ Reduces all **incoming** damage received by `target` by `percent`%.
 ```yaml
 modifiers:
   - type: damage_reduction
-    percent: 40          # 1–99 (100 would be invulnerability, which is disallowed)
-    target: player       # "player" (default) or "enemy"
+    percent: 40 # 1–99 (100 would be invulnerability, which is disallowed)
+    target: player # "player" (default) or "enemy"
 ```
 
 #### `damage_amplify`
@@ -176,7 +176,7 @@ Increases all **outgoing** damage dealt by `target` by `percent`%.
 ```yaml
 modifiers:
   - type: damage_amplify
-    percent: 50          # ≥ 1
+    percent: 50 # ≥ 1
     target: player
 ```
 
@@ -187,7 +187,7 @@ Returns `percent`% of all damage received by `target` back to the attacker.
 ```yaml
 modifiers:
   - type: damage_reflect
-    percent: 30          # 1–100
+    percent: 30 # 1–100
     target: player
 ```
 
@@ -198,7 +198,7 @@ Increases all **incoming** damage received by `target` by `percent`% (a debuff).
 ```yaml
 modifiers:
   - type: damage_vulnerability
-    percent: 25          # ≥ 1
+    percent: 25 # ≥ 1
     target: player
 ```
 
@@ -209,7 +209,7 @@ modifiers:
 The `variables` block declares named integer parameters with default values. `modifier` `percent` fields can reference these names instead of hardcoding values, then be overridden at each apply site:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Buff
 metadata:
   name: thorns
@@ -218,10 +218,10 @@ spec:
   description: "Reflects a percentage of incoming damage back at attackers."
   duration_turns: 3
   variables:
-    reflect_percent: 30     # default value
+    reflect_percent: 30 # default value
   modifiers:
     - type: damage_reflect
-      percent: reflect_percent   # variable reference
+      percent: reflect_percent # variable reference
       target: player
 ```
 
@@ -231,7 +231,7 @@ When this buff is applied without overrides, `reflect_percent` resolves to `30`.
 - type: apply_buff
   buff_ref: thorns
   variables:
-    reflect_percent: 60   # overrides the manifest default
+    reflect_percent: 60 # overrides the manifest default
 ```
 
 Referencing an undeclared variable name in a modifier is a load-time error.
@@ -244,9 +244,9 @@ Referencing an undeclared variable name in a modifier is a load-time error.
 
 ```yaml
 - type: apply_buff
-  buff_ref: shielded     # Buff manifest name (required)
-  target: player         # "player" or "enemy" (default: "player")
-  variables:             # Optional — overrides buff manifest variable defaults
+  buff_ref: shielded # Buff manifest name (required)
+  target: player # "player" or "enemy" (default: "player")
+  variables: # Optional — overrides buff manifest variable defaults
     reflect_percent: 60
 ```
 
@@ -260,8 +260,8 @@ The `dispel` effect removes an active buff from a target by its manifest name:
 
 ```yaml
 - type: dispel
-  label: on-fire         # Buff manifest name to remove (exact match)
-  target: player         # "player" or "enemy" (default: "player")
+  label: on-fire # Buff manifest name to remove (exact match)
+  target: player # "player" or "enemy" (default: "player")
 ```
 
 Outside combat, `dispel` is silently skipped. This allows consumables (like Water) to have a `dispel` that safely does nothing when used from the main menu.
@@ -278,7 +278,7 @@ Skills granted only while this item occupies an equipment slot. Removed when une
 
 ```yaml
 grants_skills_equipped:
-  - battle-cry       # Skill manifest name
+  - battle-cry # Skill manifest name
   - shield-bash
 ```
 
@@ -288,7 +288,7 @@ Skills granted while this item is anywhere in the character's inventory (equippe
 
 ```yaml
 grants_skills_held:
-  - identify-item    # Granted even if the item is not equipped
+  - identify-item # Granted even if the item is not equipped
 ```
 
 ### `grants_buffs_equipped`
@@ -297,7 +297,7 @@ Buff grants applied automatically at the start of every combat while this item o
 
 ```yaml
 grants_buffs_equipped:
-  - buff_ref: thorns          # Buff manifest name
+  - buff_ref: thorns # Buff manifest name
     # No variables — uses manifest defaults (reflect_percent: 30)
 ```
 
@@ -307,7 +307,7 @@ With a variable override:
 grants_buffs_equipped:
   - buff_ref: thorns
     variables:
-      reflect_percent: 60     # This item grants thorns at 60% instead of the default 30%
+      reflect_percent: 60 # This item grants thorns at 60% instead of the default 30%
 ```
 
 ### `grants_buffs_held`
@@ -322,7 +322,7 @@ grants_buffs_held:
 ### Complete Item Example
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Item
 metadata:
   name: master-thorns-sword
@@ -353,9 +353,9 @@ Maps the resource names used by `SkillCost` to actual character stats:
 
 ```yaml
 skill_resources:
-  - name: mana             # Resource name used in SkillCost.stat
-    stat: mana             # Stat holding the current value
-    max_stat: max_mana     # Stat holding the maximum (shown in UI)
+  - name: mana # Resource name used in SkillCost.stat
+    stat: mana # Stat holding the current value
+    max_stat: max_mana # Stat holding the maximum (shown in UI)
 ```
 
 Both `stat` and `max_stat` must reference stats declared in `public_stats` or `hidden_stats`. A load-time error is raised if either is missing.
@@ -367,11 +367,11 @@ Optional rules that govern which skills from a category a character can learn si
 ```yaml
 skill_category_rules:
   - category: magic
-    max_known: 3            # At most 3 magic skills at once (null = unlimited)
+    max_known: 3 # At most 3 magic skills at once (null = unlimited)
   - category: warrior
     max_known: 2
     exclusive_with:
-      - magic               # Cannot know warrior OR magic skills simultaneously
+      - magic # Cannot know warrior OR magic skills simultaneously
 ```
 
 - **`max_known`**: if set, `grant_skill` will refuse to add a skill in this category once the limit is reached.
@@ -388,7 +388,7 @@ See [Enemies](./enemies.md) for the full enemy manifest format. The skill-relate
 Enemies declare skills directly on their spec:
 
 ```yaml
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Enemy
 metadata:
   name: fire-mage
@@ -400,19 +400,19 @@ spec:
   xp_reward: 60
   skills:
     - skill_ref: enemy-fireball
-      use_every_n_turns: 3      # Fires on turn 3, 6, 9, …
+      use_every_n_turns: 3 # Fires on turn 3, 6, 9, …
     - skill_ref: enemy-weakness-curse
-      use_every_n_turns: 4      # Fires on turn 4, 8, 12, …
+      use_every_n_turns: 4 # Fires on turn 4, 8, 12, …
   skill_resources:
-    mana: 80                    # Starting mana pool
+    mana: 80 # Starting mana pool
 ```
 
 ### `EnemySkillEntry` Fields
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `skill_ref` | `str` | required | Skill manifest name |
-| `use_every_n_turns` | `int` | `0` | Trigger on every nth turn (starting turn 1). `0` = never triggered automatically |
+| Field               | Type  | Default  | Description                                                                      |
+| ------------------- | ----- | -------- | -------------------------------------------------------------------------------- |
+| `skill_ref`         | `str` | required | Skill manifest name                                                              |
+| `use_every_n_turns` | `int` | `0`      | Trigger on every nth turn (starting turn 1). `0` = never triggered automatically |
 
 ### Enemy Skill Resources (`skill_resources`)
 
@@ -432,8 +432,8 @@ Skills declare which contexts they support via `contexts`:
 
 ```yaml
 contexts:
-  - combat      # Can be used during combat
-  - overworld   # Can be used from the overworld actions screen
+  - combat # Can be used during combat
+  - overworld # Can be used from the overworld actions screen
 ```
 
 At least one context must be declared. A skill with only `overworld` does not appear in combat menus, and vice versa.
@@ -444,18 +444,18 @@ At least one context must be declared. A skill with only `overworld` does not ap
 
 ## Reference: All Buff Modifier Types
 
-| Type | Effect | `percent` Range |
-|---|---|---|
-| `damage_reduction` | Reduces incoming damage to `target` | 1–99 |
-| `damage_amplify` | Increases outgoing damage from `target` | ≥ 1 |
-| `damage_reflect` | Returns damage from `target` to attacker | 1–100 |
-| `damage_vulnerability` | Increases incoming damage to `target` | ≥ 1 |
+| Type                   | Effect                                   | `percent` Range |
+| ---------------------- | ---------------------------------------- | --------------- |
+| `damage_reduction`     | Reduces incoming damage to `target`      | 1–99            |
+| `damage_amplify`       | Increases outgoing damage from `target`  | ≥ 1             |
+| `damage_reflect`       | Returns damage from `target` to attacker | 1–100           |
+| `damage_vulnerability` | Increases incoming damage to `target`    | ≥ 1             |
 
 All modifier `percent` fields accept either an integer literal or a variable name declared in the buff's `variables` block.
 
 ---
 
-*See [Effects](./effects.md) for the full effects list usable in `use_effects` and `per_turn_effects`.*
-*See [Conditions](./conditions.md) for condition syntax usable in `requires`.*
-*See [Items](./items.md) for how to attach skills and buffs to gear.*
-*For engine internals — CombatContext, cooldown tracking — see the [Game Engine docs](../dev/game-engine.md#skill-and-buff-system).*
+_See [Effects](./effects.md) for the full effects list usable in `use_effects` and `per_turn_effects`._
+_See [Conditions](./conditions.md) for condition syntax usable in `requires`._
+_See [Items](./items.md) for how to attach skills and buffs to gear._
+_For engine internals — CombatContext, cooldown tracking — see the [Game Engine docs](../dev/game-engine.md#skill-and-buff-system)._

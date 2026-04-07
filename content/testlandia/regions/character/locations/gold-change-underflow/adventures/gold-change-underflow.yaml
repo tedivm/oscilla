@@ -1,10 +1,11 @@
-apiVersion: game/v1
+apiVersion: oscilla/v1
 kind: Adventure
 metadata:
   name: gold-change-underflow
 spec:
   displayName: "Gold Underflow (clips to min)"
-  description: "Test stat_change that drops below bounds.min. Subtracts 500 from gold — result is clipped to 0 with a warning
+  description:
+    "Test stat_change that drops below bounds.min. Subtracts 500 from gold — result is clipped to 0 with a warning
     notification."
   steps:
     - type: narrative

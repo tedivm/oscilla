@@ -40,11 +40,11 @@ Everything is data. Your entire game is written in YAML manifest files that decl
 
 These documents explain the three cross-cutting systems you'll use in almost everything you write.
 
-| Guide | What it covers |
-|---|---|
+| Guide                         | What it covers                                                                                                                                                                                       |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [Conditions](./conditions.md) | All condition types — level, milestone, item, stat, skill, calendar/time predicates, and logical operators. Used in unlock gates, adventure requirements, stat checks, and choice option visibility. |
-| [Effects](./effects.md) | All effect types — XP, item drops, stat changes, milestones, skills, flow control, and combat buffs. Used anywhere something happens: adventure outcomes, skill use, item use. |
-| [Templates](./templates.md) | Jinja2 templates in narrative text — player context, mathematical functions, calendar functions, filters, and pronoun placeholders. |
+| [Effects](./effects.md)       | All effect types — XP, item drops, stat changes, milestones, skills, flow control, and combat buffs. Used anywhere something happens: adventure outcomes, skill use, item use.                       |
+| [Templates](./templates.md)   | Jinja2 templates in narrative text — player context, mathematical functions, calendar functions, filters, and pronoun placeholders.                                                                  |
 
 ---
 
@@ -52,25 +52,25 @@ These documents explain the three cross-cutting systems you'll use in almost eve
 
 These documents cover each manifest kind in depth.
 
-| Guide | What it covers |
-|---|---|
-| [Game Configuration](./game-configuration.md) | `game.yaml` and `character_config.yaml` — XP thresholds, HP formula, item labels, stats, equipment slots, custom pronoun sets. |
-| [In-Game Time](./ingame-time.md) | Calendar cycles, dual clocks, eras, tick-based cooldowns, and time conditions. |
-| [World Building](./world-building.md) | Regions, nested regions, locations, adventure pools, unlock conditions. |
-| [Adventures](./adventures.md) | Narrative, combat, choice, and stat-check steps; goto/labels; outcome branches. |
-| [Items](./items.md) | Consumables, gear, charges, equip requirements, labels, skill/buff grants. |
-| [Enemies](./enemies.md) | Combat stats, loot tables, enemy skills and resources. |
-| [Skills](./skills.md) | Skill and Buff manifests, costs, cooldowns, buff modifiers, item skill/buff grants, enemy skills, CharacterConfig skill resources. |
-| [Passive Effects](./passive-effects.md) | Always-on and condition-gated stat bonuses and skill grants declared in `game.yaml`. |
-| [Quests](./quests.md) | Multi-stage storylines with milestone-driven stage advancement. |
-| [Recipes](./recipes.md) | Crafting formulas: input items + quantities → output item. |
+| Guide                                         | What it covers                                                                                                                     |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| [Game Configuration](./game-configuration.md) | `game.yaml` and `character_config.yaml` — XP thresholds, HP formula, item labels, stats, equipment slots, custom pronoun sets.     |
+| [In-Game Time](./ingame-time.md)              | Calendar cycles, dual clocks, eras, tick-based cooldowns, and time conditions.                                                     |
+| [World Building](./world-building.md)         | Regions, nested regions, locations, adventure pools, unlock conditions.                                                            |
+| [Adventures](./adventures.md)                 | Narrative, combat, choice, and stat-check steps; goto/labels; outcome branches.                                                    |
+| [Items](./items.md)                           | Consumables, gear, charges, equip requirements, labels, skill/buff grants.                                                         |
+| [Enemies](./enemies.md)                       | Combat stats, loot tables, enemy skills and resources.                                                                             |
+| [Skills](./skills.md)                         | Skill and Buff manifests, costs, cooldowns, buff modifiers, item skill/buff grants, enemy skills, CharacterConfig skill resources. |
+| [Passive Effects](./passive-effects.md)       | Always-on and condition-gated stat bonuses and skill grants declared in `game.yaml`.                                               |
+| [Quests](./quests.md)                         | Multi-stage storylines with milestone-driven stage advancement.                                                                    |
+| [Recipes](./recipes.md)                       | Crafting formulas: input items + quantities → output item.                                                                         |
 
 ---
 
 ## Author CLI Tooling
 
-| Guide | What it covers |
-|---|---|
+| Guide                     | What it covers                                                                                                                                                                         |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [CLI Reference](./cli.md) | `oscilla content` commands — list, show, graph, schema, test, trace, create. Inspect content, generate graphs, export JSON schemas, trace adventure paths, and scaffold new manifests. |
 
 ---
@@ -79,18 +79,18 @@ These documents cover each manifest kind in depth.
 
 Not sure which guide to read? Find your goal:
 
-| I want to… | Read |
-|---|---|
-| Branch an adventure based on player level or a stat | [Conditions §stat-check](./conditions.md) + [Adventures §stat-check](./adventures.md#stat-check) |
-| Give the player XP, loot, or a stat change | [Effects](./effects.md) |
-| Make narrative text mention the player's stats or pronouns | [Templates](./templates.md) |
-| Let players equip weapons and armor | [Game Configuration §equipment-slots](./game-configuration.md#equipment-slots) + [Items §gear](./items.md#equippable-gear) |
-| Create a boss fight | [Enemies](./enemies.md) + [Adventures §combat](./adventures.md#combat) + [Skills](./skills.md) |
-| Track story progress across multiple adventures | [Conditions §milestone](./conditions.md) + [Quests](./quests.md) |
-| Let players craft items from materials | [Recipes](./recipes.md) |
-| Add skill abilities (heal, power attack, etc.) | [Skills](./skills.md) |
-| Lock a region until the player is strong enough | [World Building §unlocking-regions](./world-building.md#unlocking-regions) |
-| Add pronoun options beyond the built-in three | [Game Configuration §custom-pronoun-sets](./game-configuration.md#custom-pronoun-sets) |
+| I want to…                                                 | Read                                                                                                                       |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Branch an adventure based on player level or a stat        | [Conditions §stat-check](./conditions.md) + [Adventures §stat-check](./adventures.md#stat-check)                           |
+| Give the player XP, loot, or a stat change                 | [Effects](./effects.md)                                                                                                    |
+| Make narrative text mention the player's stats or pronouns | [Templates](./templates.md)                                                                                                |
+| Let players equip weapons and armor                        | [Game Configuration §equipment-slots](./game-configuration.md#equipment-slots) + [Items §gear](./items.md#equippable-gear) |
+| Create a boss fight                                        | [Enemies](./enemies.md) + [Adventures §combat](./adventures.md#combat) + [Skills](./skills.md)                             |
+| Track story progress across multiple adventures            | [Conditions §milestone](./conditions.md) + [Quests](./quests.md)                                                           |
+| Let players craft items from materials                     | [Recipes](./recipes.md)                                                                                                    |
+| Add skill abilities (heal, power attack, etc.)             | [Skills](./skills.md)                                                                                                      |
+| Lock a region until the player is strong enough            | [World Building §unlocking-regions](./world-building.md#unlocking-regions)                                                 |
+| Add pronoun options beyond the built-in three              | [Game Configuration §custom-pronoun-sets](./game-configuration.md#custom-pronoun-sets)                                     |
 
 ---
 
@@ -98,11 +98,11 @@ Not sure which guide to read? Find your goal:
 
 Ready-made patterns for common authoring challenges:
 
-| Recipe | What it covers |
-|---|---|
-| [Reputation System](./cookbook/reputation-system.md) | Tracking player standing with a faction using a stat, conditions, and templates |
-| [Locked Doors](./cookbook/locked-doors.md) | Gating a choice behind a key item, one-time discovery, and item consumption |
-| [Day-Night Narrative](./cookbook/day-night-narrative.md) | Writing text that changes based on the real system clock |
+| Recipe                                                      | What it covers                                                                       |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| [Reputation System](./cookbook/reputation-system.md)        | Tracking player standing with a faction using a stat, conditions, and templates      |
+| [Locked Doors](./cookbook/locked-doors.md)                  | Gating a choice behind a key item, one-time discovery, and item consumption          |
+| [Day-Night Narrative](./cookbook/day-night-narrative.md)    | Writing text that changes based on the real system clock                             |
 | [In-Game Time Patterns](./cookbook/ingame-time-patterns.md) | Seasonal events, era transitions, time skips, lunar gates, and time-reversal puzzles |
 
 More recipes: [Cookbook README](./cookbook/README.md)

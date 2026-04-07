@@ -69,7 +69,7 @@ Each roll picks exactly one item. Use `count` to roll multiple times:
 ```yaml
 effects:
   - type: item_drop
-    count: 3         # three separate rolls
+    count: 3 # three separate rolls
     loot:
       - item: gold-coins
         weight: 80
@@ -88,7 +88,7 @@ effects:
     loot:
       - item: gold-coins
         weight: 100
-        quantity: 5    # player always receives 5 coins from this roll
+        quantity: 5 # player always receives 5 coins from this roll
 ```
 
 Instead of an inline `loot` list, you can reference a named [LootTable manifest](./items.md#loot-tables) or an enemy manifest by name using `loot_ref`:
@@ -97,11 +97,11 @@ Instead of an inline `loot` list, you can reference a named [LootTable manifest]
 effects:
   - type: item_drop
     count: 1
-    loot_ref: dungeon-treasure    # named LootTable manifest
+    loot_ref: dungeon-treasure # named LootTable manifest
 
   - type: item_drop
     count: 2
-    loot_ref: goblin-warrior      # enemy manifest — uses its loot list
+    loot_ref: goblin-warrior # enemy manifest — uses its loot list
 ```
 
 Exactly one of `loot` or `loot_ref` must be set; providing both or neither is a load-time error.
@@ -126,11 +126,11 @@ Use `stat_change` to increment or decrement any `int` [stat](./game-configuratio
 effects:
   - type: stat_change
     stat: gold
-    amount: -25     # spend 25 gold
+    amount: -25 # spend 25 gold
 
   - type: stat_change
     stat: reputation
-    amount: 5       # gain 5 reputation
+    amount: 5 # gain 5 reputation
 ```
 
 If the stat has `bounds` set in [`character_config.yaml`](./game-configuration.md#stats), the result is clamped automatically and the player is notified.
@@ -188,7 +188,7 @@ Starts a [quest](./quests.md) by registering it as active at its entry stage. Th
 ```yaml
 effects:
   - type: quest_activate
-    quest_ref: missing-merchant    # must match a Quest manifest name
+    quest_ref: missing-merchant # must match a Quest manifest name
 ```
 
 Activating a quest that is already active or already completed is a safe no-op. If the player already holds any milestone required by the entry stage's `advance_on` list, the quest immediately advances (in the same tick). See [Quests](./quests.md) for the full quest manifest format and `completion_effects`.
@@ -232,7 +232,7 @@ Jumps to a labeled step within the same adventure. Use this for loops and revisi
 ```yaml
 effects:
   - type: goto
-    target: crossroads    # must match a `label:` on a step
+    target: crossroads # must match a `label:` on a step
 ```
 
 See [Adventures](./adventures.md#labels-and-goto) for the full pattern.
@@ -251,7 +251,7 @@ Applies a named [buff](./skills.md#defining-a-buff) to the player or enemy.
 effects:
   - type: apply_buff
     buff_ref: on-fire
-    target: enemy       # "player" or "enemy" (default: "player")
+    target: enemy # "player" or "enemy" (default: "player")
 ```
 
 ### Dispel
@@ -296,35 +296,35 @@ Four things happen at once: XP, item, milestone, reputation. That's the composab
 
 ### All Effect Types
 
-| Type | Required fields | Optional fields | Notes |
-|---|---|---|---|
-| `xp_grant` | `amount` | — | Positive or negative int/template |
-| `stat_change` | `stat`, `amount` | — | `int` stats only; `amount` can be template |
-| `stat_set` | `stat`, `value` | — | Works on `int` and `bool` stats |
-| `item_drop` | `loot` or `loot_ref` | `count` (default 1), `quantity` (per entry) | Weighted table; `count` can be template; `loot_ref` names a LootTable or Enemy |
-| `use_item` | `item` | — | Player must already hold the item |
-| `milestone_grant` | `milestone` | — | Sets a permanent story flag; triggers quest advancement |
-| `quest_activate` | `quest_ref` | — | Activates a named quest; no-op if already active/complete |
-| `skill_grant` | `skill` | — | Player permanently learns the skill |
-| `apply_buff` | `buff_ref` | `target`, `variables` | Combat only; `target`: `player` or `enemy` |
-| `dispel` | `label` | `target` | Combat only; removes buff by manifest name |
-| `end_adventure` | `outcome` | — | Terminates the adventure |
-| `goto` | `target` | — | Jumps to a labeled step |
+| Type              | Required fields      | Optional fields                             | Notes                                                                          |
+| ----------------- | -------------------- | ------------------------------------------- | ------------------------------------------------------------------------------ |
+| `xp_grant`        | `amount`             | —                                           | Positive or negative int/template                                              |
+| `stat_change`     | `stat`, `amount`     | —                                           | `int` stats only; `amount` can be template                                     |
+| `stat_set`        | `stat`, `value`      | —                                           | Works on `int` and `bool` stats                                                |
+| `item_drop`       | `loot` or `loot_ref` | `count` (default 1), `quantity` (per entry) | Weighted table; `count` can be template; `loot_ref` names a LootTable or Enemy |
+| `use_item`        | `item`               | —                                           | Player must already hold the item                                              |
+| `milestone_grant` | `milestone`          | —                                           | Sets a permanent story flag; triggers quest advancement                        |
+| `quest_activate`  | `quest_ref`          | —                                           | Activates a named quest; no-op if already active/complete                      |
+| `skill_grant`     | `skill`              | —                                           | Player permanently learns the skill                                            |
+| `apply_buff`      | `buff_ref`           | `target`, `variables`                       | Combat only; `target`: `player` or `enemy`                                     |
+| `dispel`          | `label`              | `target`                                    | Combat only; removes buff by manifest name                                     |
+| `end_adventure`   | `outcome`            | —                                           | Terminates the adventure                                                       |
+| `goto`            | `target`             | —                                           | Jumps to a labeled step                                                        |
 
 ### `item_drop` loot entry fields
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `item` | `str` | yes | [Item](./items.md) manifest name |
-| `weight` | `int` | yes | Relative probability; higher = more likely |
+| Field    | Type  | Required | Description                                |
+| -------- | ----- | -------- | ------------------------------------------ |
+| `item`   | `str` | yes      | [Item](./items.md) manifest name           |
+| `weight` | `int` | yes      | Relative probability; higher = more likely |
 
 ### `apply_buff` fields
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `buff_ref` | `str` | required | [Buff](./skills.md#defining-a-buff) manifest name |
-| `target` | `str` | `"player"` | `"player"` or `"enemy"` |
-| `variables` | dict | `{}` | Overrides buff manifest variable defaults |
+| Field       | Type  | Default    | Description                                       |
+| ----------- | ----- | ---------- | ------------------------------------------------- |
+| `buff_ref`  | `str` | required   | [Buff](./skills.md#defining-a-buff) manifest name |
+| `target`    | `str` | `"player"` | `"player"` or `"enemy"`                           |
+| `variables` | dict  | `{}`       | Overrides buff manifest variable defaults         |
 
 ---
 
@@ -335,7 +335,7 @@ The `emit_trigger` effect fires a custom trigger that has been declared in `game
 ```yaml
 effects:
   - type: emit_trigger
-    trigger: player-discovered-relic   # must be in game.yaml triggers.custom
+    trigger: player-discovered-relic # must be in game.yaml triggers.custom
 ```
 
 ### When to use `emit_trigger`
@@ -359,12 +359,12 @@ spec:
 
 ### `emit_trigger` fields
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `type` | `"emit_trigger"` | yes | Identifies this effect type |
-| `trigger` | `str` | yes | Custom trigger name declared in `game.yaml triggers.custom` |
+| Field     | Type             | Required | Description                                                 |
+| --------- | ---------------- | -------- | ----------------------------------------------------------- |
+| `type`    | `"emit_trigger"` | yes      | Identifies this effect type                                 |
+| `trigger` | `str`            | yes      | Custom trigger name declared in `game.yaml triggers.custom` |
 
 ---
 
-*Next: [Templates](./templates.md) — dynamic text and calculations in narrative.*
-*See [Game Configuration](./game-configuration.md#triggered-adventures) for the full trigger system.*
+_Next: [Templates](./templates.md) — dynamic text and calculations in narrative._
+_See [Game Configuration](./game-configuration.md#triggered-adventures) for the full trigger system._
