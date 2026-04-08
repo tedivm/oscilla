@@ -174,11 +174,19 @@ def _check_orphaned_adventures(registry: "ContentRegistry") -> List[SemanticIssu
 
     Orphaned adventures are surfaced as warnings — the author may be drafting
     them — but they never run and can't be reached by players.
+
+    Adventures wired to triggers via trigger_adventures are not orphaned — they
+    run automatically when the trigger fires and do not need a location pool entry.
     """
     referenced: Set[str] = set()
     for loc in registry.locations.all():
         for entry in loc.spec.adventures:
             referenced.add(entry.ref)
+
+    # Adventures referenced by any trigger are reachable; exclude them from the orphan check.
+    if registry.game is not None:
+        for adv_refs in registry.game.spec.trigger_adventures.values():
+            referenced.update(adv_refs)
 
     issues = []
     for adv in registry.adventures.all():

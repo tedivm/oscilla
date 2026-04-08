@@ -13,6 +13,7 @@ from oscilla.engine.models.adventure import (
     OutcomeBranch,
 )
 from oscilla.engine.models.base import Metadata
+from oscilla.engine.models.game import GameManifest, GameSpec, HpFormula
 from oscilla.engine.models.location import LocationManifest, LocationSpec
 from oscilla.engine.models.region import RegionManifest, RegionSpec
 from oscilla.engine.registry import ContentRegistry
@@ -129,6 +130,28 @@ def test_orphaned_adventure_is_warning() -> None:
     issues = validate_semantic(registry)
     warnings = [i for i in issues if i.severity == "warning"]
     assert any("orphan" in i.kind or "orphan-quest" in i.message for i in warnings)
+
+
+def test_triggered_adventure_is_not_orphaned() -> None:
+    """An adventure wired to a trigger should not be flagged as orphaned."""
+    region = _base_region()
+    location = _base_location()  # no adventure pool entries
+    adventure = _base_adventure("character-creation")
+    game = GameManifest(
+        apiVersion="oscilla/v1",
+        kind="Game",
+        metadata=Metadata(name="test-game"),
+        spec=GameSpec(
+            displayName="Test Game",
+            xp_thresholds=[100],
+            hp_formula=HpFormula(base_hp=10, hp_per_level=2),
+            trigger_adventures={"on_character_create": ["character-creation"]},
+        ),
+    )
+    registry = ContentRegistry.build(manifests=[region, location, adventure, game])
+    issues = validate_semantic(registry)
+    orphan_warnings = [i for i in issues if i.severity == "warning" and "character-creation" in i.message]
+    assert orphan_warnings == [], f"Unexpected orphan warning for triggered adventure: {orphan_warnings}"
 
 
 def test_semantic_issue_str_includes_manifest_name() -> None:

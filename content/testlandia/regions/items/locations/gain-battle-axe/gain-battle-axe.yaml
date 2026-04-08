@@ -6,3 +6,6 @@ spec:
   displayName: "Battle Axe Cache"
   description: "Obtain the Battle Axe — a weapon that grants War Rage while equipped."
   region: items
+  adventures:
+    - ref: gain-battle-axe
+      weight: 100

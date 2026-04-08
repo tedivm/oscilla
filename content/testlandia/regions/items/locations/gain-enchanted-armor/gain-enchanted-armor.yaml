@@ -6,3 +6,6 @@ spec:
   displayName: "Enchanted Armor Vault"
   description: "Obtain the Enchanted Breastplate — armor that automatically applies Iron Skin buff when held."
   region: items
+  adventures:
+    - ref: gain-enchanted-armor
+      weight: 100

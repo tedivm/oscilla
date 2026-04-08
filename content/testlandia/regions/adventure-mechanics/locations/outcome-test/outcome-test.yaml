@@ -6,3 +6,6 @@ spec:
   displayName: "Outcome Test"
   description: "Tests custom adventure outcome names declared in game.yaml."
   region: adventure-mechanics
+  adventures:
+    - ref: test-custom-outcome
+      weight: 100
