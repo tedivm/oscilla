@@ -214,9 +214,13 @@ class PlayerPronounView:
 
 @dataclass(frozen=True)
 class PlayerMilestoneView:
-    """Read-only milestone set exposed to templates as player.milestones."""
+    """Read-only milestone view exposed to templates as player.milestones.
 
-    _milestones: Set[str] = field(default_factory=set)
+    Accepts either a Set[str] or a Dict[str, ...] for backward-compat during migration.
+    Templates should only use player.milestones.has(name).
+    """
+
+    _milestones: "Set[str] | Dict[str, Any]" = field(default_factory=set)
 
     def has(self, name: str) -> bool:
         return name in self._milestones
@@ -248,7 +252,7 @@ class PlayerContext:
             hp=char.hp,
             max_hp=char.max_hp,
             stats=dict(char.stats),
-            milestones=PlayerMilestoneView(_milestones=set(char.milestones)),
+            milestones=PlayerMilestoneView(_milestones=char.milestones),
             pronouns=PlayerPronounView.from_set(char.pronouns),
         )
 
@@ -366,6 +370,13 @@ def _clamp(value: int | float, lo: int | float, hi: int | float) -> int | float:
     return max(lo, min(hi, value))
 
 
+# Common real-world time multiples for use in template expressions (e.g. seconds: "{{ SECONDS_PER_DAY }}")
+SECONDS_PER_MINUTE: int = 60
+SECONDS_PER_HOUR: int = 3_600
+SECONDS_PER_DAY: int = 86_400
+SECONDS_PER_WEEK: int = 604_800
+
+
 SAFE_GLOBALS: Dict[str, Any] = {
     "roll": _safe_roll,
     "choice": _safe_choice,
@@ -397,6 +408,11 @@ SAFE_GLOBALS: Dict[str, Any] = {
     "zodiac_sign": calendar_utils.zodiac_sign,
     "chinese_zodiac": calendar_utils.chinese_zodiac,
     "moon_phase": calendar_utils.moon_phase,
+    # Time constants for cooldown expressions.
+    "SECONDS_PER_MINUTE": SECONDS_PER_MINUTE,
+    "SECONDS_PER_HOUR": SECONDS_PER_HOUR,
+    "SECONDS_PER_DAY": SECONDS_PER_DAY,
+    "SECONDS_PER_WEEK": SECONDS_PER_WEEK,
 }
 
 
@@ -687,3 +703,16 @@ class GameTemplateEngine:
     def is_template(self, value: str) -> bool:
         """Return True if value looks like a Jinja2 template string."""
         return "{{" in value or "{%" in value or bool(re.search(r"\{[A-Za-z]+\}", value))
+
+    def render_raw(self, raw: str) -> str:
+        """Render an ad-hoc template string using only SAFE_GLOBALS.
+
+        Intended for cooldown field expressions (e.g. ``"{{ SECONDS_PER_DAY }}"``) that
+        require no player or combat context — only the injected constants.
+        Raises TemplateRuntimeError on failure.
+        """
+        try:
+            template = self._env.from_string(raw)
+            return str(template.render(**SAFE_GLOBALS))
+        except Exception as exc:
+            raise TemplateRuntimeError(f"Failed to render raw template {raw!r}: {exc}") from exc

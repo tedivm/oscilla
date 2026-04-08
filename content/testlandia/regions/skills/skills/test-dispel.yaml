@@ -13,7 +13,7 @@ spec:
     amount: 5
   cooldown:
     scope: turn
-    count: 2
+    turns: 2
   use_effects:
     - type: dispel
       label: shield-buff

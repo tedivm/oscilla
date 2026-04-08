@@ -123,7 +123,7 @@ async def test_quest_activate_with_milestone_already_held_advances_immediately(
 ) -> None:
     """Activating a quest when the advance_on milestone is already held advances in same tick."""
     player = _make_player()
-    player.milestones.add("quest-a-done")
+    player.grant_milestone("quest-a-done")
     tui = AsyncMock()
     effect = QuestActivateEffect(type="quest_activate", quest_ref="test-quest")
 

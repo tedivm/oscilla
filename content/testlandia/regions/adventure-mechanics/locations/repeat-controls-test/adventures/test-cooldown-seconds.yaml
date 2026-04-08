@@ -1,0 +1,19 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: test-cooldown-seconds
+spec:
+  displayName: "The Quick Errand"
+  description: "A cooldown adventure with a 1-minute real-world cooldown. Uses the SECONDS_PER_MINUTE template constant to illustrate time-based repeat controls."
+  cooldown:
+    seconds: "{{ SECONDS_PER_MINUTE }}"
+  repeatable: true
+  steps:
+    - type: narrative
+      name: errand
+      text: "You complete a quick errand in town. The shopkeeper thanks you and says you can return in a minute."
+      choices:
+        - label: "Finish the errand"
+          effects:
+            - type: end_adventure
+              outcome: completed

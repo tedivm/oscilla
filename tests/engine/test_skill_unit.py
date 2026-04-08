@@ -22,7 +22,6 @@ from oscilla.engine.models.buff import (
     DamageReflectModifier,
     DamageVulnerabilityModifier,
 )
-from oscilla.engine.models.skill import SkillCooldown
 from oscilla.engine.steps.combat import _apply_damage_amplify, _apply_incoming_modifiers
 
 # ---------------------------------------------------------------------------
@@ -365,27 +364,6 @@ def test_skill_condition_invalid_mode_raises() -> None:
 
 
 # ---------------------------------------------------------------------------
-# SkillCooldown model tests
-# ---------------------------------------------------------------------------
-
-
-def test_skill_cooldown_turn_scope() -> None:
-    cooldown = SkillCooldown(scope="turn", count=2)
-    assert cooldown.scope == "turn"
-    assert cooldown.count == 2
-
-
-def test_skill_cooldown_adventure_scope() -> None:
-    cooldown = SkillCooldown(scope="adventure", count=1)
-    assert cooldown.scope == "adventure"
-
-
-def test_skill_cooldown_count_zero_raises() -> None:
-    with pytest.raises(Exception):
-        SkillCooldown(scope="turn", count=0)
-
-
-# ---------------------------------------------------------------------------
 # CharacterState.grant_skill() tests (11.3)
 # ---------------------------------------------------------------------------
 
@@ -433,37 +411,6 @@ def test_available_skills_includes_known(base_player: CharacterState) -> None:
 
 
 # ---------------------------------------------------------------------------
-# CharacterState.tick_skill_cooldowns() tests (11.5)
-# ---------------------------------------------------------------------------
-
-
-def test_tick_skill_cooldowns_decrements(base_player: CharacterState) -> None:
-    base_player.skill_cooldowns = {"fireball": 3}
-    base_player.tick_skill_cooldowns()
-    assert base_player.skill_cooldowns["fireball"] == 2
-
-
-def test_tick_skill_cooldowns_removes_on_zero(base_player: CharacterState) -> None:
-    base_player.skill_cooldowns = {"fireball": 1}
-    base_player.tick_skill_cooldowns()
-    assert "fireball" not in base_player.skill_cooldowns
-
-
-def test_tick_skill_cooldowns_multiple_skills(base_player: CharacterState) -> None:
-    base_player.skill_cooldowns = {"a": 1, "b": 2, "c": 3}
-    base_player.tick_skill_cooldowns()
-    assert "a" not in base_player.skill_cooldowns
-    assert base_player.skill_cooldowns["b"] == 1
-    assert base_player.skill_cooldowns["c"] == 2
-
-
-def test_tick_skill_cooldowns_empty_dict(base_player: CharacterState) -> None:
-    base_player.skill_cooldowns = {}
-    base_player.tick_skill_cooldowns()
-    assert base_player.skill_cooldowns == {}
-
-
-# ---------------------------------------------------------------------------
 # CharacterState serialization roundtrip tests (11.6)
 # ---------------------------------------------------------------------------
 
@@ -477,21 +424,25 @@ def test_known_skills_roundtrip(base_player: CharacterState, minimal_registry: "
 
 
 def test_skill_cooldowns_roundtrip(base_player: CharacterState, minimal_registry: "ContentRegistry") -> None:
-    base_player.skill_cooldowns = {"skill-a": 2, "skill-b": 5}
+    base_player.skill_tick_expiry = {"skill-a": 100, "skill-b": 200}
+    base_player.skill_real_expiry = {"skill-a": 9999999, "skill-b": 8888888}
     data = base_player.to_dict()
     assert minimal_registry.character_config is not None
     restored = CharacterState.from_dict(data, character_config=minimal_registry.character_config)
-    assert restored.skill_cooldowns == {"skill-a": 2, "skill-b": 5}
+    assert restored.skill_tick_expiry == {"skill-a": 100, "skill-b": 200}
+    assert restored.skill_real_expiry == {"skill-a": 9999999, "skill-b": 8888888}
 
 
 def test_empty_skills_roundtrip(base_player: CharacterState, minimal_registry: "ContentRegistry") -> None:
     base_player.known_skills = set()
-    base_player.skill_cooldowns = {}
+    base_player.skill_tick_expiry = {}
+    base_player.skill_real_expiry = {}
     data = base_player.to_dict()
     assert minimal_registry.character_config is not None
     restored = CharacterState.from_dict(data, character_config=minimal_registry.character_config)
     assert restored.known_skills == set()
-    assert restored.skill_cooldowns == {}
+    assert restored.skill_tick_expiry == {}
+    assert restored.skill_real_expiry == {}
 
 
 # ---------------------------------------------------------------------------

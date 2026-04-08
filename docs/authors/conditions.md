@@ -203,6 +203,35 @@ requires:
   gte: 1
 ```
 
+### Milestone Ticks Elapsed
+
+True when a milestone was granted at least (or at most) N adventure ticks ago. This lets you create content that unlocks after a story beat "settles" for a while, or expires if the player waits too long.
+
+```yaml
+requires:
+  type: milestone_ticks_elapsed
+  name: "completed-the-ritual"
+  gte: 5 # adventure must be at least 5 ticks after milestone was granted
+```
+
+| Field  | Type | Description                                                                            |
+| ------ | ---- | -------------------------------------------------------------------------------------- |
+| `name` | str  | Name of the milestone to check. If the player doesn't hold it, the condition is false. |
+| `gte`  | int  | Minimum number of ticks that must have elapsed since the milestone was granted.        |
+| `lte`  | int  | Maximum number of ticks that may have elapsed since the milestone was granted.         |
+
+At least one of `gte` or `lte` must be provided. Both can be combined to create a tick window:
+
+```yaml
+requires:
+  type: milestone_ticks_elapsed
+  name: "found-the-artifact"
+  gte: 3
+  lte: 10 # adventure is only available 3–10 ticks after the milestone
+```
+
+"Ticks" here are **internal adventure ticks** — each adventure you complete advances the counter by one. They are not real-world time. Use [calendar conditions](#real-world-calendar-conditions) for wall-clock gating.
+
 ---
 
 ## Real-World Calendar Conditions
@@ -504,32 +533,33 @@ requires:
 
 ### All Condition Types
 
-| Type                   | Required fields      | Optional fields            | Notes                                                                                 |
-| ---------------------- | -------------------- | -------------------------- | ------------------------------------------------------------------------------------- |
-| `level`                | `value`              | —                          | True when player level ≥ value                                                        |
-| `milestone`            | `name`               | —                          | True when player holds the milestone                                                  |
-| `item`                 | `item_ref`           | `quantity` (default 1)     | Checks inventory count ≥ quantity                                                     |
-| `character_stat`       | `stat`, one operator | `stat_source`              | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                             |
-| `item_equipped`        | `item`               | —                          | Checks a specific item is equipped                                                    |
-| `item_held_label`      | `label`              | —                          | Any inventory item has this label                                                     |
-| `any_item_equipped`    | `label`              | —                          | Any equipped item has this label                                                      |
-| `skill`                | `skill_ref`          | `mode` (default `learned`) | `mode`: `learned` or `available`                                                      |
-| `enemies_defeated`     | `name`, one operator | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                             |
-| `locations_visited`    | `name`, one operator | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                             |
-| `adventures_completed` | `name`, one operator | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                             |
-| `prestige_count`       | one operator         | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                             |
-| `all`                  | `conditions`         | —                          | All child conditions must pass (AND)                                                  |
-| `any`                  | `conditions`         | —                          | Any child condition must pass (OR)                                                    |
-| `not`                  | `condition`          | —                          | Inverts the single child condition                                                    |
-| `season_is`            | `value`              | —                          | True when meteorological season matches; `spring` \| `summer` \| `autumn` \| `winter` |
-| `moon_phase_is`        | `value`              | —                          | True when lunar phase matches (approximate ±1 day)                                    |
-| `zodiac_is`            | `value`              | —                          | True when Western zodiac sign matches today's date                                    |
-| `chinese_zodiac_is`    | `value`              | —                          | True when Chinese zodiac animal matches the current year                              |
-| `month_is`             | `value`              | —                          | Integer 1–12 or full English month name                                               |
-| `day_of_week_is`       | `value`              | —                          | Integer 0–6 (Mon=0) or full English weekday name                                      |
-| `date_is`              | `month`, `day`       | `year`                     | Annual when `year` omitted; one-off when `year` included                              |
-| `date_between`         | `start`, `end`       | —                          | Each has `month` + `day`; wraps year boundary when `start` > `end`                    |
-| `time_between`         | `start`, `end`       | —                          | `HH:MM` 24-hour format; wraps midnight when `start` > `end`                           |
+| Type                      | Required fields            | Optional fields            | Notes                                                                                  |
+| ------------------------- | -------------------------- | -------------------------- | -------------------------------------------------------------------------------------- |
+| `level`                   | `value`                    | —                          | True when player level ≥ value                                                         |
+| `milestone`               | `name`                     | —                          | True when player holds the milestone                                                   |
+| `item`                    | `item_ref`                 | `quantity` (default 1)     | Checks inventory count ≥ quantity                                                      |
+| `character_stat`          | `stat`, one operator       | `stat_source`              | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                              |
+| `item_equipped`           | `item`                     | —                          | Checks a specific item is equipped                                                     |
+| `item_held_label`         | `label`                    | —                          | Any inventory item has this label                                                      |
+| `any_item_equipped`       | `label`                    | —                          | Any equipped item has this label                                                       |
+| `skill`                   | `skill_ref`                | `mode` (default `learned`) | `mode`: `learned` or `available`                                                       |
+| `enemies_defeated`        | `name`, one operator       | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                              |
+| `locations_visited`       | `name`, one operator       | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                              |
+| `adventures_completed`    | `name`, one operator       | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                              |
+| `prestige_count`          | one operator               | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                              |
+| `milestone_ticks_elapsed` | `name`, one of `gte`/`lte` | —                          | True when ticks since milestone grant meet the comparison; false if milestone not held |
+| `all`                     | `conditions`               | —                          | All child conditions must pass (AND)                                                   |
+| `any`                     | `conditions`               | —                          | Any child condition must pass (OR)                                                     |
+| `not`                     | `condition`                | —                          | Inverts the single child condition                                                     |
+| `season_is`               | `value`                    | —                          | True when meteorological season matches; `spring` \| `summer` \| `autumn` \| `winter`  |
+| `moon_phase_is`           | `value`                    | —                          | True when lunar phase matches (approximate ±1 day)                                     |
+| `zodiac_is`               | `value`                    | —                          | True when Western zodiac sign matches today's date                                     |
+| `chinese_zodiac_is`       | `value`                    | —                          | True when Chinese zodiac animal matches the current year                               |
+| `month_is`                | `value`                    | —                          | Integer 1–12 or full English month name                                                |
+| `day_of_week_is`          | `value`                    | —                          | Integer 0–6 (Mon=0) or full English weekday name                                       |
+| `date_is`                 | `month`, `day`             | `year`                     | Annual when `year` omitted; one-off when `year` included                               |
+| `date_between`            | `start`, `end`             | —                          | Each has `month` + `day`; wraps year boundary when `start` > `end`                     |
+| `time_between`            | `start`, `end`             | —                          | `HH:MM` 24-hour format; wraps midnight when `start` > `end`                            |
 
 ### `stat_source` Values
 

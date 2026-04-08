@@ -476,16 +476,13 @@ spec:
 
 ## Repeat Controls
 
-By default, every adventure can be run as many times as the player likes. Use the optional repeat-control fields to limit how often an adventure appears in the adventure pool.
+By default, every adventure can be run as many times as the player likes. Use the optional fields to limit how often an adventure appears in the pool.
 
-All four fields are optional and default to unrestricted behavior. Setting none of them is equivalent to `repeatable: true` with no caps.
-
-| Field                 | Type | Default | Description                                                                                      |
-| --------------------- | ---- | ------- | ------------------------------------------------------------------------------------------------ |
-| `repeatable`          | bool | `true`  | Set to `false` to make an adventure a one-shot that disappears after the first completion.       |
-| `max_completions`     | int  | none    | Hard cap: the adventure is hidden once the player has completed it this many times.              |
-| `cooldown_days`       | int  | none    | The adventure is hidden for this many calendar days after the most recent completion.            |
-| `cooldown_adventures` | int  | none    | The adventure is hidden until this many total adventures have been completed since the last run. |
+| Field             | Type           | Default | Description                                                                                |
+| ----------------- | -------------- | ------- | ------------------------------------------------------------------------------------------ |
+| `repeatable`      | bool           | `true`  | Set to `false` to make an adventure a one-shot that disappears after the first completion. |
+| `max_completions` | int            | none    | Hard cap: the adventure is hidden once the player has completed it this many times.        |
+| `cooldown`        | Cooldown block | none    | Time or tick constraint that must pass between runs. See [Cooldowns](./cooldowns.md).      |
 
 `repeatable: false` and `max_completions` are mutually exclusive — choose one or the other.
 
@@ -507,13 +504,15 @@ steps:
             outcome: completed
 ```
 
-### Cooldown by adventures
+### Cooldown adventure
 
-An adventure that can be replayed, but only after the player has completed three other adventures first:
+An adventure that can be replayed, but only after 3 more adventures have been completed:
 
 ```yaml
 displayName: "The Bandit Camp"
-cooldown_adventures: 3
+repeatable: true
+cooldown:
+  ticks: 3
 steps:
   - type: combat
     name: fight
@@ -528,9 +527,11 @@ steps:
           outcome: defeated
 ```
 
+For time-based cooldowns (e.g. once per day) and combining multiple constraints, see the [Cooldowns reference](./cooldowns.md).
+
 ### Notes on cooldown tracking
 
-- `cooldown_adventures` counts total adventures completed across all locations, not just in the current region.
+- `cooldown.ticks` counts total adventures completed across all locations, not just in the current region.
 - All repeat-control state resets when the character starts a new iteration (prestige run).
 
 ---

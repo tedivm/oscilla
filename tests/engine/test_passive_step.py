@@ -53,7 +53,7 @@ async def test_passive_no_bypass_applies_effects() -> None:
 async def test_passive_bypass_true_skips_effects_shows_bypass_text() -> None:
     """When bypass condition is met, effects are skipped and bypass_text is shown."""
     player = _make_player()
-    player.milestones.add("nimble")
+    player.grant_milestone("nimble")
     tui = MockTUI()
     registry = ContentRegistry()
     step = PassiveStep(
@@ -76,7 +76,7 @@ async def test_passive_bypass_true_skips_effects_shows_bypass_text() -> None:
 async def test_passive_bypass_true_no_bypass_text_silent_skip() -> None:
     """When bypass fires and no bypass_text is set, skip is silent."""
     player = _make_player()
-    player.milestones.add("nimble")
+    player.grant_milestone("nimble")
     tui = MockTUI()
     registry = ContentRegistry()
     step = PassiveStep(

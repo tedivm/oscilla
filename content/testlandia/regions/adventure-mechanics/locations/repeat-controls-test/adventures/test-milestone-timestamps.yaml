@@ -1,0 +1,28 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: test-milestone-timestamps
+spec:
+  displayName: "The Ancient Ritual"
+  description: "Complete this ritual to earn a milestone. Return after 2 more adventures to unlock the follow-up ceremony — demonstrating milestone_ticks_elapsed conditions."
+  repeatable: true
+  steps:
+    - type: narrative
+      name: ritual
+      text: "You perform the ancient ritual, earning the mark of the order."
+      effects:
+        - type: milestone_grant
+          milestone: timestamp-test
+      choices:
+        - label: "Accept the mark"
+          condition:
+            type: milestone_ticks_elapsed
+            name: timestamp-test
+            gte: 2
+          effects:
+            - type: end_adventure
+              outcome: completed
+        - label: "Leave for now"
+          effects:
+            - type: end_adventure
+              outcome: completed

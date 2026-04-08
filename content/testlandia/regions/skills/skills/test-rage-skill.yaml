@@ -13,7 +13,7 @@ spec:
     amount: 15
   cooldown:
     scope: turn
-    count: 4
+    turns: 4
   use_effects:
     - type: apply_buff
       buff_ref: rage-buff

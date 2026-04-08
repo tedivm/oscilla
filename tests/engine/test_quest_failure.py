@@ -74,7 +74,7 @@ async def test_evaluate_failures_moves_quest_to_failed_when_condition_met() -> N
     registry = _make_failable_registry()
     player = _make_player()
     player.active_quests["failable-quest"] = "active"
-    player.milestones.add("quest-fail-trigger")
+    player.grant_milestone("quest-fail-trigger")
     tui = AsyncMock()
 
     await _evaluate_quest_failures(player=player, registry=registry, tui=tui)
@@ -89,7 +89,7 @@ async def test_evaluate_failures_runs_fail_effects() -> None:
     registry = _make_failable_registry()
     player = _make_player()
     player.active_quests["failable-quest"] = "active"
-    player.milestones.add("quest-fail-trigger")
+    player.grant_milestone("quest-fail-trigger")
     tui = AsyncMock()
 
     await _evaluate_quest_failures(player=player, registry=registry, tui=tui)
@@ -103,7 +103,7 @@ async def test_evaluate_failures_shows_tui_message() -> None:
     registry = _make_failable_registry()
     player = _make_player()
     player.active_quests["failable-quest"] = "active"
-    player.milestones.add("quest-fail-trigger")
+    player.grant_milestone("quest-fail-trigger")
     tui = AsyncMock()
 
     await _evaluate_quest_failures(player=player, registry=registry, tui=tui)
@@ -138,7 +138,7 @@ def test_silent_advance_silently_fails_quest_when_condition_met() -> None:
     registry = _make_failable_registry()
     player = _make_player()
     player.active_quests["failable-quest"] = "active"
-    player.milestones.add("quest-fail-trigger")
+    player.grant_milestone("quest-fail-trigger")
 
     _advance_quests_silent(player=player, registry=registry)
 

@@ -360,7 +360,8 @@ async def test_adventure_repeat_state_persists_and_reloads(
         session=async_session,
         iteration_id=iteration_id,
         adventure_ref="test-quest",
-        last_completed_on="2026-04-04",
+        last_completed_real_ts=1743718800,
+        last_completed_game_ticks=0,
         last_completed_at_ticks=7,
     )
 
@@ -370,7 +371,7 @@ async def test_adventure_repeat_state_persists_and_reloads(
         character_config=minimal_registry.character_config,
     )
     assert loaded is not None
-    assert loaded.adventure_last_completed_on["test-quest"] == "2026-04-04"
+    assert loaded.adventure_last_completed_real_ts["test-quest"] == 1743718800
     assert loaded.adventure_last_completed_at_ticks["test-quest"] == 7
 
 

@@ -135,8 +135,15 @@ async def save_character(session: AsyncSession, state: "CharacterState", user_id
                 instance_id=str(instance_id),
             )
         )
-    for milestone_ref in state.milestones:
-        session.add(CharacterIterationMilestone(iteration_id=iteration.id, milestone_ref=milestone_ref))
+    for milestone_ref, milestone_record in state.milestones.items():
+        session.add(
+            CharacterIterationMilestone(
+                iteration_id=iteration.id,
+                milestone_ref=milestone_ref,
+                grant_tick=milestone_record.tick,
+                grant_timestamp=milestone_record.timestamp,
+            )
+        )
     for quest_ref, stage in state.active_quests.items():
         session.add(
             CharacterIterationQuest(
@@ -193,14 +200,19 @@ async def save_character(session: AsyncSession, state: "CharacterState", user_id
         )
     for skill_ref in state.known_skills:
         session.add(CharacterIterationSkill(iteration_id=iteration.id, skill_ref=skill_ref))
-    for skill_ref, cooldown in state.skill_cooldowns.items():
-        session.add(
-            CharacterIterationSkillCooldown(
-                iteration_id=iteration.id,
-                skill_ref=skill_ref,
-                cooldown_remaining=cooldown,
+    all_cooldown_refs = set(state.skill_tick_expiry) | set(state.skill_real_expiry)
+    for skill_ref in all_cooldown_refs:
+        tick_exp = state.skill_tick_expiry.get(skill_ref, 0)
+        real_exp = state.skill_real_expiry.get(skill_ref, 0)
+        if tick_exp > 0 or real_exp > 0:
+            session.add(
+                CharacterIterationSkillCooldown(
+                    iteration_id=iteration.id,
+                    skill_ref=skill_ref,
+                    tick_expiry=tick_exp,
+                    real_expiry=real_exp,
+                )
             )
-        )
 
     await session.commit()
 
@@ -280,7 +292,10 @@ async def load_character(
         for row in iteration.item_instance_rows
     ]
     equipment: Dict[str, str] = {row.slot: row.instance_id for row in iteration.equipment_rows}
-    milestones: List[str] = [row.milestone_ref for row in iteration.milestone_rows]
+    milestones: Dict[str, Any] = {
+        row.milestone_ref: {"tick": row.grant_tick, "timestamp": row.grant_timestamp}
+        for row in iteration.milestone_rows
+    }
     active_quests: Dict[str, str] = {
         row.quest_ref: row.stage or "" for row in iteration.quest_rows if row.status == "active"
     }
@@ -306,11 +321,21 @@ async def load_character(
             adventure_outcome_counts[adventure_ref][outcome_name] = stat_row.count
 
     known_skills: List[str] = [row.skill_ref for row in iteration.skill_rows]
-    skill_cooldowns: Dict[str, int] = {row.skill_ref: row.cooldown_remaining for row in iteration.skill_cooldown_rows}
-    adventure_last_completed_on: Dict[str, str] = {
-        row.adventure_ref: row.last_completed_on
+    skill_tick_expiry: Dict[str, int] = {
+        row.skill_ref: row.tick_expiry for row in iteration.skill_cooldown_rows if row.tick_expiry > 0
+    }
+    skill_real_expiry: Dict[str, int] = {
+        row.skill_ref: row.real_expiry for row in iteration.skill_cooldown_rows if row.real_expiry > 0
+    }
+    adventure_last_completed_real_ts: Dict[str, int] = {
+        row.adventure_ref: row.last_completed_real_ts
         for row in iteration.adventure_state_rows
-        if row.last_completed_on is not None
+        if row.last_completed_real_ts is not None
+    }
+    adventure_last_completed_game_ticks: Dict[str, int] = {
+        row.adventure_ref: row.last_completed_game_ticks
+        for row in iteration.adventure_state_rows
+        if row.last_completed_game_ticks is not None
     }
     adventure_last_completed_at_ticks: Dict[str, int] = {
         row.adventure_ref: row.last_completed_at_ticks
@@ -353,8 +378,10 @@ async def load_character(
         },
         "active_adventure": active_adventure,
         "known_skills": known_skills,
-        "skill_cooldowns": skill_cooldowns,
-        "adventure_last_completed_on": adventure_last_completed_on,
+        "skill_tick_expiry": skill_tick_expiry,
+        "skill_real_expiry": skill_real_expiry,
+        "adventure_last_completed_real_ts": adventure_last_completed_real_ts,
+        "adventure_last_completed_game_ticks": adventure_last_completed_game_ticks,
         "adventure_last_completed_at_ticks": adventure_last_completed_at_ticks,
         "internal_ticks": iteration.internal_ticks,
         "game_ticks": iteration.game_ticks,
@@ -826,6 +853,8 @@ async def add_milestone(
     session: AsyncSession,
     iteration_id: UUID,
     milestone_ref: str,
+    grant_tick: int = 0,
+    grant_timestamp: int = 0,
 ) -> None:
     """Insert one character_iteration_milestones row.
 
@@ -836,6 +865,8 @@ async def add_milestone(
         CharacterIterationMilestone(
             iteration_id=iteration_id,
             milestone_ref=milestone_ref,
+            grant_tick=grant_tick,
+            grant_timestamp=grant_timestamp,
         )
     )
     await session.commit()
@@ -956,13 +987,14 @@ async def set_skill_cooldown(
     session: AsyncSession,
     iteration_id: UUID,
     skill_ref: str,
-    cooldown_remaining: int,
+    tick_expiry: int,
+    real_expiry: int,
 ) -> None:
-    """Upsert (cooldown > 0) or delete (cooldown == 0) one skill cooldown row.
+    """Upsert or delete one skill cooldown row.
 
-    A cooldown of 0 means the skill is no longer on cooldown; the row is removed.
+    Deletes the row when both expiry values are zero (cooldown fully cleared).
     """
-    if cooldown_remaining <= 0:
+    if tick_expiry <= 0 and real_expiry <= 0:
         stmt = select(CharacterIterationSkillCooldown).where(
             and_(
                 CharacterIterationSkillCooldown.iteration_id == iteration_id,
@@ -978,7 +1010,8 @@ async def set_skill_cooldown(
             CharacterIterationSkillCooldown(
                 iteration_id=iteration_id,
                 skill_ref=skill_ref,
-                cooldown_remaining=cooldown_remaining,
+                tick_expiry=tick_expiry,
+                real_expiry=real_expiry,
             )
         )
     await session.commit()
@@ -988,7 +1021,8 @@ async def upsert_adventure_state(
     session: AsyncSession,
     iteration_id: UUID,
     adventure_ref: str,
-    last_completed_on: str | None,
+    last_completed_real_ts: int | None,
+    last_completed_game_ticks: int | None,
     last_completed_at_ticks: int | None,
 ) -> None:
     """Upsert the repeat-control state for one adventure.
@@ -999,7 +1033,8 @@ async def upsert_adventure_state(
         CharacterIterationAdventureState(
             iteration_id=iteration_id,
             adventure_ref=adventure_ref,
-            last_completed_on=last_completed_on,
+            last_completed_real_ts=last_completed_real_ts,
+            last_completed_game_ticks=last_completed_game_ticks,
             last_completed_at_ticks=last_completed_at_ticks,
         )
     )

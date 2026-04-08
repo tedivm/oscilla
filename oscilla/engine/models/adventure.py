@@ -361,6 +361,46 @@ PassiveStep.model_rebuild()
 # ---------------------------------------------------------------------------
 
 
+class Cooldown(BaseModel):
+    """Shared cooldown model for adventure repeat controls and skill activation frequency.
+
+    All numeric fields accept int or Jinja2 template strings resolved at eligibility check time.
+    Multiple non-None fields are AND-ed — all constraints must pass simultaneously.
+    """
+
+    # internal_ticks elapsed since last use — tamper-proof monotone clock.
+    ticks: int | str | None = None
+    # game_ticks elapsed since last use — narrative clock, adjustable by effects.
+    game_ticks: int | str | None = None
+    # Real-world seconds elapsed since last use — wall-clock track.
+    seconds: int | str | None = None
+    # Combat turns before reuse — only valid with scope: "turn".
+    turns: int | str | None = None
+    # scope: None (default) = persistent across sessions (adventure-scope).
+    # scope: "turn" = resets each combat; only "turns" field is evaluated.
+    scope: Literal["turn"] | None = None
+
+    @model_validator(mode="after")
+    def validate_scope_fields(self) -> "Cooldown":
+        if self.scope == "turn":
+            if any(v is not None for v in [self.ticks, self.game_ticks, self.seconds]):
+                raise ValueError(
+                    "Cooldown with scope='turn' may only use 'turns'. Remove ticks, game_ticks, and seconds fields."
+                )
+        else:
+            if self.turns is not None:
+                raise ValueError("Cooldown 'turns' field is only valid with scope='turn'.")
+        return self
+
+    @model_validator(mode="after")
+    def at_least_one_constraint(self) -> "Cooldown":
+        if all(v is None for v in [self.ticks, self.game_ticks, self.seconds, self.turns]):
+            raise ValueError(
+                "Cooldown must specify at least one constraint field (ticks, game_ticks, seconds, or turns)."
+            )
+        return self
+
+
 class AdventureSpec(BaseModel):
     displayName: str
     description: str = ""
@@ -372,37 +412,8 @@ class AdventureSpec(BaseModel):
     # Repeat controls — all optional, all default to unrestricted behavior.
     repeatable: bool = Field(default=True, description="Set to False to make this a one-shot adventure.")
     max_completions: int | None = Field(default=None, description="Hard cap on total completions this iteration.")
-    cooldown_days: int | None = Field(default=None, description="Calendar days that must pass between runs.")
-    # cooldown_adventures is deprecated. Use cooldown_ticks instead.
-    # At load time, cooldown_adventures is mapped to cooldown_ticks with a warning.
-    cooldown_adventures: int | None = Field(
-        default=None,
-        description="Deprecated. Use cooldown_ticks instead.",
-    )
-    cooldown_ticks: int | None = Field(
-        default=None,
-        description="internal_ticks that must pass since last completion (default clock for cooldowns).",
-    )
-    cooldown_game_ticks: int | None = Field(
-        default=None,
-        description="game_ticks that must pass since last completion.",
-    )
-
-    @model_validator(mode="after")
-    def migrate_deprecated_cooldown_adventures(self) -> "AdventureSpec":
-        """Map deprecated cooldown_adventures to cooldown_ticks with a load warning."""
-        if self.cooldown_adventures is not None:
-            import logging
-
-            logging.getLogger(__name__).warning(
-                "Adventure uses deprecated 'cooldown_adventures' — use 'cooldown_ticks' instead. "
-                "Mapping %d → cooldown_ticks.",
-                self.cooldown_adventures,
-            )
-            if self.cooldown_ticks is None:
-                self.cooldown_ticks = self.cooldown_adventures
-            self.cooldown_adventures = None
-        return self
+    # Unified cooldown: ticks, game_ticks, seconds constraints. Replaces flat cooldown_* fields.
+    cooldown: Cooldown | None = None
 
     @model_validator(mode="after")
     def validate_repeat_controls(self) -> "AdventureSpec":

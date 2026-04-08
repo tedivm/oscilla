@@ -7,16 +7,16 @@ it is trusted internal state and plain dataclasses keep mutation straightforward
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, Dict, List, Set
 from uuid import UUID, uuid4
 
+from oscilla.engine.models.base import MilestoneRecord
 from oscilla.engine.templates import DEFAULT_PRONOUN_SET, PRONOUN_SETS, PronounSet
 
 if TYPE_CHECKING:
-    from datetime import date
-
     from oscilla.engine.models.adventure import AdventureSpec
     from oscilla.engine.models.character_config import CharacterConfigManifest
     from oscilla.engine.models.game import GameManifest
@@ -146,7 +146,8 @@ class CharacterState:
     current_location: str | None
     # Player's chosen pronoun set. Defaults to they/them until explicitly set.
     pronouns: PronounSet = field(default_factory=lambda: DEFAULT_PRONOUN_SET)
-    milestones: Set[str] = field(default_factory=set)
+    # Milestones granted this iteration: name → MilestoneRecord(tick, timestamp).
+    milestones: Dict[str, MilestoneRecord] = field(default_factory=dict)
     statistics: CharacterStatistics = field(default_factory=CharacterStatistics)
     # Stackable items: item_ref → quantity
     stacks: Dict[str, int] = field(default_factory=dict)
@@ -163,14 +164,17 @@ class CharacterState:
     stats: Dict[str, int | bool | None] = field(default_factory=dict)
     # Skill refs permanently learned by the player.
     known_skills: Set[str] = field(default_factory=set)
-    # Adventure-scope cooldowns: skill_ref → adventures remaining before reuse.
-    # Decremented at adventure start; removed when value reaches 0.
-    skill_cooldowns: Dict[str, int] = field(default_factory=dict)
-    # Repeat-control tracking: ISO date (YYYY-MM-DD) when each adventure was last completed.
-    adventure_last_completed_on: Dict[str, str] = field(default_factory=dict)
+    # Expiry-timestamp skill cooldowns (adventure-scope).
+    # skill_tick_expiry: skill_ref → internal_ticks value at which the cooldown expires.
+    # skill_real_expiry: skill_ref → Unix timestamp (seconds) at which the cooldown expires.
+    skill_tick_expiry: Dict[str, int] = field(default_factory=dict)
+    skill_real_expiry: Dict[str, int] = field(default_factory=dict)
+    # Repeat-control tracking: Unix timestamp (seconds) when each adventure was last completed.
+    adventure_last_completed_real_ts: Dict[str, int] = field(default_factory=dict)
     # internal_ticks value at the time each adventure was last completed.
-    # Replaces the deprecated adventure_last_completed_at_total (adventure count).
     adventure_last_completed_at_ticks: Dict[str, int] = field(default_factory=dict)
+    # game_ticks value at the time each adventure was last completed.
+    adventure_last_completed_game_ticks: Dict[str, int] = field(default_factory=dict)
     # In-game tick counters. Both reset to 0 on new iteration.
     # internal_ticks: monotone; only advances on adventure completion; never adjusted by effects.
     # game_ticks: narrative clock; advances on completion; adjustable by adjust_game_ticks effect.
@@ -429,8 +433,9 @@ class CharacterState:
     # --- Milestones ---
 
     def grant_milestone(self, name: str) -> None:
-        """Add a milestone flag. No-op if already held."""
-        self.milestones.add(name)
+        """Record a milestone with current tick and timestamp. No-op if already held."""
+        if name not in self.milestones:
+            self.milestones[name] = MilestoneRecord(tick=self.internal_ticks, timestamp=int(time.time()))
 
     def has_milestone(self, name: str) -> bool:
         return name in self.milestones
@@ -536,34 +541,20 @@ class CharacterState:
         self.known_skills.add(skill_ref)
         return True
 
-    def tick_skill_cooldowns(self) -> None:
-        """Decrement adventure-scoped cooldowns by one. Called at the start of each adventure.
-
-        Removes entries that reach 0 so that skill_cooldowns only contains active cooldowns.
-        """
-        spent: List[str] = []
-        for skill_ref, remaining in self.skill_cooldowns.items():
-            new_val = remaining - 1
-            if new_val <= 0:
-                spent.append(skill_ref)
-            else:
-                self.skill_cooldowns[skill_ref] = new_val
-        for skill_ref in spent:
-            del self.skill_cooldowns[skill_ref]
-
     def is_adventure_eligible(
         self,
         adventure_ref: str,
         spec: "AdventureSpec",
-        today: "date",
+        now_ts: int,
+        template_engine: "Any | None" = None,
     ) -> bool:
         """Return True if repeat controls allow running this adventure right now.
 
         Called AFTER the adventure's `requires` condition has already passed.
         Any constraint that is not met returns False immediately.
+        Multiple cooldown fields are AND-ed — all must pass.
+        Turn-scope cooldowns are not checked here (combat only).
         """
-        from datetime import date as date_t
-
         completions = self.statistics.adventures_completed.get(adventure_ref, 0)
 
         # repeatable: false is equivalent to max_completions: 1
@@ -574,26 +565,45 @@ class CharacterState:
         if spec.max_completions is not None and completions >= spec.max_completions:
             return False
 
-        # cooldown_days (calendar days since last completion)
-        if spec.cooldown_days is not None:
-            last_on_str = self.adventure_last_completed_on.get(adventure_ref)
-            if last_on_str is not None:
-                last_on = date_t.fromisoformat(last_on_str)
-                if (today - last_on).days < spec.cooldown_days:
+        if spec.cooldown is not None and spec.cooldown.scope != "turn":
+
+            def _resolve(v: "int | str | None") -> "int | None":
+                if v is None:
+                    return None
+                if isinstance(v, int):
+                    return v
+                # Template string — render and cast to int.
+                if template_engine is not None:
+                    try:
+                        rendered = template_engine.render_raw(v)
+                        return int(rendered)
+                    except Exception:
+                        logger.warning(
+                            "Failed to render cooldown template %r for adventure %r — skipping constraint.",
+                            v,
+                            adventure_ref,
+                        )
+                return None
+
+            # ticks (internal_ticks elapsed since last run)
+            ticks_required = _resolve(spec.cooldown.ticks)
+            if ticks_required is not None:
+                last_ticks = self.adventure_last_completed_at_ticks.get(adventure_ref)
+                if last_ticks is not None and self.internal_ticks - last_ticks < ticks_required:
                     return False
 
-        # cooldown_ticks (internal_ticks elapsed since last run — default tick-based cooldown)
-        if spec.cooldown_ticks is not None:
-            last_ticks = self.adventure_last_completed_at_ticks.get(adventure_ref)
-            if last_ticks is not None:
-                if self.internal_ticks - last_ticks < spec.cooldown_ticks:
+            # game_ticks (game_ticks elapsed since last run)
+            game_ticks_required = _resolve(spec.cooldown.game_ticks)
+            if game_ticks_required is not None:
+                last_game_ticks = self.adventure_last_completed_game_ticks.get(adventure_ref)
+                if last_game_ticks is not None and self.game_ticks - last_game_ticks < game_ticks_required:
                     return False
 
-        # cooldown_game_ticks (game_ticks elapsed since last run — narrative clock cooldown)
-        if spec.cooldown_game_ticks is not None:
-            last_game_ticks = self.adventure_last_completed_at_ticks.get(f"__game__{adventure_ref}")
-            if last_game_ticks is not None:
-                if self.game_ticks - last_game_ticks < spec.cooldown_game_ticks:
+            # seconds (real-world wall-clock time elapsed)
+            seconds_required = _resolve(spec.cooldown.seconds)
+            if seconds_required is not None:
+                last_ts = self.adventure_last_completed_real_ts.get(adventure_ref)
+                if last_ts is not None and now_ts - last_ts < seconds_required:
                     return False
 
         return True
@@ -675,7 +685,7 @@ class CharacterState:
                 (k for k, v in PRONOUN_SETS.items() if v == self.pronouns),
                 "they_them",  # fallback if using a custom set not in the built-in registry
             ),
-            "milestones": sorted(self.milestones),
+            "milestones": {name: {"tick": r.tick, "timestamp": r.timestamp} for name, r in self.milestones.items()},
             "stacks": dict(self.stacks),
             "instances": [
                 {
@@ -701,9 +711,11 @@ class CharacterState:
             },
             "active_adventure": active_adventure,
             "known_skills": sorted(self.known_skills),
-            "skill_cooldowns": dict(self.skill_cooldowns),
-            "adventure_last_completed_on": dict(self.adventure_last_completed_on),
+            "skill_tick_expiry": dict(self.skill_tick_expiry),
+            "skill_real_expiry": dict(self.skill_real_expiry),
+            "adventure_last_completed_real_ts": dict(self.adventure_last_completed_real_ts),
             "adventure_last_completed_at_ticks": dict(self.adventure_last_completed_at_ticks),
+            "adventure_last_completed_game_ticks": dict(self.adventure_last_completed_game_ticks),
             "internal_ticks": self.internal_ticks,
             "game_ticks": self.game_ticks,
             "era_started_at_ticks": dict(self.era_started_at_ticks),
@@ -803,6 +815,53 @@ class CharacterState:
         raw_equipment: Dict[str, str] = data.get("equipment", {})
         equipment: Dict[str, UUID] = {slot: UUID(iid_str) for slot, iid_str in raw_equipment.items()}
 
+        # Deserialize and migrate milestones to Dict[str, MilestoneRecord].
+        # Supports three formats for backward-compat:
+        #   - Old list: ["milestone-a", "milestone-b"] → MilestoneRecord(tick=0, timestamp=0)
+        #   - Intermediate int-dict: {"milestone-a": 42} → MilestoneRecord(tick=42, timestamp=0)
+        #   - Current nested-dict: {"milestone-a": {"tick": 42, "timestamp": 1744000000}}
+        raw_milestones: Any = data.get("milestones", [])
+        milestones: Dict[str, MilestoneRecord] = {}
+        if isinstance(raw_milestones, list):
+            if raw_milestones:
+                logger.warning("Migrating legacy milestone list format to MilestoneRecord dict (tick=0, timestamp=0).")
+            for name in raw_milestones:
+                milestones[name] = MilestoneRecord(tick=0, timestamp=0)
+        elif isinstance(raw_milestones, dict):
+            for name, value in raw_milestones.items():
+                if isinstance(value, int):
+                    # Intermediate int-dict format
+                    logger.warning("Migrating intermediate milestone int-dict format for %r to MilestoneRecord.", name)
+                    milestones[name] = MilestoneRecord(tick=value, timestamp=0)
+                elif isinstance(value, dict):
+                    milestones[name] = MilestoneRecord(
+                        tick=int(value.get("tick", 0)),
+                        timestamp=int(value.get("timestamp", 0)),
+                    )
+                else:
+                    logger.warning("Unrecognized milestone format for %r — skipping.", name)
+
+        # Migrate __game__-prefixed entries out of adventure_last_completed_at_ticks.
+        raw_at_ticks: Dict[str, int] = dict(
+            data.get("adventure_last_completed_at_ticks") or data.get("adventure_last_completed_at_total", {})
+        )
+        migrated_at_ticks: Dict[str, int] = {}
+        migrated_game_ticks: Dict[str, int] = {}
+        for key, val in raw_at_ticks.items():
+            if key.startswith("__game__"):
+                migrated_game_ticks[key[len("__game__") :]] = val
+            else:
+                migrated_at_ticks[key] = val
+        if migrated_game_ticks:
+            logger.warning(
+                "Migrating %d __game__-prefixed entries from adventure_last_completed_at_ticks "
+                "to adventure_last_completed_game_ticks.",
+                len(migrated_game_ticks),
+            )
+        # Merge with any explicitly stored adventure_last_completed_game_ticks
+        stored_game_ticks: Dict[str, int] = dict(data.get("adventure_last_completed_game_ticks", {}))
+        merged_game_ticks = {**migrated_game_ticks, **stored_game_ticks}
+
         result = cls(
             character_id=UUID(data["character_id"]),
             prestige_count=data.get("prestige_count", data.get("iteration", 0)),
@@ -814,7 +873,7 @@ class CharacterState:
             max_hp=data["max_hp"],
             current_location=data.get("current_location"),
             pronouns=_deserialize_pronoun_set(data.get("pronoun_set", "they_them")),
-            milestones=set(data.get("milestones", [])),
+            milestones=milestones,
             stacks=dict(data.get("stacks", {})),
             instances=instances,
             equipment=equipment,
@@ -825,12 +884,11 @@ class CharacterState:
             statistics=statistics,
             active_adventure=active_adventure,
             known_skills=set(data.get("known_skills", [])),
-            skill_cooldowns=dict(data.get("skill_cooldowns", {})),
-            adventure_last_completed_on=dict(data.get("adventure_last_completed_on", {})),
-            # Accept both old key (adventure_last_completed_at_total) and new key for backward compat.
-            adventure_last_completed_at_ticks=dict(
-                data.get("adventure_last_completed_at_ticks") or data.get("adventure_last_completed_at_total", {})
-            ),
+            skill_tick_expiry=dict(data.get("skill_tick_expiry", {})),
+            skill_real_expiry=dict(data.get("skill_real_expiry", {})),
+            adventure_last_completed_real_ts=dict(data.get("adventure_last_completed_real_ts", {})),
+            adventure_last_completed_at_ticks=migrated_at_ticks,
+            adventure_last_completed_game_ticks=merged_game_ticks,
             internal_ticks=int(data.get("internal_ticks", 0)),
             game_ticks=int(data.get("game_ticks", 0)),
             era_started_at_ticks=dict(data.get("era_started_at_ticks", {})),

@@ -5,7 +5,8 @@ metadata:
 spec:
   displayName: "The Patrol Route"
   description: "A cooldown adventure that requires 3 other adventures between runs."
-  cooldown_adventures: 3
+  cooldown:
+    ticks: 3
   steps:
     - type: narrative
       name: patrol

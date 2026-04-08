@@ -539,7 +539,7 @@ Skills and buffs are first-class manifest kinds processed by the content loader 
 | `skill_uses_this_combat` | `Dict[str, int]`           | Turn-scope cooldown tracking: skill_ref → last turn used                                  |
 | `enemy_resources`        | `Dict[str, int]`           | Live resource values for enemy skill costs (initialized from `EnemySpec.skill_resources`) |
 
-On combat exit, `CombatContext` is discarded. Only `CharacterState.skill_cooldowns` (adventure-scope cooldowns) is written back to the player state.
+On combat exit, `CombatContext` is discarded. Adventure-scope cooldowns (`CharacterState.skill_tick_expiry` and `CharacterState.skill_real_expiry`) are written back to the player state.
 
 ### `ActiveCombatEffect`
 
@@ -565,11 +565,24 @@ Without a registry, only `known_skills` is returned. This makes the method safe 
 
 ### Cooldown Tracking
 
-Two cooldown scopes exist:
+Two cooldown scopes exist for skills:
 
-**Turn-scope** (`CombatContext.skill_uses_this_combat`): stored as `skill_ref → turn_last_used`. A skill with `scope: turn, count: 1` can be used at most once per turn. The check is `current_turn - last_used < cooldown.count`. Turn-scope cooldowns reset at the start of every combat.
+**Turn-scope** (`CombatContext.skill_uses_this_combat`): stored as `skill_ref → turn_last_used`. A skill with `scope: turn, turns: 1` can be used at most once per turn. The check is `current_turn - last_used < cooldown.turns`. Turn-scope cooldowns reset at the start of every combat.
 
-**Adventure-scope** (`CharacterState.skill_cooldowns`): stored as `skill_ref → adventures_remaining`. Decremented at adventure start by `tick_skill_cooldowns()`. Removed when the count reaches 0. These values are persisted to the database and survive between play sessions.
+**Adventure-scope** (`CharacterState.skill_tick_expiry` and `CharacterState.skill_real_expiry`): two dicts that store the expiry threshold for each skill on cooldown. `skill_tick_expiry` maps `skill_ref → adventure_tick_when_cooldown_expires`; `skill_real_expiry` maps `skill_ref → unix_timestamp_when_cooldown_expires`. The helpers `_skill_on_cooldown(state, skill_ref, now_ts)` and `_set_skill_cooldown(state, skill_ref, cooldown, now_tick, now_ts)` in `oscilla/engine/character.py` read and write these dicts. On adventure completion, `tick_skill_cooldowns(state, internal_ticks, now_ts)` removes any entries whose thresholds have been passed.
+
+Adventure-scope cooldown state is persisted to the database and survives between play sessions.
+
+**Two-track time model:**
+
+`CharacterState` tracks completion of the most recent adventure via two parallel fields:
+
+| Field                                 | Type  | Meaning                                                |
+| ------------------------------------- | ----- | ------------------------------------------------------ |
+| `adventure_last_completed_real_ts`    | `int` | `time.time()` Unix timestamp when last adventure ended |
+| `adventure_last_completed_game_ticks` | `int` | Internal tick counter value when last adventure ended  |
+
+An adventure's `cooldown` block may specify `ticks` (internal tick threshold), `seconds` (wall-clock threshold), or both. Both constraints must be satisfied simultaneously when both are set. `is_adventure_eligible(adventure_spec, now_tick, now_ts)` implements this check.
 
 ### `SkillCondition` Modes
 

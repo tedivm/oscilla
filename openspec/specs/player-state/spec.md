@@ -8,37 +8,57 @@ The player state system manages all persistent player data including stats, inve
 
 ### Requirement: Player state fields
 
-The player state model SHALL include the following fixed fields: `player_id` (UUID), `name` (string), `character_class` (string, nullable), `level` (int, default 1), `xp` (int, default 0), `hp` (int), `max_hp` (int), `prestige_count` (int, default 0), `current_location` (string reference, nullable), `milestones` (set of strings), `statistics` (PlayerStatistics dataclass with enemy/location/adventure counters), `stacks` (mapping of item ref to quantity for stackable items), `instances` (list of `ItemInstance` objects for non-stackable items, each with `instance_id: UUID`, `item_ref: str`, and `modifiers: Dict`), `equipment` (mapping of slot name to `instance_id: UUID`), `active_quests` (mapping of quest ref to stage name), `completed_quests` (set of quest refs), `active_adventure` (nullable adventure position struct), `pending_triggers` (FIFO list of trigger names awaiting drain, default empty list), and `prestige_pending` (nullable `PrestigeCarryForward` dataclass, default `None` — see prestige-system spec).
+The player state model SHALL include the following fixed fields: `player_id` (UUID), `name` (string), `character_class` (string, nullable), `level` (int, default 1), `xp` (int, default 0), `hp` (int), `max_hp` (int), `prestige_count` (int, default 0), `current_location` (string reference, nullable), `milestones` (dict mapping milestone name to the `internal_ticks` value at grant time — see milestone-timestamps spec), `statistics` (PlayerStatistics dataclass with enemy/location/adventure counters), `stacks` (mapping of item ref to quantity for stackable items), `instances` (list of `ItemInstance` objects for non-stackable items, each with `instance_id: UUID`, `item_ref: str`, and `modifiers: Dict`), `equipment` (mapping of slot name to `instance_id: UUID`), `active_quests` (mapping of quest ref to stage name), `completed_quests` (set of quest refs), `active_adventure` (nullable adventure position struct), `pending_triggers` (FIFO list of trigger names awaiting drain, default empty list), and `prestige_pending` (nullable `PrestigeCarryForward` dataclass, default `None` — see prestige-system spec).
 
-The `prestige_pending` field is ephemeral: it is never serialized to the database or restored from it. It exists solely to signal the `adventure_end` persist path that a prestige iteration transition must be executed before writing the reset state. After the transition, the field is cleared to `None`.
+The `prestige_pending` field is ephemeral: it is never serialized to the database or restored from it.
 
-In addition to fixed fields, the player state SHALL contain a `stats` mapping (stat name → value) populated dynamically from the `CharacterConfig` manifest at character creation. Both `public_stats` and `hidden_stats` are stored in this single mapping; the distinction is only presentational. Stat values SHALL be typed `int | bool | None` — the `float` type is no longer permitted. Stat values SHALL default to the declared default, or `null` if no default is set. Integer stats SHALL only be mutated through `CharacterState.set_stat()`, which enforces hard INT32 floor/ceiling bounds.
+In addition to fixed fields, the player state SHALL contain a `stats` mapping populated dynamically from `CharacterConfig`. Stat values SHALL be typed `int | bool | None`. Integer stats SHALL only be mutated through `CharacterState.set_stat()`.
+
+Adventure completion timestamps SHALL be stored in three separate dicts:
+
+- `adventure_last_completed_at_ticks: Dict[str, int]` — `internal_ticks` value when each adventure was last completed.
+- `adventure_last_completed_game_ticks: Dict[str, int]` — `game_ticks` value when each adventure was last completed.
+- `adventure_last_completed_real_ts: Dict[str, int]` — Unix timestamp (integer seconds) when each adventure was last completed.
+
+The deprecated `adventure_last_completed_on: Dict[str, str]` (ISO date string) field SHALL be removed. The `__game__` prefix encoding in `adventure_last_completed_at_ticks` SHALL be removed; game-tick completions use the dedicated `adventure_last_completed_game_ticks` dict.
+
+Skill cooldown state SHALL be stored as absolute expiry timestamps:
+
+- `skill_tick_expiry: Dict[str, int]` — `internal_ticks` value at which the adventure-scope cooldown for this skill expires.
+- `skill_real_expiry: Dict[str, int]` — Unix timestamp (integer seconds) at which the adventure-scope cooldown expires.
+
+The deprecated `skill_cooldowns: Dict[str, int]` (adventure-count countdown) field SHALL be removed.
 
 #### Scenario: New player starts with default values
 
-- **WHEN** a new player state is created with only a name
-- **THEN** level is 1, XP is 0, prestige_count is 0, milestones is empty, statistics has all counters at zero, stacks is empty, instances is empty, equipment is empty, active_adventure is None, pending_triggers is an empty list, prestige_pending is None, and the stats map contains every stat from CharacterConfig initialised to its declared default
+- **WHEN** a new player state is created
+- **THEN** level is 1, XP is 0, prestige_count is 0, milestones is an empty dict, statistics has all counters at zero, all adventure timestamp dicts are empty, all skill expiry dicts are empty, and stats contains every stat from CharacterConfig initialized to its declared default
 
-#### Scenario: Public stats are visible, hidden stats are not
+#### Scenario: adventure_last_completed_real_ts stores Unix timestamp
 
-- **WHEN** the player status panel is rendered
-- **THEN** only stats declared under `public_stats` in CharacterConfig are displayed; stats in `hidden_stats` are omitted from the UI
+- **WHEN** an adventure completes and the current time is Unix timestamp 1700000000
+- **THEN** `adventure_last_completed_real_ts[adventure_ref] == 1700000000`
 
-#### Scenario: Stats map contains only int and bool values
+#### Scenario: game-tick completions stored in dedicated dict
 
-- **WHEN** a character is created from a `CharacterConfig` that declares only `int` and `bool` stats
-- **THEN** every value in `player.stats` is an `int`, `bool`, or `None`; no `float` values are present
+- **WHEN** an adventure completes at `game_ticks == 42`
+- **THEN** `adventure_last_completed_game_ticks[adventure_ref] == 42`
+- **THEN** `adventure_last_completed_at_ticks[adventure_ref]` contains only internal_ticks (no `__game__` prefix entries)
 
-#### Scenario: prestige_pending is ephemeral — not in to_dict output
+#### Scenario: skill_tick_expiry set on skill use
+
+- **WHEN** a skill with `cooldown: {ticks: 5}` is used at `internal_ticks == 10`
+- **THEN** `skill_tick_expiry[skill_ref] == 15`
+
+#### Scenario: skill_real_expiry cleared on prestige
+
+- **WHEN** a prestige effect fires
+- **THEN** both `skill_tick_expiry` and `skill_real_expiry` are cleared to empty dicts
+
+#### Scenario: prestige_pending is ephemeral
 
 - **WHEN** `player.to_dict()` is called while `prestige_pending` is not None
 - **THEN** the returned dict does not contain a `prestige_pending` key
-
-#### Scenario: prestige_pending survives in-memory until adventure_end
-
-- **WHEN** the prestige effect fires mid-adventure and sets `prestige_pending`
-- **THEN** subsequent steps in the same adventure observe `prestige_pending is not None` on the in-memory state
-- **AND THEN** `prestige_pending` is `None` after `_persist_diff(event="adventure_end")` completes
 
 ---
 

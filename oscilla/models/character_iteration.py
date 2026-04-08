@@ -245,6 +245,10 @@ class CharacterIterationMilestone(Base):
 
     iteration_id: Mapped[UUID] = mapped_column(ForeignKey("character_iterations.id"), primary_key=True, nullable=False)
     milestone_ref: Mapped[str] = mapped_column(String, primary_key=True)
+    # Tick and wall-clock timestamp at which this milestone was granted.
+    # Default 0 preserves compatibility with rows written before this migration.
+    grant_tick: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    grant_timestamp: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
 
     iteration: Mapped["CharacterIterationRecord"] = relationship(
         "CharacterIterationRecord", back_populates="milestone_rows"
@@ -314,16 +318,19 @@ class CharacterIterationSkill(Base):
 class CharacterIterationSkillCooldown(Base):
     """One row per skill that is on an adventure-scope cooldown.
 
-    cooldown_remaining is the number of *adventures* remaining until the skill
-    can be used again.  Turn-scope cooldowns are not persisted — they reset
-    every combat encounter.
+    tick_expiry is the internal_ticks value at which the cooldown expires
+    (0 = no tick-based constraint active).
+    real_expiry is the Unix timestamp (seconds) at which the cooldown expires
+    (0 = no real-time constraint active).
+    Turn-scope cooldowns are not persisted — they reset every combat encounter.
     """
 
     __tablename__ = "character_iteration_skill_cooldowns"
 
     iteration_id: Mapped[UUID] = mapped_column(ForeignKey("character_iterations.id"), primary_key=True, nullable=False)
     skill_ref: Mapped[str] = mapped_column(String, primary_key=True)
-    cooldown_remaining: Mapped[int] = mapped_column(Integer, nullable=False)
+    tick_expiry: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    real_expiry: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
 
     iteration: Mapped["CharacterIterationRecord"] = relationship(
         "CharacterIterationRecord", back_populates="skill_cooldown_rows"
@@ -333,17 +340,20 @@ class CharacterIterationSkillCooldown(Base):
 class CharacterIterationAdventureState(Base):
     """One row per adventure that has been completed at least once this iteration.
 
-    last_completed_on is the ISO-8601 date string (YYYY-MM-DD) of the most
-    recent completion — used for cooldown_days checks.
+    last_completed_real_ts is the Unix timestamp (seconds) at the time of the
+    most recent completion — used for seconds-based cooldown checks.
+    last_completed_game_ticks is the game_ticks value at the time of the most
+    recent completion — used for game_ticks cooldown checks.
     last_completed_at_ticks is the internal_ticks value at the time of the most
-    recent completion — used for cooldown_ticks and cooldown_game_ticks checks.
+    recent completion — used for ticks-based cooldown checks.
     """
 
     __tablename__ = "character_iteration_adventure_state"
 
     iteration_id: Mapped[UUID] = mapped_column(ForeignKey("character_iterations.id"), primary_key=True, nullable=False)
     adventure_ref: Mapped[str] = mapped_column(String, primary_key=True)
-    last_completed_on: Mapped[str | None] = mapped_column(String, nullable=True)
+    last_completed_real_ts: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    last_completed_game_ticks: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     last_completed_at_ticks: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     iteration: Mapped["CharacterIterationRecord"] = relationship(

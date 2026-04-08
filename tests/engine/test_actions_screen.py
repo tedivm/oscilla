@@ -16,11 +16,11 @@ import pytest
 
 from oscilla.engine.actions import open_actions_screen
 from oscilla.engine.character import CharacterState
-from oscilla.engine.models.adventure import StatChangeEffect
+from oscilla.engine.models.adventure import Cooldown, StatChangeEffect
 from oscilla.engine.models.base import Metadata
 from oscilla.engine.models.character_config import CharacterConfigManifest, CharacterConfigSpec, StatDefinition
 from oscilla.engine.models.game import GameManifest, GameSpec, HpFormula
-from oscilla.engine.models.skill import SkillCooldown, SkillCost, SkillManifest, SkillSpec
+from oscilla.engine.models.skill import SkillCost, SkillManifest, SkillSpec
 from oscilla.engine.registry import ContentRegistry
 from tests.engine.conftest import MockTUI
 
@@ -82,7 +82,7 @@ def _overworld_skill(
     name: str = "test-overworld",
     display: str = "Overworld Skill",
     cost: SkillCost | None = None,
-    cooldown: SkillCooldown | None = None,
+    cooldown: Cooldown | None = None,
     use_effects: list | None = None,
 ) -> SkillManifest:
     return SkillManifest(
@@ -274,15 +274,15 @@ async def test_actions_screen_available_false_when_insufficient_resource() -> No
 
 @pytest.mark.asyncio
 async def test_actions_screen_blocks_use_if_adventure_scope_cooldown_active() -> None:
-    """Selecting a skill on adventure-scope cooldown shows a cooldown message and fires nothing."""
+    """Selecting a skill on cooldown shows a cooldown message and fires nothing."""
     skill = _overworld_skill(
-        cooldown=SkillCooldown(scope="adventure", count=2),
+        cooldown=Cooldown(ticks=2),
         use_effects=[StatChangeEffect(type="stat_change", stat="strength", amount=99)],
     )
     registry = _make_registry(extra_skills=[skill])
     player = _make_player(registry=registry, known_skills=["test-overworld"])
-    # Simulate active cooldown.
-    player.skill_cooldowns["test-overworld"] = 1
+    # Simulate active tick-based cooldown (expires in the future).
+    player.skill_tick_expiry["test-overworld"] = player.internal_ticks + 5
     initial_strength = int(player.stats["strength"])  # type: ignore[arg-type]
 
     tui = MockTUI(skill_menu_responses=[0])
@@ -294,13 +294,13 @@ async def test_actions_screen_blocks_use_if_adventure_scope_cooldown_active() ->
 
 @pytest.mark.asyncio
 async def test_actions_screen_available_false_when_adventure_cooldown_active() -> None:
-    """The skill dict marks available=False when adventure cooldown is active."""
+    """The skill dict marks available=False when cooldown is active."""
     skill = _overworld_skill(
-        cooldown=SkillCooldown(scope="adventure", count=2),
+        cooldown=Cooldown(ticks=2),
     )
     registry = _make_registry(extra_skills=[skill])
     player = _make_player(registry=registry, known_skills=["test-overworld"])
-    player.skill_cooldowns["test-overworld"] = 1
+    player.skill_tick_expiry["test-overworld"] = player.internal_ticks + 5
 
     tui = MockTUI()
     await open_actions_screen(player=player, registry=registry, tui=tui)
@@ -310,9 +310,9 @@ async def test_actions_screen_available_false_when_adventure_cooldown_active() -
 
 @pytest.mark.asyncio
 async def test_actions_screen_records_adventure_cooldown_after_successful_use() -> None:
-    """Using a skill with adventure-scope cooldown sets skill_cooldowns on the player."""
+    """Using a skill with a tick-based cooldown sets skill_tick_expiry on the player."""
     skill = _overworld_skill(
-        cooldown=SkillCooldown(scope="adventure", count=3),
+        cooldown=Cooldown(ticks=3),
         use_effects=[],
     )
     registry = _make_registry(extra_skills=[skill])
@@ -321,7 +321,7 @@ async def test_actions_screen_records_adventure_cooldown_after_successful_use() 
     tui = MockTUI(skill_menu_responses=[0])
     await open_actions_screen(player=player, registry=registry, tui=tui)
 
-    assert player.skill_cooldowns["test-overworld"] == 3
+    assert player.skill_tick_expiry["test-overworld"] == player.internal_ticks + 3
 
 
 @pytest.mark.asyncio

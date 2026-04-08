@@ -24,10 +24,9 @@ These items fix existing bugs, remove technical debt that actively misleads auth
 
 Since this project has not had a v1 release yet it is acceptable to break backwards compatibility, but we want to prioritize those features before the v1 release.
 
-| Item                                                          | Effort | Group                   |
-| ------------------------------------------------------------- | ------ | ----------------------- |
-| [Tick-Anchored State Refactor](#tick-anchored-state-refactor) | L      | Engine Architecture     |
-| [Character Archetypes](#character-archetypes)                 | M      | Character Progression   |
+| Item                                          | Effort | Group                 |
+| --------------------------------------------- | ------ | --------------------- |
+| [Character Archetypes](#character-archetypes) | M      | Character Progression |
 
 ### All Items
 
@@ -35,7 +34,6 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | ------------------------------------------------------------------------------------------- | ------ | ----------------------- |
 | [Full TUI Upgrade](#full-tui-upgrade)                                                       | L      | —                       |
 | [Cross-Iteration Conditions/Templates/Effects](#cross-iteration-conditionstemplateseffects) | M      | Character Progression   |
-| [Tick-Anchored State Refactor](#tick-anchored-state-refactor)                               | L      | Engine Architecture     |
 | [Adventure-Scoped Variables](#adventure-scoped-variables)                                   | M      | Adventure Authoring     |
 | [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems)        | XL     | Combat Overhaul         |
 | [Buff Blocking and Priority](#buff-blocking-and-priority)                                   | S      | Combat Refinement       |

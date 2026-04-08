@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+import time
 from uuid import uuid4
 
 import pytest
@@ -52,7 +52,7 @@ def test_eligible_no_constraints_never_played() -> None:
     """No constraints + never played → always eligible."""
     player = _make_player()
     spec = _spec()
-    assert player.is_adventure_eligible("cave", spec, date.today()) is True
+    assert player.is_adventure_eligible("cave", spec, now_ts=int(time.time())) is True
 
 
 def test_eligible_no_constraints_played_many_times() -> None:
@@ -60,7 +60,7 @@ def test_eligible_no_constraints_played_many_times() -> None:
     player = _make_player()
     player.statistics.adventures_completed["cave"] = 99
     spec = _spec()
-    assert player.is_adventure_eligible("cave", spec, date.today()) is True
+    assert player.is_adventure_eligible("cave", spec, now_ts=int(time.time())) is True
 
 
 # --- repeatable: false ---
@@ -70,7 +70,7 @@ def test_repeatable_false_not_yet_completed() -> None:
     """repeatable: false → eligible before first completion."""
     player = _make_player()
     spec = _spec(repeatable=False)
-    assert player.is_adventure_eligible("cave", spec, date.today()) is True
+    assert player.is_adventure_eligible("cave", spec, now_ts=int(time.time())) is True
 
 
 def test_repeatable_false_hides_after_completion() -> None:
@@ -78,7 +78,7 @@ def test_repeatable_false_hides_after_completion() -> None:
     player = _make_player()
     player.statistics.adventures_completed["cave"] = 1
     spec = _spec(repeatable=False)
-    assert player.is_adventure_eligible("cave", spec, date.today()) is False
+    assert player.is_adventure_eligible("cave", spec, now_ts=int(time.time())) is False
 
 
 # --- max_completions ---
@@ -89,7 +89,7 @@ def test_max_completions_below_cap() -> None:
     player = _make_player()
     player.statistics.adventures_completed["cave"] = 1
     spec = _spec(max_completions=2)
-    assert player.is_adventure_eligible("cave", spec, date.today()) is True
+    assert player.is_adventure_eligible("cave", spec, now_ts=int(time.time())) is True
 
 
 def test_max_completions_at_cap() -> None:
@@ -97,7 +97,7 @@ def test_max_completions_at_cap() -> None:
     player = _make_player()
     player.statistics.adventures_completed["cave"] = 2
     spec = _spec(max_completions=2)
-    assert player.is_adventure_eligible("cave", spec, date.today()) is False
+    assert player.is_adventure_eligible("cave", spec, now_ts=int(time.time())) is False
 
 
 def test_max_completions_above_cap() -> None:
@@ -105,65 +105,65 @@ def test_max_completions_above_cap() -> None:
     player = _make_player()
     player.statistics.adventures_completed["cave"] = 5
     spec = _spec(max_completions=2)
-    assert player.is_adventure_eligible("cave", spec, date.today()) is False
+    assert player.is_adventure_eligible("cave", spec, now_ts=int(time.time())) is False
 
 
-# --- cooldown_days ---
+# --- cooldown: seconds ---
 
 
-def test_cooldown_days_same_day_hidden() -> None:
-    """cooldown_days=1 → ineligible when completed today."""
+def test_cooldown_seconds_within_window_hidden() -> None:
+    """cooldown seconds=86400 → ineligible when completed less than 86400 seconds ago."""
     player = _make_player()
-    today = date.today()
-    player.adventure_last_completed_on["cave"] = today.isoformat()
-    spec = _spec(cooldown_days=1)
-    assert player.is_adventure_eligible("cave", spec, today) is False
+    now_ts = int(time.time())
+    player.adventure_last_completed_real_ts["cave"] = now_ts - 100  # 100 seconds ago
+    spec = _spec(cooldown={"seconds": 86400})
+    assert player.is_adventure_eligible("cave", spec, now_ts=now_ts) is False
 
 
-def test_cooldown_days_next_day_visible() -> None:
-    """cooldown_days=1 → eligible when cooldown has passed."""
+def test_cooldown_seconds_past_window_visible() -> None:
+    """cooldown seconds=86400 → eligible when completed more than 86400 seconds ago."""
     player = _make_player()
-    yesterday = date.today() - timedelta(days=1)
-    player.adventure_last_completed_on["cave"] = yesterday.isoformat()
-    spec = _spec(cooldown_days=1)
-    assert player.is_adventure_eligible("cave", spec, date.today()) is True
+    now_ts = int(time.time())
+    player.adventure_last_completed_real_ts["cave"] = now_ts - 86401  # just over 1 day ago
+    spec = _spec(cooldown={"seconds": 86400})
+    assert player.is_adventure_eligible("cave", spec, now_ts=now_ts) is True
 
 
-def test_cooldown_days_never_completed_no_cooldown() -> None:
-    """cooldown_days set but never completed → eligible."""
+def test_cooldown_seconds_never_completed_no_cooldown() -> None:
+    """cooldown seconds set but never completed → eligible."""
     player = _make_player()
-    spec = _spec(cooldown_days=7)
-    assert player.is_adventure_eligible("cave", spec, date.today()) is True
+    spec = _spec(cooldown={"seconds": 3600})
+    assert player.is_adventure_eligible("cave", spec, now_ts=int(time.time())) is True
 
 
-# --- cooldown_adventures ---
+# --- cooldown: ticks ---
 
 
-def test_cooldown_adventures_below_threshold() -> None:
-    """cooldown_adventures=3 maps to cooldown_ticks=3; ineligible when < 3 ticks elapsed."""
+def test_cooldown_ticks_below_threshold() -> None:
+    """cooldown ticks=3 → ineligible when < 3 ticks have elapsed."""
     player = _make_player()
     # Last completed at tick 10; only 2 ticks have elapsed (internal_ticks=12) → ineligible
     player.adventure_last_completed_at_ticks["cave"] = 10
     player.internal_ticks = 12
-    spec = _spec(cooldown_adventures=3)
-    assert player.is_adventure_eligible("cave", spec, date.today()) is False
+    spec = _spec(cooldown={"ticks": 3})
+    assert player.is_adventure_eligible("cave", spec, now_ts=int(time.time())) is False
 
 
-def test_cooldown_adventures_at_threshold() -> None:
-    """cooldown_adventures=3 maps to cooldown_ticks=3; eligible at exactly 3 ticks elapsed."""
+def test_cooldown_ticks_at_threshold() -> None:
+    """cooldown ticks=3 → eligible at exactly 3 ticks elapsed."""
     player = _make_player()
     # Last completed at tick 10; 3 ticks have elapsed (internal_ticks=13) → eligible
     player.adventure_last_completed_at_ticks["cave"] = 10
     player.internal_ticks = 13
-    spec = _spec(cooldown_adventures=3)
-    assert player.is_adventure_eligible("cave", spec, date.today()) is True
+    spec = _spec(cooldown={"ticks": 3})
+    assert player.is_adventure_eligible("cave", spec, now_ts=int(time.time())) is True
 
 
-def test_cooldown_adventures_never_completed_no_cooldown() -> None:
-    """cooldown_adventures set but never completed → eligible."""
+def test_cooldown_ticks_never_completed_no_cooldown() -> None:
+    """cooldown ticks set but never completed → eligible."""
     player = _make_player()
-    spec = _spec(cooldown_adventures=3)
-    assert player.is_adventure_eligible("cave", spec, date.today()) is True
+    spec = _spec(cooldown={"ticks": 3})
+    assert player.is_adventure_eligible("cave", spec, now_ts=int(time.time())) is True
 
 
 # --- repeat controls validator ---

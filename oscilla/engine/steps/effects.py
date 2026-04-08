@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 from collections import Counter
 from logging import getLogger
-from typing import TYPE_CHECKING, Dict, List, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Set
 
 from oscilla.engine.character import _INT64_MAX, _INT64_MIN, PrestigeCarryForward, cascade_unequip_invalid
 from oscilla.engine.combat_context import ActiveCombatEffect, CombatContext
@@ -526,7 +526,10 @@ async def run_effect(
                 stat: player.stats.get(stat) for stat in prestige_cfg.carry_stats if stat in player.stats
             }
             carried_skills: Set[str] = player.known_skills & set(prestige_cfg.carry_skills)
-            carried_milestones: Set[str] = player.milestones & set(prestige_cfg.carry_milestones)
+            # milestones is now Dict[str, MilestoneRecord] — intersect on keys.
+            carried_milestones: Dict[str, Any] = {
+                k: v for k, v in player.milestones.items() if k in prestige_cfg.carry_milestones
+            }
 
             # 3. Reset in-memory state to character_config defaults.
             if registry.character_config is None:
@@ -540,7 +543,7 @@ async def run_effect(
             player.max_hp = base_hp
             player.character_class = None
             player.current_location = None
-            player.milestones = set()
+            player.milestones = {}
             player.stacks = {}
             player.instances = []
             player.equipment = {}
@@ -548,8 +551,10 @@ async def run_effect(
             player.completed_quests = set()
             player.failed_quests = set()
             player.known_skills = set()
-            player.skill_cooldowns = {}
-            player.adventure_last_completed_on = {}
+            player.skill_tick_expiry = {}
+            player.skill_real_expiry = {}
+            player.adventure_last_completed_real_ts = {}
+            player.adventure_last_completed_game_ticks = {}
             player.adventure_last_completed_at_ticks = {}
             player.internal_ticks = 0
             player.game_ticks = 0

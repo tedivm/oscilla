@@ -19,6 +19,7 @@ from oscilla.engine.models.base import (
     LevelCondition,
     LocationsVisitedCondition,
     MilestoneCondition,
+    MilestoneTicksElapsedCondition,
     NotCondition,
     PrestigeCountCondition,
     PronounsCondition,
@@ -376,3 +377,78 @@ def test_item_condition_stack_path(base_player: CharacterState) -> None:
     base_player.stacks["health-potion"] = 2
     cond = ItemCondition(type="item", name="health-potion")
     assert evaluate(condition=cond, player=base_player) is True
+
+
+# ---------------------------------------------------------------------------
+# MilestoneTicksElapsedCondition — evaluator (task 14.10)
+# ---------------------------------------------------------------------------
+
+
+def test_milestone_ticks_elapsed_false_when_not_granted(base_player: CharacterState) -> None:
+    """Returns False when the milestone has never been granted."""
+    cond = MilestoneTicksElapsedCondition(type="milestone_ticks_elapsed", name="not-held", gte=1)
+    assert evaluate(condition=cond, player=base_player) is False
+
+
+def test_milestone_ticks_elapsed_gte_pass(base_player: CharacterState) -> None:
+    """Returns True when elapsed ticks >= gte."""
+    base_player.internal_ticks = 10
+    base_player.grant_milestone("joined-guild")
+    base_player.internal_ticks = 20
+
+    cond = MilestoneTicksElapsedCondition(type="milestone_ticks_elapsed", name="joined-guild", gte=5)
+    assert evaluate(condition=cond, player=base_player) is True
+
+
+def test_milestone_ticks_elapsed_gte_exact(base_player: CharacterState) -> None:
+    """Returns True when elapsed ticks exactly equals gte."""
+    base_player.internal_ticks = 10
+    base_player.grant_milestone("joined-guild")
+    base_player.internal_ticks = 15
+
+    cond = MilestoneTicksElapsedCondition(type="milestone_ticks_elapsed", name="joined-guild", gte=5)
+    assert evaluate(condition=cond, player=base_player) is True
+
+
+def test_milestone_ticks_elapsed_gte_fail(base_player: CharacterState) -> None:
+    """Returns False when elapsed ticks < gte."""
+    base_player.internal_ticks = 10
+    base_player.grant_milestone("joined-guild")
+    base_player.internal_ticks = 14  # only 4 elapsed
+
+    cond = MilestoneTicksElapsedCondition(type="milestone_ticks_elapsed", name="joined-guild", gte=5)
+    assert evaluate(condition=cond, player=base_player) is False
+
+
+def test_milestone_ticks_elapsed_lte_pass(base_player: CharacterState) -> None:
+    """Returns True when elapsed ticks <= lte."""
+    base_player.internal_ticks = 10
+    base_player.grant_milestone("fresh-flag")
+    base_player.internal_ticks = 13  # 3 elapsed
+
+    cond = MilestoneTicksElapsedCondition(type="milestone_ticks_elapsed", name="fresh-flag", lte=5)
+    assert evaluate(condition=cond, player=base_player) is True
+
+
+def test_milestone_ticks_elapsed_lte_fail(base_player: CharacterState) -> None:
+    """Returns False when elapsed ticks > lte."""
+    base_player.internal_ticks = 10
+    base_player.grant_milestone("old-flag")
+    base_player.internal_ticks = 20  # 10 elapsed
+
+    cond = MilestoneTicksElapsedCondition(type="milestone_ticks_elapsed", name="old-flag", lte=5)
+    assert evaluate(condition=cond, player=base_player) is False
+
+
+def test_milestone_ticks_elapsed_both_gte_and_lte(base_player: CharacterState) -> None:
+    """With both gte and lte set, elapsed must be in window [gte, lte]."""
+    base_player.internal_ticks = 0
+    base_player.grant_milestone("window-flag")
+    cond = MilestoneTicksElapsedCondition(type="milestone_ticks_elapsed", name="window-flag", gte=3, lte=7)
+
+    base_player.internal_ticks = 2  # too early
+    assert evaluate(condition=cond, player=base_player) is False
+    base_player.internal_ticks = 5  # in window
+    assert evaluate(condition=cond, player=base_player) is True
+    base_player.internal_ticks = 8  # too late
+    assert evaluate(condition=cond, player=base_player) is False

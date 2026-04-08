@@ -54,16 +54,27 @@ cost:
 
 If the player lacks sufficient resource, the skill is blocked and an error message is shown.
 
-### `SkillCooldown` Fields
+### Cooldown Fields
+
+Skill cooldowns use the same `Cooldown` block as adventure cooldowns. See the [Cooldowns reference](./cooldowns.md) for the full schema.
+
+**Turn-scope cooldown** — resets each combat:
 
 ```yaml
 cooldown:
-  scope: turn # "turn" (resets each combat) or "adventure" (persists across adventures)
-  count: 1 # Number of turns/adventures required between uses
+  scope: turn
+  turns: 1 # skill can be used at most once per turn
 ```
 
-- **`turn`** scope: the skill cannot be used more than once per combat turn (handy for once-per-turn abilities).
-- **`adventure`** scope: the cooldown persists between adventures and is stored in the character's save data. The counter decrements when an adventure ends.
+**Adventure-scope cooldown** — persists across adventures, stored in save data:
+
+```yaml
+cooldown:
+  ticks: 2 # skill is blocked until 2 more adventures have been completed
+```
+
+- **`scope: turn`**: the skill cannot be used more than once per combat turn. Requires `turns` to be set.
+- Without `scope` (default): the cooldown is cross-adventure. The counter decrements when an adventure ends. `ticks`, `game_ticks`, and `seconds` are all valid here.
 
 ### Skill Effects
 

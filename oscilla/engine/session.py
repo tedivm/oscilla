@@ -231,7 +231,7 @@ class GameSession:
 
     async def run_adventure(self, adventure_ref: str) -> "AdventureOutcome":
         """Build AdventurePipeline with _on_state_change and run to completion."""
-        from datetime import date as _date
+        import time
 
         from oscilla.engine.pipeline import AdventurePipeline
 
@@ -247,7 +247,7 @@ class GameSession:
         outcome = await pipeline.run(adventure_ref=adventure_ref)
 
         # Record repeat-control tracking state after each adventure run.
-        self._character.adventure_last_completed_on[adventure_ref] = _date.today().isoformat()
+        self._character.adventure_last_completed_real_ts[adventure_ref] = int(time.time())
         # Record per-outcome count for this completion.
         self._character.statistics.record_adventure_outcome(adventure_ref=adventure_ref, outcome=outcome.value)
 
@@ -275,7 +275,7 @@ class GameSession:
         if self._character is None:
             return
 
-        from datetime import date as _date
+        import time
 
         from oscilla.engine.conditions import evaluate
 
@@ -304,7 +304,7 @@ class GameSession:
                 if not self._character.is_adventure_eligible(
                     adventure_ref=adventure_ref,
                     spec=adv_manifest.spec,
-                    today=_date.today(),
+                    now_ts=int(time.time()),
                 ):
                     logger.debug(
                         "Triggered adventure %r skipped: repeat control not satisfied.",
@@ -478,13 +478,16 @@ class GameSession:
                 )
 
         # --- Milestones (additive only — never removed within an iteration) ---
-        last_milestones = last.milestones if last is not None else set()
-        for milestone_ref in state.milestones - last_milestones:
-            await add_milestone(
-                session=self.db_session,
-                iteration_id=iteration_id,
-                milestone_ref=milestone_ref,
-            )
+        last_milestones = last.milestones if last is not None else {}
+        for milestone_ref, record in state.milestones.items():
+            if milestone_ref not in last_milestones:
+                await add_milestone(
+                    session=self.db_session,
+                    iteration_id=iteration_id,
+                    milestone_ref=milestone_ref,
+                    grant_tick=record.tick,
+                    grant_timestamp=record.timestamp,
+                )
 
         # --- Quests ---
         last_active = last.active_quests if last is not None else {}
@@ -577,23 +580,31 @@ class GameSession:
             )
 
         # --- Skill cooldowns (upsert/delete) ---
-        last_cooldowns = last.skill_cooldowns if last is not None else {}
-        for skill_ref, remaining in state.skill_cooldowns.items():
-            if remaining != last_cooldowns.get(skill_ref):
+        # Both expiry dicts are diffed together; a skill is deleted when both reach zero.
+        last_tick_expiry = last.skill_tick_expiry if last is not None else {}
+        last_real_expiry = last.skill_real_expiry if last is not None else {}
+        all_skill_refs = set(state.skill_tick_expiry) | set(state.skill_real_expiry)
+        for skill_ref in all_skill_refs:
+            new_tick = state.skill_tick_expiry.get(skill_ref, 0)
+            new_real = state.skill_real_expiry.get(skill_ref, 0)
+            if new_tick != last_tick_expiry.get(skill_ref, 0) or new_real != last_real_expiry.get(skill_ref, 0):
                 await set_skill_cooldown(
                     session=self.db_session,
                     iteration_id=iteration_id,
                     skill_ref=skill_ref,
-                    cooldown_remaining=remaining,
+                    tick_expiry=new_tick,
+                    real_expiry=new_real,
                 )
-        for skill_ref in last_cooldowns:
-            if skill_ref not in state.skill_cooldowns:
-                await set_skill_cooldown(
-                    session=self.db_session,
-                    iteration_id=iteration_id,
-                    skill_ref=skill_ref,
-                    cooldown_remaining=0,
-                )
+        # Clear skills that were on cooldown before but no longer are.
+        last_all_skills = set(last_tick_expiry) | set(last_real_expiry)
+        for skill_ref in last_all_skills - all_skill_refs:
+            await set_skill_cooldown(
+                session=self.db_session,
+                iteration_id=iteration_id,
+                skill_ref=skill_ref,
+                tick_expiry=0,
+                real_expiry=0,
+            )
 
         # --- Name change detection ---
         # Fires when the in-memory name (possibly updated by SetNameEffect) differs
@@ -631,18 +642,30 @@ class GameSession:
                 step_state=None,
             )
             # Persist adventure repeat-control state for any adventures tracked
-            last_completed_on = last.adventure_last_completed_on if last is not None else {}
+            last_completed_real_ts = last.adventure_last_completed_real_ts if last is not None else {}
+            last_completed_game_ticks_map = last.adventure_last_completed_game_ticks if last is not None else {}
             last_completed_at_ticks = last.adventure_last_completed_at_ticks if last is not None else {}
-            for adventure_ref, completed_on in state.adventure_last_completed_on.items():
-                if completed_on != last_completed_on.get(adventure_ref) or state.adventure_last_completed_at_ticks.get(
-                    adventure_ref
-                ) != last_completed_at_ticks.get(adventure_ref):
+            all_adventures = (
+                set(state.adventure_last_completed_real_ts)
+                | set(state.adventure_last_completed_game_ticks)
+                | set(state.adventure_last_completed_at_ticks)
+            )
+            for adventure_ref in all_adventures:
+                new_real_ts = state.adventure_last_completed_real_ts.get(adventure_ref)
+                new_game_ticks = state.adventure_last_completed_game_ticks.get(adventure_ref)
+                new_at_ticks = state.adventure_last_completed_at_ticks.get(adventure_ref)
+                if (
+                    new_real_ts != last_completed_real_ts.get(adventure_ref)
+                    or new_game_ticks != last_completed_game_ticks_map.get(adventure_ref)
+                    or new_at_ticks != last_completed_at_ticks.get(adventure_ref)
+                ):
                     await upsert_adventure_state(
                         session=self.db_session,
                         iteration_id=iteration_id,
                         adventure_ref=adventure_ref,
-                        last_completed_on=completed_on,
-                        last_completed_at_ticks=state.adventure_last_completed_at_ticks.get(adventure_ref),
+                        last_completed_real_ts=new_real_ts,
+                        last_completed_game_ticks=new_game_ticks,
+                        last_completed_at_ticks=new_at_ticks,
                     )
             # Persist tick counters and era states
             await update_character_tick_state(

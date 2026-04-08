@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import time
 from uuid import UUID, uuid4
 
 import pytest
 
 from oscilla.engine.character import _INT64_MAX, _INT64_MIN, CharacterState, ItemInstance
+from oscilla.engine.models.adventure import AdventureSpec, Cooldown
+from oscilla.engine.models.base import MilestoneRecord
 from oscilla.engine.registry import ContentRegistry
 
 
@@ -17,7 +20,7 @@ def test_new_player_defaults(base_player: CharacterState) -> None:
     assert base_player.max_hp == 20
     assert base_player.stacks == {}
     assert base_player.instances == []
-    assert base_player.milestones == set()
+    assert base_player.milestones == {}
     assert base_player.active_adventure is None
 
 
@@ -73,9 +76,9 @@ def test_grant_and_has_milestone(base_player: CharacterState) -> None:
 def test_grant_milestone_idempotent(base_player: CharacterState) -> None:
     base_player.grant_milestone("idempotent-flag")
     base_player.grant_milestone("idempotent-flag")
-    # Set deduplicates — should still only appear once
+    # Dict deduplicates — should still only appear once
     assert base_player.has_milestone("idempotent-flag")
-    assert len([m for m in base_player.milestones if m == "idempotent-flag"]) == 1
+    assert sum(1 for m in base_player.milestones if m == "idempotent-flag") == 1
 
 
 def test_add_and_remove_item(base_player: CharacterState) -> None:
@@ -424,3 +427,195 @@ def test_new_adventure_tick_key_takes_precedence(minimal_registry: ContentRegist
     # new key takes precedence; old key is ignored
     assert restored.adventure_last_completed_at_ticks == {"new-quest": 99}
     assert "old-quest" not in restored.adventure_last_completed_at_ticks
+
+
+# ---------------------------------------------------------------------------
+# grant_milestone — tick/timestamp recording (tasks 14.1-14.2)
+# ---------------------------------------------------------------------------
+
+
+def test_grant_milestone_records_tick_and_timestamp(base_player: CharacterState) -> None:
+    """grant_milestone() records internal_ticks and a positive timestamp."""
+    base_player.internal_ticks = 7
+    before = int(time.time())
+    base_player.grant_milestone("joined-guild")
+    after = int(time.time())
+
+    record = base_player.milestones["joined-guild"]
+    assert record.tick == 7
+    assert before <= record.timestamp <= after
+
+
+def test_grant_milestone_noop_if_already_held(base_player: CharacterState) -> None:
+    """Re-granting a milestone must not overwrite the original MilestoneRecord."""
+    base_player.internal_ticks = 3
+    base_player.grant_milestone("joined-guild")
+    original_tick = base_player.milestones["joined-guild"].tick
+    original_ts = base_player.milestones["joined-guild"].timestamp
+
+    base_player.internal_ticks = 99
+    base_player.grant_milestone("joined-guild")
+
+    record = base_player.milestones["joined-guild"]
+    assert record.tick == original_tick
+    assert record.timestamp == original_ts
+
+
+# ---------------------------------------------------------------------------
+# from_dict — milestone migration (tasks 14.3-14.4)
+# ---------------------------------------------------------------------------
+
+
+def test_from_dict_migrates_milestone_list(minimal_registry: ContentRegistry) -> None:
+    """Old list milestone format migrates to MilestoneRecord(tick=0, timestamp=0)."""
+    assert minimal_registry.character_config is not None
+    player = CharacterState.new_character(
+        name="MigList",
+        game_manifest=minimal_registry.game,
+        character_config=minimal_registry.character_config,
+    )
+    data = player.to_dict()
+    data["milestones"] = ["alpha", "beta"]
+
+    restored = CharacterState.from_dict(data=data, character_config=minimal_registry.character_config)
+    assert "alpha" in restored.milestones
+    assert "beta" in restored.milestones
+    assert restored.milestones["alpha"] == MilestoneRecord(tick=0, timestamp=0)
+    assert restored.milestones["beta"] == MilestoneRecord(tick=0, timestamp=0)
+
+
+def test_from_dict_migrates_milestone_int_dict(minimal_registry: ContentRegistry) -> None:
+    """Intermediate int-dict milestone format migrates to MilestoneRecord(tick=N, timestamp=0)."""
+    assert minimal_registry.character_config is not None
+    player = CharacterState.new_character(
+        name="MigInt",
+        game_manifest=minimal_registry.game,
+        character_config=minimal_registry.character_config,
+    )
+    data = player.to_dict()
+    data["milestones"] = {"alpha": 42, "beta": 0}
+
+    restored = CharacterState.from_dict(data=data, character_config=minimal_registry.character_config)
+    assert restored.milestones["alpha"] == MilestoneRecord(tick=42, timestamp=0)
+    assert restored.milestones["beta"] == MilestoneRecord(tick=0, timestamp=0)
+
+
+# ---------------------------------------------------------------------------
+# from_dict — __game__ prefix migration (task 14.5)
+# ---------------------------------------------------------------------------
+
+
+def test_from_dict_migrates_game_prefix_from_at_ticks(minimal_registry: ContentRegistry) -> None:
+    """__game__ prefixed entries in adventure_last_completed_at_ticks migrate to game_ticks dict."""
+    assert minimal_registry.character_config is not None
+    player = CharacterState.new_character(
+        name="MigGame",
+        game_manifest=minimal_registry.game,
+        character_config=minimal_registry.character_config,
+    )
+    data = player.to_dict()
+    data["adventure_last_completed_at_ticks"] = {
+        "regular-quest": 5,
+        "__game__dungeon-raid": 7,
+    }
+    data.pop("adventure_last_completed_game_ticks", None)
+
+    restored = CharacterState.from_dict(data=data, character_config=minimal_registry.character_config)
+    assert restored.adventure_last_completed_at_ticks == {"regular-quest": 5}
+    assert restored.adventure_last_completed_game_ticks == {"dungeon-raid": 7}
+
+
+# ---------------------------------------------------------------------------
+# is_adventure_eligible — ticks and seconds cooldowns (tasks 14.6-14.8)
+# ---------------------------------------------------------------------------
+
+
+def _make_bare_eligible_player() -> CharacterState:
+    """Minimal CharacterState for is_adventure_eligible tests."""
+    return CharacterState(
+        character_id=uuid4(),
+        name="EligTest",
+        character_class=None,
+        level=1,
+        xp=0,
+        hp=20,
+        max_hp=20,
+        prestige_count=0,
+        current_location=None,
+        stats={},
+    )
+
+
+def test_is_adventure_eligible_ticks_cooldown_blocks_then_allows() -> None:
+    """Cooldown(ticks=5) blocks until 5 more internal ticks have elapsed."""
+    player = _make_bare_eligible_player()
+    spec = AdventureSpec(
+        displayName="Tick Cooldown",
+        steps=[],
+        cooldown=Cooldown(ticks=5),
+        repeatable=True,
+    )
+    now_ts = int(time.time())
+
+    # No prior completion — eligible
+    assert player.is_adventure_eligible(adventure_ref="test-adv", spec=spec, now_ts=now_ts) is True
+
+    # Record completion at tick 10
+    player.internal_ticks = 10
+    player.adventure_last_completed_at_ticks["test-adv"] = 10
+
+    # At tick 14 (only 4 elapsed) — still blocked
+    player.internal_ticks = 14
+    assert player.is_adventure_eligible(adventure_ref="test-adv", spec=spec, now_ts=now_ts) is False
+
+    # At tick 15 (exactly 5 elapsed) — now eligible
+    player.internal_ticks = 15
+    assert player.is_adventure_eligible(adventure_ref="test-adv", spec=spec, now_ts=now_ts) is True
+
+
+def test_is_adventure_eligible_seconds_cooldown_blocks_then_allows() -> None:
+    """Cooldown(seconds=3600) blocks until 3600 real seconds have elapsed."""
+    player = _make_bare_eligible_player()
+    spec = AdventureSpec(
+        displayName="Seconds Cooldown",
+        steps=[],
+        cooldown=Cooldown(seconds=3600),
+        repeatable=True,
+    )
+
+    base_ts = 1_700_000_000
+    player.adventure_last_completed_real_ts["test-adv"] = base_ts
+
+    # 3599 seconds later — blocked
+    assert player.is_adventure_eligible(adventure_ref="test-adv", spec=spec, now_ts=base_ts + 3599) is False
+
+    # 3600 seconds later — eligible
+    assert player.is_adventure_eligible(adventure_ref="test-adv", spec=spec, now_ts=base_ts + 3600) is True
+
+
+def test_is_adventure_eligible_multiple_constraints_anded() -> None:
+    """Cooldown(ticks=5, seconds=3600): both constraints must pass independently."""
+    player = _make_bare_eligible_player()
+    spec = AdventureSpec(
+        displayName="Both Cooldowns",
+        steps=[],
+        cooldown=Cooldown(ticks=5, seconds=3600),
+        repeatable=True,
+    )
+
+    base_ts = 1_700_000_000
+    player.internal_ticks = 10
+    player.adventure_last_completed_at_ticks["test-adv"] = 10
+    player.adventure_last_completed_real_ts["test-adv"] = base_ts
+
+    # Ticks met (15 - 10 = 5), seconds not met (only 100s elapsed) → blocked
+    player.internal_ticks = 15
+    assert player.is_adventure_eligible(adventure_ref="test-adv", spec=spec, now_ts=base_ts + 100) is False
+
+    # Seconds met, ticks not met (only 4 elapsed) → blocked
+    player.internal_ticks = 14
+    assert player.is_adventure_eligible(adventure_ref="test-adv", spec=spec, now_ts=base_ts + 3600) is False
+
+    # Both met → eligible
+    player.internal_ticks = 15
+    assert player.is_adventure_eligible(adventure_ref="test-adv", spec=spec, now_ts=base_ts + 3600) is True

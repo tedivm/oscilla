@@ -780,7 +780,8 @@ erDiagram
     VARCHAR adventure_ref PK
     CHAR(32) iteration_id PK,FK
     BIGINT last_completed_at_ticks "nullable"
-    VARCHAR last_completed_on "nullable"
+    BIGINT last_completed_game_ticks "nullable"
+    BIGINT last_completed_real_ts "nullable"
   }
 
   character_iteration_equipment {
@@ -818,6 +819,8 @@ erDiagram
   character_iteration_milestones {
     CHAR(32) iteration_id PK,FK
     VARCHAR milestone_ref PK
+    BIGINT grant_tick
+    BIGINT grant_timestamp
   }
 
   character_iteration_pending_triggers {
@@ -836,7 +839,8 @@ erDiagram
   character_iteration_skill_cooldowns {
     CHAR(32) iteration_id PK,FK
     VARCHAR skill_ref PK
-    INTEGER cooldown_remaining
+    BIGINT real_expiry
+    BIGINT tick_expiry
   }
 
   character_iteration_skills {

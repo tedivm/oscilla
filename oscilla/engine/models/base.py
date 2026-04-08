@@ -51,9 +51,36 @@ class LevelCondition(BaseModel):
     value: int = Field(ge=1)
 
 
+class MilestoneRecord(BaseModel):
+    """Records the tick and real-world timestamp at which a milestone was granted."""
+
+    tick: int = Field(description="Value of internal_ticks at the moment this milestone was granted.")
+    timestamp: int = Field(description="Unix timestamp (seconds) at the moment this milestone was granted.")
+
+
 class MilestoneCondition(BaseModel):
     type: Literal["milestone"]
     name: str
+
+
+class MilestoneTicksElapsedCondition(BaseModel):
+    """True when the ticks elapsed since a milestone was granted satisfies the comparator.
+
+    elapsed = player.internal_ticks - milestone.tick (the grant tick).
+    Returns False if the milestone has not been granted.
+    At least one of gte / lte must be set.
+    """
+
+    type: Literal["milestone_ticks_elapsed"]
+    name: str = Field(description="Milestone name to look up.")
+    gte: int | None = None
+    lte: int | None = None
+
+    @model_validator(mode="after")
+    def require_comparator(self) -> "MilestoneTicksElapsedCondition":
+        if self.gte is None and self.lte is None:
+            raise ValueError("milestone_ticks_elapsed condition must specify at least one of: gte, lte")
+        return self
 
 
 class ItemCondition(BaseModel):
@@ -472,6 +499,7 @@ Condition = Annotated[
         GameCalendarEraCondition,
         LevelCondition,
         MilestoneCondition,
+        MilestoneTicksElapsedCondition,
         ItemCondition,
         ItemEquippedCondition,
         ItemHeldLabelCondition,

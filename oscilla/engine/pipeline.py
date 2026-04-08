@@ -192,8 +192,9 @@ class AdventurePipeline:
             tick_cost = self._resolve_tick_cost(adventure_ref)
             self._player.internal_ticks += tick_cost
             self._player.game_ticks += tick_cost
-            # Record internal_ticks snapshot for cooldown evaluation.
+            # Record tick snapshots for cooldown evaluation.
             self._player.adventure_last_completed_at_ticks[adventure_ref] = self._player.internal_ticks
+            self._player.adventure_last_completed_game_ticks[adventure_ref] = self._player.game_ticks
             # Evaluate era start/end conditions and latch activation ticks.
             if self._registry.game is not None and self._registry.game.spec.time is not None:
                 from oscilla.engine.ingame_time import update_era_states

@@ -139,18 +139,25 @@ async def _use_skill_in_combat(
     # Turn-scope cooldown check.
     if spec.cooldown is not None and spec.cooldown.scope == "turn":
         last_used = ctx.skill_uses_this_combat.get(skill_ref, 0)
-        if last_used > 0 and (ctx.turn_number - last_used) < spec.cooldown.count:
-            remaining = spec.cooldown.count - (ctx.turn_number - last_used)
+        turns_required = spec.cooldown.turns
+        if isinstance(turns_required, str):
+            try:
+                turns_required = int(turns_required)
+            except (ValueError, TypeError):
+                turns_required = 0
+        if turns_required is None:
+            turns_required = 0
+        if last_used > 0 and (ctx.turn_number - last_used) < turns_required:
+            remaining = turns_required - (ctx.turn_number - last_used)
             await tui.show_text(f"[yellow]{spec.displayName} is on cooldown ({remaining} turn(s) remaining).[/yellow]")
             return False
 
     # Adventure-scope cooldown check.
-    if spec.cooldown is not None and spec.cooldown.scope == "adventure":
-        remaining_adv = player.skill_cooldowns.get(skill_ref, 0)
-        if remaining_adv > 0:
-            await tui.show_text(
-                f"[yellow]{spec.displayName} is on cooldown ({remaining_adv} adventure(s) remaining).[/yellow]"
-            )
+    from oscilla.engine.actions import _skill_on_cooldown
+
+    if spec.cooldown is not None and spec.cooldown.scope != "turn":
+        if _skill_on_cooldown(player=player, skill_ref=skill_ref):
+            await tui.show_text(f"[yellow]{spec.displayName} is on cooldown.[/yellow]")
             return False
 
     # Resource cost check.
@@ -182,8 +189,10 @@ async def _use_skill_in_combat(
     if spec.cooldown is not None:
         if spec.cooldown.scope == "turn":
             ctx.skill_uses_this_combat[skill_ref] = ctx.turn_number
-        else:  # adventure
-            player.skill_cooldowns[skill_ref] = spec.cooldown.count
+        else:  # adventure-scope — persist via tick/real expiry
+            from oscilla.engine.actions import _set_skill_cooldown
+
+            _set_skill_cooldown(player=player, skill_ref=skill_ref, cooldown=spec.cooldown)
 
     # Dispatch immediate use_effects (including any apply_buff effects).
     await tui.show_text(f"You use [bold]{spec.displayName}[/bold]!")

@@ -13,7 +13,7 @@ from uuid import uuid4
 import pytest
 
 from oscilla.engine.character import AdventurePosition, CharacterState, ItemInstance
-from oscilla.engine.models.adventure import ApplyBuffEffect, CombatStep, OutcomeBranch
+from oscilla.engine.models.adventure import ApplyBuffEffect, CombatStep, Cooldown, OutcomeBranch
 from oscilla.engine.models.base import Metadata
 from oscilla.engine.models.buff import (
     BuffManifest,
@@ -26,7 +26,7 @@ from oscilla.engine.models.character_config import CharacterConfigManifest, Char
 from oscilla.engine.models.enemy import EnemyManifest, EnemySkillEntry, EnemySpec
 from oscilla.engine.models.game import GameManifest, GameSpec, HpFormula
 from oscilla.engine.models.item import BuffGrant, ItemManifest, ItemSpec
-from oscilla.engine.models.skill import SkillCooldown, SkillCost, SkillManifest, SkillSpec
+from oscilla.engine.models.skill import SkillCost, SkillManifest, SkillSpec
 from oscilla.engine.pipeline import AdventureOutcome
 from oscilla.engine.registry import ContentRegistry
 from oscilla.engine.steps.combat import run_combat
@@ -119,7 +119,14 @@ def _add_skill_to_registry(
 ) -> None:
     """Helper to add a Skill manifest to the registry."""
     cost = SkillCost(stat=cost_stat, amount=cost_amount) if cost_stat else None
-    cooldown = SkillCooldown(scope=cooldown_scope, count=cooldown_count) if cooldown_scope else None
+    cooldown: Cooldown | None
+    if cooldown_scope == "turn":
+        cooldown = Cooldown(scope="turn", turns=cooldown_count)
+    elif cooldown_scope is not None:
+        # adventure-scope uses ticks
+        cooldown = Cooldown(ticks=cooldown_count)
+    else:
+        cooldown = None
     skill = SkillManifest(
         apiVersion="oscilla/v1",
         kind="Skill",

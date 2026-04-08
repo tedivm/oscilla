@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-
 from oscilla.engine.character import CharacterState
 from oscilla.engine.models.adventure import (
+    AdjustGameTicksEffect,
     AdventureManifest,
     AdventureSpec,
-    AdjustGameTicksEffect,
     EndAdventureEffect,
     NarrativeStep,
 )
@@ -15,7 +14,6 @@ from oscilla.engine.models.base import Metadata
 from oscilla.engine.pipeline import AdventurePipeline
 from oscilla.engine.registry import ContentRegistry
 from tests.engine.conftest import MockTUI
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -190,8 +188,9 @@ async def test_custom_ticks_cost_advances_by_spec_value(
             adventures=[AdventurePoolEntry(ref="test-five-tick-adv", weight=1)],
         ),
     )
-    from oscilla.engine.loader import load
     from pathlib import Path
+
+    from oscilla.engine.loader import load
 
     FIXTURES = Path(__file__).parent.parent / "fixtures" / "content"
     base_registry, _ = load(FIXTURES / "ingame-time")
@@ -216,9 +215,10 @@ async def test_adjust_game_ticks_positive_delta(
     mock_tui: MockTUI,
 ) -> None:
     """adjust_game_ticks with positive delta advances game_ticks beyond normal tick cost."""
-    from oscilla.engine.models.location import AdventurePoolEntry, LocationManifest, LocationSpec
-    from oscilla.engine.loader import load
     from pathlib import Path
+
+    from oscilla.engine.loader import load
+    from oscilla.engine.models.location import AdventurePoolEntry, LocationManifest, LocationSpec
 
     FIXTURES = Path(__file__).parent.parent / "fixtures" / "content"
     registry, _ = load(FIXTURES / "ingame-time")
@@ -251,9 +251,10 @@ async def test_adjust_game_ticks_negative_delta_clamp(
     mock_tui: MockTUI,
 ) -> None:
     """adjust_game_ticks clamps to 0 when pre_epoch_behavior=clamp and delta pushes below 0."""
-    from oscilla.engine.models.location import AdventurePoolEntry, LocationManifest, LocationSpec
-    from oscilla.engine.loader import load
     from pathlib import Path
+
+    from oscilla.engine.loader import load
+    from oscilla.engine.models.location import AdventurePoolEntry, LocationManifest, LocationSpec
 
     FIXTURES = Path(__file__).parent.parent / "fixtures" / "content"
     registry, _ = load(FIXTURES / "ingame-time")
@@ -289,9 +290,10 @@ async def test_adjust_game_ticks_does_not_affect_internal_ticks(
     mock_tui: MockTUI,
 ) -> None:
     """adjust_game_ticks never changes internal_ticks."""
-    from oscilla.engine.models.location import AdventurePoolEntry, LocationManifest, LocationSpec
-    from oscilla.engine.loader import load
     from pathlib import Path
+
+    from oscilla.engine.loader import load
+    from oscilla.engine.models.location import AdventurePoolEntry, LocationManifest, LocationSpec
 
     FIXTURES = Path(__file__).parent.parent / "fixtures" / "content"
     registry, _ = load(FIXTURES / "ingame-time")
@@ -323,9 +325,10 @@ async def test_adjust_game_ticks_does_not_affect_internal_ticks(
 
 
 def test_cooldown_ticks_eligible_before_elapsed(ingame_time_registry: ContentRegistry) -> None:
-    """Adventure with cooldown_ticks is ineligible once played until enough ticks pass."""
+    """Adventure with cooldown ticks=5 is ineligible once played until enough ticks pass."""
+    import time
+
     from oscilla.engine.models.adventure import AdventureSpec
-    import datetime
 
     player = _make_player(ingame_time_registry)
     player.internal_ticks = 5
@@ -334,20 +337,21 @@ def test_cooldown_ticks_eligible_before_elapsed(ingame_time_registry: ContentReg
     spec = AdventureSpec.model_validate(
         {
             "displayName": "Cave",
-            "cooldown_ticks": 5,
+            "cooldown": {"ticks": 5},
             "steps": [
                 {"type": "narrative", "text": ".", "effects": [{"type": "end_adventure", "outcome": "completed"}]}
             ],
         }
     )
-    # Only 2 ticks elapsed (5 - 3), cooldown_ticks=5 → not eligible
-    assert player.is_adventure_eligible("cave", spec, datetime.date.today()) is False
+    # Only 2 ticks elapsed (5 - 3), cooldown ticks=5 → not eligible
+    assert player.is_adventure_eligible("cave", spec, now_ts=int(time.time())) is False
 
 
 def test_cooldown_ticks_eligible_after_elapsed(ingame_time_registry: ContentRegistry) -> None:
-    """Adventure becomes eligible once cooldown_ticks have elapsed."""
+    """Adventure becomes eligible once cooldown ticks have elapsed."""
+    import time
+
     from oscilla.engine.models.adventure import AdventureSpec
-    import datetime
 
     player = _make_player(ingame_time_registry)
     player.internal_ticks = 10
@@ -356,11 +360,11 @@ def test_cooldown_ticks_eligible_after_elapsed(ingame_time_registry: ContentRegi
     spec = AdventureSpec.model_validate(
         {
             "displayName": "Cave",
-            "cooldown_ticks": 5,
+            "cooldown": {"ticks": 5},
             "steps": [
                 {"type": "narrative", "text": ".", "effects": [{"type": "end_adventure", "outcome": "completed"}]}
             ],
         }
     )
-    # 7 ticks elapsed (10 - 3), cooldown_ticks=5 → eligible
-    assert player.is_adventure_eligible("cave", spec, datetime.date.today()) is True
+    # 7 ticks elapsed (10 - 3), cooldown ticks=5 → eligible
+    assert player.is_adventure_eligible("cave", spec, now_ts=int(time.time())) is True

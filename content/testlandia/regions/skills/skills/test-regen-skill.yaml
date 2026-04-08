@@ -11,8 +11,7 @@ spec:
     stat: mana
     amount: 20
   cooldown:
-    scope: adventure
-    count: 1
+    ticks: 1
   use_effects:
     - type: apply_buff
       buff_ref: regen-buff

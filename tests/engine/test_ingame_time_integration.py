@@ -24,6 +24,7 @@ from oscilla.engine.models.adventure import (
     AdjustGameTicksEffect,
     AdventureManifest,
     AdventureSpec,
+    Cooldown,
     EndAdventureEffect,
     NarrativeStep,
 )
@@ -313,7 +314,7 @@ async def test_cooldown_ticks_blocks_after_recent_completion(
                     effects=[EndAdventureEffect(type="end_adventure", outcome="completed")],
                 ),
             ],
-            cooldown_ticks=3,
+            cooldown=Cooldown(ticks=3),
             repeatable=True,
         ),
     )
@@ -328,13 +329,13 @@ async def test_cooldown_ticks_blocks_after_recent_completion(
     await pipeline.run("test-cooldown-integration")
 
     # After 1 tick internal_ticks=1; last_completed=1; cooldown=3 → ineligible
-    from datetime import date
+    import time
 
     assert player.adventure_last_completed_at_ticks["test-cooldown-integration"] == 1
     eligible = player.is_adventure_eligible(
         adventure_ref="test-cooldown-integration",
         spec=cooldown_adv.spec,
-        today=date.today(),
+        now_ts=int(time.time()),
     )
     assert eligible is False
 
@@ -358,7 +359,7 @@ async def test_cooldown_ticks_allows_after_enough_ticks_elapsed(
                     effects=[EndAdventureEffect(type="end_adventure", outcome="completed")],
                 ),
             ],
-            cooldown_ticks=3,
+            cooldown=Cooldown(ticks=3),
             repeatable=True,
         ),
     )
@@ -375,12 +376,12 @@ async def test_cooldown_ticks_allows_after_enough_ticks_elapsed(
     for _ in range(3):
         await pipeline.run("test-narrative")
 
-    from datetime import date
+    import time
 
     # internal_ticks=4; last_completed=1; 4-1=3 >= cooldown_ticks=3 → eligible
     eligible = player.is_adventure_eligible(
         adventure_ref="test-cooldown-allow",
         spec=cooldown_adv.spec,
-        today=date.today(),
+        now_ts=int(time.time()),
     )
     assert eligible is True

@@ -920,7 +920,7 @@ class OscillaApp(App[None]):
                             location = registry.locations.require(location_ref, "Location")
 
                             # Adventure selection (weighted random from eligible pool)
-                            from datetime import date as _date
+                            import time as _time
 
                             eligible = [
                                 entry
@@ -929,7 +929,7 @@ class OscillaApp(App[None]):
                                 and player.is_adventure_eligible(
                                     adventure_ref=entry.ref,
                                     spec=registry.adventures.require(entry.ref, "Adventure").spec,
-                                    today=_date.today(),
+                                    now_ts=int(_time.time()),
                                 )
                             ]
                             if not eligible:

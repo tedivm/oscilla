@@ -12,7 +12,7 @@ spec:
     amount: 4
   cooldown:
     scope: turn
-    count: 2
+    turns: 2
   use_effects:
     - type: apply_buff
       buff_ref: test-buff-shield

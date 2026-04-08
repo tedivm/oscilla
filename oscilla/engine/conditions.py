@@ -29,6 +29,7 @@ from oscilla.engine.models.base import (
     LevelCondition,
     LocationsVisitedCondition,
     MilestoneCondition,
+    MilestoneTicksElapsedCondition,
     MonthIsCondition,
     MoonPhaseIsCondition,
     NameEqualsCondition,
@@ -89,6 +90,16 @@ def evaluate(
             return player.level >= v
         case MilestoneCondition(name=n):
             return n in player.milestones
+        case MilestoneTicksElapsedCondition() as c:
+            record = player.milestones.get(c.name)
+            if record is None:
+                return False
+            elapsed = player.internal_ticks - record.tick
+            if c.gte is not None and elapsed < c.gte:
+                return False
+            if c.lte is not None and elapsed > c.lte:
+                return False
+            return True
         case ItemCondition(name=n):
             # Fixed: check both stackable items and non-stackable instances.
             in_stacks = player.stacks.get(n, 0) > 0

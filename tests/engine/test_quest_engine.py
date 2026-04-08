@@ -39,7 +39,7 @@ def test_silent_advance_moves_stage_to_terminal(
     """When the advance_on milestone is held, silent advance moves quest to terminal stage."""
     player = _make_player()
     player.active_quests["test-quest"] = "stage-a"
-    player.milestones.add("quest-a-done")
+    player.grant_milestone("quest-a-done")
 
     _advance_quests_silent(player=player, registry=minimal_quest_registry)
 
@@ -102,7 +102,7 @@ async def test_evaluate_advancements_fires_completion_effects(
     """When the advance milestone is held, full evaluation fires completion effects."""
     player = _make_player()
     player.active_quests["test-quest"] = "stage-a"
-    player.milestones.add("quest-a-done")
+    player.grant_milestone("quest-a-done")
     tui = AsyncMock()
 
     await evaluate_quest_advancements(player=player, registry=minimal_quest_registry, tui=tui)
@@ -151,8 +151,9 @@ async def test_evaluate_advancements_no_active_quests_is_noop() -> None:
 
 def test_completion_effects_on_non_terminal_stage_raises() -> None:
     """A non-terminal stage with completion_effects must raise a ValidationError."""
-    from oscilla.engine.models.quest import QuestManifest
     from pydantic import ValidationError
+
+    from oscilla.engine.models.quest import QuestManifest
 
     with pytest.raises(ValidationError, match="not terminal"):
         QuestManifest.model_validate(

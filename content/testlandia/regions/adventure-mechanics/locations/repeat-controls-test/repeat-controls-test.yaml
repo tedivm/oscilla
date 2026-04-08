@@ -11,3 +11,7 @@ spec:
       weight: 100
     - ref: test-cooldown
       weight: 100
+    - ref: test-cooldown-seconds
+      weight: 100
+    - ref: test-milestone-timestamps
+      weight: 100

@@ -120,6 +120,34 @@ text: "Your accuracy is {{ (random() * 100) | round }}%."
 
 ---
 
+## Built-in Globals
+
+Oscilla injects a small set of named constants into every template context. You can use them directly in any `{{` expression or `{%` block.
+
+### Time Constants
+
+Use these with the `seconds` field of a [cooldown block](./cooldowns.md) to keep the intent readable without hardcoding magic numbers:
+
+| Constant             | Value  | Equivalent |
+| -------------------- | ------ | ---------- |
+| `SECONDS_PER_MINUTE` | 60     | 1 minute   |
+| `SECONDS_PER_HOUR`   | 3600   | 1 hour     |
+| `SECONDS_PER_DAY`    | 86400  | 24 hours   |
+| `SECONDS_PER_WEEK`   | 604800 | 7 days     |
+
+```yaml
+# Readable cooldown expressions
+cooldown:
+  seconds: "{{ SECONDS_PER_HOUR * 4 }}"    # 4 hours
+  ticks: 1                                   # AND at least 1 adventure
+
+# Combine with arithmetic
+cooldown:
+  seconds: "{{ SECONDS_PER_DAY * 3 }}"     # 3 days
+```
+
+---
+
 ## Calendar and Astronomical Functions
 
 These functions give you current date, time, and astronomical data for use in narrative text. By default they use server local time; configure `timezone` in `game.yaml` to pin them to a specific IANA timezone (e.g. `"America/New_York"`).
