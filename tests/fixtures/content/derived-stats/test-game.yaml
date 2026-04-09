@@ -1,0 +1,6 @@
+apiVersion: oscilla/v1
+kind: Game
+metadata:
+  name: derived-stats-test-game
+spec:
+  displayName: "Derived Stats Test Game"

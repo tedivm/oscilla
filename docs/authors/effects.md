@@ -7,7 +7,8 @@ Effects appear in several places: on [adventure](./adventures.md) steps, on comb
 ```yaml
 on_win:
   effects:
-    - type: xp_grant
+    - type: stat_change
+      stat: xp
       amount: 100
     - type: item_drop
       loot:
@@ -30,21 +31,23 @@ This fires four effects in sequence: XP, a loot roll, a story milestone, and a r
 
 ### Granting Experience
 
+XP is stored like any other stat. Use `stat_change` on your XP stat (typically named `xp`) to reward the player:
+
 ```yaml
 effects:
-  - type: xp_grant
+  - type: stat_change
+    stat: xp
     amount: 150
 ```
 
-Positive amounts reward the player; negative amounts apply a penalty. Level-up (and level-down) calculations run automatically after the amount is applied.
-
-Level-down rules: the player cannot go below level 1, and XP cannot go below 0.
+Positive amounts reward the player; negative amounts apply a penalty. Level-up calculations happen through `on_stat_threshold` triggers declared in `game.yaml` — there is no special XP handler. See [Game Configuration §XP, Leveling, and HP](./game-configuration.md#xp-leveling-and-hp) for the full setup.
 
 You can also use a [template expression](./templates.md) for dynamic XP:
 
 ```yaml
 effects:
-  - type: xp_grant
+  - type: stat_change
+    stat: xp
     amount: "{{ roll(50, 200) }}"
 ```
 
@@ -275,7 +278,8 @@ Effects fire in order. You can chain as many as you want on a single step:
 - type: narrative
   text: "You defeat the bandit and recover the stolen goods."
   effects:
-    - type: xp_grant
+    - type: stat_change
+      stat: xp
       amount: 75
     - type: item_drop
       loot:
@@ -298,8 +302,7 @@ Four things happen at once: XP, item, milestone, reputation. That's the composab
 
 | Type              | Required fields      | Optional fields                             | Notes                                                                          |
 | ----------------- | -------------------- | ------------------------------------------- | ------------------------------------------------------------------------------ |
-| `xp_grant`        | `amount`             | —                                           | Positive or negative int/template                                              |
-| `stat_change`     | `stat`, `amount`     | —                                           | `int` stats only; `amount` can be template                                     |
+| `stat_change`     | `stat`, `amount`     | —                                           | `int` stats only; `amount` can be template; use for XP, gold, damage, etc.    |
 | `stat_set`        | `stat`, `value`      | —                                           | Works on `int` and `bool` stats                                                |
 | `item_drop`       | `loot` or `loot_ref` | `count` (default 1), `quantity` (per entry) | Weighted table; `count` can be template; `loot_ref` names a LootTable or Enemy |
 | `use_item`        | `item`               | —                                           | Player must already hold the item                                              |

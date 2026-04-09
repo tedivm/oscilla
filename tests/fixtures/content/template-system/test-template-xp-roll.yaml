@@ -4,10 +4,11 @@ metadata:
   name: test-template-xp-roll
 spec:
   displayName: "Template XP Roll Test"
-  description: "Adventure that uses roll() in xp_grant amount."
+  description: "Adventure that uses roll() in stat_change xp amount."
   steps:
     - type: narrative
       text: "You gain experience!"
       effects:
-        - type: xp_grant
+        - type: stat_change
+          stat: xp
           amount: "{{ roll(5, 15) }}"

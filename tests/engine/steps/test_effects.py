@@ -16,7 +16,6 @@ from oscilla.engine.models.adventure import (
     SetPronounsEffect,
     StatChangeEffect,
     StatSetEffect,
-    XpGrantEffect,
 )
 from oscilla.engine.models.base import Metadata
 from oscilla.engine.models.character_config import (
@@ -25,7 +24,7 @@ from oscilla.engine.models.character_config import (
     StatBounds,
     StatDefinition,
 )
-from oscilla.engine.models.game import GameManifest, GameSpec, HpFormula
+from oscilla.engine.models.game import GameManifest, GameSpec
 from oscilla.engine.models.loot_table import LootEntry
 from oscilla.engine.registry import ContentRegistry
 from oscilla.engine.signals import _EndSignal
@@ -34,7 +33,7 @@ from tests.engine.conftest import MockTUI
 
 
 def create_test_game_registry() -> ContentRegistry:
-    """Create a registry with test game config."""
+    """Create a registry with a minimal test game config."""
     registry = ContentRegistry()
 
     game = GameManifest(
@@ -43,41 +42,11 @@ def create_test_game_registry() -> ContentRegistry:
         metadata=Metadata(name="test-game"),
         spec=GameSpec(
             displayName="Test Game",
-            xp_thresholds=[100, 200, 300],  # Level 2 at 100 XP, etc.
-            hp_formula=HpFormula(base_hp=20, hp_per_level=5),
         ),
     )
     registry.game = game
 
     return registry
-
-
-async def test_xp_grant_effect_with_game_config(base_player: CharacterState) -> None:
-    """Test XP grant effect with game configuration."""
-    registry = create_test_game_registry()
-    tui = MockTUI()
-
-    effect = XpGrantEffect(type="xp_grant", amount=150)
-
-    await run_effect(effect=effect, player=base_player, registry=registry, tui=tui)
-
-    # Player should gain XP and level up (100 XP threshold for level 2)
-    assert base_player.xp == 150
-    assert base_player.level == 2  # Leveled up
-
-
-async def test_xp_grant_effect_no_game_config(base_player: CharacterState) -> None:
-    """Test XP grant effect when no game config is available."""
-    registry = ContentRegistry()  # No game config
-    tui = MockTUI()
-
-    effect = XpGrantEffect(type="xp_grant", amount=50)
-
-    await run_effect(effect=effect, player=base_player, registry=registry, tui=tui)
-
-    # Should still gain XP but no level up (no thresholds)
-    assert base_player.xp == 50
-    assert base_player.level == 1  # No level up without thresholds
 
 
 async def test_milestone_grant_effect(base_player: CharacterState) -> None:
@@ -179,9 +148,9 @@ async def test_multiple_effects_sequence(base_player: CharacterState) -> None:
 
     tui = MockTUI()
 
-    # Apply XP effect
-    xp_effect = XpGrantEffect(type="xp_grant", amount=50)
-    await run_effect(effect=xp_effect, player=base_player, registry=registry, tui=tui)
+    # Apply stat_change effect
+    stat_effect = StatChangeEffect(type="stat_change", stat="gold", amount=50)
+    await run_effect(effect=stat_effect, player=base_player, registry=registry, tui=tui)
 
     # Apply milestone effect
     milestone_effect = MilestoneGrantEffect(type="milestone_grant", milestone="progress")
@@ -195,7 +164,7 @@ async def test_multiple_effects_sequence(base_player: CharacterState) -> None:
         await run_effect(effect=item_effect, player=base_player, registry=registry, tui=tui)
 
     # Verify all effects applied
-    assert base_player.xp == 50
+    assert base_player.stats.get("gold", 0) == 50
     assert base_player.has_milestone("progress")
     assert base_player.stacks.get("reward", 0) == 1
 
@@ -223,42 +192,42 @@ async def test_heal_effect_full_restores_to_max(base_player: CharacterState) -> 
     """Test that heal with amount='full' restores HP to max_hp."""
     registry = ContentRegistry()
 
-    base_player.hp = 1
-    max_hp = base_player.max_hp
+    base_player.stats["hp"] = 1
+    base_player.stats["max_hp"] = 20
 
     tui = MockTUI()
     effect = HealEffect(type="heal", amount="full")
     await run_effect(effect=effect, player=base_player, registry=registry, tui=tui)
 
-    assert base_player.hp == max_hp
+    assert base_player.stats["hp"] == 20
 
 
 async def test_heal_effect_partial_heals_by_amount(base_player: CharacterState) -> None:
     """Test that a numeric heal amount restores exactly that many HP."""
     registry = ContentRegistry()
 
-    base_player.hp = 5
-    base_player.max_hp = 20
+    base_player.stats["hp"] = 5
+    base_player.stats["max_hp"] = 20
     tui = MockTUI()
 
     effect = HealEffect(type="heal", amount=8)
     await run_effect(effect=effect, player=base_player, registry=registry, tui=tui)
 
-    assert base_player.hp == 13
+    assert base_player.stats["hp"] == 13
 
 
 async def test_heal_effect_cannot_exceed_max_hp(base_player: CharacterState) -> None:
     """Test that healing is capped at max_hp."""
     registry = ContentRegistry()
 
-    base_player.hp = 18
-    base_player.max_hp = 20
+    base_player.stats["hp"] = 18
+    base_player.stats["max_hp"] = 20
     tui = MockTUI()
 
     effect = HealEffect(type="heal", amount=50)
     await run_effect(effect=effect, player=base_player, registry=registry, tui=tui)
 
-    assert base_player.hp == 20
+    assert base_player.stats["hp"] == 20
 
 
 # ---------------------------------------------------------------------------
@@ -286,10 +255,6 @@ def _make_gold_player(gold: int = 100) -> CharacterState:
         character_id=uuid4(),
         name="TestHero",
         character_class=None,
-        level=1,
-        xp=0,
-        hp=20,
-        max_hp=20,
         prestige_count=0,
         current_location=None,
         stats={"gold": gold},

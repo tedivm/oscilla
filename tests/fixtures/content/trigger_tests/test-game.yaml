@@ -4,13 +4,6 @@ metadata:
   name: trigger-test-game
 spec:
   displayName: "Trigger Test Game"
-  xp_thresholds:
-    - 100
-    - 300
-    - 600
-  hp_formula:
-    base_hp: 20
-    hp_per_level: 5
   triggers:
     custom:
       - test-custom

@@ -9,7 +9,8 @@ spec:
     - type: narrative
       text: "You discover an ancient chest. The treasure inside shifts and glimmers."
       effects:
-        - type: xp_grant
+        - type: stat_change
+          stat: xp
           amount: "{{ roll(10, 50) }}"
         - type: stat_change
           stat: gold

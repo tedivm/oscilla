@@ -9,5 +9,6 @@ spec:
     - type: narrative
       text: "Gained 9999 XP!"
       effects:
-        - type: xp_grant
+        - type: stat_change
+          stat: xp
           amount: 9999

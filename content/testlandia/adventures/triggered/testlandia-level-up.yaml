@@ -1,0 +1,24 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: testlandia-level-up
+spec:
+  displayName: "Level Up!"
+  repeatable: true
+  steps:
+    - type: narrative
+      text: |
+        You have reached level {{ ordinal(player.stats["level"]) }}!
+
+        Your constitution of {{ player.stats["constitution"] }}
+        grants a modifier of {{ signed(player.stats["constitution_bonus"]) }}.
+
+        You roll for hit points: {{ roll_pool(1, 8) | join(", ") }}
+        Total HP gained: {{ d8() + player.stats["constitution_bonus"] }}
+      effects:
+        - type: stat_change
+          stat: max_hp
+          amount: "{{ d8() + player.stats['constitution_bonus'] }}"
+        - type: stat_change
+          stat: hp
+          amount: "{{ d8() + player.stats['constitution_bonus'] }}"

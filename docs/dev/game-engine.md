@@ -163,67 +163,68 @@ See [load-warnings.md](./load-warnings.md) for the full policy and how to add ne
 
 ## Player State
 
-The `PlayerState` dataclass tracks all mutable game state:
+The `CharacterState` dataclass tracks all mutable game state:
 
 ```python
 @dataclass
-class PlayerState:
+class CharacterState:
     name: str
-    level: int
-    xp: int
-    hp: int
-    max_hp: int
-    stats: Dict[str, int | bool | None]
+    stats: Dict[str, int | bool | None]  # stored stats only (no derived)
+    _derived_shadows: Dict[str, int | None]  # ephemeral, recomputed at runtime
     inventory: Dict[str, int]
     equipment: Dict[str, str]
-    milestones: Set[str]
+    milestones: Dict[str, MilestoneRecord]
     prestige_count: int
     statistics: PlayerStatistics
 ```
 
 **Key Methods:**
 
-- `new_player()` - Factory for character creation
-- `add_xp()` - Handle experience and leveling (supports level-down)
+- `new_character()` - Factory for character creation
 - `add_item()` / `remove_item()` - Inventory management
 - `grant_milestone()` / `has_milestone()` - Story progress tracking
-- `equip()` - Equipment slot management
+- `equip_instance()` - Equipment slot management
+- `effective_stats()` - Returns stats merged with equipment and passive bonuses
 - Statistics recording: `record_enemy_defeated()`, `record_location_visited()`, `record_adventure_completed()`
 
-### Experience and Level Mechanics
+### Stats Architecture
 
-**`add_xp(amount: int)` → `tuple[List[int], List[int]]`**
+Player stats fall into two categories:
 
-The `add_xp()` method handles both positive and negative experience changes, returning lists of gained and lost levels:
+**Stored stats** are plain key-value pairs in `CharacterState.stats`. Content authors define them in `character_config.yaml` with a `default` value. They are read from and written to the database.
 
-```python
-# Gain experience and levels
-gained_levels, lost_levels = player.add_xp(75)
-# Returns: ([2, 3], [])  if player leveled from 1 → 3
+**Derived stats** are defined with a `derived` Jinja2 formula in `character_config.yaml`. They are never stored in the database. Instead, their computed values live in `CharacterState._derived_shadows`, which is recomputed automatically after every stored-stat mutation.
 
-# Lose experience and de-level
-gained_levels, lost_levels = player.add_xp(-60)
-# Returns: ([], [3, 2])  if player de-leveled from 3 → 1
-```
+- Derived stats are **not** keys in `CharacterState.stats`.
+- `_derived_shadows` is excluded from `to_dict()` and never persisted.
+- From `from_dict()`, `_derived_shadows` starts empty and is populated lazily on the first recompute.
+- Formulas are evaluated in topological dependency order so that derived-from-derived chains resolve correctly.
+- Circular dependencies are caught at load time with a `ContentLoadError`.
 
-**Level-Down Rules:**
+### Derived Stat Recomputation
 
-- Negative XP can reduce player level, but not below level 1
-- XP cannot go below 0 (clamped to zero)
-- HP is capped to new max HP when leveling down
-- Return tuple format: `(gained_levels, lost_levels)` where each list contains the levels traversed
+**`_recompute_derived_stats(player, registry, engine, tui)`** in `oscilla/engine/steps/effects.py`
 
-**Example Usage in Effects:**
+Called after every `StatChangeEffect` or `StatSetEffect` that modifies a stored stat. It:
 
-```python
-gained, lost = self.player_state.add_xp(effect.amount)
+1. Evaluates each derived stat formula in topo order using the `GameTemplateEngine`.
+2. Updates `_derived_shadows[stat_name]` with the result.
+3. Makes already-computed derived values available for downstream derived stats (chain resolution).
+4. Clamps the result to `bounds` if declared.
+5. Calls `_fire_threshold_triggers()` for any derived stat whose value changed.
 
-for level in gained:
-    self.tui.show_text(f"You reached level {level}!")
+Stat bounds clamping and threshold firing for derived stats mirror the behavior of stored stats.
 
-for level in lost:
-    self.tui.show_text(f"You lost level {level}.")
-```
+### Stat Threshold Triggers and `fire_mode`
+
+`_fire_threshold_triggers(stat_name, old_value, new_value, player, registry)` fires `on_stat_threshold` adventures for both stored and derived stats.
+
+Each threshold entry declares a `fire_mode`:
+
+- **`each`** (default) — every threshold crossed in a single mutation enqueues separately, in ascending threshold order.
+- **`highest`** — only the single highest crossed threshold enqueues; lower ones are suppressed.
+
+Both groups operate independently: all `each` entries fire first, then the top `highest` entry, if any. Downward crossings never fire.
 
 ## Condition System
 
@@ -231,7 +232,6 @@ Conditions are tree structures that evaluate player state:
 
 **Leaf Conditions:**
 
-- `level`: Player level comparison
 - `milestone`: Milestone possession check
 - `item`: Inventory check (stacks **and** instances — both stackable and equipped items)
 - `character_stat`: Custom stat comparison (see `stat_source` below)
@@ -325,22 +325,23 @@ Each step type has a dedicated handler module:
 
 ### Effects (`oscilla/engine/steps/effects.py`)
 
-- `XpGrantEffect`: Adds experience (may trigger leveling)
-- `DamageEffect`: Reduces player HP
-- `HealEffect`: Restores player HP
-- `ItemGrantEffect`: Adds items to inventory
+- `AdjustGameTicksEffect`: Shifts in-game time by a tick delta
+- `ApplyBuffEffect`: Applies a named buff manifest during combat
+- `DispelEffect`: Removes active combat buffs/debuffs by label
+- `EmitTriggerEffect`: Fires a named trigger for cross-step signaling
+- `EndAdventureEffect`: Terminates an adventure with a given outcome
+- `HealEffect`: Restores HP and optionally max HP
 - `ItemDropEffect`: Weighted random item distribution
 - `MilestoneGrantEffect`: Unlocks story milestones; triggers quest advancement and failure checks
-- `StatChangeEffect`: Modifies player stats by amount (addition/subtraction)
-- `StatSetEffect`: Sets player stats to specific values
-- `SkillGrantEffect`: Teaches the player a new skill
-- `UseItemEffect`: Activates an item's use effects
-- `DispelEffect`: Removes active combat buffs/debuffs by label
-- `ApplyBuffEffect`: Applies a named buff manifest during combat
-- `SetPronounsEffect`: Changes the player's active pronoun set
+- `PrestigeEffect`: Resets character stats for prestige runs, preserving specified fields
 - `QuestActivateEffect`: Starts a quest at its entry stage
 - `QuestFailEffect`: Immediately fails an active quest and runs its current stage's `fail_effects`
-- `EndAdventureEffect`: Terminates adventure with outcome
+- `SetNameEffect`: Changes the character's display name
+- `SetPronounsEffect`: Changes the player's active pronoun set
+- `SkillGrantEffect`: Teaches the player a new skill
+- `StatChangeEffect`: Modifies player stats by amount (addition/subtraction); triggers derived stat recomputation and threshold evaluation
+- `StatSetEffect`: Sets player stats to specific values; triggers derived stat recomputation and threshold evaluation
+- `UseItemEffect`: Activates an item's use effects
 
 #### Stat Mutation Effects
 
@@ -382,7 +383,6 @@ effects:
 - Stat types are `int` and `bool` only — `float` and `str` are not supported and cause a `ContentLoadError` at load time
 - `StatChangeEffect` cannot be applied to `bool` stats (load-time validation error)
 - `StatSetEffect` value must match the stat type (`int` or `bool`)
-- `bounds` cannot be specified on `bool` stats (load-time validation error)
 - `bounds` cannot be specified on `bool` stats (load-time validation error)
 - Load-time validation prevents runtime type errors
 

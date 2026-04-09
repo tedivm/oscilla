@@ -379,16 +379,8 @@ class GameSession:
         iteration_id = self._iteration_id
         last = self._last_saved_state
 
-        # --- Scalar fields (level, xp, hp, max_hp, character_class, current_location) ---
+        # --- Scalar fields (character_class, current_location, pronoun_set) ---
         scalar_fields: Dict[str, int | float | str | None] = {}
-        if last is None or state.level != last.level:
-            scalar_fields["level"] = state.level
-        if last is None or state.xp != last.xp:
-            scalar_fields["xp"] = state.xp
-        if last is None or state.hp != last.hp:
-            scalar_fields["hp"] = state.hp
-        if last is None or state.max_hp != last.max_hp:
-            scalar_fields["max_hp"] = state.max_hp
         if last is None or state.character_class != last.character_class:
             scalar_fields["character_class"] = state.character_class
         if last is None or state.current_location != last.current_location:
@@ -625,7 +617,6 @@ class GameSession:
                     session=self.db_session,
                     character_id=state.character_id,
                     character_config=self.registry.character_config,
-                    game_manifest=self.registry.game,
                 )
                 self._iteration_id = new_iteration.id
                 iteration_id = new_iteration.id

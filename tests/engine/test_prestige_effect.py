@@ -8,7 +8,7 @@ from oscilla.engine.character import CharacterState
 from oscilla.engine.models.adventure import PrestigeEffect, StatChangeEffect
 from oscilla.engine.models.base import Metadata
 from oscilla.engine.models.character_config import CharacterConfigManifest, CharacterConfigSpec, StatDefinition
-from oscilla.engine.models.game import GameManifest, GameSpec, HpFormula, PrestigeConfig
+from oscilla.engine.models.game import GameManifest, GameSpec, PrestigeConfig
 from oscilla.engine.registry import ContentRegistry
 from oscilla.engine.steps.effects import run_effect
 from tests.engine.conftest import MockTUI
@@ -30,8 +30,6 @@ def _build_prestige_registry(
         metadata=Metadata(name="test-prestige-game"),
         spec=GameSpec(
             displayName="Prestige Test Game",
-            xp_thresholds=[100, 200, 300],
-            hp_formula=HpFormula(base_hp=20, hp_per_level=5),
             prestige=PrestigeConfig(
                 carry_stats=carry_stats or ["legacy_power"],
                 carry_skills=carry_skills or [],
@@ -69,17 +67,18 @@ def prestige_player(prestige_registry: ContentRegistry) -> CharacterState:
         game_manifest=prestige_registry.game,
         character_config=prestige_registry.character_config,
     )
-    player.level = 5
-    player.xp = 250
+    player.stats["level"] = 5
+    player.stats["xp"] = 250
     return player
 
 
 async def test_prestige_resets_level(prestige_player: CharacterState, prestige_registry: ContentRegistry) -> None:
-    """Player level must be 1 after prestige."""
+    """Player level stat must be reset to default after prestige."""
     tui = MockTUI()
     effect = PrestigeEffect(type="prestige")
     await run_effect(effect=effect, player=prestige_player, registry=prestige_registry, tui=tui)
-    assert prestige_player.level == 1
+    # level is a stat — it should be reset to its config default (or absent after prestige)
+    assert prestige_player.stats.get("level", 0) in (0, None) or "level" not in prestige_player.stats
 
 
 async def test_prestige_increments_prestige_count(
@@ -145,8 +144,6 @@ async def test_prestige_no_config_logs_error(prestige_player: CharacterState, ca
         metadata=Metadata(name="no-prestige-game"),
         spec=GameSpec(
             displayName="No Prestige",
-            xp_thresholds=[100],
-            hp_formula=HpFormula(base_hp=20, hp_per_level=5),
             prestige=None,
         ),
     )

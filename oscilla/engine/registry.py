@@ -19,6 +19,7 @@ from oscilla.engine.models.skill import SkillManifest
 
 if TYPE_CHECKING:
     from oscilla.engine.ingame_time import InGameTimeResolver
+    from oscilla.engine.models.character_config import StatDefinition
     from oscilla.engine.templates import GameTemplateEngine
 
 T = TypeVar("T", bound=ManifestEnvelope)
@@ -83,6 +84,9 @@ class ContentRegistry:
         self.trigger_index: Dict[str, List[str]] = {}
         # stat_name → sorted list of (threshold_value, trigger_name) pairs.
         self.stat_threshold_index: Dict[str, List[tuple[int, str]]] = {}
+        # Topological sort of derived stats (dependencies first). Populated by loader.py.
+        # Used by _recompute_derived_stats() in effects.py to evaluate in safe order.
+        self.derived_eval_order: "List[StatDefinition]" = []
 
     @property
     def ingame_time_resolver(self) -> "InGameTimeResolver | None":

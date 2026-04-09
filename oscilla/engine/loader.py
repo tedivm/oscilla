@@ -36,9 +36,9 @@ from oscilla.engine.models.adventure import (
     SkillGrantEffect,
     StatChangeEffect,
     StatCheckStep,
+    StatSetEffect,
     Step,
     UseItemEffect,
-    XpGrantEffect,
 )
 from oscilla.engine.models.base import (
     AllCondition,
@@ -966,9 +966,7 @@ def _collect_all_template_strings(
 
     def _walk_effects(effects: List[Effect], path: str, context_type: str) -> None:
         for effect in effects:
-            if isinstance(effect, XpGrantEffect) and _is_template(effect.amount):
-                results.append((f"__effect_xp_{id(effect)}", effect.amount, context_type))  # type: ignore[arg-type]
-            elif isinstance(effect, StatChangeEffect) and _is_template(effect.amount):
+            if isinstance(effect, StatChangeEffect) and _is_template(effect.amount):
                 results.append((f"__effect_statchange_{id(effect)}", effect.amount, context_type))  # type: ignore[arg-type]
             elif isinstance(effect, ItemDropEffect) and _is_template(effect.count):
                 results.append((f"__effect_itemdrop_{id(effect)}", effect.count, context_type))  # type: ignore[arg-type]
@@ -1235,7 +1233,7 @@ def _validate_trigger_adventures(registry: "ContentRegistry") -> List[LoadWarnin
     # Build allowed trigger key set.
     built_in_outcomes = {"completed", "defeated", "fled"}
     all_outcomes = built_in_outcomes | set(spec.outcomes)
-    allowed_keys: Set[str] = {"on_character_create", "on_level_up"}
+    allowed_keys: Set[str] = {"on_character_create"}
     allowed_keys |= {f"on_outcome_{o}" for o in all_outcomes}
     if spec.triggers.on_game_rejoin is not None:
         allowed_keys.add("on_game_rejoin")
@@ -1245,6 +1243,19 @@ def _validate_trigger_adventures(registry: "ContentRegistry") -> List[LoadWarnin
         allowed_keys.add(custom)
 
     for trigger_key, adv_refs in spec.trigger_adventures.items():
+        # Specific warning for deprecated on_level_up key.
+        if trigger_key == "on_level_up":
+            warnings.append(
+                LoadWarning(
+                    file=Path("<game.yaml>"),
+                    message="trigger_adventures key 'on_level_up' is no longer a built-in trigger.",
+                    suggestion=(
+                        "Use on_stat_threshold entries for your 'level' (or equivalent) stat and wire "
+                        "the threshold names in trigger_adventures instead."
+                    ),
+                )
+            )
+            continue
         if trigger_key not in allowed_keys:
             warnings.append(
                 LoadWarning(
@@ -1255,7 +1266,7 @@ def _validate_trigger_adventures(registry: "ContentRegistry") -> List[LoadWarnin
                     ),
                     suggestion=(
                         f"Remove or rename {trigger_key!r} to a valid trigger. "
-                        "Valid keys: on_character_create, on_level_up, on_outcome_<name>, "
+                        "Valid keys: on_character_create, on_outcome_<name>, "
                         "on_game_rejoin, <threshold.name>, or a declared custom trigger name."
                     ),
                 )
@@ -1283,6 +1294,23 @@ def _validate_trigger_adventures(registry: "ContentRegistry") -> List[LoadWarnin
                 )
             )
         seen.add(name)
+
+    # on_stat_threshold stat names must refer to a known stat (stored or derived).
+    if registry.character_config is not None:
+        all_stat_defs = registry.character_config.spec.public_stats + registry.character_config.spec.hidden_stats
+        all_known_stat_names: Set[str] = {s.name for s in all_stat_defs}
+        for threshold in spec.triggers.on_stat_threshold:
+            if threshold.stat not in all_known_stat_names:
+                warnings.append(
+                    LoadWarning(
+                        file=Path("<game.yaml>"),
+                        message=f"on_stat_threshold entry references unknown stat {threshold.stat!r}.",
+                        suggestion=(
+                            f"Declare a stat named {threshold.stat!r} in CharacterConfig public_stats "
+                            "or hidden_stats, or correct the stat name."
+                        ),
+                    )
+                )
 
     # emit_trigger effects must reference declared custom triggers.
     declared_custom: Set[str] = set(spec.triggers.custom)
@@ -1361,6 +1389,150 @@ def _build_stat_threshold_index(game: GameManifest) -> Dict[str, List[tuple[int,
     return index
 
 
+def _validate_no_derived_stat_writes(
+    registry: "ContentRegistry",
+    warnings: List[LoadWarning],
+    errors: List[LoadError],
+) -> None:
+    """Reject stat_change and stat_set effects that target a derived stat."""
+    char_config = registry.character_config
+    if char_config is None:
+        return
+    all_stats = char_config.spec.public_stats + char_config.spec.hidden_stats
+    derived_names: Set[str] = {s.name for s in all_stats if s.derived is not None}
+    if not derived_names:
+        return
+
+    for adventure_manifest in registry.adventures.all():
+        adventure_ref = adventure_manifest.metadata.name
+        for step in adventure_manifest.spec.steps:
+            _check_step_for_derived_writes(
+                step=step,
+                derived_names=derived_names,
+                adventure_ref=adventure_ref,
+                errors=errors,
+            )
+
+
+def _check_step_for_derived_writes(
+    step: Step,
+    derived_names: Set[str],
+    adventure_ref: str,
+    errors: List[LoadError],
+) -> None:
+    """Recursively check all effects in a step for writes to derived stats."""
+    effects_to_check: List[Effect] = []
+    match step:
+        case NarrativeStep():
+            effects_to_check.extend(step.effects)
+        case PassiveStep():
+            effects_to_check.extend(step.effects)
+        case ChoiceStep():
+            for choice in step.options:
+                for eff in choice.effects:
+                    if isinstance(eff, (StatChangeEffect, StatSetEffect)) and eff.stat in derived_names:
+                        errors.append(
+                            LoadError(
+                                file=Path(f"<{adventure_ref}>"),
+                                message=(
+                                    f"Effect targets derived stat {eff.stat!r} in adventure {adventure_ref!r}. "
+                                    "Derived stats cannot be modified directly."
+                                ),
+                            )
+                        )
+        case CombatStep():
+            for branch in [step.on_win, step.on_defeat, step.on_flee]:
+                for eff in branch.effects:
+                    if isinstance(eff, (StatChangeEffect, StatSetEffect)) and eff.stat in derived_names:
+                        errors.append(
+                            LoadError(
+                                file=Path(f"<{adventure_ref}>"),
+                                message=(
+                                    f"Effect targets derived stat {eff.stat!r} in adventure {adventure_ref!r}. "
+                                    "Derived stats cannot be modified directly."
+                                ),
+                            )
+                        )
+        case _:
+            pass
+    for eff in effects_to_check:
+        if isinstance(eff, (StatChangeEffect, StatSetEffect)) and eff.stat in derived_names:
+            errors.append(
+                LoadError(
+                    file=Path(f"<{adventure_ref}>"),
+                    message=(
+                        f"Effect targets derived stat {eff.stat!r} in adventure {adventure_ref!r}. "
+                        "Derived stats cannot be modified directly."
+                    ),
+                )
+            )
+
+
+def _build_derived_eval_order(
+    char_config: CharacterConfigManifest,
+    errors: List[LoadError],
+) -> "List[Any]":
+    """Topologically sort derived stats so dependencies are evaluated before dependents.
+
+    Uses DFS with cycle detection. Any cycle (including self-reference) appends a
+    LoadError and returns an empty list to halt derived stat processing.
+    Non-derived stats are excluded; the result contains only derived stats in safe order.
+    """
+    from oscilla.engine.models.character_config import StatDefinition
+
+    all_stats = char_config.spec.public_stats + char_config.spec.hidden_stats
+    derived_map: Dict[str, StatDefinition] = {s.name: s for s in all_stats if s.derived is not None}
+    if not derived_map:
+        return []
+
+    def _deps(stat_def: StatDefinition) -> Set[str]:
+        assert stat_def.derived is not None
+        # Extract references to other derived stats from the formula string.
+        return {
+            name
+            for name in derived_map
+            if f'player.stats["{name}"]' in stat_def.derived or f"player.stats['{name}']" in stat_def.derived
+        }
+
+    sorted_stats: List[StatDefinition] = []
+    visited: Set[str] = set()
+    in_stack: Set[str] = set()
+    cycle_found = False
+
+    def visit(name: str) -> bool:
+        nonlocal cycle_found
+        if name in in_stack:
+            errors.append(
+                LoadError(
+                    file=Path("<CharacterConfig>"),
+                    message=(
+                        f"Circular dependency detected in derived stats involving {name!r}. "
+                        "Derived stat formulas must not form cycles."
+                    ),
+                )
+            )
+            cycle_found = True
+            return False
+        if name in visited:
+            return True
+        in_stack.add(name)
+        stat_def = derived_map[name]
+        for dep in _deps(stat_def):
+            if not visit(dep):
+                return False
+        in_stack.discard(name)
+        visited.add(name)
+        sorted_stats.append(stat_def)
+        return True
+
+    for name in derived_map:
+        if name not in visited:
+            if not visit(name):
+                return []
+
+    return sorted_stats
+
+
 def load(content_path: Path) -> Tuple[ContentRegistry, List[LoadWarning]]:
     """Orchestrate scan → parse → validate_references → build_effective_conditions → template validation.
 
@@ -1410,16 +1582,45 @@ def load(content_path: Path) -> Tuple[ContentRegistry, List[LoadWarning]]:
 
     template_engine = GameTemplateEngine(stat_names=stat_names, has_ingame_time=has_ingame_time)
 
+    # Validate derived stat definitions and precompile their formulas.
+    derived_errors: List[LoadError] = []
+    derived_eval_order: List[Any] = []
+    if char_config is not None:
+        cc = cast(CharacterConfigManifest, char_config)
+        derived_eval_order = _build_derived_eval_order(cc, derived_errors)
+        # Precompile derived stat formulas using the template engine so formula
+        # errors are caught at load time rather than runtime.
+        for stat_def in derived_eval_order:
+            assert stat_def.derived is not None
+            template_id = f"__derived_{stat_def.name}"
+            try:
+                template_engine.precompile_and_validate(
+                    raw=stat_def.derived,
+                    template_id=template_id,
+                    context_type="adventure",
+                )
+            except Exception as exc:
+                derived_errors.append(
+                    LoadError(
+                        file=Path("<CharacterConfig>"),
+                        message=f"Derived stat {stat_def.name!r} formula failed validation: {exc}",
+                    )
+                )
+
     pronoun_errors = _validate_pronoun_set_names(manifests)
     template_errors = _validate_templates(manifests, template_engine)
-    if pronoun_errors or template_errors:
-        raise ContentLoadError(pronoun_errors + template_errors)
+    if pronoun_errors or template_errors or derived_errors:
+        raise ContentLoadError(pronoun_errors + template_errors + derived_errors)
 
     registry = ContentRegistry.build(manifests, template_engine=template_engine)
+    registry.derived_eval_order = derived_eval_order
 
     loot_ref_errors = _validate_loot_refs(registry)
-    if loot_ref_errors:
-        raise ContentLoadError(loot_ref_errors)
+    derived_write_errors: List[LoadError] = []
+    _validate_no_derived_stat_writes(registry=registry, warnings=[], errors=derived_write_errors)
+    all_post_errors = loot_ref_errors + derived_write_errors
+    if all_post_errors:
+        raise ContentLoadError(all_post_errors)
 
     elapsed_ms = (time.perf_counter() - t0) * 1000
     logger.info("Content loaded in %.1f ms (%d manifests)", elapsed_ms, len(manifests))

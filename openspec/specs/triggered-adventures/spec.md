@@ -8,30 +8,38 @@ The triggered adventures system enables adventures to fire automatically in resp
 
 ### Requirement: game.yaml trigger configuration schema
 
-`GameSpec` SHALL include two new optional blocks: `triggers` (a `GameTriggers` model) and `trigger_adventures` (a `Dict[str, List[str]]`). Both SHALL default to empty values if absent so existing game packages without trigger configuration continue to load without modification.
+`GameSpec` SHALL include two optional blocks: `triggers` (a `GameTriggers` model) and `trigger_adventures` (a `Dict[str, List[str]]`). Both SHALL default to empty values if absent so existing game packages without trigger configuration continue to load without modification.
 
 `GameTriggers` SHALL contain:
 
 - `custom: List[str]` — declared custom trigger names, default empty
 - `on_game_rejoin: GameRejoinTrigger | None` — optional, with `absence_hours: int` (min 1)
-- `on_stat_threshold: List[StatThresholdTrigger]` — each entry with `stat: str`, `threshold: int`, `name: str`
+- `on_stat_threshold: List[StatThresholdTrigger]` — each entry with `stat: str`, `threshold: int`, `name: str`, and an optional `fire_mode: Literal["each", "highest"]` (default `"each"`)
+- `max_trigger_queue_depth: int` — maximum pending trigger queue depth, default `6`, minimum `1`
 
 `trigger_adventures` maps a trigger name (string) to an ordered list of adventure refs (strings). Adventures fire top-to-bottom per trigger in declaration order.
+
+`GameSpec` SHALL NOT include `xp_thresholds` or `hp_formula`.
 
 #### Scenario: game.yaml with no triggers block loads cleanly
 
 - **WHEN** a `game.yaml` that has no `triggers` or `trigger_adventures` fields is loaded
 - **THEN** the `GameSpec` loads without error, `spec.triggers` is an empty `GameTriggers`, and `spec.trigger_adventures` is `{}`
 
-#### Scenario: trigger_adventures wires an adventure to a built-in trigger
+#### Scenario: trigger_adventures wires an adventure to on_character_create
 
 - **WHEN** `game.yaml` contains `trigger_adventures: {on_character_create: [welcome-adventure]}`
 - **THEN** `registry.trigger_index["on_character_create"]` equals `["welcome-adventure"]` after content load
 
 #### Scenario: Multiple adventures per trigger maintain declaration order
 
-- **WHEN** `trigger_adventures: {on_level_up: [adv-a, adv-b, adv-c]}` is declared
+- **WHEN** `trigger_adventures: {on_stat_threshold_level: [adv-a, adv-b, adv-c]}` is declared
 - **THEN** adventures are run in the order `adv-a → adv-b → adv-c` when the trigger fires
+
+#### Scenario: game.yaml with xp_thresholds fails validation
+
+- **WHEN** a `game.yaml` contains a top-level `xp_thresholds` key
+- **THEN** the `GameSpec` raises a Pydantic validation error (extra fields forbidden)
 
 ---
 
@@ -42,11 +50,12 @@ The content loader SHALL validate every key in `trigger_adventures` against the 
 Known trigger names are:
 
 - `on_character_create` (always valid)
-- `on_level_up` (always valid)
 - `on_outcome_<name>` for each name in the built-in outcome set (`completed`, `defeated`, `fled`) plus each name in `spec.outcomes`
 - `on_game_rejoin` (valid only when `triggers.on_game_rejoin` is configured)
 - `<threshold.name>` for each entry in `triggers.on_stat_threshold`
 - Each name in `triggers.custom`
+
+`on_level_up` is NOT a known trigger name and SHALL produce a load warning if used as a `trigger_adventures` key.
 
 Each adventure ref in every list SHALL also be validated against the registered adventure manifests. A ref that doesn't resolve SHALL produce a load warning.
 
@@ -56,6 +65,11 @@ Duplicate `name` values among `triggers.on_stat_threshold` entries SHALL produce
 
 - **WHEN** `trigger_adventures` contains `{on_unknown_event: [some-adv]}`
 - **THEN** a load warning is emitted for the unknown key and the adventure list is ignored at runtime
+
+#### Scenario: on_level_up key produces load warning
+
+- **WHEN** `trigger_adventures` contains `{on_level_up: [some-adv]}`
+- **THEN** a load warning is emitted for `on_level_up` (it is not a known trigger name)
 
 #### Scenario: on*outcome*<custom> is valid when outcome is declared
 
@@ -156,27 +170,6 @@ At session start on the load path (an existing character, not a new one), the en
 
 ---
 
-### Requirement: on_level_up trigger detection
-
-In the `xp_grant` effect handler, for each level in the `levels_gained` list returned by `add_xp()`, the engine SHALL call `player.enqueue_trigger("on_level_up")`. Multi-level jumps result in one queue entry per level gained.
-
-#### Scenario: Single level up queues one trigger
-
-- **WHEN** an `xp_grant` effect causes the player to gain exactly one level
-- **THEN** `pending_triggers` contains exactly one `"on_level_up"` entry
-
-#### Scenario: Multi-level jump queues multiple triggers
-
-- **WHEN** an `xp_grant` effect causes the player to gain two levels in one step
-- **THEN** `pending_triggers` contains two `"on_level_up"` entries
-
-#### Scenario: No level gained means no queue entry
-
-- **WHEN** an `xp_grant` effect adds XP that does not cross any threshold
-- **THEN** `pending_triggers` is unchanged
-
----
-
 ### Requirement: on*outcome*<name> trigger detection
 
 After each call to `session.run_adventure()` returns an outcome, the engine SHALL construct the trigger key `f"on_outcome_{outcome.value}"` and call `player.enqueue_trigger(trigger_key)` if that key is in `registry.trigger_index`.
@@ -200,7 +193,17 @@ After each call to `session.run_adventure()` returns an outcome, the engine SHAL
 
 ### Requirement: on_stat_threshold trigger detection
 
-After every stat value mutation (via `stat_change` or `stat_set` effect handlers), the engine SHALL check all thresholds registered for that stat name in `registry.stat_threshold_index`. For each entry: if the old value was `< threshold` and the new value is `>= threshold`, `player.enqueue_trigger(threshold.name)` SHALL be called. Downward crossings SHALL NOT fire the trigger.
+After every stored stat value mutation (via `stat_change` or `stat_set` effect handlers), the engine SHALL check all thresholds registered for that stored stat name. Additionally, after `_recompute_derived_stats()` runs, the engine SHALL check all thresholds registered for any derived stat whose shadow value changed.
+
+For each entry: if the old value was `< threshold` and the new value is `>= threshold`, the entry has been crossed. Downward crossings SHALL NOT fire the trigger.
+
+**`fire_mode` controls how crossed entries enqueue:**
+- `fire_mode: each` (default) — every crossed entry fires as a separate `enqueue_trigger()` call, in ascending threshold order.
+- `fire_mode: highest` — only the single highest crossed threshold fires.
+
+`each` and `highest` entries on the same stat operate in independent groups: all `each` entries fire first (ascending), then the single highest `highest` entry fires (if any `highest` entries were crossed).
+
+`on_stat_threshold` entries may reference either stored or derived stat names. The loader SHALL validate that the `stat` field matches a stat name declared in `CharacterConfig` (stored or derived); an unknown stat name SHALL produce a load warning.
 
 #### Scenario: Upward crossing fires threshold trigger
 
@@ -217,10 +220,40 @@ After every stat value mutation (via `stat_change` or `stat_set` effect handlers
 - **WHEN** a stat changes from 110 to 50 and a threshold at 100 is registered
 - **THEN** no trigger is appended for the downward crossing
 
+#### Scenario: Multi-cross with fire_mode: each enqueues one entry per threshold in ascending order
+
+- **WHEN** a stat jumps from 0 to 300 and three `fire_mode: each` thresholds at 100, 200, and 300 are registered
+- **THEN** three trigger entries are appended to `pending_triggers` in ascending threshold order (100, 200, 300)
+
+#### Scenario: Multi-cross with fire_mode: highest enqueues only the highest crossed threshold
+
+- **WHEN** a stat jumps from 0 to 300 and three `fire_mode: highest` thresholds at 100, 200, and 300 are registered
+- **THEN** exactly one trigger entry is appended to `pending_triggers` for the threshold at 300
+
+#### Scenario: Mixed fire_mode entries on the same stat operate independently
+
+- **WHEN** a stat jumps from 0 to 300 and has `fire_mode: each` thresholds at 100 and 200 and a `fire_mode: highest` threshold at 300
+- **THEN** three entries are appended: 100 (each), 200 (each), then 300 (highest)
+
+#### Scenario: fire_mode defaults to each when omitted
+
+- **WHEN** an `on_stat_threshold` entry has no `fire_mode` field
+- **THEN** it behaves as if `fire_mode: each` were declared
+
+#### Scenario: Threshold on derived stat fires when derived shadow changes
+
+- **WHEN** a derived stat `constitution_bonus` changes from 1 to 3 after a `stat_change` to `constitution`, and a threshold at 2 is registered for `constitution_bonus`
+- **THEN** the threshold's trigger name is appended to `pending_triggers`
+
 #### Scenario: Stat with no registered thresholds is unaffected
 
 - **WHEN** a stat that has no entries in `stat_threshold_index` is mutated
 - **THEN** no trigger detection logic runs for that stat
+
+#### Scenario: on_stat_threshold entry with unknown stat name produces load warning
+
+- **WHEN** an `on_stat_threshold` entry declares `stat: nonexistent_stat` and that name is not in `CharacterConfig`
+- **THEN** a load warning is produced at content load time
 
 ---
 

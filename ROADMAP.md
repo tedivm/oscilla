@@ -40,7 +40,7 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [Buff Persistence Between Adventures](#buff-persistence-between-adventures)                 | S      | Combat Refinement       |
 | [Character Archetypes](#character-archetypes)                                               | M      | Character Progression   |
 | [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades)                          | L      | Character Progression   |
-| [Stat Formula Templates](#stat-formula-templates)                                           | M      | Character Progression   |
+| [Extended Template Primitives](#extended-template-primitives)                               | S      | Engine Architecture     |
 | [Player-Defined Pronouns](#player-defined-pronouns)                                         | S      | Character Configuration |
 | [Shop and Vendor System](#shop-and-vendor-system)                                           | L      | Economy & NPCs          |
 | [Persistent NPCs and Dialogue](#persistent-npcs-and-dialogue)                               | L      | Economy & NPCs          |
@@ -227,24 +227,21 @@ Because prerequisites are conditions and rewards are standard effects:
 - Any effect type (stat change, skill grant, archetype add, item grant) is available at zero extra design cost
 - Packages that have no talent system simply omit `TalentNode` manifests entirely
 
-### Stat Formula Templates
+### Extended Template Primitives
 
-**Effort: M** · **Group: Character Progression**
+**Effort: S** · **Group: Engine Architecture**
 
-Level-up stat gains, HP maximums, and other derived values are currently hard-coded in the engine or declared as fixed integers in `character_config.yaml`. This prevents authors from expressing formulas like "max HP = base_hp + (constitution × 3)" or "XP to next level = 100 × level²".
+Adds a second tier of numeric and interpolation utilities to `SAFE_GLOBALS` for authors who need continuous value scaling, percentage math, or list statistics — going beyond what the foundational dice pool functions (added in the stat-formula-templates change) provide.
 
-Allow `character_config.yaml` stat definitions and level-up tables to declare template strings instead of fixed numbers:
+Functions deferred from the stat-formula-templates change:
 
-```yaml
-stats:
-  - name: max_hp
-    type: int
-    formula: "{{ base_hp + player.stats.constitution * 3 }}" # recalculated on level-up
+- `lerp(a, b, t)` — linear interpolation: `a + (b - a) * t`
+- `average(values)` — arithmetic mean of a list (alias for `mean`, more discoverable name)
+- `percent(value, total)` — `(value / total) * 100`, safe for zero-total
+- `scale(value, in_min, in_max, out_min, out_max)` — map a value from one range to another
+- Additional pool manipulation: `drop_highest(pool, n)`, `drop_lowest(pool, n)`, `reroll_below(pool, sides, threshold)`
 
-level_xp_formula: "{{ 100 * player.level ** 2 }}"
-```
-
-Formulas are evaluated using the standard template engine with the player's current stats as context. This is consistent with how `xp_grant.amount` and `stat_change.amount` already support template strings.
+All functions follow the existing SAFE_GLOBALS conventions: pure Python, sandboxed, `ValueError` on invalid input, precompile-and-mock-render at load time.
 
 ### Player-Defined Pronouns
 

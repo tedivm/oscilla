@@ -14,11 +14,6 @@ if TYPE_CHECKING:
     from oscilla.engine.models.adventure import Effect
 
 
-class HpFormula(BaseModel):
-    base_hp: int = Field(ge=1)
-    hp_per_level: int = Field(ge=0)
-
-
 class ItemLabelDef(BaseModel):
     """Author-defined display vocabulary entry for item labels.
 
@@ -48,6 +43,9 @@ class PassiveEffect(BaseModel):
     skill_grants: List[str] = []
 
 
+StatThresholdFireMode = Literal["each", "highest"]
+
+
 class StatThresholdTrigger(BaseModel):
     """A stat threshold that fires a named trigger when crossed upward."""
 
@@ -57,6 +55,12 @@ class StatThresholdTrigger(BaseModel):
     threshold: int
     # The trigger name this entry maps to in trigger_adventures.
     name: str
+    # Controls how multi-cross firing behaves when multiple thresholds are
+    # crossed in a single stat mutation:
+    #   "each"    — fire once per threshold crossed (ascending order)
+    #   "highest" — fire only the single highest threshold crossed
+    # Default: "each" (backward-compatible with existing threshold entries).
+    fire_mode: StatThresholdFireMode = "each"
 
 
 class GameRejoinTrigger(BaseModel):
@@ -133,9 +137,9 @@ class PrestigeConfig(BaseModel):
 class GameSpec(BaseModel):
     displayName: str
     description: str = ""
-    # XP required to reach each level. Index 0 = XP to reach level 2, etc.
-    xp_thresholds: List[int] = Field(min_length=1)
-    hp_formula: HpFormula
+    # xp_thresholds and hp_formula removed — XP thresholds are now declared as
+    # on_stat_threshold entries in triggers; HP initialization is done via
+    # on_character_create trigger adventures.
     # Author-defined label vocabulary for items.
     item_labels: List[ItemLabelDef] = []
     # Condition-gated stat modifiers and skill grants evaluated continuously.
@@ -155,7 +159,7 @@ class GameSpec(BaseModel):
     # Trigger configuration. Absent = no triggers defined.
     triggers: GameTriggers = Field(default_factory=GameTriggers)
     # Maps trigger name → ordered list of adventure refs to run.
-    # Valid keys: on_character_create, on_level_up, on_outcome_<name>,
+    # Valid keys: on_character_create, on_outcome_<name>,
     #             on_game_rejoin, <threshold.name>, <custom trigger name>.
     # Validated at load time against the known trigger vocabulary.
     trigger_adventures: Dict[str, List[str]] = Field(default_factory=dict)

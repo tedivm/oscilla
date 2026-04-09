@@ -8,11 +8,13 @@ Defines the `stat_change` and `stat_set` adventure effects that modify player st
 
 ### Requirement: stat_change effect applies a numeric delta to a player stat
 
-The `stat_change` adventure effect SHALL modify a named stat by a signed integer amount. The `stat` field SHALL reference a stat name declared in `CharacterConfig`. The `amount` field SHALL be a non-zero integer **or a Jinja2 template string that resolves to a non-zero integer at runtime**. The effect SHALL be validated at content load time: the referenced stat MUST exist in `CharacterConfig` and its declared type MUST be `int`. A `stat_change` targeting a `bool` stat SHALL be a content load error.
+The `stat_change` adventure effect SHALL modify a named stat by a signed integer amount. The `stat` field SHALL reference a stored (non-derived) stat name declared in `CharacterConfig`. **Targeting a derived stat is a content load error.** The `amount` field SHALL be a non-zero integer **or a Jinja2 template string that resolves to a non-zero integer at runtime**. The effect SHALL be validated at content load time: the referenced stat MUST exist in `CharacterConfig`, its declared type MUST be `int`, and it MUST NOT be a derived stat. A `stat_change` targeting a `bool` stat SHALL be a content load error.
 
 If applying the delta would produce a value outside the stat's effective bounds (see stat-bounds spec), the result SHALL be clamped, a WARNING logged, and the player notified via the TUI. The amount type is `int | str` — float amounts and non-integer template results are not accepted.
 
 When `amount` is a template string, the template SHALL be precompiled and mock-rendered at content load time. A template that fails mock render SHALL be a content load error. At runtime, the template SHALL be rendered to produce a string, then coerced to `int`; a render result that cannot be coerced SHALL raise a `TemplateRuntimeError`.
+
+After `stat_change` applies its delta to the stored stat, the engine SHALL call `_recompute_derived_stats()` and `_fire_threshold_triggers()` for the modified stored stat.
 
 #### Scenario: Positive delta increases int stat
 
@@ -49,6 +51,11 @@ When `amount` is a template string, the template SHALL be precompiled and mock-r
 - **WHEN** a `stat_change` template resolves to `"foo"` at runtime
 - **THEN** a `TemplateRuntimeError` is raised
 
+#### Scenario: Template string for int stat is accepted and precompiled
+
+- **WHEN** a manifest declares `stat_change { stat: strength, amount: "{{ player.stats['xp'] // 10 }}" }` and `strength` is an `int` stat
+- **THEN** the content loader compiles and mock-renders the template without error
+
 ---
 
 ### Requirement: stat_set effect assigns an absolute value to a player stat
@@ -79,7 +86,7 @@ If the new value would fall outside the stat's effective bounds, the result SHAL
 
 #### Scenario: Template string for int stat is accepted and precompiled
 
-- **WHEN** a manifest declares `stat_set { stat: strength, value: "{{ player.level * 2 }}" }` and `strength` is an `int` stat
+- **WHEN** a manifest declares `stat_set { stat: strength, value: "{{ player.stats['xp'] // 10 }}" }` and `strength` is an `int` stat
 - **THEN** the content loader compiles and mock-renders the template without error
 
 #### Scenario: Template string for bool stat that resolves to non-bool raises TemplateRuntimeError

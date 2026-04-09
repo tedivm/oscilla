@@ -179,7 +179,7 @@ async def test_run_adventure_triggers_persist_callbacks(
     )
     assert loaded is not None
     # test-narrative grants XP; persisted value must be > 0
-    assert loaded.xp > 0
+    assert loaded.stats.get("xp", 0) > 0
     # active_adventure must be cleared at adventure_end
     assert loaded.active_adventure is None
 

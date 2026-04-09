@@ -8,4 +8,28 @@ spec:
       type: int
       default: 10
       description: "Physical power"
+    - name: level
+      type: int
+      default: 1
+      bounds:
+        min: 1
+      description: "Character level"
+    - name: xp
+      type: int
+      default: 0
+      bounds:
+        min: 0
+      description: "Experience points"
+    - name: gold
+      type: int
+      default: 0
+      bounds:
+        min: 0
+      description: "Currency stat for effect tests"
+    - name: hp
+      type: int
+      default: 20
+      bounds:
+        min: 0
+      description: "Hit points"
   hidden_stats: []

@@ -7,13 +7,7 @@ from typing import Dict, List
 from oscilla.engine.loader import _validate_trigger_adventures
 from oscilla.engine.models.adventure import AdventureManifest, AdventureSpec, NarrativeStep
 from oscilla.engine.models.base import Metadata
-from oscilla.engine.models.game import (
-    GameManifest,
-    GameSpec,
-    GameTriggers,
-    HpFormula,
-    StatThresholdTrigger,
-)
+from oscilla.engine.models.game import GameManifest, GameSpec, GameTriggers, StatThresholdTrigger
 from oscilla.engine.registry import ContentRegistry
 
 
@@ -30,8 +24,6 @@ def _make_game_manifest(
         metadata=Metadata(name="test-game"),
         spec=GameSpec(
             displayName="Test Game",
-            xp_thresholds=[100, 300, 600],
-            hp_formula=HpFormula(base_hp=20, hp_per_level=5),
             outcomes=outcomes or [],
             triggers=GameTriggers(
                 custom=custom_triggers or [],
@@ -90,7 +82,8 @@ def test_unknown_trigger_key_is_load_warning() -> None:
 
 def test_unknown_adventure_ref_is_load_warning() -> None:
     """A trigger_adventures value referencing a non-existent adventure produces a warning."""
-    game = _make_game_manifest(trigger_adventures={"on_level_up": ["no-such-adv"]})
+    # Use on_character_create (a valid built-in trigger key) with a bogus adventure ref.
+    game = _make_game_manifest(trigger_adventures={"on_character_create": ["no-such-adv"]})
     # Register no adventures — the ref will not resolve.
     registry = _build_registry(game)
 
@@ -161,10 +154,8 @@ def test_duplicate_threshold_name_is_load_warning() -> None:
 
 def test_emit_trigger_undeclared_custom_name_is_load_warning() -> None:
     """An emit_trigger effect whose trigger name is not in triggers.custom is a load warning."""
-    from oscilla.engine.models.adventure import EmitTriggerEffect
-
     # Build an adventure that emits an undeclared custom trigger.
-    from oscilla.engine.models.adventure import AdventureSpec, NarrativeStep
+    from oscilla.engine.models.adventure import AdventureSpec, EmitTriggerEffect, NarrativeStep
 
     adv = AdventureManifest(
         apiVersion="oscilla/v1",

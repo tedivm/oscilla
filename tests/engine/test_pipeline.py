@@ -35,12 +35,12 @@ async def test_narrative_grants_xp(
     base_player: CharacterState,
     mock_tui: MockTUI,
 ) -> None:
-    """The test-narrative adventure has an xp_grant effect of 10."""
+    """The test-narrative adventure has a stat_change xp effect of 10."""
     assert minimal_registry.game is not None
     pipeline = AdventurePipeline(registry=minimal_registry, player=base_player, tui=mock_tui)
     await pipeline.run("test-narrative")
     # XP should have been added (exact amount depends on fixture; at least > 0)
-    assert base_player.xp > 0
+    assert base_player.stats.get("xp", 0) > 0
 
 
 async def test_combat_win_outcome(
@@ -72,7 +72,7 @@ async def test_combat_win_grants_xp(
 ) -> None:
     pipeline = AdventurePipeline(registry=combat_registry, player=combat_player, tui=mock_tui)
     await pipeline.run("test-combat")
-    assert combat_player.xp > 0
+    assert combat_player.stats.get("xp", 0) > 0
 
 
 async def test_combat_win_records_enemy_defeated(

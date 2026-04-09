@@ -16,7 +16,6 @@ from oscilla.models.character import CharacterRecord
 from tests.engine.conftest import MockTUI
 from tests.fixtures.content.trigger_tests import build_trigger_test_registry
 
-
 # ---------------------------------------------------------------------------
 # DB fixture scoped to this module — fresh in-memory SQLite per test.
 # Each test function gets its own session via async_session (from root conftest).
@@ -113,17 +112,18 @@ async def test_on_game_rejoin_fires_when_absent(
 
 
 # ---------------------------------------------------------------------------
-# 8.4 — on_level_up fires after xp_grant
+# 8.4 — on_stat_threshold fires after stat_change crosses xp threshold
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_on_level_up_fires_after_xp_grant(
+async def test_on_stat_threshold_fires_after_xp_change(
     async_session: AsyncSession,
 ) -> None:
-    """on_level_up trigger adventure fires after the player levels up via xp_grant."""
+    """on_stat_threshold trigger adventure fires after xp stat crosses the declared threshold."""
     registry = build_trigger_test_registry(
-        trigger_adventures={"on_level_up": ["level-up-adventure"]},
+        on_stat_threshold=[StatThresholdTrigger(stat="xp", threshold=100, name="xp-100-reached")],
+        trigger_adventures={"xp-100-reached": ["level-up-adventure"]},
     )
     tui = MockTUI()
     async with GameSession(
@@ -134,7 +134,7 @@ async def test_on_level_up_fires_after_xp_grant(
         character_name="LevelHero",
     ) as session:
         await session.start()
-        # Run an adventure that grants 100 XP — threshold[0]=100 → level 2.
+        # Run an adventure that grants 100 XP via stat_change.
         await session.run_adventure("test-xp-grant-adventure")
         await session.drain_trigger_queue()
 

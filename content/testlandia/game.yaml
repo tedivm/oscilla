@@ -5,10 +5,6 @@ metadata:
 spec:
   displayName: "Testlandia"
   description: "A developer sandbox for manually exercising engine features. No plot, no rules — just levers."
-  xp_thresholds: [100, 250, 500, 900, 1400, 2100, 3000, 4200, 5800, 8000]
-  hp_formula:
-    base_hp: 100
-    hp_per_level: 20
 
   # Item label vocabulary for label rendering, sorting, and condition tests.
   item_labels:
@@ -169,16 +165,30 @@ spec:
       - stat: gold
         threshold: 50
         name: test-threshold-reached
-      - stat: level
-        threshold: 5
-        name: max-level-reached
+      # XP-based level thresholds — fire when xp crosses each level boundary.
+      - stat: xp
+        threshold: 100
+        name: level-2-reached
+      - stat: xp
+        threshold: 300
+        name: level-3-reached
+      - stat: xp
+        threshold: 600
+        name: level-4-reached
+      - stat: xp
+        threshold: 1000
+        name: level-5-reached
+      - stat: xp
+        threshold: 1500
+        name: level-6-reached
+        # Level 6 is the cap; trigger prestige ceremony.
+        fire_mode: highest
 
   trigger_adventures:
     on_character_create:
+      - testlandia-character-creation
       - test-character-intro
       - character-creation
-    on_level_up:
-      - test-level-up-scene
     on_outcome_defeated:
       - test-defeat-recovery
     on_game_rejoin:
@@ -187,7 +197,16 @@ spec:
       - test-threshold-scene
     test-custom-event:
       - test-custom-trigger-scene
-    max-level-reached:
+    level-2-reached:
+      - testlandia-level-up
+    level-3-reached:
+      - testlandia-level-up
+    level-4-reached:
+      - testlandia-level-up
+    level-5-reached:
+      - testlandia-level-up
+    level-6-reached:
+      - testlandia-level-up
       - prestige-ceremony
 
   # Prestige system: resets the character on max-level-reached but carries forward

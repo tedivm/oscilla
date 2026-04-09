@@ -83,10 +83,6 @@ metadata:
   name: test-game
 spec:
   displayName: "Test"
-  xp_thresholds: [100]
-  hp_formula:
-    base_hp: 20
-    hp_per_level: 5
 """
 
 
@@ -142,10 +138,6 @@ metadata:
   name: test-game
 spec:
   displayName: "Test"
-  xp_thresholds: [100]
-  hp_formula:
-    base_hp: 20
-    hp_per_level: 5
 """
 
 _GAME_YAML_WITH_PRESTIGE = """\
@@ -155,10 +147,6 @@ metadata:
   name: test-game
 spec:
   displayName: "Test"
-  xp_thresholds: [100]
-  hp_formula:
-    base_hp: 20
-    hp_per_level: 5
   prestige:
     carry_stats: []
 """

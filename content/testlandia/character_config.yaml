@@ -4,6 +4,34 @@ metadata:
   name: testlandia-character
 spec:
   public_stats:
+    - name: xp
+      type: int
+      default: 0
+      description: "Experience points. Sum of xp earned during adventures."
+      bounds:
+        min: 0
+    - name: level
+      type: int
+      derived: "{{ 1 + (1 if player.stats['xp'] >= 100 else 0) + (1 if player.stats['xp'] >= 300 else 0) + (1 if player.stats['xp'] >= 600 else 0) + (1 if player.stats['xp'] >= 1000 else 0) + (1 if player.stats['xp'] >= 1500 else 0) }}"
+      description: "Current level derived from xp. Starts at 1; caps at 6 with testlandia thresholds."
+    - name: hp
+      type: int
+      default: 0
+      description: "Current hit points."
+      bounds:
+        min: 0
+    - name: max_hp
+      type: int
+      default: 0
+      description: "Maximum hit points."
+    - name: constitution
+      type: int
+      default: 10
+      description: "Constitution score. Drives HP-on-level-up bonus via constitution_bonus."
+    - name: constitution_bonus
+      type: int
+      derived: "{{ floor((player.stats['constitution'] - 10) / 2) }}"
+      description: "D&D-style constitution modifier: floor((constitution - 10) / 2)."
     - name: strength
       type: int
       default: 10

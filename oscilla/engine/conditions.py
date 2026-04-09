@@ -87,7 +87,8 @@ def evaluate(
 
         # --- Player attribute leaves ---
         case LevelCondition(value=v):
-            return player.level >= v
+            # level is now a regular stat; fall back to 0 if the game doesn't declare it.
+            return int(player.stats.get("level") or 0) >= v
         case MilestoneCondition(name=n):
             return n in player.milestones
         case MilestoneTicksElapsedCondition() as c:

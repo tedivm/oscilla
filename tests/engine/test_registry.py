@@ -6,7 +6,7 @@ from oscilla.engine.models.adventure import AdventureManifest, AdventureSpec
 from oscilla.engine.models.base import ManifestEnvelope, Metadata
 from oscilla.engine.models.character_config import CharacterConfigManifest, CharacterConfigSpec
 from oscilla.engine.models.enemy import EnemyManifest, EnemySpec
-from oscilla.engine.models.game import GameManifest, GameSpec, HpFormula
+from oscilla.engine.models.game import GameManifest, GameSpec
 from oscilla.engine.models.item import ItemManifest, ItemSpec
 from oscilla.engine.models.location import LocationManifest, LocationSpec
 from oscilla.engine.models.quest import QuestManifest, QuestSpec, QuestStage
@@ -140,9 +140,7 @@ def test_content_registry_build_with_all_kinds() -> None:
             apiVersion="oscilla/v1",
             kind="Game",
             metadata=Metadata(name="test-game"),
-            spec=GameSpec(
-                displayName="Test Game", xp_thresholds=[0, 100], hp_formula=HpFormula(base_hp=20, hp_per_level=5)
-            ),
+            spec=GameSpec(displayName="Test Game"),
         ),
         CharacterConfigManifest(
             apiVersion="oscilla/v1",

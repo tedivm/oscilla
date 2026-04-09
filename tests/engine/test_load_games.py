@@ -61,9 +61,7 @@ def test_load_games_error_in_one_package_raises(tmp_path: Path) -> None:
     bad_game.mkdir()
     # game.yaml exists so the package is detected but an adventure ref is broken
     (bad_game / "game.yaml").write_text(
-        "apiVersion: oscilla/v1\nkind: Game\nmetadata:\n  name: bad-game\n"
-        "spec:\n  displayName: Bad\n  xp_thresholds: [0, 100]\n"
-        "  hp_formula:\n    base_hp: 20\n    hp_per_level: 5\n",
+        "apiVersion: oscilla/v1\nkind: Game\nmetadata:\n  name: bad-game\nspec:\n  displayName: Bad\n",
         encoding="utf-8",
     )
     (bad_game / "character-config.yaml").write_text(

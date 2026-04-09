@@ -9,5 +9,6 @@ spec:
     - type: narrative
       text: "You are in test-beta. Everything is fine."
       effects:
-        - type: xp_grant
+        - type: stat_change
+          stat: xp
           amount: 10

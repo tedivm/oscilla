@@ -28,7 +28,6 @@ from oscilla.engine.models.adventure import (
     StatChangeEffect,
     StatSetEffect,
     UseItemEffect,
-    XpGrantEffect,
 )
 from oscilla.engine.signals import _EndSignal
 
@@ -40,6 +39,163 @@ if TYPE_CHECKING:
     from oscilla.engine.templates import ExpressionContext
 
 logger = getLogger(__name__)
+
+
+async def _fire_threshold_triggers(
+    stat_name: str,
+    old_value: int | None,
+    new_value: int | None,
+    player: "CharacterState",
+    registry: "ContentRegistry",
+) -> None:
+    """Enqueue on_stat_threshold triggers for an upward stat transition.
+
+    Handles two firing modes per entry:
+      - "each"    — every threshold crossed in one mutation enqueues separately
+                    (sorted ascending so lower thresholds fire first)
+      - "highest" — only the single highest crossed threshold enqueues;
+                    lower-threshold entries are suppressed
+
+    Both groups operate independently: all "each" entries fire first (ascending),
+    then the highest-threshold "highest" entry fires (if any).
+    Downward crossings are not supported — only upward crossings fire.
+    """
+    from oscilla.engine.models.game import StatThresholdTrigger
+
+    game = registry.game
+    if game is None:
+        return
+
+    thresholds = game.spec.triggers.on_stat_threshold
+    if not thresholds:
+        return
+
+    if old_value is None or new_value is None:
+        return
+
+    # Collect all threshold entries for this stat that were crossed upward.
+    crossed: List[StatThresholdTrigger] = [
+        t for t in thresholds if t.stat == stat_name and old_value < t.threshold <= new_value
+    ]
+
+    max_depth = game.spec.triggers.max_trigger_queue_depth
+
+    # --- fire_mode: each --- fire every crossed entry in ascending threshold order.
+    each_entries = sorted(
+        (t for t in crossed if t.fire_mode == "each"),
+        key=lambda t: t.threshold,
+    )
+    for threshold_entry in each_entries:
+        if threshold_entry.name in registry.trigger_index:
+            player.enqueue_trigger(threshold_entry.name, max_depth=max_depth)
+
+    # --- fire_mode: highest --- fire only the single highest crossed entry.
+    highest_entries = [t for t in crossed if t.fire_mode == "highest"]
+    if highest_entries:
+        top = max(highest_entries, key=lambda t: t.threshold)
+        if top.name in registry.trigger_index:
+            player.enqueue_trigger(top.name, max_depth=max_depth)
+
+
+async def _recompute_derived_stats(
+    player: "CharacterState",
+    registry: "ContentRegistry",
+    engine: "Any",
+    tui: "TUICallbacks",
+) -> None:
+    """Re-evaluate all derived stats and fire on_stat_threshold triggers for any that changed.
+
+    Called after every stat_change or stat_set that modifies a stored stat.
+    Derived stats are never written directly — their computed values exist only
+    in the shadow dict. The shadow dict is compared to the new computed value;
+    when they differ, on_stat_threshold entries for that stat are evaluated.
+
+    Multi-cross behavior: if a derived stat's value jumps past multiple threshold
+    values in a single recomputation, all crossed thresholds fire in ascending order.
+    """
+    from oscilla.engine.templates import ExpressionContext, GameContext, PlayerContext
+
+    char_config = registry.character_config
+    if char_config is None:
+        return
+
+    derived_stats = getattr(registry, "derived_eval_order", [])
+    if not derived_stats:
+        return
+
+    game = registry.game
+    game_spec = game.spec if game is not None else None
+    hemisphere = game_spec.season_hemisphere if game_spec is not None else "northern"
+    timezone = game_spec.timezone if game_spec is not None else None
+
+    # Precompute effective stats once if any derived stat needs them.
+    effective: Dict[str, int | bool | None] | None = None
+    if any(s.stat_context == "effective" for s in derived_stats):
+        effective = player.effective_stats(registry=registry)
+
+    # working_stats accumulates stored stats + already-evaluated derived values
+    # so derived-from-derived chains work correctly.
+    working_stats: Dict[str, int | bool | None] = dict(player.stats)
+
+    for stat_def in derived_stats:
+        assert stat_def.derived is not None
+        template_id = f"__derived_{stat_def.name}"
+        try:
+            base_stats = effective if stat_def.stat_context == "effective" and effective is not None else working_stats
+            # Merge already-computed derived values for cross-derived chaining.
+            formula_stats: Dict[str, int | bool | None] = {
+                **base_stats,
+                **{k: v for k, v in working_stats.items() if k not in base_stats},
+            }
+            # Build a temporary PlayerContext with the merged formula stats.
+            from oscilla.engine.character import _INT64_MAX, _INT64_MIN
+
+            render_player = PlayerContext.from_character(player)
+            # Override stats with the merged formula view
+            render_player = type(render_player)(
+                name=render_player.name,
+                prestige_count=render_player.prestige_count,
+                stats=formula_stats,
+                milestones=render_player.milestones,
+                pronouns=render_player.pronouns,
+            )
+            ctx = ExpressionContext(
+                player=render_player,
+                game=GameContext(season_hemisphere=hemisphere, timezone=timezone),
+            )
+            result_str = engine.render(template_id=template_id, ctx=ctx).strip()
+            new_value: int | None = int(result_str) if result_str else None
+        except Exception:
+            logger.exception(
+                "Failed to evaluate derived stat %r formula at runtime — skipping.",
+                stat_def.name,
+            )
+            continue
+
+        # Apply bounds clamping to derived values, same as stored stats.
+        if new_value is not None and stat_def.bounds is not None:
+            from oscilla.engine.character import _INT64_MAX, _INT64_MIN
+
+            lo = stat_def.bounds.min if stat_def.bounds.min is not None else _INT64_MIN
+            hi = stat_def.bounds.max if stat_def.bounds.max is not None else _INT64_MAX
+            new_value = max(lo, min(hi, new_value))
+
+        old_value = player._derived_shadows.get(stat_def.name)
+        player._derived_shadows[stat_def.name] = new_value
+        # Make this derived value available for downstream derived stats.
+        working_stats[stat_def.name] = new_value
+
+        if old_value == new_value:
+            continue
+
+        # Fire on_stat_threshold triggers for this derived stat.
+        await _fire_threshold_triggers(
+            stat_name=stat_def.name,
+            old_value=old_value if isinstance(old_value, int) else None,
+            new_value=new_value if isinstance(new_value, int) else None,
+            player=player,
+            registry=registry,
+        )
 
 
 def _resolve_stat_bounds(stat: str, registry: "ContentRegistry") -> tuple[int, int]:
@@ -115,12 +271,7 @@ async def run_effect(
             )
         engine = registry.template_engine
 
-        if isinstance(effect, XpGrantEffect) and isinstance(effect.amount, str):
-            template_id = f"__effect_xp_{id(effect)}"
-            resolved_amount = engine.render_int(template_id, ctx)
-            effect = XpGrantEffect(type="xp_grant", amount=resolved_amount)
-
-        elif isinstance(effect, StatChangeEffect) and isinstance(effect.amount, str):
+        if isinstance(effect, StatChangeEffect) and isinstance(effect.amount, str):
             template_id = f"__effect_statchange_{id(effect)}"
             resolved_amount = engine.render_int(template_id, ctx)
             effect = StatChangeEffect(
@@ -142,32 +293,6 @@ async def run_effect(
             )
 
     match effect:
-        case XpGrantEffect(amount=amount):
-            # String amounts are resolved to int by template resolution above.
-            assert isinstance(amount, int), f"Unexpected non-int XP amount after template resolution: {amount!r}"
-            game = registry.game
-            if game is not None:
-                thresholds = game.spec.xp_thresholds
-                hp_per = game.spec.hp_formula.hp_per_level
-            else:
-                thresholds = []
-                hp_per = 0
-            levels_gained, levels_lost = player.add_xp(amount=amount, xp_thresholds=thresholds, hp_per_level=hp_per)
-            if amount >= 0:
-                await tui.show_text(f"Gained {amount} XP.")
-            else:
-                await tui.show_text(f"Lost {abs(amount)} XP.")
-            for level in levels_gained:
-                await tui.show_text(f"[bold]Level up![/bold] You are now level {level}!")
-                # Queue once per level gained so multi-level jumps fire the trigger repeatedly.
-                if game is not None and "on_level_up" in registry.trigger_index:
-                    player.enqueue_trigger(
-                        "on_level_up",
-                        max_depth=game.spec.triggers.max_trigger_queue_depth,
-                    )
-            for level in levels_lost:
-                await tui.show_text(f"[bold red]Level down![/bold red] You are now level {level}.")
-
         case ItemDropEffect(count=count) if isinstance(count, int):
             loot_entries = _resolve_loot_list(effect=effect, registry=registry)
             weights = [entry.weight for entry in loot_entries]
@@ -231,15 +356,25 @@ async def run_effect(
                 combat.enemy_hp = max(0, combat.enemy_hp + int(amount))
                 await tui.show_text(f"Enemy healed for {amount}. (Enemy HP: {combat.enemy_hp})")
                 return
-            # — player target (original logic) —
-            before_hp = player.hp
+            # — player target — hp and max_hp are declared stats, not CharacterState fields.
+            hp_val = player.stats.get("hp")
+            max_hp_val = player.stats.get("max_hp")
+            if not isinstance(hp_val, int) or isinstance(hp_val, bool):
+                logger.warning("heal effect: 'hp' stat missing or not an int stat — skipping.")
+                return
+            if not isinstance(max_hp_val, int) or isinstance(max_hp_val, bool):
+                logger.warning("heal effect: 'max_hp' stat missing or not an int stat — skipping.")
+                return
+            before_hp = hp_val
+            new_hp: int
             if amount == "full":
-                player.hp = player.max_hp
+                new_hp = max_hp_val
             else:
-                player.hp = min(player.hp + int(amount), player.max_hp)
-            healed = player.hp - before_hp
+                new_hp = min(hp_val + int(amount), max_hp_val)
+            healed = new_hp - before_hp
+            player.set_stat(name="hp", value=new_hp)
             if healed > 0:
-                await tui.show_text(f"Restored {healed} HP. (HP: {player.hp} / {player.max_hp})")
+                await tui.show_text(f"Restored {healed} HP. (HP: {new_hp} / {max_hp_val})")
 
         case StatChangeEffect(stat=stat, amount=amount, target=target):
             # String amounts are resolved to int by template resolution above.
@@ -283,15 +418,18 @@ async def run_effect(
             player.set_stat(name=stat, value=new_value)
             await tui.show_text(
                 f"Changed {stat}: {old_value} → {new_value}"
-            )  # Check stat thresholds after mutation — fire on upward crossing only.
-            if isinstance(old_value, int) and isinstance(new_value, int):
-                for threshold_value, trigger_name in registry.stat_threshold_index.get(stat, []):
-                    if old_value < threshold_value <= new_value:
-                        if registry.game is not None:
-                            player.enqueue_trigger(
-                                trigger_name,
-                                max_depth=registry.game.spec.triggers.max_trigger_queue_depth,
-                            )  # Cascade-unequip items whose requirements are no longer satisfied.
+            )  # Fire threshold triggers for the stored stat and recompute derived stats.
+            await _fire_threshold_triggers(
+                stat_name=stat,
+                old_value=old_value,
+                new_value=new_value,
+                player=player,
+                registry=registry,
+            )
+            if registry.template_engine is not None:
+                await _recompute_derived_stats(
+                    player=player, registry=registry, engine=registry.template_engine, tui=tui
+                )
             displaced = cascade_unequip_invalid(player=player, registry=registry)
             for name in displaced:
                 await tui.show_text(f"[yellow]⚠ {name} unequipped: requirements no longer met.[/yellow]")
@@ -333,15 +471,18 @@ async def run_effect(
             player.set_stat(name=stat, value=clamped)
             await tui.show_text(
                 f"Set {stat}: {old_value} → {clamped}"
-            )  # Check stat thresholds after mutation — fire on upward crossing only.
-            if isinstance(old_value, int) and isinstance(clamped, int):
-                for threshold_value, trigger_name in registry.stat_threshold_index.get(stat, []):
-                    if old_value < threshold_value <= clamped:
-                        if registry.game is not None:
-                            player.enqueue_trigger(
-                                trigger_name,
-                                max_depth=registry.game.spec.triggers.max_trigger_queue_depth,
-                            )  # Cascade-unequip items whose requirements are no longer satisfied.
+            )  # Fire threshold triggers for the stored stat and recompute derived stats.
+            await _fire_threshold_triggers(
+                stat_name=stat,
+                old_value=old_value if isinstance(old_value, int) else None,
+                new_value=clamped,
+                player=player,
+                registry=registry,
+            )
+            if registry.template_engine is not None:
+                await _recompute_derived_stats(
+                    player=player, registry=registry, engine=registry.template_engine, tui=tui
+                )
             displaced = cascade_unequip_invalid(player=player, registry=registry)
             for name in displaced:
                 await tui.show_text(f"[yellow]⚠ {name} unequipped: requirements no longer met.[/yellow]")
@@ -536,11 +677,6 @@ async def run_effect(
                 logger.error("prestige effect: character_config not available in registry — skipping reset.")
                 return
             all_stats = registry.character_config.spec.public_stats + registry.character_config.spec.hidden_stats
-            base_hp = registry.game.spec.hp_formula.base_hp
-            player.level = 1
-            player.xp = 0
-            player.hp = base_hp
-            player.max_hp = base_hp
             player.character_class = None
             player.current_location = None
             player.milestones = {}

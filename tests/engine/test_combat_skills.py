@@ -24,7 +24,7 @@ from oscilla.engine.models.buff import (
 )
 from oscilla.engine.models.character_config import CharacterConfigManifest, CharacterConfigSpec, StatDefinition
 from oscilla.engine.models.enemy import EnemyManifest, EnemySkillEntry, EnemySpec
-from oscilla.engine.models.game import GameManifest, GameSpec, HpFormula
+from oscilla.engine.models.game import GameManifest, GameSpec
 from oscilla.engine.models.item import BuffGrant, ItemManifest, ItemSpec
 from oscilla.engine.models.skill import SkillCost, SkillManifest, SkillSpec
 from oscilla.engine.pipeline import AdventureOutcome
@@ -53,8 +53,6 @@ def _make_game_registry(enemy_attack: int = 3, enemy_hp: int = 5, enemy_defense:
         metadata=Metadata(name="test-game"),
         spec=GameSpec(
             displayName="Test",
-            xp_thresholds=[100],
-            hp_formula=HpFormula(base_hp=30, hp_per_level=5),
         ),
     )
     registry.game = game
@@ -99,8 +97,8 @@ def _make_player_with_mana(registry: ContentRegistry, mana: int = 20, hp: int = 
         game_manifest=registry.game,
         character_config=registry.character_config,
     )
-    player.hp = hp
-    player.max_hp = hp
+    player.stats["hp"] = hp
+    player.stats["max_hp"] = hp
     player.stats["mana"] = mana
     player.stats["strength"] = 20  # High enough to kill a weak enemy in one hit
     player.stats["dexterity"] = 10
@@ -293,8 +291,8 @@ async def test_dot_buff_ticks_and_expires() -> None:
         game_manifest=registry.game,
         character_config=registry.character_config,
     )
-    player.hp = 100
-    player.max_hp = 100
+    player.stats["hp"] = 100
+    player.stats["max_hp"] = 100
     player.stats["strength"] = 1  # Low attack — enemy won't die from basic attacks fast
     player.stats["dexterity"] = 1
     player.stats["mana"] = 20

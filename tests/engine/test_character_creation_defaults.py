@@ -9,7 +9,7 @@ import pytest
 from oscilla.engine.character import CharacterState
 from oscilla.engine.models.base import Metadata
 from oscilla.engine.models.character_config import CharacterConfigManifest, CharacterConfigSpec, StatDefinition
-from oscilla.engine.models.game import CharacterCreationDefaults, GameManifest, GameSpec, HpFormula
+from oscilla.engine.models.game import CharacterCreationDefaults, GameManifest, GameSpec
 from oscilla.engine.templates import DEFAULT_PRONOUN_SET, PRONOUN_SETS
 
 
@@ -20,8 +20,6 @@ def _make_game(character_creation: CharacterCreationDefaults | None = None) -> G
         metadata=Metadata(name="cc-test-game"),
         spec=GameSpec(
             displayName="CC Test",
-            xp_thresholds=[100],
-            hp_formula=HpFormula(base_hp=20, hp_per_level=5),
             character_creation=character_creation,
         ),
     )

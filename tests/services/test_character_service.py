@@ -92,10 +92,10 @@ async def test_stale_version_raises_stale_data_error(
 ) -> None:
     """StaleDataError is raised when the version column differs between memory and DB.
 
-    Uses no_autoflush so that `iteration.level = 2` is not automatically flushed
-    before the bulk version bump.  After the bump, the identity map still holds
-    version = 0 while the DB (in the same transaction) has version = 1.  An
-    explicit flush() then generates ``WHERE version = 0``, matches 0 rows, and
+    Uses no_autoflush so that `iteration.current_location = "somewhere"` is not
+    automatically flushed before the bulk version bump. After the bump, the identity
+    map still holds version = 0 while the DB (in the same transaction) has version = 1.
+    An explicit flush() then generates ``WHERE version = 0``, matches 0 rows, and
     raises StaleDataError.
     """
     from sqlalchemy import select, update
@@ -114,10 +114,10 @@ async def test_stale_version_raises_stale_data_error(
 
     # Disable autoflush while we set up the stale state.  Without this,
     # executing the bulk UPDATE below would trigger an autoflush of
-    # `iteration.level = 2` BEFORE the version bump, allowing it to succeed
+    # `iteration.current_location = "somewhere"` BEFORE the version bump, allowing it to succeed
     # (defeating the point of the test).
     with async_session.no_autoflush:
-        iteration.level = 2  # mark dirty (not yet flushed)
+        iteration.current_location = "somewhere"  # mark dirty (not yet flushed)
 
         # Bump version in the DB via a bulk UPDATE with synchronize_session=False
         # so the identity map is NOT updated.  version in memory = 0; DB = 1.
@@ -155,8 +155,8 @@ async def test_load_character_matches_saved_state(
     assert minimal_registry.character_config is not None
     user = await get_or_create_user(session=async_session, user_key="load@host")
     player = _make_player(minimal_registry, name="LoadHero")
-    player.level = 3
-    player.xp = 90
+    player.stats["level"] = 3
+    player.stats["xp"] = 90
     player.add_item(ref="test-potion", quantity=2)
     player.grant_milestone("found-sword")
     await save_character(session=async_session, state=player, user_id=user.id, game_name="test-game")
@@ -168,8 +168,8 @@ async def test_load_character_matches_saved_state(
     )
     assert loaded is not None
     assert loaded.name == player.name
-    assert loaded.level == player.level
-    assert loaded.xp == player.xp
+    assert loaded.stats.get("level") == player.stats.get("level")
+    assert loaded.stats.get("xp") == player.stats.get("xp")
     assert loaded.stacks == player.stacks
     assert loaded.milestones == player.milestones
 

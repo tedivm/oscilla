@@ -13,7 +13,7 @@ from oscilla.engine.models.adventure import (
     OutcomeBranch,
 )
 from oscilla.engine.models.base import Metadata
-from oscilla.engine.models.game import GameManifest, GameSpec, HpFormula
+from oscilla.engine.models.game import GameManifest, GameSpec
 from oscilla.engine.models.location import LocationManifest, LocationSpec
 from oscilla.engine.models.region import RegionManifest, RegionSpec
 from oscilla.engine.registry import ContentRegistry
@@ -143,8 +143,6 @@ def test_triggered_adventure_is_not_orphaned() -> None:
         metadata=Metadata(name="test-game"),
         spec=GameSpec(
             displayName="Test Game",
-            xp_thresholds=[100],
-            hp_formula=HpFormula(base_hp=10, hp_per_level=2),
             trigger_adventures={"on_character_create": ["character-creation"]},
         ),
     )
@@ -216,8 +214,6 @@ def _time_game(cycles: list, epoch: dict | None = None, eras: list | None = None
         metadata=Metadata(name="test-game"),
         spec=GameSpec(
             displayName="Test",
-            xp_thresholds=[0, 100],
-            hp_formula={"base_hp": 10, "hp_per_level": 5},
             time={
                 "ticks_per_adventure": 1,
                 "base_unit": "tick",

@@ -4,10 +4,3 @@ metadata:
   name: test-game
 spec:
   displayName: "Test Game"
-  xp_thresholds:
-    - 0
-    - 100
-    - 300
-  hp_formula:
-    base_hp: 20
-    hp_per_level: 5

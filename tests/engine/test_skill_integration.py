@@ -367,13 +367,13 @@ async def test_stat_change_enemy_target_without_combat_is_skipped(
     """stat_change target=enemy without CombatContext is skipped (no crash)."""
     from tests.engine.conftest import MockTUI
 
-    original_hp = base_player.hp
+    original_hp = base_player.stats.get("hp", 0)
     tui = MockTUI()
     effect = StatChangeEffect(type="stat_change", stat="hp", amount=-5, target="enemy")
     # Should not raise; no combat context → logged warning and skip.
     await run_effect(effect=effect, player=base_player, registry=minimal_registry, tui=tui, combat=None)
     # Player HP should be unchanged.
-    assert base_player.hp == original_hp
+    assert base_player.stats.get("hp", 0) == original_hp
 
 
 # ---------------------------------------------------------------------------
@@ -450,10 +450,6 @@ metadata:
   name: test-game
 spec:
   displayName: "Test"
-  xp_thresholds: [100]
-  hp_formula:
-    base_hp: 20
-    hp_per_level: 5
 """,
         encoding="utf-8",
     )

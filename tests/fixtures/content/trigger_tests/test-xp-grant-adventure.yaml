@@ -8,5 +8,6 @@ spec:
     - type: narrative
       text: "You complete a challenge and gain experience."
       effects:
-        - type: xp_grant
+        - type: stat_change
+          stat: xp
           amount: 100

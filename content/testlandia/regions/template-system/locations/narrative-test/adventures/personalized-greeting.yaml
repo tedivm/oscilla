@@ -4,10 +4,10 @@ metadata:
   name: personalized-greeting
 spec:
   displayName: "Personalized Greeting"
-  description: "Tests player.name, player.level, pronoun placeholders, and verb agreement in narrative text."
+  description: "Tests player.name, player.stats.level, pronoun placeholders, and verb agreement in narrative text."
   steps:
     - type: narrative
-      text: "Welcome, {{ player.name }}! You have reached level {{ player.level }}."
+      text: "Welcome, {{ player.name }}! You have reached level {{ player.stats.level }}."
       effects: []
     - type: narrative
       text: "{They} {are} standing at the crossroads. {Their} journey has only just begun."

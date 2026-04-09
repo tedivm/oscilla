@@ -108,7 +108,8 @@ async def test_xp_roll_template_within_range(
     tui = MockTUI()
     pipeline = AdventurePipeline(registry=template_registry, player=template_player, tui=tui)
     await pipeline.run("test-template-xp-roll")
-    assert 5 <= template_player.xp <= 15, f"xp={template_player.xp} is not in [5, 15]"
+    xp = template_player.stats.get("xp", 0)
+    assert 5 <= xp <= 15, f"xp={xp} is not in [5, 15]"
 
 
 # ---------------------------------------------------------------------------

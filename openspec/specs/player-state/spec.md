@@ -8,9 +8,11 @@ The player state system manages all persistent player data including stats, inve
 
 ### Requirement: Player state fields
 
-The player state model SHALL include the following fixed fields: `player_id` (UUID), `name` (string), `character_class` (string, nullable), `level` (int, default 1), `xp` (int, default 0), `hp` (int), `max_hp` (int), `prestige_count` (int, default 0), `current_location` (string reference, nullable), `milestones` (dict mapping milestone name to the `internal_ticks` value at grant time — see milestone-timestamps spec), `statistics` (PlayerStatistics dataclass with enemy/location/adventure counters), `stacks` (mapping of item ref to quantity for stackable items), `instances` (list of `ItemInstance` objects for non-stackable items, each with `instance_id: UUID`, `item_ref: str`, and `modifiers: Dict`), `equipment` (mapping of slot name to `instance_id: UUID`), `active_quests` (mapping of quest ref to stage name), `completed_quests` (set of quest refs), `active_adventure` (nullable adventure position struct), `pending_triggers` (FIFO list of trigger names awaiting drain, default empty list), and `prestige_pending` (nullable `PrestigeCarryForward` dataclass, default `None` — see prestige-system spec).
+The player state model SHALL include the following fixed fields: `player_id` (UUID), `name` (string), `character_class` (string, nullable), `prestige_count` (int, default 0), `current_location` (string reference, nullable), `milestones` (dict mapping milestone name to the `internal_ticks` value at grant time — see milestone-timestamps spec), `statistics` (PlayerStatistics dataclass with enemy/location/adventure counters), `stacks` (mapping of item ref to quantity for stackable items), `instances` (list of `ItemInstance` objects for non-stackable items, each with `instance_id: UUID`, `item_ref: str`, and `modifiers: Dict`), `equipment` (mapping of slot name to `instance_id: UUID`), `active_quests` (mapping of quest ref to stage name), `completed_quests` (set of quest refs), `active_adventure` (nullable adventure position struct), `pending_triggers` (FIFO list of trigger names awaiting drain, default empty list), and `prestige_pending` (nullable `PrestigeCarryForward` dataclass, default `None` — see prestige-system spec).
 
 The `prestige_pending` field is ephemeral: it is never serialized to the database or restored from it.
+
+`CharacterState` SHALL also include `_derived_shadows: Dict[str, int | None]` (ephemeral, default empty dict). This field is never serialized to the database; it holds the most recently computed value for each derived stat and is always recomputed after load.
 
 In addition to fixed fields, the player state SHALL contain a `stats` mapping populated dynamically from `CharacterConfig`. Stat values SHALL be typed `int | bool | None`. Integer stats SHALL only be mutated through `CharacterState.set_stat()`.
 
@@ -32,7 +34,7 @@ The deprecated `skill_cooldowns: Dict[str, int]` (adventure-count countdown) fie
 #### Scenario: New player starts with default values
 
 - **WHEN** a new player state is created
-- **THEN** level is 1, XP is 0, prestige_count is 0, milestones is an empty dict, statistics has all counters at zero, all adventure timestamp dicts are empty, all skill expiry dicts are empty, and stats contains every stat from CharacterConfig initialized to its declared default
+- **THEN** prestige_count is 0, milestones is an empty dict, statistics has all counters at zero, all adventure timestamp dicts are empty, all skill expiry dicts are empty, `_derived_shadows` is an empty dict, and stats contains every non-derived stat from CharacterConfig initialized to its declared default
 
 #### Scenario: adventure_last_completed_real_ts stores Unix timestamp
 
@@ -135,22 +137,6 @@ Counters are append-only and SHALL never be decremented. All three counter categ
 
 - **WHEN** a new player state is created
 - **THEN** all three counter dicts in `statistics` are empty (querying any key returns 0)
-
----
-
-### Requirement: XP and levelling
-
-The player state SHALL track XP and level. XP thresholds per level SHALL be defined in the game manifest (default formula if not specified). When XP is added that crosses a level threshold, the level SHALL increment automatically. A level-up SHALL also recalculate max_hp and stat caps if defined.
-
-#### Scenario: XP added below threshold
-
-- **WHEN** 50 XP is added and it does not cross the next level threshold
-- **THEN** XP increases and level remains unchanged
-
-#### Scenario: XP crosses level threshold
-
-- **WHEN** XP is added and the cumulative total crosses the threshold for level 2
-- **THEN** level increments to 2 and max_hp is recalculated
 
 ---
 
@@ -290,3 +276,86 @@ The `CharacterState.to_dict()` method SHALL serialize the prestige run counter u
 
 - **WHEN** `CharacterState.from_dict({"iteration": 2, ...})` is called (no prestige_count key)
 - **THEN** the resulting state has `prestige_count == 2` (legacy key accepted for backward compat)
+
+---
+
+### Requirement: CharacterState serializes and deserializes player state
+
+`CharacterState.to_dict()` SHALL serialize all stored stat values under the `stats` key as a flat dict. The fields `level`, `xp`, `hp`, and `max_hp` SHALL NOT appear as top-level keys in the serialized dict. `CharacterState.from_dict()` SHALL not expect or read these fields as top-level keys.
+
+The `_derived_shadows` field SHALL NOT be serialized. Derived shadows are ephemeral and are always recomputed from `CharacterState.stats` on first run of `_recompute_derived_stats()` after load.
+
+Games that declare `level`, `xp`, `hp`, or `max_hp` as stat names in `CharacterConfig` will find those values in `to_dict()["stats"]` exactly as any other stat value.
+
+#### Scenario: to_dict does not contain top-level level/xp/hp/max_hp keys
+
+- **WHEN** `player.to_dict()` is called on any character state
+- **THEN** the returned dict does not contain top-level keys named `"level"`, `"xp"`, `"hp"`, or `"max_hp"`
+
+#### Scenario: Stats declared as level/xp/hp/max_hp appear under stats key
+
+- **WHEN** a game declares `level` as a stat and the character has `stats["level"] = 3`
+- **THEN** `player.to_dict()["stats"]["level"]` equals `3`
+
+#### Scenario: _derived_shadows is not serialized
+
+- **WHEN** `player.to_dict()` is called on a character with non-empty `_derived_shadows`
+- **THEN** the returned dict does not contain a `"_derived_shadows"` key
+
+#### Scenario: from_dict does not require level/xp/hp/max_hp keys
+
+- **WHEN** `CharacterState.from_dict(data)` is called and `data` has no top-level `"level"` key
+- **THEN** the resulting character state deserializes without error
+
+---
+
+### Requirement: new_character() initializes CharacterState without hardcoded progression fields
+
+`new_character()` SHALL initialize `CharacterState` with only:
+- Author-declared stat names and their default values (from `CharacterConfig`), for stats that are NOT derived
+- Derived stats SHALL be absent from the initial `stats` dict
+
+`new_character()` SHALL NOT read `hp_formula`, `xp_thresholds`, or any game-level HP/XP configuration. Initial HP and other setup values are the responsibility of the `on_character_create` trigger adventure.
+
+#### Scenario: new_character stats contains only non-derived stat defaults
+
+- **WHEN** `CharacterState.new_character()` is called with a `CharacterConfig` containing one derived stat and two stored stats
+- **THEN** `player.stats` contains the two stored stats at their default values and does NOT contain the derived stat
+
+#### Scenario: new_character does not read hp_formula
+
+- **WHEN** `CharacterState.new_character()` is called
+- **THEN** it does not raise an error even if the `GameSpec` has no `hp_formula` field
+
+---
+
+### Requirement: CharacterState._derived_shadows initialized empty on new characters
+
+`CharacterState` SHALL include a `_derived_shadows: Dict[str, int | None]` field initialized to an empty dict. This is a non-serialized ephemeral field used by `_recompute_derived_stats()`.
+
+#### Scenario: new_character produces empty _derived_shadows
+
+- **WHEN** `CharacterState.new_character()` is called
+- **THEN** `player._derived_shadows == {}`
+
+#### Scenario: _derived_shadows populated after first recompute
+
+- **WHEN** `_recompute_derived_stats()` is called for the first time after `new_character()`
+- **THEN** all derived stat names appear as keys in `player._derived_shadows`
+
+---
+
+### Requirement: Database migration removes hardcoded progression columns
+
+A new Alembic migration SHALL remove the `level`, `xp`, `hp`, and `max_hp` columns from `character_iterations`. The downgrade SHALL re-add these columns as nullable integers so data is not lost on rollback.
+
+#### Scenario: Migration removes progression columns
+
+- **WHEN** the migration is applied
+- **THEN** `character_iterations` has no columns named `level`, `xp`, `hp`, or `max_hp`
+
+#### Scenario: Migration downgrade restores columns as nullable
+
+- **WHEN** the migration downgrade is applied
+- **THEN** `character_iterations` has nullable integer columns named `level`, `xp`, `hp`, and `max_hp`
+

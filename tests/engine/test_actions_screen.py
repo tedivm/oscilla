@@ -19,7 +19,7 @@ from oscilla.engine.character import CharacterState
 from oscilla.engine.models.adventure import Cooldown, StatChangeEffect
 from oscilla.engine.models.base import Metadata
 from oscilla.engine.models.character_config import CharacterConfigManifest, CharacterConfigSpec, StatDefinition
-from oscilla.engine.models.game import GameManifest, GameSpec, HpFormula
+from oscilla.engine.models.game import GameManifest, GameSpec
 from oscilla.engine.models.skill import SkillCost, SkillManifest, SkillSpec
 from oscilla.engine.registry import ContentRegistry
 from tests.engine.conftest import MockTUI
@@ -39,8 +39,6 @@ def _make_registry(extra_skills: List[SkillManifest] | None = None) -> ContentRe
         metadata=Metadata(name="test-game"),
         spec=GameSpec(
             displayName="Test",
-            xp_thresholds=[100],
-            hp_formula=HpFormula(base_hp=30, hp_per_level=5),
         ),
     )
     registry.game = game

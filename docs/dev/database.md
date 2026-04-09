@@ -871,17 +871,13 @@ erDiagram
     DATETIME completed_at "nullable"
     VARCHAR current_location "nullable"
     BIGINT game_ticks
-    INTEGER hp
     BIGINT internal_ticks
     BOOLEAN is_active
     INTEGER iteration
-    INTEGER level
-    INTEGER max_hp
     VARCHAR pronoun_set
     VARCHAR session_token "nullable"
     DATETIME started_at
     INTEGER version
-    INTEGER xp
   }
 
   characters {

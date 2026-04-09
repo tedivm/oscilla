@@ -235,23 +235,23 @@ class PlayerContext:
     """
 
     name: str
-    level: int
     prestige_count: int
-    hp: int
-    max_hp: int
+    # level, hp, max_hp removed — these are now in stats if the game declares them.
+    # Templates use player.stats["level"] etc.
     stats: Dict[str, int | bool | None]
     milestones: PlayerMilestoneView
     pronouns: PlayerPronounView
 
     @classmethod
     def from_character(cls, char: "CharacterState") -> "PlayerContext":
+        # Merge stored stats with current derived stat shadow values so templates
+        # see derived stats via player.stats["name"] like any other stat.
+        merged_stats: Dict[str, int | bool | None] = dict(char.stats)
+        merged_stats.update(char._derived_shadows)
         return cls(
             name=char.name,
-            level=char.level,
             prestige_count=char.prestige_count,
-            hp=char.hp,
-            max_hp=char.max_hp,
-            stats=dict(char.stats),
+            stats=merged_stats,
             milestones=PlayerMilestoneView(_milestones=char.milestones),
             pronouns=PlayerPronounView.from_set(char.pronouns),
         )
@@ -377,6 +377,193 @@ SECONDS_PER_DAY: int = 86_400
 SECONDS_PER_WEEK: int = 604_800
 
 
+# ---------------------------------------------------------------------------
+# Dice pool functions
+# ---------------------------------------------------------------------------
+
+
+def _safe_roll_pool(n: int, sides: int) -> List[int]:
+    """Roll n dice each with the given number of sides. Returns the individual results.
+
+    Example: roll_pool(3, 6) might return [2, 5, 1] for 3d6.
+    """
+    if not isinstance(n, int) or not isinstance(sides, int):
+        raise ValueError("roll_pool() requires int arguments")
+    if n < 1:
+        raise ValueError(f"roll_pool(): n must be >= 1, got {n}")
+    if sides < 2:
+        raise ValueError(f"roll_pool(): sides must be >= 2, got {sides}")
+    return [random.randint(1, sides) for _ in range(n)]
+
+
+def _safe_keep_highest(pool: List[int], n: int) -> List[int]:
+    """Return the n highest values from pool (sorted descending).
+
+    Example: keep_highest([1, 5, 3, 4], 2) returns [5, 4].
+    Used for advantage mechanics: keep_highest(roll_pool(2, 20), 1).
+    """
+    if not isinstance(pool, list):
+        raise ValueError("keep_highest(): first argument must be a list")
+    if not isinstance(n, int) or n < 1:
+        raise ValueError(f"keep_highest(): n must be a positive int, got {n!r}")
+    if n > len(pool):
+        raise ValueError(f"keep_highest(): n={n} exceeds pool length {len(pool)}")
+    return sorted(pool, reverse=True)[:n]
+
+
+def _safe_keep_lowest(pool: List[int], n: int) -> List[int]:
+    """Return the n lowest values from pool (sorted ascending).
+
+    Example: keep_lowest([1, 5, 3, 4], 2) returns [1, 3].
+    Used for disadvantage mechanics: keep_lowest(roll_pool(2, 20), 1).
+    """
+    if not isinstance(pool, list):
+        raise ValueError("keep_lowest(): first argument must be a list")
+    if not isinstance(n, int) or n < 1:
+        raise ValueError(f"keep_lowest(): n must be a positive int, got {n!r}")
+    if n > len(pool):
+        raise ValueError(f"keep_lowest(): n={n} exceeds pool length {len(pool)}")
+    return sorted(pool)[:n]
+
+
+def _safe_count_successes(pool: List[int], threshold: int) -> int:
+    """Count the number of dice in pool that are >= threshold.
+
+    Example: count_successes([3, 5, 2, 6], 5) returns 2.
+    Used for pool-based success-counting systems (World of Darkness, Year Zero).
+    """
+    if not isinstance(pool, list):
+        raise ValueError("count_successes(): first argument must be a list")
+    if not isinstance(threshold, int):
+        raise ValueError("count_successes(): threshold must be an int")
+    return sum(1 for die in pool if die >= threshold)
+
+
+def _safe_explode(pool: List[int], sides: int, on: int | None = None, max_explosions: int = 10) -> List[int]:
+    """Re-roll dice that land on the explode value (default: sides) and add new results.
+
+    Each die that lands on the explode value is kept AND an additional die is rolled.
+    The new die can also explode, up to max_explosions total extra rolls.
+    """
+    if not isinstance(pool, list):
+        raise ValueError("explode(): pool must be a list")
+    explode_on = on if on is not None else sides
+    if not isinstance(explode_on, int) or explode_on < 1 or explode_on > sides:
+        raise ValueError(f"explode(): on value {explode_on!r} must be between 1 and {sides}")
+    result = list(pool)
+    extra_rolls = 0
+    i = 0
+    while i < len(result) and extra_rolls < max_explosions:
+        if result[i] == explode_on:
+            new_die = random.randint(1, sides)
+            result.append(new_die)
+            extra_rolls += 1
+        i += 1
+    return result
+
+
+def _safe_roll_fudge(n: int) -> List[int]:
+    """Roll n FATE/Fudge dice. Each die returns -1, 0, or 1 with equal probability.
+
+    Example: roll_fudge(4) might return [-1, 0, 1, 1].
+    Sum the result for the final FATE roll: sum(roll_fudge(4)).
+    """
+    if not isinstance(n, int) or n < 1:
+        raise ValueError(f"roll_fudge(): n must be a positive int, got {n!r}")
+    return [random.choice([-1, 0, 1]) for _ in range(n)]
+
+
+def _safe_weighted_roll(options: List[Any], weights: List[int | float]) -> Any:  # noqa: ANN401
+    """Return one element from options selected by the given weights.
+
+    Example: weighted_roll(['miss', 'hit', 'crit'], [50, 40, 10]).
+    Unlike choice() which assumes equal probability, this accepts explicit weights.
+    """
+    if not isinstance(options, list) or not isinstance(weights, list):
+        raise ValueError("weighted_roll(): both arguments must be lists")
+    if not options:
+        raise ValueError("weighted_roll(): options list must not be empty")
+    if len(options) != len(weights):
+        raise ValueError(f"weighted_roll(): options length {len(options)} != weights length {len(weights)}")
+    return random.choices(options, weights=weights, k=1)[0]
+
+
+# ---------------------------------------------------------------------------
+# Die shorthand aliases
+# ---------------------------------------------------------------------------
+
+
+# Ergonomic aliases for the most common die types. Naming matches universal TTRPG shorthand.
+def _d4() -> int:
+    return random.randint(1, 4)
+
+
+def _d6() -> int:
+    return random.randint(1, 6)
+
+
+def _d8() -> int:
+    return random.randint(1, 8)
+
+
+def _d10() -> int:
+    return random.randint(1, 10)
+
+
+def _d12() -> int:
+    return random.randint(1, 12)
+
+
+def _d20() -> int:
+    return random.randint(1, 20)
+
+
+def _d100() -> int:
+    return random.randint(1, 100)
+
+
+# ---------------------------------------------------------------------------
+# Display and numeric helpers
+# ---------------------------------------------------------------------------
+
+
+def _ordinal(n: int) -> str:
+    """Return the ordinal string representation of n.
+
+    Examples: ordinal(1) → '1st', ordinal(2) → '2nd', ordinal(13) → '13th'.
+    Teen numbers (11th, 12th, 13th) always use 'th'.
+    """
+    if not isinstance(n, int):
+        raise ValueError(f"ordinal(): argument must be an int, got {type(n).__name__}")
+    # Special cases for 11th, 12th, 13th (teen numbers always use 'th').
+    if 11 <= n % 100 <= 13:
+        return f"{n}th"
+    suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def _signed(n: int | float) -> str:
+    """Return n as a signed string: +3, -2, 0.
+
+    Useful for narrative stat-change display: 'You gained {{ signed(amount) }} strength.'
+    """
+    if not isinstance(n, (int, float)):
+        raise ValueError(f"signed(): argument must be numeric, got {type(n).__name__}")
+    return f"+{n}" if n > 0 else str(n)
+
+
+def _stat_mod(value: int) -> int:
+    """Return the D&D-style ability score modifier: floor((value - 10) / 2).
+
+    Example: stat_mod(14) → 2, stat_mod(8) → -1, stat_mod(10) → 0.
+    Available as a function in addition to the existing | stat_modifier filter,
+    for use in formula expressions: roll(1, 20) + stat_mod(player.stats[\"strength\"]).
+    """
+    if not isinstance(value, int):
+        raise ValueError(f"stat_mod(): argument must be an int, got {type(value).__name__}")
+    return (value - 10) // 2
+
+
 SAFE_GLOBALS: Dict[str, Any] = {
     "roll": _safe_roll,
     "choice": _safe_choice,
@@ -413,6 +600,26 @@ SAFE_GLOBALS: Dict[str, Any] = {
     "SECONDS_PER_HOUR": SECONDS_PER_HOUR,
     "SECONDS_PER_DAY": SECONDS_PER_DAY,
     "SECONDS_PER_WEEK": SECONDS_PER_WEEK,
+    # Dice pools
+    "roll_pool": _safe_roll_pool,
+    "keep_highest": _safe_keep_highest,
+    "keep_lowest": _safe_keep_lowest,
+    "count_successes": _safe_count_successes,
+    "explode": _safe_explode,
+    "roll_fudge": _safe_roll_fudge,
+    "weighted_roll": _safe_weighted_roll,
+    # Die shorthand aliases
+    "d4": _d4,
+    "d6": _d6,
+    "d8": _d8,
+    "d10": _d10,
+    "d12": _d12,
+    "d20": _d20,
+    "d100": _d100,
+    # Display and numeric helpers
+    "ordinal": _ordinal,
+    "signed": _signed,
+    "stat_mod": _stat_mod,
 }
 
 
@@ -505,10 +712,7 @@ class _MockPlayer:
 
     def __init__(self, stat_names: List[str]) -> None:
         self.name = "TestPlayer"
-        self.level = 5
         self.prestige_count = 0
-        self.hp = 30
-        self.max_hp = 30
         self.milestones = _MockPlayerMilestones()
         self.pronouns = _MockPlayerPronouns()
         # Build stats dict from CharacterConfig stat names with mock values.

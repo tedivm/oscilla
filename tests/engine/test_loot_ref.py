@@ -164,10 +164,6 @@ def test_unknown_loot_ref_raises_content_load_error(tmp_path: Path) -> None:
               name: test-game
             spec:
               displayName: Test
-              xp_thresholds: [100]
-              hp_formula:
-                base_hp: 10
-                hp_per_level: 2
         """)
     )
 

@@ -27,7 +27,6 @@ from oscilla.models.character_iteration import (
 if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
     from oscilla.engine.models.character_config import CharacterConfigManifest
-    from oscilla.engine.models.game import GameManifest
     from oscilla.engine.registry import ContentRegistry
 
 from oscilla.engine.templates import PRONOUN_SETS
@@ -78,10 +77,6 @@ async def save_character(session: AsyncSession, state: "CharacterState", user_id
         character_id=state.character_id,
         iteration=state.prestige_count,
         is_active=True,
-        level=state.level,
-        xp=state.xp,
-        hp=state.hp,
-        max_hp=state.max_hp,
         character_class=state.character_class,
         current_location=state.current_location,
         pronoun_set=next((k for k, v in PRONOUN_SETS.items() if v == state.pronouns), "they_them"),
@@ -356,10 +351,6 @@ async def load_character(
         "prestige_count": iteration.iteration,
         "name": character.name,
         "character_class": iteration.character_class,
-        "level": iteration.level,
-        "xp": iteration.xp,
-        "hp": iteration.hp,
-        "max_hp": iteration.max_hp,
         "current_location": iteration.current_location,
         "pronoun_set": iteration.pronoun_set,
         "milestones": milestones,
@@ -483,7 +474,6 @@ async def prestige_character(
     session: AsyncSession,
     character_id: UUID,
     character_config: "CharacterConfigManifest",
-    game_manifest: "GameManifest | None" = None,
 ) -> CharacterIterationRecord:
     """Close the active iteration and open a new one.
 
@@ -517,16 +507,11 @@ async def prestige_character(
 
     # 4. Create the new iteration with fresh defaults from character_config
     all_stats = character_config.spec.public_stats + character_config.spec.hidden_stats
-    base_hp = game_manifest.spec.hp_formula.base_hp if game_manifest is not None else 10
 
     new_iteration = CharacterIterationRecord(
         character_id=character_id,
         iteration=new_ordinal,
         is_active=True,
-        level=1,
-        xp=0,
-        hp=base_hp,
-        max_hp=base_hp,
     )
     session.add(new_iteration)
     await session.flush()

@@ -1,0 +1,20 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: testlandia-character-creation
+spec:
+  displayName: "Testlandia Initialization"
+  repeatable: false
+  steps:
+    # Set base HP and max_hp for the character on creation.
+    # In the new engine design HP is a regular stat initialized via this trigger
+    # instead of a hardcoded hp_formula field in game.yaml.
+    - type: narrative
+      text: "The world takes shape around you. You feel the pulse of life in your veins."
+      effects:
+        - type: stat_set
+          stat: hp
+          value: 10
+        - type: stat_set
+          stat: max_hp
+          value: 10

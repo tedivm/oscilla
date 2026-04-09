@@ -20,6 +20,12 @@ spec:
       type: int
       default: 20
       description: "Maximum mana"
+    - name: xp
+      type: int
+      default: 0
+      bounds:
+        min: 0
+      description: "Experience points"
   hidden_stats: []
   skill_resources:
     - name: mana

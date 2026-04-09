@@ -49,11 +49,6 @@ class CharacterIterationRecord(Base):
     # uq_active_iteration_per_character partial unique index.
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    # Scalar run stats — indexed and queryable directly
-    level: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    xp: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    hp: Mapped[int] = mapped_column(Integer, nullable=False)
-    max_hp: Mapped[int] = mapped_column(Integer, nullable=False)
     character_class: Mapped[str | None] = mapped_column(String, nullable=True)
     current_location: Mapped[str | None] = mapped_column(String, nullable=True)
     pronoun_set: Mapped[str] = mapped_column(String, nullable=False, default="they_them")

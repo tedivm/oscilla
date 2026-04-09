@@ -78,10 +78,6 @@ metadata:
   name: test-game
 spec:
   displayName: "Test"
-  xp_thresholds: [100]
-  hp_formula:
-    base_hp: 20
-    hp_per_level: 5
 """)
     (tmp_path / "character-config.yaml").write_text("""
 apiVersion: oscilla/v1
@@ -110,10 +106,6 @@ metadata:
   name: broken-game
 spec:
   displayName: "Broken"
-  xp_thresholds: [0, 100]
-  hp_formula:
-    base_hp: 20
-    hp_per_level: 5
 """)
 
     (tmp_path / "character-config.yaml").write_text("""
@@ -184,10 +176,6 @@ metadata:
   name: broken-game
 spec:
   displayName: "Broken"
-  xp_thresholds: [0, 100]
-  hp_formula:
-    base_hp: 20
-    hp_per_level: 5
 """)
 
     (tmp_path / "character-config.yaml").write_text("""
@@ -255,10 +243,6 @@ metadata:
   name: broken-game
 spec:
   displayName: "Broken"
-  xp_thresholds: [0, 100]
-  hp_formula:
-    base_hp: 20
-    hp_per_level: 5
 """)
 
     (tmp_path / "character-config.yaml").write_text("""

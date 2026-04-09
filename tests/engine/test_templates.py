@@ -28,17 +28,13 @@ from oscilla.engine.templates import (
 
 def _make_player(
     name: str = "Tester",
-    level: int = 1,
     stats: dict | None = None,
     milestones: Set[str] | None = None,
 ) -> PlayerContext:
     pronouns = PlayerPronounView.from_set(DEFAULT_PRONOUN_SET)
     return PlayerContext(
         name=name,
-        level=level,
         prestige_count=0,
-        hp=20,
-        max_hp=20,
         stats=stats or {"strength": 10},
         milestones=PlayerMilestoneView(_milestones=milestones or set()),
         pronouns=pronouns,
@@ -110,7 +106,7 @@ def test_preprocess_unknown_placeholder_unchanged() -> None:
 
 
 def test_preprocess_jinja_blocks_not_affected() -> None:
-    raw = "{% if player.level > 1 %}veteran{% endif %}"
+    raw = "{% if player.stats['level'] > 1 %}veteran{% endif %}"
     result = preprocess_pronouns(raw)
     assert result == raw
 
@@ -137,9 +133,9 @@ def test_render_player_stat() -> None:
 
 
 def test_render_player_level() -> None:
-    engine = _make_engine()
-    ctx = _make_ctx(_make_player(level=5))
-    engine.precompile_and_validate("Level: {{ player.level }}", "test-level", "adventure")
+    engine = _make_engine(["level"])
+    ctx = _make_ctx(_make_player(stats={"level": 5}))
+    engine.precompile_and_validate("Level: {{ player.stats.level }}", "test-level", "adventure")
     result = engine.render("test-level", ctx)
     assert result == "Level: 5"
 
@@ -365,7 +361,7 @@ def test_is_template_jinja_expression() -> None:
 
 def test_is_template_jinja_block() -> None:
     engine = _make_engine()
-    assert engine.is_template("{% if player.level > 1 %}...{% endif %}")
+    assert engine.is_template("{% if player.stats['level'] > 1 %}...{% endif %}")
 
 
 def test_is_template_pronoun_shorthand() -> None:

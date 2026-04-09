@@ -1,0 +1,14 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: test-derived-adventure
+spec:
+  displayName: "Derived Stats Test"
+  description: "Adventure that changes stored stats to trigger derived recalculation."
+  steps:
+    - type: narrative
+      text: "Testing derived stat updates."
+      effects:
+        - type: stat_change
+          stat: strength
+          amount: 2

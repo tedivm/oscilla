@@ -10,7 +10,8 @@ spec:
       enemy: test-enemy
       on_win:
         effects:
-          - type: xp_grant
+          - type: stat_change
+            stat: xp
             amount: 20
           - type: milestone_grant
             milestone: test-combat-won

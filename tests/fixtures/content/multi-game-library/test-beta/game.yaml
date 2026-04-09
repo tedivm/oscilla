@@ -4,10 +4,3 @@ metadata:
   name: test-beta
 spec:
   displayName: "Test Beta"
-  xp_thresholds:
-    - 0
-    - 100
-    - 300
-  hp_formula:
-    base_hp: 20
-    hp_per_level: 5

@@ -21,10 +21,6 @@ metadata:
   name: test-game
 spec:
   displayName: "Test"
-  xp_thresholds: [100]
-  hp_formula:
-    base_hp: 20
-    hp_per_level: 5
 """
 
 _GAME_YAML_WITH_OUTCOMES = """\
@@ -34,10 +30,6 @@ metadata:
   name: test-game
 spec:
   displayName: "Test"
-  xp_thresholds: [100]
-  hp_formula:
-    base_hp: 20
-    hp_per_level: 5
   outcomes:
     - discovered
     - rescued
@@ -209,10 +201,6 @@ def _make_player() -> CharacterState:
         character_id=uuid4(),
         name="Tester",
         character_class=None,
-        level=1,
-        xp=0,
-        hp=20,
-        max_hp=20,
         prestige_count=0,
         current_location=None,
         stats={},

@@ -37,44 +37,78 @@ metadata:
 spec:
   displayName: "My Kingdom"
   description: "A text-based adventure in a medieval realm."
-  xp_thresholds: [100, 250, 500, 900, 1400, 2100, 3000]
-  hp_formula:
-    base_hp: 20
-    hp_per_level: 10
 ```
 
 `metadata.name` must match the directory name.
 
-### XP and Leveling
+### XP, Leveling, and HP
 
-The `xp_thresholds` list defines how much total XP is required to reach each level above 1. Index 0 is level 2, index 1 is level 3, and so on.
+XP and leveling are implemented entirely through the stat and trigger systems — there are no special `xp_thresholds` or `hp_formula` fields. This gives you full control over the shape of progression.
 
-```yaml
-xp_thresholds: [100, 250, 500, 900, 1400]
-```
+**Typical setup:**
 
-This means:
+1. Declare `xp` and `level` as `int` stats in `character_config.yaml`.
+2. Compute HP and other derived values with `derived` formulas on stats.
+3. Configure `on_stat_threshold` in `game.yaml` to fire adventures when XP crosses a level boundary.
+4. Run an `on_character_create` adventure that initializes HP via `stat_set`.
 
-- Level 1: 0 XP (starting level)
-- Level 2: 100 XP total
-- Level 3: 250 XP total
-- Level 4: 500 XP total
-- Level 5: 900 XP total
-- Level 6: 1400 XP total
-
-The number of entries determines the maximum level. A player who reaches the last threshold is at the game's level cap.
-
-**Level-down mechanics:** Negative XP from effects can reduce the player's level. The engine enforces a floor of level 1 and an XP floor of 0. When a level change occurs, max HP is recalculated and current HP is capped if needed.
-
-### HP Formula
+**Example XP → level setup in `character_config.yaml`:**
 
 ```yaml
-hp_formula:
-  base_hp: 20 # HP at level 1
-  hp_per_level: 10 # HP gained per level
+public_stats:
+  - name: xp
+    type: int
+    default: 0
+    bounds:
+      min: 0
+    description: "Accumulated experience."
+
+  - name: level
+    type: int
+    default: 1
+    bounds:
+      min: 1
+    description: "Character level."
+
+  - name: hp
+    type: int
+    default: 20
+    bounds:
+      min: 0
+    description: "Hit points."
+
+  # max_hp is computed from level using a derived formula
+  - name: max_hp
+    type: int
+    derived: "{{ 20 + (player.stats['level'] - 1) * 10 }}"
+    description: "Maximum hit points."
 ```
 
-Max HP = `base_hp + (level - 1) × hp_per_level`. At level 5: 20 + 4 × 10 = 60 HP.
+**Example threshold triggers in `game.yaml`:**
+
+```yaml
+triggers:
+  on_stat_threshold:
+    - stat: xp
+      threshold: 100
+      name: xp-level-2
+    - stat: xp
+      threshold: 300
+      name: xp-level-3
+    - stat: xp
+      threshold: 600
+      name: xp-level-4
+
+trigger_adventures:
+  xp-level-2:
+    - level-up-ceremony
+  xp-level-3:
+    - level-up-ceremony
+  xp-level-4:
+    - level-up-ceremony
+```
+
+The `level-up-ceremony` adventure uses `stat_change` to increment `level` and `stat_set` to update `hp`. See [Triggered Adventures](#triggered-adventures) below for the trigger wiring pattern.
 
 ### Item Labels
 
@@ -335,20 +369,17 @@ spec:
 
 ### `game.yaml` spec fields
 
-| Field                     | Required | Description                                                                                      |
-| ------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
-| `displayName`             | yes      | Player-facing game title                                                                         |
-| `description`             | no       | One or two sentence description                                                                  |
-| `xp_thresholds`           | yes      | List of total XP values for levels 2, 3, 4, …                                                    |
-| `hp_formula.base_hp`      | yes      | HP at level 1                                                                                    |
-| `hp_formula.hp_per_level` | yes      | HP gained per level                                                                              |
-| `item_labels`             | no       | List of label definitions (see above)                                                            |
-| `passive_effects`         | no       | List of game-wide passive effect entries                                                         |
-| `season_hemisphere`       | no       | `northern` (default) or `southern` — flips which months are which season                         |
-| `timezone`                | no       | IANA timezone name (e.g. `"America/New_York"`); defaults to server local time                    |
-| `time`                    | no       | In-game time system configuration — cycles, eras, epoch. See [In-Game Time](./ingame-time.md).   |
-| `triggers`                | no       | Trigger declarations: `custom`, `on_game_rejoin`, `on_stat_threshold`, `max_trigger_queue_depth` |
-| `trigger_adventures`      | no       | Maps trigger keys to ordered adventure ref lists (see Triggered Adventures above)                |
+| Field                | Required | Description                                                                                      |
+| -------------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `displayName`        | yes      | Player-facing game title                                                                         |
+| `description`        | no       | One or two sentence description                                                                  |
+| `item_labels`        | no       | List of label definitions (see above)                                                            |
+| `passive_effects`    | no       | List of game-wide passive effect entries                                                         |
+| `season_hemisphere`  | no       | `northern` (default) or `southern` — flips which months are which season                         |
+| `timezone`           | no       | IANA timezone name (e.g. `"America/New_York"`); defaults to server local time                    |
+| `time`               | no       | In-game time system configuration — cycles, eras, epoch. See [In-Game Time](./ingame-time.md).   |
+| `triggers`           | no       | Trigger declarations: `custom`, `on_game_rejoin`, `on_stat_threshold`, `max_trigger_queue_depth` |
+| `trigger_adventures` | no       | Maps trigger keys to ordered adventure ref lists (see Triggered Adventures above)                |
 
 ### `character_config.yaml` spec fields
 
@@ -361,14 +392,50 @@ spec:
 
 ### Stat definition fields
 
-| Field         | Required | Description                         |
-| ------------- | -------- | ----------------------------------- |
-| `name`        | yes      | Identifier (lowercase, underscores) |
-| `type`        | yes      | `int` or `bool`                     |
-| `default`     | yes      | Starting value                      |
-| `description` | no       | Displayed to player                 |
-| `bounds.min`  | no       | Minimum value (int stats only)      |
-| `bounds.max`  | no       | Maximum value (int stats only)      |
+| Field          | Required                       | Description                                                                                               |
+| -------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `name`         | yes                            | Identifier (lowercase, underscores)                                                                       |
+| `type`         | yes                            | `int` or `bool`                                                                                           |
+| `default`      | yes for stored; absent for derived | Starting value. Must be omitted on derived stats.                                               |
+| `description`  | no                             | Displayed to player                                                                                       |
+| `bounds.min`   | no                             | Minimum value (int stats only)                                                                            |
+| `bounds.max`   | no                             | Maximum value (int stats only)                                                                            |
+| `derived`      | no                             | Jinja2 expression evaluated at runtime; result replaces the stored value in conditions and templates      |
+| `stat_context` | no (default: `stored`)         | `stored` — formula sees raw stored stats; `effective` — formula sees equipment + passive bonuses applied  |
+
+#### Derived stats
+
+A `derived` stat has no stored value. Its value is recomputed automatically every time any stored stat changes, and the result is available in template expressions and conditions just like a regular stat.
+
+- Derived stats cannot declare a `default` value.
+- Derived stats cannot be targeted by `stat_change` or `stat_set` effects.
+- `bool` stats cannot have a `derived` formula.
+- A derived stat can reference another derived stat in its formula; the engine resolves them in topological order.
+- Circular dependencies between derived stats are caught at load time.
+
+```yaml
+# Derived stat example: D&D-style strength modifier
+- name: str_mod
+  type: int
+  derived: "{{ (player.stats['strength'] - 10) // 2 }}"
+  description: "Strength modifier"
+
+# Derived stat referencing another derived stat
+- name: attack_bonus
+  type: int
+  derived: "{{ player.stats['str_mod'] + player.stats['level'] }}"
+  description: "Total attack bonus"
+```
+
+Use `stat_context: effective` to factor in equipment and passive bonuses when computing the derived value:
+
+```yaml
+- name: effective_strength
+  type: int
+  derived: "{{ player.stats['strength'] }}"
+  stat_context: effective  # sees equipment bonuses
+  description: "Strength with gear"
+```
 
 ### Built-in pronoun sets
 

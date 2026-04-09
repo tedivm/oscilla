@@ -26,13 +26,9 @@ def _player(
         character_id=uuid4(),
         name="Tester",
         character_class=None,
-        level=level,
-        xp=0,
-        hp=20,
-        max_hp=20,
         prestige_count=0,
         current_location=None,
-        stats={},
+        stats={"level": level},
     )
     p.game_ticks = game_ticks
     p.internal_ticks = internal_ticks
@@ -88,8 +84,6 @@ def _time_registry(
     )
     game_spec = GameSpec(
         displayName="Test Time Game",
-        xp_thresholds=[0, 100],
-        hp_formula={"base_hp": 20, "hp_per_level": 5},
         time=spec,
     )
     game_manifest = GameManifest(

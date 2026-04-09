@@ -15,15 +15,15 @@ Inside a template, the `player` object gives you access to everything about the 
 ```yaml
 text: |
   Welcome back, {{ player.name }}!
-  You are level {{ player.level }} with {{ player.hp }}/{{ player.max_hp }} HP.
+  You are level {{ player.stats['level'] }} with {{ player.stats['hp'] }}/{{ player.stats['max_hp'] }} HP.
 ```
 
 | Expression                            | Type     | Description                           |
 | ------------------------------------- | -------- | ------------------------------------- |
 | `{{ player.name }}`                   | str      | Character name                        |
-| `{{ player.level }}`                  | int      | Current level                         |
-| `{{ player.hp }}`                     | int      | Current hit points                    |
-| `{{ player.max_hp }}`                 | int      | Maximum hit points                    |
+| `{{ player.stats['level'] }}`         | int      | Level stat (if declared in config)    |
+| `{{ player.stats['hp'] }}`            | int      | HP stat (if declared in config)       |
+| `{{ player.stats['max_hp'] }}`        | int/None | Derived or stored HP cap              |
 | `{{ player.stats.<name> }}`           | int/bool | Any stat defined in `CharacterConfig` |
 | `{{ player.milestones.has("name") }}` | bool     | True if player holds that milestone   |
 
@@ -62,9 +62,10 @@ The `roll(low, high)` function returns a random integer between `low` and `high`
 # In narrative text
 text: "You find {{ roll(10, 50) }} gold coins scattered on the floor."
 
-# In an XP grant — dynamic reward
+# In a stat_change (grant XP dynamically)
 effects:
-  - type: xp_grant
+  - type: stat_change
+    stat: xp
     amount: "{{ roll(50, 150) }}"
 
 # In a stat_change
@@ -113,10 +114,76 @@ text: "Your accuracy is {{ (random() * 100) | round }}%."
 | `ceil(n)`            | Round up                 | `{{ ceil(x) }}`                             |
 | `abs(n)`             | Absolute value           | `{{ abs(player.stats.debt) }}`              |
 | `int(x)`             | Convert to integer       | `{{ int(x) }}`                              |
-| `str(x)`             | Convert to string        | `{{ str(player.level) }}`                   |
+| `str(x)`             | Convert to string        | `{{ str(player.stats.level) }}`             |
 | `len(seq)`           | Length of a sequence     | `{{ len(items) }}`                          |
 | `range(n)`           | Integer range for loops  | `{% for i in range(3) %}`                   |
 | `sum(seq)`           | Sum a sequence           | `{{ sum(values) }}`                         |
+
+---
+
+## Dice and Pool Functions
+
+These functions support tabletop-style dice rolls and pool mechanics.
+
+### Die Aliases
+
+Shorthand functions for common die sizes. Each returns a single random integer.
+
+| Function    | Equivalent                | Example                  |
+| ----------- | ------------------------- | ------------------------ |
+| `d4()`      | `roll_pool(1, 4)[0]`      | `{{ d4() }}`             |
+| `d6()`      | `roll_pool(1, 6)[0]`      | `{{ d6() }}`             |
+| `d8()`      | `roll_pool(1, 8)[0]`      | `{{ d8() }}`             |
+| `d10()`     | `roll_pool(1, 10)[0]`     | `{{ d10() }}`            |
+| `d12()`     | `roll_pool(1, 12)[0]`     | `{{ d12() }}`            |
+| `d20()`     | `roll_pool(1, 20)[0]`     | `{{ d20() }}`            |
+| `d100()`    | `roll_pool(1, 100)[0]`    | `{{ d100() }}`           |
+
+### Pool Functions
+
+| Function                                   | Returns       | Description                                                             |
+| ------------------------------------------ | ------------- | ----------------------------------------------------------------------- |
+| `roll_pool(n, sides)`                      | `List[int]`   | Roll `n` dice with `sides` faces; each result is `1..sides`            |
+| `keep_highest(pool, n)`                    | `List[int]`   | Keep the `n` highest values from `pool`                                 |
+| `keep_lowest(pool, n)`                     | `List[int]`   | Keep the `n` lowest values from `pool`                                  |
+| `count_successes(pool, threshold)`         | `int`         | Count dice in `pool` that are `>= threshold`                            |
+| `explode(pool, sides, on=None, max=10)`    | `List[int]`   | Re-roll dice at max value; append extra dice; cap at `max` explosions   |
+| `roll_fudge(n)`                            | `List[int]`   | Roll `n` Fudge/FATE dice; each result is `-1`, `0`, or `+1`            |
+| `weighted_roll(options, weights)`          | any           | Pick one element from `options` using the given relative `weights`      |
+
+```yaml
+# Roll 4d6, drop lowest, sum the rest
+effects:
+  - type: stat_change
+    stat: strength
+    amount: "{{ keep_highest(roll_pool(4, 6), 3) | sum }}"
+
+# Dice pool: number of d6s that show 5 or 6 determines damage
+text: "You roll {{ count_successes(roll_pool(player.stats['skill'], 6), 5) }} hits!"
+
+# HP on level-up (D20-style)
+effects:
+  - type: stat_change
+    stat: hp
+    amount: "{{ d10() + stat_mod(player.stats['constitution']) }}"
+```
+
+---
+
+## Formatting Functions
+
+| Function         | Description                               | Example                          |
+| ---------------- | ----------------------------------------- | -------------------------------- |
+| `ordinal(n)`     | Format integer as ordinal (`1st`, `2nd`)  | `ordinal(3)` → `"3rd"`          |
+| `signed(n)`      | Add `+` prefix to positive numbers        | `signed(2)` → `"+2"`            |
+| `stat_mod(n)`    | D&D-style ability modifier `(n-10)//2`    | `stat_mod(14)` → `2`            |
+
+**`ordinal()` teen edge cases:** 11, 12, and 13 always use `th` regardless of the tens digit (`11th`, `12th`, `13th`). This also applies to 111, 112, 113, etc.
+
+```yaml
+text: "You've reached the {{ ordinal(player.stats['level']) }} level of power!"
+text: "Attack bonus: {{ signed(stat_mod(player.stats['strength'])) }}"
+```
 
 ---
 
@@ -264,12 +331,11 @@ text: |
 
 Templates are supported in these fields:
 
-| Field                 | Example                         |
-| --------------------- | ------------------------------- |
-| Narrative step `text` | `"Hello, {{ player.name }}!"`   |
-| `xp_grant.amount`     | `"{{ roll(50, 150) }}"`         |
-| `stat_change.amount`  | `"{{ player.stats.luck * 2 }}"` |
-| `item_drop.count`     | `"{{ roll(1, 3) }}"`            |
+| Field                | Example                         |
+| -------------------- | ------------------------------- |
+| Narrative step `text`| `"Hello, {{ player.name }}!"`   |
+| `stat_change.amount` | `"{{ player.stats.luck * 2 }}"` |
+| `item_drop.count`    | `"{{ roll(1, 3) }}"`            |
 
 Fields that don't support templates will treat the string literally.
 
@@ -294,9 +360,9 @@ Template syntax errors and unknown context references are reported with the file
 | Expression                              | Type     | Description                             |
 | --------------------------------------- | -------- | --------------------------------------- |
 | `player.name`                           | str      | Character name                          |
-| `player.level`                          | int      | Current level                           |
-| `player.hp`                             | int      | Current hit points                      |
-| `player.max_hp`                         | int      | Maximum hit points                      |
+| `player.stats['level']`                 | int      | Level stat value (if declared in config)|
+| `player.stats['hp']`                    | int      | HP stat value (if declared in config)   |
+| `player.stats['max_hp']`                | int/None | Max HP stat (stored or derived)         |
 | `player.stats.<name>`                   | int/bool | Any declared stat by name               |
 | `player.milestones.has("<name>")`       | bool     | True if player holds the milestone      |
 | `player.pronouns.subject`               | str      | Subject pronoun (they/she/he)           |

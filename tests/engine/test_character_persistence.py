@@ -13,9 +13,9 @@ from oscilla.engine.registry import ContentRegistry
 
 def test_to_dict_round_trips_all_fields(base_player: CharacterState) -> None:
     """to_dict → from_dict with matching config produces identical state."""
-    base_player.level = 3
-    base_player.xp = 150
-    base_player.hp = 15
+    base_player.stats["level"] = 3
+    base_player.stats["xp"] = 150
+    base_player.stats["hp"] = 15
     base_player.add_item(ref="test-sword", quantity=2)
     base_player.grant_milestone("first-victory")
     base_player.statistics.record_enemy_defeated("test-enemy")
@@ -43,10 +43,9 @@ def test_to_dict_round_trips_all_fields(base_player: CharacterState) -> None:
 
     assert restored.character_id == base_player.character_id
     assert restored.name == base_player.name
-    assert restored.level == base_player.level
-    assert restored.xp == base_player.xp
-    assert restored.hp == base_player.hp
-    assert restored.max_hp == base_player.max_hp
+    assert restored.stats.get("level") == base_player.stats.get("level")
+    assert restored.stats.get("xp") == base_player.stats.get("xp")
+    assert restored.stats.get("hp") == base_player.stats.get("hp")
     assert restored.stacks == base_player.stacks
     assert restored.milestones == base_player.milestones
     assert restored.active_quests == base_player.active_quests
@@ -68,10 +67,6 @@ def test_from_dict_matching_config(minimal_registry: ContentRegistry) -> None:
         "iteration": 0,
         "name": "TestHero",
         "character_class": None,
-        "level": 1,
-        "xp": 0,
-        "hp": 20,
-        "max_hp": 20,
         "current_location": None,
         "milestones": [],
         "inventory": {},
@@ -85,7 +80,6 @@ def test_from_dict_matching_config(minimal_registry: ContentRegistry) -> None:
     state = CharacterState.from_dict(data=data, character_config=minimal_registry.character_config)
     assert state.stats["strength"] == 10
     assert state.name == "TestHero"
-    assert state.level == 1
 
 
 def test_from_dict_injects_missing_stat_default(minimal_registry: ContentRegistry) -> None:
@@ -96,10 +90,6 @@ def test_from_dict_injects_missing_stat_default(minimal_registry: ContentRegistr
         "iteration": 0,
         "name": "MissingStats",
         "character_class": None,
-        "level": 1,
-        "xp": 0,
-        "hp": 20,
-        "max_hp": 20,
         "current_location": None,
         "milestones": [],
         "inventory": {},
@@ -126,10 +116,6 @@ def test_from_dict_drops_unknown_stat_and_logs_warning(
         "iteration": 0,
         "name": "StaleStats",
         "character_class": None,
-        "level": 1,
-        "xp": 0,
-        "hp": 20,
-        "max_hp": 20,
         "current_location": None,
         "milestones": [],
         "inventory": {},
@@ -158,10 +144,6 @@ def test_from_dict_clears_stale_adventure_ref_and_logs_warning(
         "iteration": 0,
         "name": "StuckHero",
         "character_class": None,
-        "level": 1,
-        "xp": 0,
-        "hp": 20,
-        "max_hp": 20,
         "current_location": None,
         "milestones": [],
         "inventory": {},

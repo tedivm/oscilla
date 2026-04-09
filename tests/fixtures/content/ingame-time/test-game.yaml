@@ -4,13 +4,6 @@ metadata:
   name: test-time-game
 spec:
   displayName: "Test Time Game"
-  xp_thresholds:
-    - 0
-    - 100
-    - 300
-  hp_formula:
-    base_hp: 20
-    hp_per_level: 5
   time:
     ticks_per_adventure: 1
     base_unit: tick

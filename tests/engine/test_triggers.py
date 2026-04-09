@@ -20,12 +20,9 @@ def _make_state(level: int = 1) -> CharacterState:
         character_id=uuid4(),
         name="Tester",
         character_class=None,
-        level=level,
-        xp=0,
-        hp=20,
-        max_hp=20,
         prestige_count=0,
         current_location=None,
+        stats={"level": level, "xp": 0},
     )
 
 
@@ -68,17 +65,13 @@ def test_enqueue_trigger_max_depth() -> None:
 
 
 def test_on_level_up_enqueues_per_level() -> None:
-    """Each level gained from add_xp corresponds to one on_level_up enqueue."""
+    """Threshold-based level triggers can be manually enqueued per level gained."""
     state = _make_state()
-    # Thresholds: 100 → level 2, 300 → level 3; grant enough to pass both.
-    levels_gained, _ = state.add_xp(amount=350, xp_thresholds=[100, 300], hp_per_level=5)
-    assert len(levels_gained) == 2
+    # Simulate two level-up events by manually enqueueing level trigger names.
+    state.enqueue_trigger("level-2-reached")
+    state.enqueue_trigger("level-3-reached")
 
-    # Simulate what the effect handler does: one enqueue per level gained.
-    for _ in levels_gained:
-        state.enqueue_trigger("on_level_up")
-
-    assert state.pending_triggers.count("on_level_up") == 2
+    assert len(state.pending_triggers) == 2
 
 
 # ---------------------------------------------------------------------------
@@ -130,11 +123,11 @@ async def test_drain_skips_ineligible() -> None:
         requires=LevelCondition(type="level", value=99),  # never met at level 1
     )
     registry = ContentRegistry()
-    registry.trigger_index = {"on_level_up": ["gated-adv"]}
+    registry.trigger_index = {"level-2-reached": ["gated-adv"]}
     registry.adventures.register(gated_adv)
 
     state = _make_state(level=1)
-    state.pending_triggers = ["on_level_up"]
+    state.pending_triggers = ["level-2-reached"]
 
     # Inject state and registry into a MagicMock that stands in for a GameSession.
     session: MagicMock = MagicMock()

@@ -34,13 +34,12 @@ Templates SHALL receive an `ExpressionContext` at render time containing a `Play
 The `PlayerContext` SHALL expose:
 
 - `player.name` — character name (str)
-- `player.level` — current level (int)
-- `player.hp` — current HP (int)
-- `player.max_hp` — max HP (int)
 - `player.iteration` — current game iteration (int)
-- `player.stats["<name>"]` — any stat from `CharacterConfig` (dict-subscript access)
+- `player.stats["<name>"]` — any stat from CharacterConfig, including both stored AND derived stats (dict-subscript access)
 - `player.milestones.has("<name>")` — milestone membership check (bool)
 - `player.pronouns.<field>` — all pronoun fields (see pronoun-system spec)
+
+The `PlayerContext` SHALL NOT expose `player.level`, `player.hp`, or `player.max_hp` as first-class fields. Games that declare these stats in `CharacterConfig` access them via `player.stats['level']`, `player.stats['hp']`, etc.
 
 The `GameContext` SHALL expose:
 

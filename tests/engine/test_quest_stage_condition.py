@@ -12,7 +12,6 @@ from oscilla.engine.conditions import evaluate
 from oscilla.engine.loader import ContentLoadError, load
 from oscilla.engine.models.base import QuestStageCondition
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -23,10 +22,6 @@ def _make_player() -> CharacterState:
         character_id=uuid4(),
         name="Tester",
         character_class=None,
-        level=1,
-        xp=0,
-        hp=20,
-        max_hp=20,
         prestige_count=0,
         current_location=None,
         stats={},
@@ -80,10 +75,6 @@ metadata:
   name: test-game
 spec:
   displayName: "Test"
-  xp_thresholds: [100]
-  hp_formula:
-    base_hp: 20
-    hp_per_level: 5
 """
 
 _CHAR_CONFIG_YAML = """\

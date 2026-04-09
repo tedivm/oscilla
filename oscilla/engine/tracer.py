@@ -254,14 +254,11 @@ def _summarise_effects(effects: list) -> List[TracedEffect]:
         SkillGrantEffect,
         StatChangeEffect,
         StatSetEffect,
-        XpGrantEffect,
     )
 
     result = []
     for eff in effects:
         match eff:
-            case XpGrantEffect(amount=a):
-                result.append(TracedEffect("xp_grant", f"xp +{a}"))
             case HealEffect(amount=a):
                 result.append(TracedEffect("heal", f"heal {a}"))
             case StatChangeEffect(stat=s, amount=a):

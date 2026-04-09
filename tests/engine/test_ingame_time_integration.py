@@ -200,7 +200,7 @@ def test_era_condition_conditional_era_inactive_before_start(
 ) -> None:
     """test-era-conditional is inactive at level 1 (start_condition requires level 2)."""
     player = _make_player(ingame_time_registry)
-    assert player.level == 1
+    assert player.stats.get("level", 1) == 1
 
     cond = GameCalendarEraCondition(type="game_calendar_era_is", era="test-era-conditional", state="active")
     assert evaluate(condition=cond, player=player, registry=ingame_time_registry) is False

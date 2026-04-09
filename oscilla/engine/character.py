@@ -137,10 +137,7 @@ class CharacterState:
     character_id: UUID
     name: str
     character_class: str | None
-    level: int
-    xp: int
-    hp: int
-    max_hp: int
+    # level, xp, hp, max_hp removed — authors declare these in character_config.yaml
     # 0-based prestige run number; maps to character_iterations.iteration
     prestige_count: int
     current_location: str | None
@@ -162,6 +159,10 @@ class CharacterState:
     active_adventure: AdventurePosition | None = None
     # Dynamic stats from CharacterConfig; int | bool | None (not Any).
     stats: Dict[str, int | bool | None] = field(default_factory=dict)
+    # Shadow values for derived stat change detection. Keyed by stat name.
+    # Populated after new_character() and updated by _recompute_derived_stats().
+    # Never serialized to or read from DB.
+    _derived_shadows: Dict[str, int | None] = field(default_factory=dict)
     # Skill refs permanently learned by the player.
     known_skills: Set[str] = field(default_factory=set)
     # Expiry-timestamp skill cooldowns (adventure-scope).
@@ -222,15 +223,15 @@ class CharacterState:
         game_manifest: "GameManifest",
         character_config: "CharacterConfigManifest",
     ) -> "CharacterState":
-        """Create a fresh level-1 character with defaults from game + character config.
+        """Create a fresh character with defaults from game + character config.
 
-        Stats are populated from all public and hidden stats in CharacterConfig.
-        HP and max_hp are set from the game manifest's hp_formula.base_hp.
-        All collection fields start empty.
+        Stats are populated from all public and hidden non-derived stats in
+        CharacterConfig. Derived stats are never stored; only non-derived stats
+        get initial values. All collection fields start empty.
         """
         all_stats = character_config.spec.public_stats + character_config.spec.hidden_stats
-        initial_stats: Dict[str, int | bool | None] = {s.name: s.default for s in all_stats}
-        base_hp = game_manifest.spec.hp_formula.base_hp
+        # Derived stats are not stored; only non-derived stats get initial values.
+        initial_stats: Dict[str, int | bool | None] = {s.name: s.default for s in all_stats if s.derived is None}
 
         initial_pronouns: PronounSet = DEFAULT_PRONOUN_SET
         creation_cfg = game_manifest.spec.character_creation
@@ -248,10 +249,6 @@ class CharacterState:
             character_id=uuid4(),
             name=name,
             character_class=None,
-            level=1,
-            xp=0,
-            hp=base_hp,
-            max_hp=base_hp,
             prestige_count=0,
             pronouns=initial_pronouns,
             current_location=None,
@@ -608,53 +605,6 @@ class CharacterState:
 
         return True
 
-    # --- XP / levelling ---
-
-    def add_xp(self, amount: int, xp_thresholds: List[int], hp_per_level: int) -> tuple[List[int], List[int]]:
-        """Add or subtract XP and auto-level-up or level-down.
-
-        xp_thresholds[i] is the cumulative XP required to reach level i+2
-        (index 0 = XP to reach level 2). hp_per_level is added to max_hp
-        for each level gained, or subtracted for each level lost.
-
-        For negative XP, supports level-down to level 1 (minimum) and XP floor at 0.
-        HP is capped at the new max_hp after level changes.
-
-        Returns tuple of (levels_gained, levels_lost) as lists of actual level numbers.
-        """
-        self.xp += amount
-        # Floor XP at 0
-        if self.xp < 0:
-            self.xp = 0
-
-        levels_gained: List[int] = []
-        levels_lost: List[int] = []
-
-        # Handle level-up (positive XP)
-        while self.level - 1 < len(xp_thresholds) and self.xp >= xp_thresholds[self.level - 1]:
-            self.level += 1
-            self.max_hp += hp_per_level
-            levels_gained.append(self.level)
-
-        # Handle level-down (negative XP or low remaining XP)
-        while self.level > 1:
-            # Check if current level is sustainable
-            required_xp_for_current = xp_thresholds[self.level - 2] if self.level >= 2 else 0
-            if self.xp >= required_xp_for_current:
-                break  # Can sustain current level
-
-            # Must de-level
-            old_level = self.level
-            self.level -= 1
-            self.max_hp -= hp_per_level
-            levels_lost.append(old_level)
-
-        # Cap current HP at new max HP
-        if self.hp > self.max_hp:
-            self.hp = self.max_hp
-
-        return (levels_gained, levels_lost)
-
     # --- Serialization ---
 
     def to_dict(self) -> Dict[str, Any]:
@@ -676,10 +626,8 @@ class CharacterState:
             "prestige_count": self.prestige_count,
             "name": self.name,
             "character_class": self.character_class,
-            "level": self.level,
-            "xp": self.xp,
-            "hp": self.hp,
-            "max_hp": self.max_hp,
+            # level, xp, hp, max_hp removed — they live in the stats dict
+            # _derived_shadows is ephemeral and intentionally excluded
             "current_location": self.current_location,
             "pronoun_set": next(
                 (k for k, v in PRONOUN_SETS.items() if v == self.pronouns),
@@ -750,8 +698,11 @@ class CharacterState:
         saved_stats: Dict[str, int | bool | None] = data.get("stats", {})
         reconciled_stats: Dict[str, int | bool | None] = {}
 
-        # Inject defaults for stats in config but missing from save
+        # Inject defaults for stats in config but missing from save.
+        # Derived stats are never stored — skip them during reconciliation.
         for stat_name, stat_def in stat_defs.items():
+            if stat_def.derived is not None:
+                continue  # derived stats are computed on demand, not persisted
             if stat_name not in saved_stats:
                 reconciled_stats[stat_name] = stat_def.default
             else:
@@ -867,10 +818,7 @@ class CharacterState:
             prestige_count=data.get("prestige_count", data.get("iteration", 0)),
             name=data["name"],
             character_class=data.get("character_class"),
-            level=data["level"],
-            xp=data["xp"],
-            hp=data["hp"],
-            max_hp=data["max_hp"],
+            # level, xp, hp, max_hp no longer top-level; they live in the stats dict
             current_location=data.get("current_location"),
             pronouns=_deserialize_pronoun_set(data.get("pronoun_set", "they_them")),
             milestones=milestones,

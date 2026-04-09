@@ -113,10 +113,7 @@ def _make_ctx_for_set(pronoun_key: str) -> ExpressionContext:
     view = PlayerPronounView.from_set(ps)
     player = PlayerContext(
         name="Hero",
-        level=1,
         prestige_count=0,
-        hp=20,
-        max_hp=20,
         stats={},
         milestones=PlayerMilestoneView(_milestones=set()),
         pronouns=view,
@@ -222,6 +219,16 @@ spec:
       type: int
       default: 10
       description: "Physical power"
+    - name: luck
+      type: int
+      default: 5
+      description: "Fortune stat for template roll tests"
+    - name: xp
+      type: int
+      default: 0
+      bounds:
+        min: 0
+      description: "Experience points"
   hidden_stats: []
   extra_pronoun_sets:
     - name: they_them

@@ -29,7 +29,7 @@ from textual.widgets import Button, Footer, Input, Label, OptionList, RichLog, S
 from oscilla.engine.character import cascade_unequip_invalid, validate_equipped_requires
 from oscilla.engine.conditions import evaluate
 from oscilla.engine.session import GameSession
-from oscilla.engine.steps.effects import run_effect
+from oscilla.engine.steps.effects import _recompute_derived_stats, run_effect
 from oscilla.services.crash import _GITHUB_ISSUES_URL, write_crash_report
 from oscilla.services.db import get_session
 
@@ -143,29 +143,25 @@ class StatusPanel(Static):
             self.update("(status unavailable)")
             return
 
-        game = self._registry.game
         char_config = self._registry.character_config
-        if game is None or char_config is None:
+        if char_config is None:
             self.update("(status unavailable)")
             return
 
-        thresholds = game.spec.xp_thresholds
-        if player.level - 1 < len(thresholds):
-            xp_needed = thresholds[player.level - 1]
-            xp_line = f"XP: [cyan]{player.xp}[/cyan] / {xp_needed}"
-        else:
-            xp_line = f"XP: [cyan]{player.xp}[/cyan]  [dim](max level)[/dim]"
-
+        # Merge stored public stats with any derived shadow values so derived
+        # stats (e.g. level computed from xp) appear correctly in the panel.
         stat_lines: List[str] = []
         for stat_def in char_config.spec.public_stats:
-            value = player.stats.get(stat_def.name, stat_def.default)
+            # Prefer the derived shadow if available for derived stats.
+            if stat_def.derived is not None:
+                value = player._derived_shadows.get(stat_def.name, stat_def.default)
+            else:
+                value = player.stats.get(stat_def.name, stat_def.default)
             label = stat_def.description or stat_def.name
             stat_lines.append(f"  {label}: [yellow]{value}[/yellow]")
 
         lines: List[str] = [
-            f"[bold]{player.name}[/bold]   Level [bold cyan]{player.level}[/bold cyan]",
-            f"HP:  [green]{player.hp}[/green] / {player.max_hp}",
-            xp_line,
+            f"[bold]{player.name}[/bold]",
             "",
             *stat_lines,
         ]
@@ -481,6 +477,7 @@ class InventoryScreen(ModalScreen[None]):
             if cascaded:
                 names = ", ".join(cascaded)
                 self.notify(f"Also unequipped: {names} (requirements no longer met)", severity="warning")
+            await self._recompute_effective_derived()
             await self._recompose_preserving_state(event.button)
         elif action == "equip":
             instance_id = UUID(arg)
@@ -502,6 +499,7 @@ class InventoryScreen(ModalScreen[None]):
                             f"Cannot equip {item_mf.spec.displayName}: requirements not met.",
                             severity="error",
                         )
+            await self._recompute_effective_derived()
             await self._recompose_preserving_state(event.button)
         elif action == "use_stack":
             await self._use_stack(arg)
@@ -520,6 +518,29 @@ class InventoryScreen(ModalScreen[None]):
         app = self.app
         if isinstance(app, OscillaApp):
             app.query_one(StatusPanel).refresh_player(self._player)
+
+    async def _recompute_effective_derived(self) -> None:
+        """Recompute derived stats that use effective_stats after equip/unequip.
+
+        Only runs when the content package includes derived stats with
+        stat_context == "effective", since those are the only ones affected by
+        equipment changes. Derived stats using stored context are unaffected.
+        """
+        derived_order = getattr(self._registry, "derived_eval_order", [])
+        if not any(s.stat_context == "effective" for s in derived_order):
+            return
+        engine = self._registry.template_engine
+        if engine is None:
+            return
+        app = self.app
+        if not isinstance(app, OscillaApp) or app._tui is None:
+            return
+        await _recompute_derived_stats(
+            player=self._player,
+            registry=self._registry,
+            engine=engine,
+            tui=app._tui,
+        )
 
     async def _use_stack(self, item_ref: str) -> None:
         """Run use_effects for a stackable item and consume it if needed."""

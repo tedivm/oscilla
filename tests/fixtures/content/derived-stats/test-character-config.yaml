@@ -1,0 +1,28 @@
+apiVersion: oscilla/v1
+kind: CharacterConfig
+metadata:
+  name: test-derived-character-config
+spec:
+  public_stats:
+    # Stored stats that derived stats depend on
+    - name: strength
+      type: int
+      default: 10
+      description: "Physical power"
+    - name: level
+      type: int
+      default: 1
+      bounds:
+        min: 1
+      description: "Character level"
+    # Derived stat: modifier computed from strength (D&D style)
+    - name: str_mod
+      type: int
+      derived: "{{ (player.stats['strength'] - 10) // 2 }}"
+      description: "Strength modifier derived from strength"
+    # Derived stat that depends on another derived stat (chain test)
+    - name: attack_bonus
+      type: int
+      derived: "{{ player.stats['str_mod'] + player.stats['level'] }}"
+      description: "Attack bonus derived from str_mod and level"
+  hidden_stats: []

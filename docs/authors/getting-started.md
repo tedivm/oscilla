@@ -42,13 +42,23 @@ metadata:
 spec:
   displayName: "My First Kingdom"
   description: "A humble beginning."
-  xp_thresholds: [100, 300, 600, 1000]
-  hp_formula:
-    base_hp: 20
-    hp_per_level: 8
+  triggers:
+    on_stat_threshold:
+      - stat: xp
+        threshold: 100
+        trigger: level-2-reached
+      - stat: xp
+        threshold: 300
+        trigger: level-3-reached
+      - stat: xp
+        threshold: 600
+        trigger: level-4-reached
+      - stat: xp
+        threshold: 1000
+        trigger: level-5-reached
 ```
 
-This gives you 5 levels (1 baseline + 4 thresholds). Max HP at level 5: 20 + 4×8 = 52.
+This fires named triggers when XP reaches those values. Wire each trigger name to a level-up adventure in `trigger_adventures` to grant HP and other bonuses. See [game-configuration.md](game-configuration.md) for a complete worked example.
 
 `metadata.name` is your game's identifier and must match the directory name. This is the one place where name and path are connected — everything else in the engine uses `metadata.name` for cross-references, not file paths.
 

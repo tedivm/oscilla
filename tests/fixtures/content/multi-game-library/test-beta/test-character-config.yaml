@@ -8,4 +8,10 @@ spec:
       type: int
       default: 10
       description: "Physical power"
+    - name: xp
+      type: int
+      default: 0
+      bounds:
+        min: 0
+      description: "Experience points"
   hidden_stats: []

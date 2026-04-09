@@ -44,8 +44,8 @@ async def test_combat_win_scenario(base_player: CharacterState) -> None:
 
     # Set up high strength to defeat weak enemy quickly
     base_player.stats["strength"] = 20
-    base_player.hp = 100
-    base_player.max_hp = 100
+    base_player.stats["hp"] = 100
+    base_player.stats["max_hp"] = 100
 
     step = CombatStep(
         type="combat",
@@ -108,8 +108,8 @@ async def test_combat_defeat_scenario(base_player: CharacterState) -> None:
     # Set up weak player vs strong enemy
     base_player.stats["strength"] = 1  # Very low damage
     base_player.stats["dexterity"] = 1  # Very low mitigation
-    base_player.hp = 10
-    base_player.max_hp = 10
+    base_player.stats["hp"] = 10
+    base_player.stats["max_hp"] = 10
 
     step = CombatStep(
         type="combat",
@@ -132,7 +132,7 @@ async def test_combat_defeat_scenario(base_player: CharacterState) -> None:
     assert result == AdventureOutcome.DEFEATED
     assert len(outcome_calls) == 1
     assert outcome_calls[0] == step.on_defeat
-    assert base_player.hp == 0
+    assert base_player.stats.get("hp") == 0
 
 
 async def test_combat_stat_handling_non_numeric(base_player: CharacterState) -> None:
@@ -143,7 +143,7 @@ async def test_combat_stat_handling_non_numeric(base_player: CharacterState) -> 
     # Set non-numeric stats
     base_player.stats["strength"] = "strong"  # type: ignore[assignment]  # Non-numeric
     base_player.stats["dexterity"] = "agile"  # type: ignore[assignment]  # Non-numeric
-    base_player.hp = 100
+    base_player.stats["hp"] = 100
 
     step = CombatStep(
         type="combat",
@@ -242,7 +242,7 @@ async def test_combat_damage_calculation_with_defense(base_player: CharacterStat
     mock_tui = MockTUI(menu_responses=[1])  # Attack once, then the enemy counter-attack kills the player
 
     base_player.stats["strength"] = 10  # 10 - 15 defense = 0 damage (clamped to 0)
-    base_player.hp = 5  # Low enough that enemy counter-attack (20 - dex_mitigation) kills in one hit
+    base_player.stats["hp"] = 5  # Low enough that enemy counter-attack (20 - dex_mitigation) kills in one hit
 
     step = CombatStep(
         type="combat",
@@ -265,7 +265,7 @@ async def test_combat_damage_calculation_with_defense(base_player: CharacterStat
 
     # Enemy survives because player dealt 0 damage; player dies from the counter-attack.
     assert result == AdventureOutcome.DEFEATED
-    assert base_player.hp == 0
+    assert base_player.stats.get("hp") == 0
 
 
 async def test_combat_dexterity_damage_mitigation(base_player: CharacterState) -> None:
@@ -276,8 +276,8 @@ async def test_combat_dexterity_damage_mitigation(base_player: CharacterState) -
     # High dexterity for mitigation testing
     base_player.stats["strength"] = 1  # Low damage to enemy
     base_player.stats["dexterity"] = 25  # 25 // 5 = 5 mitigation
-    base_player.hp = 100
-    base_player.max_hp = 100
+    base_player.stats["hp"] = 100
+    base_player.stats["max_hp"] = 100
 
     step = CombatStep(
         type="combat",
@@ -295,5 +295,5 @@ async def test_combat_dexterity_damage_mitigation(base_player: CharacterState) -
     )
 
     # Player should take no damage due to high dexterity
-    assert base_player.hp == 100
+    assert base_player.stats.get("hp") == 100
     assert result == AdventureOutcome.FLED

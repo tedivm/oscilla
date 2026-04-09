@@ -9,3 +9,5 @@ spec:
   adventures:
     - ref: personalized-greeting
       weight: 100
+    - ref: testlandia-stat-formula-showcase
+      weight: 100

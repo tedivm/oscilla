@@ -114,7 +114,7 @@ async def _apply_reflect(
         await tui.show_text(f"[yellow]Thorns! {reflected} damage reflected to the enemy.[/yellow]")
     else:
         # Enemy has thorns — attacker (player) takes the reflected damage.
-        player.hp = max(0, player.hp - reflected)
+        player.set_stat(name="hp", value=max(0, int(player.stats.get("hp") or 0) - reflected))
         await tui.show_text(f"[yellow]{reflected} damage reflected back at you![/yellow]")
 
 
@@ -321,7 +321,7 @@ async def run_combat(
         await _tick_active_effects(ctx=ctx, player=player, registry=registry, tui=tui)
 
         await tui.show_combat_round(
-            player_hp=player.hp,
+            player_hp=int(player.stats.get("hp") or 0),
             enemy_hp=ctx.enemy_hp,
             player_name=player.name,
             enemy_name=enemy.spec.displayName,
@@ -372,7 +372,7 @@ async def run_combat(
             incoming = _apply_incoming_modifiers(base=raw_incoming, target="player", ctx=ctx)
             if incoming > 0:
                 await tui.show_text(f"{enemy.spec.displayName} attacks for {incoming} damage!")
-            player.hp = max(0, player.hp - incoming)
+            player.set_stat(name="hp", value=max(0, int(player.stats.get("hp") or 0) - incoming))
             # Reflect a portion of incoming damage back to the enemy if player has thorns.
             await _apply_reflect(taken=incoming, target="player", ctx=ctx, player=player, tui=tui)
 
@@ -390,6 +390,6 @@ async def run_combat(
             await run_outcome_branch(step.on_win)
             return AdventureOutcome.COMPLETED
 
-        if player.hp <= 0:
+        if (player.stats.get("hp") or 0) <= 0:
             await run_outcome_branch(step.on_defeat)
             return AdventureOutcome.DEFEATED

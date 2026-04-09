@@ -1,0 +1,39 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: testlandia-stat-formula-showcase
+spec:
+  displayName: "Stat Formula Showcase"
+  repeatable: true
+  steps:
+    - type: narrative
+      text: |
+        ═══ Stat Formula Template Function Showcase ═══
+
+        ── Die Aliases ──────────────────────────────
+        d4:   {{ d4() }}   d6:  {{ d6() }}   d8:  {{ d8() }}
+        d10:  {{ d10() }}  d12: {{ d12() }}  d20: {{ d20() }}
+        d100: {{ d100() }}
+
+        ── Dice Pools ───────────────────────────────
+        roll_pool(4, 6):         {{ roll_pool(4, 6) }}
+        keep_highest(pool, 3):  {{ keep_highest(roll_pool(4, 6), 3) }}
+        keep_lowest(pool, 2):   {{ keep_lowest(roll_pool(4, 6), 2) }}
+        count_successes(≥4):    {{ count_successes(roll_pool(4, 6), 4) }}
+        explode(d6, on=6):      {{ explode([d6()], 6) }}
+        roll_fudge(4):          {{ roll_fudge(4) }}
+        weighted_roll:          {{ weighted_roll(["common", "rare", "epic"], [70, 25, 5]) }}
+
+        ── Display Helpers ──────────────────────────
+        ordinal(1):   {{ ordinal(1) }}   ordinal(13): {{ ordinal(13) }}
+        ordinal(21):  {{ ordinal(21) }}
+        signed(3):    {{ signed(3) }}    signed(-2):  {{ signed(-2) }}
+        signed(0):    {{ signed(0) }}
+        stat_mod(18): {{ stat_mod(18) }}  stat_mod(10): {{ stat_mod(10) }}
+        stat_mod(7):  {{ stat_mod(7) }}
+
+        ── Your Stats ───────────────────────────────
+        Level:        {{ ordinal(player.stats["level"]) }}
+        Constitution: {{ player.stats["constitution"] }} (modifier: {{ signed(stat_mod(player.stats["constitution"])) }})
+        XP:           {{ player.stats["xp"] }}
+        HP:           {{ player.stats["hp"] }} / {{ player.stats["max_hp"] }}

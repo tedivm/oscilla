@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Dict, List, Literal, Union
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from oscilla.engine.models.base import Condition, ManifestEnvelope
 from oscilla.engine.models.loot_table import LootEntry
@@ -15,19 +15,6 @@ from oscilla.engine.models.loot_table import LootEntry
 # ---------------------------------------------------------------------------
 # Effects — silent mechanical outcomes (no screen produced)
 # ---------------------------------------------------------------------------
-
-
-class XpGrantEffect(BaseModel):
-    type: Literal["xp_grant"]
-    # str = Jinja2 template string that resolves to a non-zero int at render time.
-    amount: int | str = Field(description="XP amount or template string resolving to int.")
-
-    @field_validator("amount")
-    @classmethod
-    def amount_not_zero(cls, v: int | str) -> int | str:
-        if isinstance(v, int) and v == 0:
-            raise ValueError("XP amount cannot be zero")
-        return v
 
 
 class ItemDropEffect(BaseModel):
@@ -233,7 +220,6 @@ class SetNameEffect(BaseModel):
 
 Effect = Annotated[
     Union[
-        XpGrantEffect,
         ItemDropEffect,
         MilestoneGrantEffect,
         EndAdventureEffect,
