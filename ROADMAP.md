@@ -39,7 +39,7 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [Buff Blocking and Priority](#buff-blocking-and-priority)                                   | S      | Combat Refinement       |
 | [Buff Persistence Between Adventures](#buff-persistence-between-adventures)                 | S      | Combat Refinement       |
 | [Character Archetypes](#character-archetypes)                                               | M      | Character Progression   |
-| [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades)                          | L      | Character Progression   |
+| [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades)                          | M      | Character Progression   |
 | [Extended Template Primitives](#extended-template-primitives)                               | S      | Engine Architecture     |
 | [Player-Defined Pronouns](#player-defined-pronouns)                                         | S      | Character Configuration |
 | [Shop and Vendor System](#shop-and-vendor-system)                                           | L      | Economy & NPCs          |
@@ -55,30 +55,6 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [Front End Website](#front-end-website)                                                     | XL     | Multi-User Platform     |
 | [Picture Selection and ASCII Art](#picture-selection-and-ascii-art)                         | M      | —                       |
 | [Region Maps](#region-maps)                                                                 | M      | —                       |
-
----
-
-## Condition System
-
-### Tick-Anchored State Refactor
-
-**Effort: L** · **Group: Engine Architecture**
-
-The internal game clock (`internal_ticks`) is a monotone, tamper-proof counter that already advances on every adventure. It is currently used for adventure cooldowns (`cooldown_ticks`) and era boundary calculations, but most state timestamps — milestones, quest completions, adventure completion history — are stored as opaque sets or string dates decoupled from the tick system. This change refactors those stores to record the `internal_ticks` value at the moment each event occurred.
-
-Key changes this enables:
-
-- **Milestone timestamps**: `milestones` changes from `Set[str]` to `Dict[str, int]` (milestone ref → tick when granted). Querying `has_milestone()` stays unchanged; conditions gain `milestone_at_ticks` and `milestone_before_ticks` predicates so authors can write time-relative checks (e.g., "granted the gate-key milestone within the last 10 ticks").
-- **Cooldown unification**: Skill cooldowns currently count down in adventure-units. With tick timestamps, all cooldowns — adventure repeats, skill reuse, and buff durations — can be expressed as `cooldown_ticks` offsets from the granting tick. This removes the `tick_skill_cooldowns()` adventure-start ceremony and the separate `cooldown_days` date-string path.
-- **Effect and trigger timestamps**: `emit_trigger` events and quest stage transitions gain a `granted_at_ticks` field, enabling elapsed-time conditions across the whole authoring surface.
-- **`adventure_last_completed_at_ticks` unification**: The current parallel tracking (`adventure_last_completed_on` for calendar dates, `adventure_last_completed_at_ticks` for ticks) collapses into the single tick-based record; calendar-day comparisons are derived from the tick-to-game-date conversion where a `time:` block is declared.
-
-Design considerations:
-
-- Backward-compatible migration: existing saves have `milestones` as a set — `from_dict()` must detect the old format and migrate it by assigning `tick = 0` (or `None`) to pre-migration milestones
-- The `has_milestone()` API must not change — only new tick-aware predicates are added; old content remains valid
-- Without a `time:` block in `game.yaml`, the calendar-day cooldown path is already gated — tick-only is the baseline; date conversion is additive
-- Skill cooldown duration would need to be expressed in ticks rather than adventure counts in manifests; a deprecation path for `cooldown_adventures` is required
 
 ---
 
@@ -144,7 +120,7 @@ Add an optional `duration` scope to buff manifests:
 - `scope: adventure` — persists until the adventure ends
 - `scope: persistent` — stored on the player and persists until explicitly dispelled or a duration expires
 
-Persistent buffs require a small addition to the player state serialization.
+The unified `Cooldown` model (which already drives adventure and skill cooldowns) is the natural fit for expressing buff durations — a persistent buff can declare `ticks`, `game_ticks`, or `seconds` before it expires, using the same schema authors already know. Persistent buffs require a small addition to the player state serialization.
 
 ---
 
@@ -195,11 +171,11 @@ Content packages that don't want a class system simply omit the `archetypes` key
 
 ### Talent Trees / Passive Upgrades
 
-**Effort: L** · **Group: Character Progression**
+**Effort: M** · **Group: Character Progression**
 
 A system for spending an author-defined resource to permanently unlock nodes that each apply a set of effects once on acquisition. The graph structure — tree, diamond, flat list, or web — is implicit in the manifests: each node's prerequisites are expressed as standard conditions, so authors build whatever topology their content needs without any engine-enforced shape.
 
-The spending currency is any stat the author declares in `character_config.yaml`. A game using talent points names the stat `talent_points`; a game using favor calls it `favor`; a game with no distinct talent resource can gate nodes purely on level, milestones, or archetypes with no currency cost at all.
+The spending currency is any stat the author declares in `character_config.yaml`. A game using talent points names the stat `talent_points`; a game using favor calls it `favor`; a game with no distinct talent resource can gate nodes purely on level, milestones, archetypes, or derived stats with no currency cost at all. Because stats are now fully author-defined (with support for derived formulas), the cost and prerequisite model is highly flexible without any new engine primitives.
 
 ```yaml
 apiVersion: oscilla/v1
@@ -209,7 +185,7 @@ metadata:
 spec:
   displayName: "Iron Constitution"
   cost:
-    stat: talent_points # any author-defined stat; omit entirely for free nodes
+    stat: talent_points # any author-declared stat; omit entirely for free nodes
     amount: 1
   requires: # standard condition — prerequisite nodes, stats, milestones, archetypes
     type: talent_unlocked
@@ -223,15 +199,18 @@ spec:
 Because prerequisites are conditions and rewards are standard effects:
 
 - A node can require multiple unlocked predecessors (AND condition), creating branching paths
-- A node can also require a milestone, archetype, or stat threshold — not just another node
+- A node can also require a milestone, archetype, stat threshold, or a `milestone_ticks_elapsed` time-based check — not just another node
+- Triggered adventures (`on_character_create`, `emit_trigger`) integrate naturally — talent point allocation can happen at character creation or as a triggered post-adventure scene
 - Any effect type (stat change, skill grant, archetype add, item grant) is available at zero extra design cost
 - Packages that have no talent system simply omit `TalentNode` manifests entirely
+
+The effort for this item has been revised downward from L to M because the stat, condition, effects, and trigger infrastructure it depends on is now fully in place.
 
 ### Extended Template Primitives
 
 **Effort: S** · **Group: Engine Architecture**
 
-Adds a second tier of numeric and interpolation utilities to `SAFE_GLOBALS` for authors who need continuous value scaling, percentage math, or list statistics — going beyond what the foundational dice pool functions (added in the stat-formula-templates change) provide.
+Adds a second tier of numeric and interpolation utilities to `SAFE_GLOBALS` for authors who need continuous value scaling, percentage math, or list statistics — going beyond the dice-pool and display functions already in the engine (shipped in the stat-formula-templates change).
 
 Functions deferred from the stat-formula-templates change:
 
@@ -270,6 +249,7 @@ Key design points:
 
 - Requires a new query surface (`load_all_iterations()` already exists in services) — the gap is exposing that data through `CharacterState`, `PlayerContext`, and the condition evaluator
 - Milestone carry-forward ("always have milestone X once earned in any run") is a special case of this — it can be implemented as a condition check at iteration creation time without changing the iteration model
+- Milestones now record the `internal_ticks` value at grant time; cross-iteration queries gain a richer "when was this milestone first earned" dimension, including which iteration it was earned in and the tick offset within that run
 - Per-run comparison displays in the TUI (e.g., best run, current vs. previous) also fall here
 - Cross-iteration effects could be limited in scope at first (read-only history for conditions and templates; write effects like carry-forward happen only at prestige time)
 - Since data in past iterations never changes it is an ideal candidate for caching.
@@ -333,7 +313,7 @@ Key design points:
 - The TUI gains a storage panel accessible from the inventory screen when the player is at a location that has a linked storage container
 - Items in storage are not available for use or equipping until moved to the active inventory
 - Storage access uses the standard condition system, so a vault can be gated behind a milestone, a key item, or a minimum level
-- **Item carry-over on prestige**: the prestige system deliberately deferred item and equipment carry-forward across iterations. Once storage containers with `global` scope exist, the carry-over mechanism can be expressed as items moved into a globally scoped container before prestige and retrieved afterward, without any new engine primitives. The `prestige:` block in `game.yaml` can be extended with a `carry_items` list once this feature ships.
+- **Item carry-over on prestige**: the prestige system (`prestige:` block in `game.yaml`) is now implemented. Once storage containers with `global` scope exist, the carry-over mechanism can be expressed as items moved into a globally scoped container before prestige and retrieved afterward, without any new engine primitives. The `prestige:` block can be extended with a `carry_items` list once this feature ships.
 
 ### Shop and Vendor System
 
@@ -531,12 +511,13 @@ A comprehensive pass over the terminal TUI to surface all engine features that h
 
 Scope of the upgrade:
 
-- **Character sheet panel** — stats, archetypes, prestige count, and iteration number in a browsable panel; pulls from fields already tracked in character state
+- **Character sheet panel** — stats (all author-declared, accessed via `player.stats`), derived stats, archetypes, prestige count (`player.prestige_count`), and iteration number in a browsable panel; pulls from fields already tracked in character state
+- **In-game time display** — when a `time:` block is configured in `game.yaml`, show the current cycle positions (day, season, era, etc.) and game-tick count alongside the character sheet; uses the `ingame_time` context already computed by the engine
 - **Inventory panel** — full item list with equip/unequip actions, item descriptions, and (if Inventory Storage is implemented) a link to open storage containers at supported locations
-- **Skills panel** — active and passive skills with descriptions, slot names, and cooldown/charge state where applicable
+- **Skills panel** — active and passive skills with descriptions, slot names, and cooldown/charge state where applicable; cooldown expiry is now stored as absolute tick or real-time timestamps, so remaining time can be displayed precisely
 - **Quests panel** — active and completed quests with current stage descriptions (depends on Quest Progress Panel being designed; this item covers the TUI surface, not the underlying engine wiring)
 - **Factions panel** — reputation values for all declared factions, displayed once Faction and Reputation System is implemented
-- **Prestige and iteration display** — after a prestige reset, the character sheet should clearly show current iteration and historical best stats where useful
+- **Prestige and iteration display** — after a prestige reset, the character sheet should clearly show current `prestige_count` and historical best stats where useful
 - **NPC encounter framing** — when an adventure is associated with an NPC, display speaker context (name, portrait if available) in a dedicated region rather than inline in the narrative text
 - **Keyboard navigation improvements** — consistent bindings across all panels, discoverable help overlay (press `?` to see keys)
 
