@@ -198,6 +198,7 @@ After every stored stat value mutation (via `stat_change` or `stat_set` effect h
 For each entry: if the old value was `< threshold` and the new value is `>= threshold`, the entry has been crossed. Downward crossings SHALL NOT fire the trigger.
 
 **`fire_mode` controls how crossed entries enqueue:**
+
 - `fire_mode: each` (default) — every crossed entry fires as a separate `enqueue_trigger()` call, in ascending threshold order.
 - `fire_mode: highest` — only the single highest crossed threshold fires.
 

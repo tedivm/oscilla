@@ -129,27 +129,27 @@ These functions support tabletop-style dice rolls and pool mechanics.
 
 Shorthand functions for common die sizes. Each returns a single random integer.
 
-| Function    | Equivalent                | Example                  |
-| ----------- | ------------------------- | ------------------------ |
-| `d4()`      | `roll_pool(1, 4)[0]`      | `{{ d4() }}`             |
-| `d6()`      | `roll_pool(1, 6)[0]`      | `{{ d6() }}`             |
-| `d8()`      | `roll_pool(1, 8)[0]`      | `{{ d8() }}`             |
-| `d10()`     | `roll_pool(1, 10)[0]`     | `{{ d10() }}`            |
-| `d12()`     | `roll_pool(1, 12)[0]`     | `{{ d12() }}`            |
-| `d20()`     | `roll_pool(1, 20)[0]`     | `{{ d20() }}`            |
-| `d100()`    | `roll_pool(1, 100)[0]`    | `{{ d100() }}`           |
+| Function | Equivalent             | Example        |
+| -------- | ---------------------- | -------------- |
+| `d4()`   | `roll_pool(1, 4)[0]`   | `{{ d4() }}`   |
+| `d6()`   | `roll_pool(1, 6)[0]`   | `{{ d6() }}`   |
+| `d8()`   | `roll_pool(1, 8)[0]`   | `{{ d8() }}`   |
+| `d10()`  | `roll_pool(1, 10)[0]`  | `{{ d10() }}`  |
+| `d12()`  | `roll_pool(1, 12)[0]`  | `{{ d12() }}`  |
+| `d20()`  | `roll_pool(1, 20)[0]`  | `{{ d20() }}`  |
+| `d100()` | `roll_pool(1, 100)[0]` | `{{ d100() }}` |
 
 ### Pool Functions
 
-| Function                                   | Returns       | Description                                                             |
-| ------------------------------------------ | ------------- | ----------------------------------------------------------------------- |
-| `roll_pool(n, sides)`                      | `List[int]`   | Roll `n` dice with `sides` faces; each result is `1..sides`            |
-| `keep_highest(pool, n)`                    | `List[int]`   | Keep the `n` highest values from `pool`                                 |
-| `keep_lowest(pool, n)`                     | `List[int]`   | Keep the `n` lowest values from `pool`                                  |
-| `count_successes(pool, threshold)`         | `int`         | Count dice in `pool` that are `>= threshold`                            |
-| `explode(pool, sides, on=None, max=10)`    | `List[int]`   | Re-roll dice at max value; append extra dice; cap at `max` explosions   |
-| `roll_fudge(n)`                            | `List[int]`   | Roll `n` Fudge/FATE dice; each result is `-1`, `0`, or `+1`            |
-| `weighted_roll(options, weights)`          | any           | Pick one element from `options` using the given relative `weights`      |
+| Function                                | Returns     | Description                                                           |
+| --------------------------------------- | ----------- | --------------------------------------------------------------------- |
+| `roll_pool(n, sides)`                   | `List[int]` | Roll `n` dice with `sides` faces; each result is `1..sides`           |
+| `keep_highest(pool, n)`                 | `List[int]` | Keep the `n` highest values from `pool`                               |
+| `keep_lowest(pool, n)`                  | `List[int]` | Keep the `n` lowest values from `pool`                                |
+| `count_successes(pool, threshold)`      | `int`       | Count dice in `pool` that are `>= threshold`                          |
+| `explode(pool, sides, on=None, max=10)` | `List[int]` | Re-roll dice at max value; append extra dice; cap at `max` explosions |
+| `roll_fudge(n)`                         | `List[int]` | Roll `n` Fudge/FATE dice; each result is `-1`, `0`, or `+1`           |
+| `weighted_roll(options, weights)`       | any         | Pick one element from `options` using the given relative `weights`    |
 
 ```yaml
 # Roll 4d6, drop lowest, sum the rest
@@ -172,11 +172,11 @@ effects:
 
 ## Formatting Functions
 
-| Function         | Description                               | Example                          |
-| ---------------- | ----------------------------------------- | -------------------------------- |
-| `ordinal(n)`     | Format integer as ordinal (`1st`, `2nd`)  | `ordinal(3)` → `"3rd"`          |
-| `signed(n)`      | Add `+` prefix to positive numbers        | `signed(2)` → `"+2"`            |
-| `stat_mod(n)`    | D&D-style ability modifier `(n-10)//2`    | `stat_mod(14)` → `2`            |
+| Function      | Description                              | Example                |
+| ------------- | ---------------------------------------- | ---------------------- |
+| `ordinal(n)`  | Format integer as ordinal (`1st`, `2nd`) | `ordinal(3)` → `"3rd"` |
+| `signed(n)`   | Add `+` prefix to positive numbers       | `signed(2)` → `"+2"`   |
+| `stat_mod(n)` | D&D-style ability modifier `(n-10)//2`   | `stat_mod(14)` → `2`   |
 
 **`ordinal()` teen edge cases:** 11, 12, and 13 always use `th` regardless of the tens digit (`11th`, `12th`, `13th`). This also applies to 111, 112, 113, etc.
 
@@ -331,11 +331,11 @@ text: |
 
 Templates are supported in these fields:
 
-| Field                | Example                         |
-| -------------------- | ------------------------------- |
-| Narrative step `text`| `"Hello, {{ player.name }}!"`   |
-| `stat_change.amount` | `"{{ player.stats.luck * 2 }}"` |
-| `item_drop.count`    | `"{{ roll(1, 3) }}"`            |
+| Field                 | Example                         |
+| --------------------- | ------------------------------- |
+| Narrative step `text` | `"Hello, {{ player.name }}!"`   |
+| `stat_change.amount`  | `"{{ player.stats.luck * 2 }}"` |
+| `item_drop.count`     | `"{{ roll(1, 3) }}"`            |
 
 Fields that don't support templates will treat the string literally.
 
@@ -357,20 +357,20 @@ Template syntax errors and unknown context references are reported with the file
 
 ### Player Context Object
 
-| Expression                              | Type     | Description                             |
-| --------------------------------------- | -------- | --------------------------------------- |
-| `player.name`                           | str      | Character name                          |
-| `player.stats['level']`                 | int      | Level stat value (if declared in config)|
-| `player.stats['hp']`                    | int      | HP stat value (if declared in config)   |
-| `player.stats['max_hp']`                | int/None | Max HP stat (stored or derived)         |
-| `player.stats.<name>`                   | int/bool | Any declared stat by name               |
-| `player.milestones.has("<name>")`       | bool     | True if player holds the milestone      |
-| `player.pronouns.subject`               | str      | Subject pronoun (they/she/he)           |
-| `player.pronouns.object`                | str      | Object pronoun (them/her/him)           |
-| `player.pronouns.possessive`            | str      | Possessive adjective (their/her/his)    |
-| `player.pronouns.possessive_standalone` | str      | Standalone possessive (theirs/hers/his) |
-| `player.pronouns.reflexive`             | str      | Reflexive (themselves/herself/himself)  |
-| `player.pronouns.uses_plural_verbs`     | bool     | True for they/them pronoun sets         |
+| Expression                              | Type     | Description                              |
+| --------------------------------------- | -------- | ---------------------------------------- |
+| `player.name`                           | str      | Character name                           |
+| `player.stats['level']`                 | int      | Level stat value (if declared in config) |
+| `player.stats['hp']`                    | int      | HP stat value (if declared in config)    |
+| `player.stats['max_hp']`                | int/None | Max HP stat (stored or derived)          |
+| `player.stats.<name>`                   | int/bool | Any declared stat by name                |
+| `player.milestones.has("<name>")`       | bool     | True if player holds the milestone       |
+| `player.pronouns.subject`               | str      | Subject pronoun (they/she/he)            |
+| `player.pronouns.object`                | str      | Object pronoun (them/her/him)            |
+| `player.pronouns.possessive`            | str      | Possessive adjective (their/her/his)     |
+| `player.pronouns.possessive_standalone` | str      | Standalone possessive (theirs/hers/his)  |
+| `player.pronouns.reflexive`             | str      | Reflexive (themselves/herself/himself)   |
+| `player.pronouns.uses_plural_verbs`     | bool     | True for they/them pronoun sets          |
 
 ### Game Context Object
 

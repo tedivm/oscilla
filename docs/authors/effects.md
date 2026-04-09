@@ -302,7 +302,7 @@ Four things happen at once: XP, item, milestone, reputation. That's the composab
 
 | Type              | Required fields      | Optional fields                             | Notes                                                                          |
 | ----------------- | -------------------- | ------------------------------------------- | ------------------------------------------------------------------------------ |
-| `stat_change`     | `stat`, `amount`     | —                                           | `int` stats only; `amount` can be template; use for XP, gold, damage, etc.    |
+| `stat_change`     | `stat`, `amount`     | —                                           | `int` stats only; `amount` can be template; use for XP, gold, damage, etc.     |
 | `stat_set`        | `stat`, `value`      | —                                           | Works on `int` and `bool` stats                                                |
 | `item_drop`       | `loot` or `loot_ref` | `count` (default 1), `quantity` (per entry) | Weighted table; `count` can be template; `loot_ref` names a LootTable or Enemy |
 | `use_item`        | `item`               | —                                           | Player must already hold the item                                              |

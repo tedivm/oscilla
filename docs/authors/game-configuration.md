@@ -392,16 +392,16 @@ spec:
 
 ### Stat definition fields
 
-| Field          | Required                       | Description                                                                                               |
-| -------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `name`         | yes                            | Identifier (lowercase, underscores)                                                                       |
-| `type`         | yes                            | `int` or `bool`                                                                                           |
-| `default`      | yes for stored; absent for derived | Starting value. Must be omitted on derived stats.                                               |
-| `description`  | no                             | Displayed to player                                                                                       |
-| `bounds.min`   | no                             | Minimum value (int stats only)                                                                            |
-| `bounds.max`   | no                             | Maximum value (int stats only)                                                                            |
-| `derived`      | no                             | Jinja2 expression evaluated at runtime; result replaces the stored value in conditions and templates      |
-| `stat_context` | no (default: `stored`)         | `stored` — formula sees raw stored stats; `effective` — formula sees equipment + passive bonuses applied  |
+| Field          | Required                           | Description                                                                                              |
+| -------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `name`         | yes                                | Identifier (lowercase, underscores)                                                                      |
+| `type`         | yes                                | `int` or `bool`                                                                                          |
+| `default`      | yes for stored; absent for derived | Starting value. Must be omitted on derived stats.                                                        |
+| `description`  | no                                 | Displayed to player                                                                                      |
+| `bounds.min`   | no                                 | Minimum value (int stats only)                                                                           |
+| `bounds.max`   | no                                 | Maximum value (int stats only)                                                                           |
+| `derived`      | no                                 | Jinja2 expression evaluated at runtime; result replaces the stored value in conditions and templates     |
+| `stat_context` | no (default: `stored`)             | `stored` — formula sees raw stored stats; `effective` — formula sees equipment + passive bonuses applied |
 
 #### Derived stats
 
@@ -433,7 +433,7 @@ Use `stat_context: effective` to factor in equipment and passive bonuses when co
 - name: effective_strength
   type: int
   derived: "{{ player.stats['strength'] }}"
-  stat_context: effective  # sees equipment bonuses
+  stat_context: effective # sees equipment bonuses
   description: "Strength with gear"
 ```
 

@@ -297,7 +297,7 @@ Games that declare `level`, `xp`, `hp`, or `max_hp` as stat names in `CharacterC
 - **WHEN** a game declares `level` as a stat and the character has `stats["level"] = 3`
 - **THEN** `player.to_dict()["stats"]["level"]` equals `3`
 
-#### Scenario: _derived_shadows is not serialized
+#### Scenario: \_derived_shadows is not serialized
 
 - **WHEN** `player.to_dict()` is called on a character with non-empty `_derived_shadows`
 - **THEN** the returned dict does not contain a `"_derived_shadows"` key
@@ -312,6 +312,7 @@ Games that declare `level`, `xp`, `hp`, or `max_hp` as stat names in `CharacterC
 ### Requirement: new_character() initializes CharacterState without hardcoded progression fields
 
 `new_character()` SHALL initialize `CharacterState` with only:
+
 - Author-declared stat names and their default values (from `CharacterConfig`), for stats that are NOT derived
 - Derived stats SHALL be absent from the initial `stats` dict
 
@@ -329,16 +330,16 @@ Games that declare `level`, `xp`, `hp`, or `max_hp` as stat names in `CharacterC
 
 ---
 
-### Requirement: CharacterState._derived_shadows initialized empty on new characters
+### Requirement: CharacterState.\_derived_shadows initialized empty on new characters
 
 `CharacterState` SHALL include a `_derived_shadows: Dict[str, int | None]` field initialized to an empty dict. This is a non-serialized ephemeral field used by `_recompute_derived_stats()`.
 
-#### Scenario: new_character produces empty _derived_shadows
+#### Scenario: new_character produces empty_derived_shadows
 
 - **WHEN** `CharacterState.new_character()` is called
 - **THEN** `player._derived_shadows == {}`
 
-#### Scenario: _derived_shadows populated after first recompute
+#### Scenario: \_derived_shadows populated after first recompute
 
 - **WHEN** `_recompute_derived_stats()` is called for the first time after `new_character()`
 - **THEN** all derived stat names appear as keys in `player._derived_shadows`
@@ -358,4 +359,3 @@ A new Alembic migration SHALL remove the `level`, `xp`, `hp`, and `max_hp` colum
 
 - **WHEN** the migration downgrade is applied
 - **THEN** `character_iterations` has nullable integer columns named `level`, `xp`, `hp`, and `max_hp`
-
