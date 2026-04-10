@@ -44,7 +44,6 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [Player-Defined Pronouns](#player-defined-pronouns)                                         | S      | Character Configuration |
 | [Shop and Vendor System](#shop-and-vendor-system)                                           | L      | Economy & NPCs          |
 | [Persistent NPCs and Dialogue](#persistent-npcs-and-dialogue)                               | L      | Economy & NPCs          |
-| [Enhanced Loot Tables](#enhanced-loot-tables)                                               | S      | Item System             |
 | [Inventory Storage](#inventory-storage)                                                     | L      | Item System             |
 | [Quest Branching](#quest-branching)                                                         | M      | Quest Depth & Factions  |
 | [Quest Progress Panel](#quest-progress-panel)                                               | M      | Quest Depth             |
@@ -287,19 +286,6 @@ Variables live only for the duration of the adventure run. They are accessible i
 ---
 
 ## Item System
-
-### Enhanced Loot Tables
-
-**Effort: S** · **Group: Item System**
-
-The current `item_drop` loot table is a flat weighted list — each entry has an `item` and a `weight`, and the engine picks one. Authors have no way to express richer drop semantics such as:
-
-- **Guaranteed drops**: always drop item A, then roll for one of B/C/D
-- **Multiple rolls**: roll the table N times independently, potentially giving duplicates
-- **Conditional entries**: include an item only if a condition is met (player has a specific skill, milestone, etc.)
-- **Tiered tables**: a rare tier with its own weight that activates separately from a common tier
-
-The loot table schema should be extended to support these patterns without requiring authors to write workarounds using item charges or multi-step adventures.
 
 ### Inventory Storage
 
