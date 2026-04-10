@@ -326,3 +326,88 @@ def test_load_single_file_path(tmp_path: Path) -> None:
     registry, warnings = load(content_file)
     assert registry.game is not None
     assert registry.character_config is not None
+
+
+# ---------------------------------------------------------------------------
+# Archetype reference validation tests (task 8.12)
+# ---------------------------------------------------------------------------
+
+_MINIMAL_ARCHETYPE_YAML = """\
+apiVersion: oscilla/v1
+kind: Archetype
+metadata:
+  name: test-warrior
+spec:
+  displayName: "Test Warrior"
+"""
+
+_MINIMAL_ADVENTURE_HAS_ARCHETYPE_YAML = """\
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: test-adv
+spec:
+  displayName: "Archetype Adventure"
+  steps:
+    - type: narrative
+      text: "You become a warrior."
+      effects:
+        - type: archetype_add
+          name: test-warrior
+"""
+
+_ADVENTURE_UNKNOWN_ARCHETYPE_YAML = """\
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: bad-adv
+spec:
+  displayName: "Bad Adventure"
+  steps:
+    - type: narrative
+      text: "You are something."
+      effects:
+        - type: archetype_add
+          name: undeclared-archetype
+"""
+
+_ADVENTURE_HAS_ARCHETYPE_CONDITION_YAML = """\
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: cond-adv
+spec:
+  displayName: "Condition Adventure"
+  steps:
+    - type: stat_check
+      condition:
+        type: has_archetype
+        name: undeclared-archetype
+"""
+
+
+def test_archetype_refs_valid_passes(tmp_path: Path) -> None:
+    """Valid archetype references in effects produce no errors."""
+    (tmp_path / "game.yaml").write_text(_MINIMAL_GAME_YAML, encoding="utf-8")
+    (tmp_path / "archetype.yaml").write_text(_MINIMAL_ARCHETYPE_YAML, encoding="utf-8")
+    (tmp_path / "adventure.yaml").write_text(_MINIMAL_ADVENTURE_HAS_ARCHETYPE_YAML, encoding="utf-8")
+    # Should not raise
+    load(tmp_path)
+
+
+def test_archetype_add_unknown_ref_raises(tmp_path: Path) -> None:
+    """archetype_add referring to an undeclared archetype raises ContentLoadError."""
+    (tmp_path / "game.yaml").write_text(_MINIMAL_GAME_YAML, encoding="utf-8")
+    (tmp_path / "adventure.yaml").write_text(_ADVENTURE_UNKNOWN_ARCHETYPE_YAML, encoding="utf-8")
+    with pytest.raises(ContentLoadError) as exc_info:
+        load(tmp_path)
+    assert "undeclared-archetype" in str(exc_info.value)
+
+
+def test_archetype_condition_unknown_ref_raises(tmp_path: Path) -> None:
+    """has_archetype condition referring to an undeclared archetype raises ContentLoadError."""
+    (tmp_path / "game.yaml").write_text(_MINIMAL_GAME_YAML, encoding="utf-8")
+    (tmp_path / "adventure.yaml").write_text(_ADVENTURE_HAS_ARCHETYPE_CONDITION_YAML, encoding="utf-8")
+    with pytest.raises(ContentLoadError) as exc_info:
+        load(tmp_path)
+    assert "undeclared-archetype" in str(exc_info.value)

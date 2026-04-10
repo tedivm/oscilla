@@ -309,11 +309,11 @@ def validate(
             "regions": len(registry.regions),
             "locations": len(registry.locations),
             "adventures": len(registry.adventures),
+            "archetypes": len(registry.archetypes),
             "enemies": len(registry.enemies),
             "items": len(registry.items),
             "recipes": len(registry.recipes),
             "quests": len(registry.quests),
-            "classes": len(registry.classes),
         }
         summary = ", ".join(f"{count} {kind}" for kind, count in counts.items() if count > 0)
         _console.print(f"[bold green]✓ {pkg_name}: {summary}[/bold green]")

@@ -1,0 +1,21 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: archetype-lab
+spec:
+  displayName: "Archetype Lab"
+  description: "Exercises archetype_add, archetype_remove, skill_revoke, and all archetype condition predicates."
+  region: archetypes
+  adventures:
+    - ref: archetype-grant-warrior
+      weight: 10
+    - ref: archetype-grant-mage
+      weight: 10
+    - ref: archetype-force-regrant
+      weight: 10
+    - ref: archetype-remove-warrior
+      weight: 10
+    - ref: archetype-condition-check
+      weight: 10
+    - ref: archetype-count-check
+      weight: 10

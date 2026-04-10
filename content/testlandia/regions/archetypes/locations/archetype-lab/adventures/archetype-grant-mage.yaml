@@ -1,0 +1,20 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: archetype-grant-mage
+spec:
+  displayName: "Become a Mage"
+  description: "Tests archetype_add: grants test-mage with passive max_mana bonus."
+  requires:
+    type: not
+    condition:
+      type: has_archetype
+      name: test-mage
+  steps:
+    - type: narrative
+      text: "The arcane tower accepts you. Mana +20 on grant; max_mana +15 passively while held."
+      effects:
+        - type: archetype_add
+          name: test-mage
+        - type: end_adventure
+          outcome: completed

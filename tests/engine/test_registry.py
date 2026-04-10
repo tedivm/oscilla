@@ -80,7 +80,6 @@ def test_content_registry_initialization() -> None:
     assert isinstance(registry.items, KindRegistry)
     assert isinstance(registry.recipes, KindRegistry)
     assert isinstance(registry.quests, KindRegistry)
-    assert isinstance(registry.classes, KindRegistry)
     assert registry.game is None
     assert registry.character_config is None
 
@@ -160,7 +159,6 @@ def test_content_registry_build_with_all_kinds() -> None:
     assert len(registry.items) == 1
     assert len(registry.recipes) == 1
     assert len(registry.quests) == 1
-    assert len(registry.classes) == 0  # No Class manifest added
 
     # Check that singleton manifests are set
     assert registry.game is not None

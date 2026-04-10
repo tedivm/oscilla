@@ -173,7 +173,8 @@ class CharacterState:
     _derived_shadows: Dict[str, int | None]  # ephemeral, recomputed at runtime
     inventory: Dict[str, int]
     equipment: Dict[str, str]
-    milestones: Dict[str, MilestoneRecord]
+    milestones: Dict[str, GrantRecord]
+    archetypes: Dict[str, GrantRecord]   # name → grant record (tick + timestamp)
     prestige_count: int
     statistics: PlayerStatistics
 ```
@@ -183,8 +184,9 @@ class CharacterState:
 - `new_character()` - Factory for character creation
 - `add_item()` / `remove_item()` - Inventory management
 - `grant_milestone()` / `has_milestone()` - Story progress tracking
+- `make_grant_record()` - Creates a `GrantRecord` stamped with current tick and wall-clock time
 - `equip_instance()` - Equipment slot management
-- `effective_stats()` - Returns stats merged with equipment and passive bonuses
+- `effective_stats()` - Returns stats merged with equipment, global passive bonuses, and archetype passive bonuses
 - Statistics recording: `record_enemy_defeated()`, `record_location_visited()`, `record_adventure_completed()`
 
 ### Stats Architecture
@@ -793,6 +795,73 @@ and apply matching effects. Because passive effects are evaluated with `registry
 conditions that require a registry — `item_held_label`, `any_item_equipped` — cannot be honored
 and trigger a `LoadWarning` at load time. Similarly, `character_stat` conditions with
 `stat_source: effective` also emit a warning since the registry is unavailable.
+
+---
+
+## Archetypes
+
+An archetype is a named, persistent state held in `CharacterState.archetypes: Dict[str, GrantRecord]`. Archetypes are granted and revoked by effects during adventures.
+
+### `GrantRecord`
+
+Both milestones and archetypes use the same record type:
+
+```python
+@dataclass
+class GrantRecord:
+    tick: int        # internal_ticks at the moment of grant
+    timestamp: int   # Unix wall-clock timestamp at the moment of grant
+```
+
+`CharacterState.make_grant_record()` stamps the current `internal_ticks` and `int(time.time())` into a fresh `GrantRecord`.
+
+### Lifecycle
+
+1. **`ArchetypeAddEffect`** — Checks whether the archetype is already held. If not (or if `force=True`):
+   - Dispatches `manifest.spec.gain_effects` recursively via `run_effect()`.
+   - Stores `player.archetypes[name] = player.make_grant_record()`.
+
+2. **`ArchetypeRemoveEffect`** — Checks whether the archetype is currently held. If so (or if `force=True`):
+   - Dispatches `manifest.spec.lose_effects` recursively.
+   - Calls `player.archetypes.pop(name, None)`.
+
+3. **`SkillRevokeEffect`** — Calls `player.known_skills.discard(skill_ref)`. Useful in `lose_effects` to take back a skill granted at archetype acquisition.
+
+### Passive Effects Evaluation Order
+
+`effective_stats()` and `available_skills()` apply passive bonuses in the following order:
+
+1. Global `game.yaml` `passive_effects`
+2. Per held archetype `passive_effects` (order: deterministic dict iteration, insertion order)
+
+Archetype passive effects share the same `PassiveEffect` schema as global passive effects: a `condition` guard (optional), `stat_modifiers`, and `skill_grants`. The implicit gate is "archetype is held"; the `condition` field adds a further refinement.
+
+### Serialization
+
+`to_dict()` emits:
+
+```python
+"archetypes": {name: {"tick": r.tick, "timestamp": r.timestamp} for name, r in self.archetypes.items()}
+```
+
+`from_dict()` supports two legacy migration paths:
+
+| Input format | Migration behavior |
+| --- | --- |
+| `{"name": {"tick": N, "timestamp": N}}` | Reconstructed as `GrantRecord` — current format |
+| `["name1", "name2"]` | Each name migrated to `GrantRecord(tick=0, timestamp=0)` |
+
+When a `ContentRegistry` is passed to `from_dict()`, any archetype names absent from the registry are silently dropped (content-drift resilience, same as milestone pruning).
+
+### Load-Time Validation
+
+`_validate_archetype_refs()` in `loader.py` checks that every archetype name referenced in effects (`archetype_add`, `archetype_remove`) and conditions (`has_archetype`, `has_all_archetypes`, `has_any_archetypes`, `archetype_ticks_elapsed`) corresponds to a declared `Archetype` manifest. Unknown references produce a hard `LoadError`.
+
+The condition walker (`_collect_archetype_refs_in_condition`) is recursive and covers `all`, `any`, and `not` compound conditions.
+
+### Prior Class Placeholder
+
+The `ClassManifest` / `ClassCondition` placeholder that was present before archetypes were implemented has been removed. There is no class system in the engine; `Archetype` is the supported primitive.
 
 ---
 

@@ -3,12 +3,12 @@
 from typing import TYPE_CHECKING, Dict, Generic, Iterator, List, Type, TypeVar, cast
 
 from oscilla.engine.models.adventure import AdventureManifest
+from oscilla.engine.models.archetype import ArchetypeManifest
 from oscilla.engine.models.base import ManifestEnvelope
 from oscilla.engine.models.buff import BuffManifest
 from oscilla.engine.models.character_config import CharacterConfigManifest
 from oscilla.engine.models.enemy import EnemyManifest
 from oscilla.engine.models.game import GameManifest
-from oscilla.engine.models.game_class import ClassManifest
 from oscilla.engine.models.item import ItemManifest
 from oscilla.engine.models.location import LocationManifest
 from oscilla.engine.models.loot_table import LootEntry, LootTableManifest
@@ -64,12 +64,12 @@ class ContentRegistry:
         self.regions: KindRegistry[RegionManifest] = KindRegistry()
         self.locations: KindRegistry[LocationManifest] = KindRegistry()
         self.adventures: KindRegistry[AdventureManifest] = KindRegistry()
+        self.archetypes: KindRegistry[ArchetypeManifest] = KindRegistry()
         self.enemies: KindRegistry[EnemyManifest] = KindRegistry()
         self.items: KindRegistry[ItemManifest] = KindRegistry()
         self.loot_tables: KindRegistry[LootTableManifest] = KindRegistry()
         self.recipes: KindRegistry[RecipeManifest] = KindRegistry()
         self.quests: KindRegistry[QuestManifest] = KindRegistry()
-        self.classes: KindRegistry[ClassManifest] = KindRegistry()
         self.buffs: KindRegistry[BuffManifest] = KindRegistry()
         self.skills: KindRegistry[SkillManifest] = KindRegistry()
         self.game: GameManifest | None = None
@@ -108,6 +108,8 @@ class ContentRegistry:
                     registry.locations.register(cast(LocationManifest, m))
                 case "Adventure":
                     registry.adventures.register(cast(AdventureManifest, m))
+                case "Archetype":
+                    registry.archetypes.register(cast(ArchetypeManifest, m))
                 case "Enemy":
                     registry.enemies.register(cast(EnemyManifest, m))
                 case "Item":
@@ -118,8 +120,6 @@ class ContentRegistry:
                     registry.recipes.register(cast(RecipeManifest, m))
                 case "Quest":
                     registry.quests.register(cast(QuestManifest, m))
-                case "Class":
-                    registry.classes.register(cast(ClassManifest, m))
                 case "Skill":
                     registry.skills.register(cast(SkillManifest, m))
                 case "Buff":

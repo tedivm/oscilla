@@ -1,0 +1,7 @@
+apiVersion: oscilla/v1
+kind: Region
+metadata:
+  name: archetypes
+spec:
+  displayName: "Archetype Testing Grounds"
+  description: "A region for testing archetype grant, revoke, passive effects, and conditions."

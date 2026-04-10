@@ -1,0 +1,49 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: archetype-count-check
+spec:
+  displayName: "Archetype Count Check"
+  description: "Tests archetype_count condition with gte, lte, and eq comparisons."
+  steps:
+    - type: stat_check
+      condition:
+        type: archetype_count
+        eq: 0
+      on_pass:
+        steps:
+          - type: narrative
+            text: "[archetype_count eq 0 PASS] You hold no archetypes."
+      on_fail:
+        steps:
+          - type: narrative
+            text: "[archetype_count eq 0 FAIL] You already hold archetypes."
+    - type: stat_check
+      condition:
+        type: archetype_count
+        gte: 1
+      on_pass:
+        steps:
+          - type: narrative
+            text: "[archetype_count gte 1 PASS] You hold at least one archetype."
+      on_fail:
+        steps:
+          - type: narrative
+            text: "[archetype_count gte 1 FAIL] You hold no archetypes."
+    - type: stat_check
+      condition:
+        type: archetype_count
+        gte: 2
+      on_pass:
+        steps:
+          - type: narrative
+            text: "[archetype_count gte 2 PASS] You hold two or more archetypes."
+      on_fail:
+        steps:
+          - type: narrative
+            text: "[archetype_count gte 2 FAIL] You hold fewer than two archetypes."
+    - type: narrative
+      text: "Count check complete."
+      effects:
+        - type: end_adventure
+          outcome: completed

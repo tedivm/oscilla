@@ -12,6 +12,8 @@ from oscilla.engine.combat_context import ActiveCombatEffect, CombatContext
 from oscilla.engine.models.adventure import (
     AdjustGameTicksEffect,
     ApplyBuffEffect,
+    ArchetypeAddEffect,
+    ArchetypeRemoveEffect,
     DispelEffect,
     Effect,
     EmitTriggerEffect,
@@ -25,6 +27,7 @@ from oscilla.engine.models.adventure import (
     SetNameEffect,
     SetPronounsEffect,
     SkillGrantEffect,
+    SkillRevokeEffect,
     StatChangeEffect,
     StatSetEffect,
     UseItemEffect,
@@ -667,7 +670,7 @@ async def run_effect(
                 stat: player.stats.get(stat) for stat in prestige_cfg.carry_stats if stat in player.stats
             }
             carried_skills: Set[str] = player.known_skills & set(prestige_cfg.carry_skills)
-            # milestones is now Dict[str, MilestoneRecord] — intersect on keys.
+            # milestones is now Dict[str, GrantRecord] — intersect on keys.
             carried_milestones: Dict[str, Any] = {
                 k: v for k, v in player.milestones.items() if k in prestige_cfg.carry_milestones
             }
@@ -729,3 +732,38 @@ async def run_effect(
         case SetNameEffect(prompt=prompt):
             chosen: str = await tui.input_text(prompt)
             player.name = chosen.strip()
+
+        case ArchetypeAddEffect(name=archetype_name, force=force):
+            already_held = archetype_name in player.archetypes
+            if not already_held or force:
+                archetype_manifest = registry.archetypes.get(archetype_name)
+                if archetype_manifest is not None:
+                    for gain_eff in archetype_manifest.spec.gain_effects:
+                        await run_effect(
+                            effect=gain_eff,
+                            player=player,
+                            registry=registry,
+                            tui=tui,
+                            combat=combat,
+                            ctx=ctx,
+                        )
+                player.archetypes[archetype_name] = player.make_grant_record()
+
+        case ArchetypeRemoveEffect(name=archetype_name, force=force):
+            currently_held = archetype_name in player.archetypes
+            if currently_held or force:
+                archetype_manifest = registry.archetypes.get(archetype_name)
+                if archetype_manifest is not None:
+                    for lose_eff in archetype_manifest.spec.lose_effects:
+                        await run_effect(
+                            effect=lose_eff,
+                            player=player,
+                            registry=registry,
+                            tui=tui,
+                            combat=combat,
+                            ctx=ctx,
+                        )
+                player.archetypes.pop(archetype_name, None)
+
+        case SkillRevokeEffect(skill=skill_ref):
+            player.known_skills.discard(skill_ref)

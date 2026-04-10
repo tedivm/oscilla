@@ -1,0 +1,18 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: archetype-remove-warrior
+spec:
+  displayName: "Renounce the Warrior Path"
+  description: "Tests archetype_remove: removes test-warrior, firing lose_effects (Strength -3)."
+  requires:
+    type: has_archetype
+    name: test-warrior
+  steps:
+    - type: narrative
+      text: "You lay down your warrior identity. The strength bonus fades."
+      effects:
+        - type: archetype_remove
+          name: test-warrior
+        - type: end_adventure
+          outcome: completed

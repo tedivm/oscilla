@@ -29,7 +29,7 @@ All content manifests SHALL use a four-field top-level envelope: `apiVersion`, `
 
 ### Requirement: Supported entity kinds
 
-The manifest system SHALL support the following `kind` values: `Region`, `Location`, `Adventure`, `Enemy`, `Item`, `Recipe`, `Quest`, `Class`, `Game`, and `CharacterConfig`.
+The manifest system SHALL support the following `kind` values: `Region`, `Location`, `Adventure`, `Enemy`, `Item`, `Recipe`, `Quest`, `Archetype`, `Game`, `CharacterConfig`, `Skill`, `Buff`, and `LootTable`.
 
 #### Scenario: Each kind maps to a Pydantic model
 

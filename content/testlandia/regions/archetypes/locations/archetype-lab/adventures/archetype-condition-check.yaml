@@ -1,0 +1,66 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: archetype-condition-check
+spec:
+  displayName: "Archetype Condition Showcase"
+  description: "Tests has_archetype, has_all_archetypes, has_any_archetypes, and archetype_ticks_elapsed conditions."
+  steps:
+    - type: stat_check
+      condition:
+        type: has_archetype
+        name: test-warrior
+      on_pass:
+        steps:
+          - type: narrative
+            text: "[has_archetype PASS] You carry the warrior mark."
+      on_fail:
+        steps:
+          - type: narrative
+            text: "[has_archetype FAIL] You are not a warrior."
+    - type: stat_check
+      condition:
+        type: has_any_archetypes
+        names:
+          - test-warrior
+          - test-mage
+      on_pass:
+        steps:
+          - type: narrative
+            text: "[has_any_archetypes PASS] You hold at least one archetype."
+      on_fail:
+        steps:
+          - type: narrative
+            text: "[has_any_archetypes FAIL] You hold no archetypes yet."
+    - type: stat_check
+      condition:
+        type: has_all_archetypes
+        names:
+          - test-warrior
+          - test-mage
+      on_pass:
+        steps:
+          - type: narrative
+            text: "[has_all_archetypes PASS] Warrior AND Mage — dual path."
+      on_fail:
+        steps:
+          - type: narrative
+            text: "[has_all_archetypes FAIL] You don't hold both warrior and mage."
+    - type: stat_check
+      condition:
+        type: archetype_ticks_elapsed
+        name: test-warrior
+        gte: 1
+      on_pass:
+        steps:
+          - type: narrative
+            text: "[archetype_ticks_elapsed PASS] Warrior for at least 1 tick."
+      on_fail:
+        steps:
+          - type: narrative
+            text: "[archetype_ticks_elapsed FAIL] Warrior not held or too new."
+    - type: narrative
+      text: "Condition showcase complete."
+      effects:
+        - type: end_adventure
+          outcome: completed

@@ -23,6 +23,8 @@ from oscilla.engine.models.adventure import (
     _BUILTIN_OUTCOMES,
     AdventureManifest,
     ApplyBuffEffect,
+    ArchetypeAddEffect,
+    ArchetypeRemoveEffect,
     ChoiceStep,
     CombatStep,
     Effect,
@@ -40,10 +42,15 @@ from oscilla.engine.models.adventure import (
     Step,
     UseItemEffect,
 )
+from oscilla.engine.models.archetype import ArchetypeManifest
 from oscilla.engine.models.base import (
     AllCondition,
     AnyCondition,
+    ArchetypeTicksElapsedCondition,
     Condition,
+    HasAllArchetypesCondition,
+    HasAnyArchetypeCondition,
+    HasArchetypeCondition,
     ManifestEnvelope,
     NotCondition,
     QuestStageCondition,
@@ -624,6 +631,146 @@ def _collect_quest_stage_conditions_from_manifest(m: ManifestEnvelope) -> List[Q
     return results
 
 
+def _collect_archetype_refs_in_condition(condition: Condition | None) -> Set[str]:
+    """Recursively collect archetype name refs from a condition tree."""
+    if condition is None:
+        return set()
+    refs: Set[str] = set()
+    match condition:
+        case HasArchetypeCondition(name=n):
+            refs.add(n)
+        case HasAllArchetypesCondition(names=ns):
+            refs.update(ns)
+        case HasAnyArchetypeCondition(names=ns):
+            refs.update(ns)
+        case ArchetypeTicksElapsedCondition(name=n):
+            refs.add(n)
+        case AllCondition(conditions=children):
+            for child in children:
+                refs.update(_collect_archetype_refs_in_condition(child))
+        case AnyCondition(conditions=children):
+            for child in children:
+                refs.update(_collect_archetype_refs_in_condition(child))
+        case NotCondition(condition=child):
+            refs.update(_collect_archetype_refs_in_condition(child))
+        case _:
+            pass
+    return refs
+
+
+def _collect_archetype_refs_in_effects(effects: List[Effect]) -> Set[str]:
+    """Collect archetype name refs from an effect list."""
+    refs: Set[str] = set()
+    for eff in effects:
+        if isinstance(eff, ArchetypeAddEffect) or isinstance(eff, ArchetypeRemoveEffect):
+            refs.add(eff.name)
+    return refs
+
+
+def _collect_archetype_refs_from_manifest(manifest: ManifestEnvelope) -> Set[str]:
+    """Collect all archetype name refs from any manifest kind.
+
+    Covers: adventure step conditions/effects, region/location unlock conditions,
+    skill use_effects, item use_effects and equip requires, archetype
+    gain_effects/lose_effects/passive_effects, game passive_effects.
+    """
+    refs: Set[str] = set()
+
+    def _add_cond(cond: Condition | None) -> None:
+        refs.update(_collect_archetype_refs_in_condition(cond))
+
+    def _add_effects(effects: List[Effect]) -> None:
+        refs.update(_collect_archetype_refs_in_effects(effects))
+
+    def _add_branch(branch: OutcomeBranch) -> None:
+        _add_effects(branch.effects)
+        for sub in branch.steps:
+            _add_step(sub)
+
+    def _add_step(step: Step) -> None:
+        match step:
+            case NarrativeStep():
+                _add_cond(step.requires)
+                _add_effects(step.effects)
+            case CombatStep():
+                _add_cond(step.requires)
+                for branch in [step.on_win, step.on_defeat, step.on_flee]:
+                    _add_branch(branch)
+            case ChoiceStep():
+                _add_cond(step.requires)
+                for opt in step.options:
+                    _add_cond(opt.requires)
+                    _add_effects(opt.effects)
+                    for sub in opt.steps:
+                        _add_step(sub)
+            case StatCheckStep():
+                _add_cond(step.condition)
+                _add_cond(step.requires)
+                for branch in [step.on_pass, step.on_fail]:
+                    _add_branch(branch)
+            case PassiveStep():
+                _add_cond(step.bypass)
+                _add_cond(step.requires)
+            case _:
+                pass
+
+    match manifest.kind:
+        case "Adventure":
+            adv = cast(AdventureManifest, manifest)
+            _add_cond(adv.spec.requires)
+            for step in adv.spec.steps:
+                _add_step(step)
+        case "Region":
+            region = cast(RegionManifest, manifest)
+            _add_cond(region.spec.unlock)
+            _add_cond(region.spec.effective_unlock)
+        case "Location":
+            loc = cast(LocationManifest, manifest)
+            _add_cond(loc.spec.unlock)
+            _add_cond(loc.spec.effective_unlock)
+            for adv_entry in loc.spec.adventures:
+                _add_cond(adv_entry.requires)
+        case "Skill":
+            skill = cast(SkillManifest, manifest)
+            _add_effects(skill.spec.use_effects)
+        case "Item":
+            item = cast(ItemManifest, manifest)
+            _add_effects(item.spec.use_effects)
+            if item.spec.equip is not None:
+                _add_cond(item.spec.equip.requires)
+        case "Archetype":
+            archetype = cast(ArchetypeManifest, manifest)
+            _add_effects(archetype.spec.gain_effects)
+            _add_effects(archetype.spec.lose_effects)
+            for pe in archetype.spec.passive_effects:
+                _add_cond(pe.condition)
+        case "Game":
+            game = cast(GameManifest, manifest)
+            for pe in game.spec.passive_effects:
+                _add_cond(pe.condition)
+
+    return refs
+
+
+def _validate_archetype_refs(manifests: List[ManifestEnvelope]) -> List[LoadError]:
+    """Validate that archetype name refs in conditions and effects point to declared Archetype manifests."""
+    errors: List[LoadError] = []
+    archetype_names: Set[str] = {m.metadata.name for m in manifests if m.kind == "Archetype"}
+
+    for m in manifests:
+        refs = _collect_archetype_refs_from_manifest(m)
+        for ref in sorted(refs):
+            if ref not in archetype_names:
+                errors.append(
+                    LoadError(
+                        file=Path(f"<{m.metadata.name}>"),
+                        message=f"archetype ref {ref!r} not found in declared Archetype manifests",
+                    )
+                )
+
+    return errors
+
+
 def _validate_quest_stage_condition_refs(manifests: List[ManifestEnvelope]) -> List[LoadError]:
     """Validate that quest_stage condition quest and stage names exist in declared Quest manifests."""
     errors: List[LoadError] = []
@@ -897,6 +1044,7 @@ def validate_references(manifests: List[ManifestEnvelope]) -> List[LoadError]:
     errors.extend(_validate_outcome_refs(manifests))
     errors.extend(_validate_prestige_effects(manifests))
     errors.extend(_validate_quest_stage_condition_refs(manifests))
+    errors.extend(_validate_archetype_refs(manifests))
 
     return errors
 

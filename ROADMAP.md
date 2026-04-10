@@ -24,9 +24,10 @@ These items fix existing bugs, remove technical debt that actively misleads auth
 
 Since this project has not had a v1 release yet it is acceptable to break backwards compatibility, but we want to prioritize those features before the v1 release.
 
-| Item                                          | Effort | Group                 |
-| --------------------------------------------- | ------ | --------------------- |
-| [Character Archetypes](#character-archetypes) | M      | Character Progression |
+| Item | Effort | Group |
+| ---- | ------ | ----- |
+
+> All pre-v1 items have been implemented.
 
 ### All Items
 
@@ -38,7 +39,7 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems)        | XL     | Combat Overhaul         |
 | [Buff Blocking and Priority](#buff-blocking-and-priority)                                   | S      | Combat Refinement       |
 | [Buff Persistence Between Adventures](#buff-persistence-between-adventures)                 | S      | Combat Refinement       |
-| [Character Archetypes](#character-archetypes)                                               | M      | Character Progression   |
+
 | [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades)                          | M      | Character Progression   |
 | [Extended Template Primitives](#extended-template-primitives)                               | S      | Engine Architecture     |
 | [Player-Defined Pronouns](#player-defined-pronouns)                                         | S      | Character Configuration |

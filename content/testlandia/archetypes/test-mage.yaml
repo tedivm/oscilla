@@ -1,0 +1,22 @@
+apiVersion: oscilla/v1
+kind: Archetype
+metadata:
+  name: test-mage
+spec:
+  displayName: "Test Mage"
+  description: "An arcane-focused archetype. Tests skill grants, passive mana bonuses, and skill_revoke in lose_effects."
+
+  gain_effects:
+    - type: stat_change
+      stat: mana
+      amount: 20
+
+  lose_effects:
+    - type: stat_change
+      stat: mana
+      amount: -20
+
+  passive_effects:
+    - stat_modifiers:
+        - stat: max_mana
+          amount: 15

@@ -13,7 +13,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Any, Dict, List, Set
 from uuid import UUID, uuid4
 
-from oscilla.engine.models.base import MilestoneRecord
+from oscilla.engine.models.base import GrantRecord
 from oscilla.engine.templates import DEFAULT_PRONOUN_SET, PRONOUN_SETS, PronounSet
 
 if TYPE_CHECKING:
@@ -143,8 +143,8 @@ class CharacterState:
     current_location: str | None
     # Player's chosen pronoun set. Defaults to they/them until explicitly set.
     pronouns: PronounSet = field(default_factory=lambda: DEFAULT_PRONOUN_SET)
-    # Milestones granted this iteration: name → MilestoneRecord(tick, timestamp).
-    milestones: Dict[str, MilestoneRecord] = field(default_factory=dict)
+    # Milestones granted this iteration: name → GrantRecord(tick, timestamp).
+    milestones: Dict[str, GrantRecord] = field(default_factory=dict)
     statistics: CharacterStatistics = field(default_factory=CharacterStatistics)
     # Stackable items: item_ref → quantity
     stacks: Dict[str, int] = field(default_factory=dict)
@@ -193,6 +193,8 @@ class CharacterState:
     # Ephemeral prestige carry-forward snapshot. Set by PrestigeEffect handler and consumed
     # at adventure_end by the session layer to call prestige_character(). Never serialized.
     prestige_pending: "PrestigeCarryForward | None" = None
+    # Archetypes held this iteration: name → GrantRecord(tick, timestamp).
+    archetypes: Dict[str, GrantRecord] = field(default_factory=dict)
 
     # --- Methods ---
 
@@ -425,14 +427,34 @@ class CharacterState:
                         if isinstance(current, int) and not isinstance(current, bool):
                             result[modifier.stat] = int(current + modifier.amount)
 
+        # Apply passive effects from held archetypes.
+        from oscilla.engine.conditions import evaluate
+
+        for archetype_name in self.archetypes:
+            archetype_manifest = registry.archetypes.get(archetype_name)
+            if archetype_manifest is None:
+                continue
+            for passive in archetype_manifest.spec.passive_effects:
+                if evaluate(condition=passive.condition, player=self, registry=None):
+                    for modifier in passive.stat_modifiers:
+                        current = result.get(modifier.stat, 0)
+                        if isinstance(current, int) and not isinstance(current, bool):
+                            result[modifier.stat] = int(current + modifier.amount)
+
         return result
+
+    # --- Grant record factory ---
+
+    def make_grant_record(self) -> GrantRecord:
+        """Create a GrantRecord stamped with the current tick and real-world timestamp."""
+        return GrantRecord(tick=self.internal_ticks, timestamp=int(time.time()))
 
     # --- Milestones ---
 
     def grant_milestone(self, name: str) -> None:
         """Record a milestone with current tick and timestamp. No-op if already held."""
         if name not in self.milestones:
-            self.milestones[name] = MilestoneRecord(tick=self.internal_ticks, timestamp=int(time.time()))
+            self.milestones[name] = self.make_grant_record()
 
     def has_milestone(self, name: str) -> bool:
         return name in self.milestones
@@ -479,6 +501,17 @@ class CharacterState:
 
             for passive in registry.game.spec.passive_effects:
                 # Passive conditions evaluated without registry to avoid recursion.
+                if evaluate(condition=passive.condition, player=self, registry=None):
+                    result.update(passive.skill_grants)
+
+        # Passive effect skill grants from held archetypes.
+        from oscilla.engine.conditions import evaluate
+
+        for archetype_name in self.archetypes:
+            archetype_manifest = registry.archetypes.get(archetype_name)
+            if archetype_manifest is None:
+                continue
+            for passive in archetype_manifest.spec.passive_effects:
                 if evaluate(condition=passive.condition, player=self, registry=None):
                     result.update(passive.skill_grants)
 
@@ -668,6 +701,7 @@ class CharacterState:
             "game_ticks": self.game_ticks,
             "era_started_at_ticks": dict(self.era_started_at_ticks),
             "era_ended_at_ticks": dict(self.era_ended_at_ticks),
+            "archetypes": {name: {"tick": r.tick, "timestamp": r.timestamp} for name, r in self.archetypes.items()},
         }
 
     @classmethod
@@ -766,26 +800,26 @@ class CharacterState:
         raw_equipment: Dict[str, str] = data.get("equipment", {})
         equipment: Dict[str, UUID] = {slot: UUID(iid_str) for slot, iid_str in raw_equipment.items()}
 
-        # Deserialize and migrate milestones to Dict[str, MilestoneRecord].
+        # Deserialize and migrate milestones to Dict[str, GrantRecord].
         # Supports three formats for backward-compat:
-        #   - Old list: ["milestone-a", "milestone-b"] → MilestoneRecord(tick=0, timestamp=0)
-        #   - Intermediate int-dict: {"milestone-a": 42} → MilestoneRecord(tick=42, timestamp=0)
+        #   - Old list: ["milestone-a", "milestone-b"] → GrantRecord(tick=0, timestamp=0)
+        #   - Intermediate int-dict: {"milestone-a": 42} → GrantRecord(tick=42, timestamp=0)
         #   - Current nested-dict: {"milestone-a": {"tick": 42, "timestamp": 1744000000}}
         raw_milestones: Any = data.get("milestones", [])
-        milestones: Dict[str, MilestoneRecord] = {}
+        milestones: Dict[str, GrantRecord] = {}
         if isinstance(raw_milestones, list):
             if raw_milestones:
-                logger.warning("Migrating legacy milestone list format to MilestoneRecord dict (tick=0, timestamp=0).")
+                logger.warning("Migrating legacy milestone list format to GrantRecord dict (tick=0, timestamp=0).")
             for name in raw_milestones:
-                milestones[name] = MilestoneRecord(tick=0, timestamp=0)
+                milestones[name] = GrantRecord(tick=0, timestamp=0)
         elif isinstance(raw_milestones, dict):
             for name, value in raw_milestones.items():
                 if isinstance(value, int):
                     # Intermediate int-dict format
-                    logger.warning("Migrating intermediate milestone int-dict format for %r to MilestoneRecord.", name)
-                    milestones[name] = MilestoneRecord(tick=value, timestamp=0)
+                    logger.warning("Migrating intermediate milestone int-dict format for %r to GrantRecord.", name)
+                    milestones[name] = GrantRecord(tick=value, timestamp=0)
                 elif isinstance(value, dict):
-                    milestones[name] = MilestoneRecord(
+                    milestones[name] = GrantRecord(
                         tick=int(value.get("tick", 0)),
                         timestamp=int(value.get("timestamp", 0)),
                     )
@@ -812,6 +846,31 @@ class CharacterState:
         # Merge with any explicitly stored adventure_last_completed_game_ticks
         stored_game_ticks: Dict[str, int] = dict(data.get("adventure_last_completed_game_ticks", {}))
         merged_game_ticks = {**migrated_game_ticks, **stored_game_ticks}
+
+        # Deserialize archetypes to Dict[str, GrantRecord].
+        # Supports two formats:
+        #   - Legacy list: ["warrior", "mage"] → GrantRecord(tick=0, timestamp=0)
+        #   - Current nested-dict: {"warrior": {"tick": 42, "timestamp": 1744000000}}
+        raw_archetypes: Any = data.get("archetypes", {})
+        archetypes: Dict[str, GrantRecord] = {}
+        if isinstance(raw_archetypes, list):
+            if raw_archetypes:
+                logger.warning("Migrating legacy archetype list format to GrantRecord dict (tick=0, timestamp=0).")
+            for aname in raw_archetypes:
+                archetypes[aname] = GrantRecord(tick=0, timestamp=0)
+        elif isinstance(raw_archetypes, dict):
+            for aname, avalue in raw_archetypes.items():
+                if isinstance(avalue, dict):
+                    archetypes[aname] = GrantRecord(
+                        tick=int(avalue.get("tick", 0)),
+                        timestamp=int(avalue.get("timestamp", 0)),
+                    )
+                else:
+                    logger.warning("Unrecognized archetype format for %r — skipping.", aname)
+        # Drop archetype names absent from registry to handle content drift.
+        if registry is not None and registry.archetypes is not None:
+            known_archetype_names = set(registry.archetypes.names())
+            archetypes = {k: v for k, v in archetypes.items() if k in known_archetype_names}
 
         result = cls(
             character_id=UUID(data["character_id"]),
@@ -842,6 +901,7 @@ class CharacterState:
             era_started_at_ticks=dict(data.get("era_started_at_ticks", {})),
             era_ended_at_ticks=dict(data.get("era_ended_at_ticks", {})),
             pending_triggers=list(data.get("pending_triggers", [])),
+            archetypes=archetypes,
         )
 
         # Warn about equipped items whose requires condition is no longer satisfied.

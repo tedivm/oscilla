@@ -12,9 +12,10 @@ from oscilla.engine.models.base import (
     AllCondition,
     AnyCondition,
     AnyItemEquippedCondition,
+    ArchetypeCountCondition,
+    ArchetypeTicksElapsedCondition,
     CharacterStatCondition,
     ChineseZodiacIsCondition,
-    ClassCondition,
     Condition,
     DateBetweenCondition,
     DateIsCondition,
@@ -23,6 +24,9 @@ from oscilla.engine.models.base import (
     GameCalendarCycleCondition,
     GameCalendarEraCondition,
     GameCalendarTimeCondition,
+    HasAllArchetypesCondition,
+    HasAnyArchetypeCondition,
+    HasArchetypeCondition,
     ItemCondition,
     ItemEquippedCondition,
     ItemHeldLabelCondition,
@@ -101,14 +105,29 @@ def evaluate(
             if c.lte is not None and elapsed > c.lte:
                 return False
             return True
+        case HasArchetypeCondition(name=n):
+            return n in player.archetypes
+        case HasAllArchetypesCondition(names=ns):
+            return all(n in player.archetypes for n in ns)
+        case HasAnyArchetypeCondition(names=ns):
+            return any(n in player.archetypes for n in ns)
+        case ArchetypeCountCondition() as c:
+            return _numeric_compare(len(player.archetypes), c)
+        case ArchetypeTicksElapsedCondition() as c:
+            record = player.archetypes.get(c.name)
+            if record is None:
+                return False
+            elapsed = player.internal_ticks - record.tick
+            if c.gte is not None and elapsed < c.gte:
+                return False
+            if c.lte is not None and elapsed > c.lte:
+                return False
+            return True
         case ItemCondition(name=n):
             # Fixed: check both stackable items and non-stackable instances.
             in_stacks = player.stacks.get(n, 0) > 0
             in_instances = any(inst.item_ref == n for inst in player.instances)
             return in_stacks or in_instances
-        case ClassCondition():
-            # No-op in v1: class mechanics are a placeholder; every class always passes.
-            return True
         case PrestigeCountCondition() as c:
             return _numeric_compare(player.prestige_count, c)
 

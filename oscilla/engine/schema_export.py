@@ -59,11 +59,11 @@ def export_union_schema() -> Dict[str, Any]:
     from pydantic import Field, RootModel
 
     from oscilla.engine.models.adventure import AdventureManifest
+    from oscilla.engine.models.archetype import ArchetypeManifest
     from oscilla.engine.models.buff import BuffManifest
     from oscilla.engine.models.character_config import CharacterConfigManifest
     from oscilla.engine.models.enemy import EnemyManifest
     from oscilla.engine.models.game import GameManifest
-    from oscilla.engine.models.game_class import ClassManifest
     from oscilla.engine.models.item import ItemManifest
     from oscilla.engine.models.location import LocationManifest
     from oscilla.engine.models.loot_table import LootTableManifest
@@ -78,9 +78,9 @@ def export_union_schema() -> Dict[str, Any]:
         Annotated[
             Union[
                 AdventureManifest,
+                ArchetypeManifest,
                 BuffManifest,
                 CharacterConfigManifest,
-                ClassManifest,
                 EnemyManifest,
                 GameManifest,
                 ItemManifest,

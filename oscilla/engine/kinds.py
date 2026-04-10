@@ -29,11 +29,11 @@ def _load_kinds() -> List[ManifestKind]:
     Deferred import keeps the module importable without loading all models.
     """
     from oscilla.engine.models.adventure import AdventureManifest
+    from oscilla.engine.models.archetype import ArchetypeManifest
     from oscilla.engine.models.buff import BuffManifest
     from oscilla.engine.models.character_config import CharacterConfigManifest
     from oscilla.engine.models.enemy import EnemyManifest
     from oscilla.engine.models.game import GameManifest
-    from oscilla.engine.models.game_class import ClassManifest
     from oscilla.engine.models.item import ItemManifest
     from oscilla.engine.models.location import LocationManifest
     from oscilla.engine.models.loot_table import LootTableManifest
@@ -44,6 +44,7 @@ def _load_kinds() -> List[ManifestKind]:
 
     return [
         ManifestKind("adventure", "adventures", "adventures", "Adventure", AdventureManifest, creatable=True),
+        ManifestKind("archetype", "archetypes", "archetypes", "Archetype", ArchetypeManifest, creatable=True),
         ManifestKind("buff", "buffs", "buffs", "Buff", BuffManifest, creatable=False),
         ManifestKind(
             "character-config",
@@ -53,7 +54,6 @@ def _load_kinds() -> List[ManifestKind]:
             CharacterConfigManifest,
             creatable=False,
         ),
-        ManifestKind("class", "classes", "classes", "Class", ClassManifest, creatable=False),
         ManifestKind("enemy", "enemies", "enemies", "Enemy", EnemyManifest, creatable=True),
         ManifestKind("game", "games", "game", "Game", GameManifest, creatable=False),
         ManifestKind("item", "items", "items", "Item", ItemManifest, creatable=True),

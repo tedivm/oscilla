@@ -109,13 +109,71 @@ effects:
 
 Exactly one of `loot` or `loot_ref` must be set; providing both or neither is a load-time error.
 
+---
+
+## Managing Skills and Archetypes
+
+### Skill Grant
+
+Permanently teaches the player a skill. It appears in their skill list for all future combats.
+
 ```yaml
 effects:
   - type: skill_grant
-    skill: battle-cry
+    skill: battle-cry   # skill manifest name
 ```
 
-The player permanently learns the skill. It appears in their skill list for all future combats. See [Skills](./skills.md) for the full skill manifest format.
+See [Skills](./skills.md) for the full skill manifest format.
+
+### Skill Revoke
+
+Permanently removes a learned skill from the player. This is the counterpart to `skill_grant` and is most commonly used in an archetype's `lose_effects` block to take back skills that were granted when the archetype was applied.
+
+```yaml
+effects:
+  - type: skill_revoke
+    skill: power-attack   # skill manifest name
+```
+
+This is a safe no-op if the character does not currently know the skill.
+
+### Archetype Add
+
+Grants the named [archetype](./archetypes.md) to the character.
+
+```yaml
+effects:
+  - type: archetype_add
+    name: warrior       # Archetype manifest name
+    force: false        # Optional; defaults to false
+```
+
+When an archetype is granted:
+
+1. The archetype's `gain_effects` are dispatched.
+2. A grant record (tick + timestamp) is stored on the character.
+3. The archetype's `passive_effects` begin applying immediately.
+
+If the character already holds the archetype, this is a no-op. Set `force: true` to re-grant an already-held archetype, which re-fires `gain_effects` and resets the grant timestamp.
+
+### Archetype Remove
+
+Removes the named [archetype](./archetypes.md) from the character.
+
+```yaml
+effects:
+  - type: archetype_remove
+    name: warrior
+    force: false        # Optional; defaults to false
+```
+
+When an archetype is removed:
+
+1. The archetype's `lose_effects` are dispatched.
+2. The grant record is deleted from the character.
+3. The archetype's `passive_effects` stop applying immediately.
+
+If the character does not hold the archetype, this is a no-op. Set `force: true` to fire `lose_effects` even when the archetype is not currently held.
 
 ---
 
@@ -309,6 +367,9 @@ Four things happen at once: XP, item, milestone, reputation. That's the composab
 | `milestone_grant` | `milestone`          | —                                           | Sets a permanent story flag; triggers quest advancement                        |
 | `quest_activate`  | `quest_ref`          | —                                           | Activates a named quest; no-op if already active/complete                      |
 | `skill_grant`     | `skill`              | —                                           | Player permanently learns the skill                                            |
+| `skill_revoke`    | `skill`              | —                                           | Removes a permanently learned skill; no-op if not known                        |
+| `archetype_add`   | `name`               | `force` (default `false`)                   | Grants an archetype; fires `gain_effects`; no-op if already held unless `force: true` |
+| `archetype_remove`| `name`               | `force` (default `false`)                   | Removes an archetype; fires `lose_effects`; no-op if not held unless `force: true`    |
 | `apply_buff`      | `buff_ref`           | `target`, `variables`                       | Combat only; `target`: `player` or `enemy`                                     |
 | `dispel`          | `label`              | `target`                                    | Combat only; removes buff by manifest name                                     |
 | `end_adventure`   | `outcome`            | —                                           | Terminates the adventure                                                       |

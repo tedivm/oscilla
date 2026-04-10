@@ -1,0 +1,35 @@
+apiVersion: oscilla/v1
+kind: Archetype
+metadata:
+  name: test-warrior
+spec:
+  displayName: "Test Warrior"
+  description: "A combat-hardened archetype. Tests gain_effects, lose_effects, and passive stat bonuses."
+
+  # Fires once when granted — boosts strength, grants power-attack skill
+  gain_effects:
+    - type: stat_change
+      stat: strength
+      amount: 3
+    - type: stat_change
+      stat: xp
+      amount: 10
+
+  # Fires once when removed — reverses the strength bonus
+  lose_effects:
+    - type: stat_change
+      stat: strength
+      amount: -3
+
+  # Always-on bonus while held; second entry is level-gated
+  passive_effects:
+    - stat_modifiers:
+        - stat: strength
+          amount: 2
+    - condition:
+        type: character_stat
+        name: level
+        gte: 3
+      stat_modifiers:
+        - stat: strength
+          amount: 3

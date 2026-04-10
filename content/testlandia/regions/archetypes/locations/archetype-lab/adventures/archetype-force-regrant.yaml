@@ -1,0 +1,19 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: archetype-force-regrant
+spec:
+  displayName: "Re-forge the Warrior (force)"
+  description: "Tests force: true — re-fires gain_effects on an already-held archetype, giving +3 strength and +10 XP again."
+  requires:
+    type: has_archetype
+    name: test-warrior
+  steps:
+    - type: narrative
+      text: "You renew your warrior vow even though you are already one. gain_effects fire again: Strength +3, XP +10."
+      effects:
+        - type: archetype_add
+          name: test-warrior
+          force: true
+        - type: end_adventure
+          outcome: completed

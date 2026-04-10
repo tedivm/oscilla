@@ -9,7 +9,7 @@ import pytest
 
 from oscilla.engine.character import _INT64_MAX, _INT64_MIN, CharacterState, ItemInstance
 from oscilla.engine.models.adventure import AdventureSpec, Cooldown
-from oscilla.engine.models.base import MilestoneRecord
+from oscilla.engine.models.base import GrantRecord
 from oscilla.engine.registry import ContentRegistry
 
 
@@ -258,7 +258,7 @@ def test_grant_milestone_records_tick_and_timestamp(base_player: CharacterState)
 
 
 def test_grant_milestone_noop_if_already_held(base_player: CharacterState) -> None:
-    """Re-granting a milestone must not overwrite the original MilestoneRecord."""
+    """Re-granting a milestone must not overwrite the original GrantRecord."""
     base_player.internal_ticks = 3
     base_player.grant_milestone("joined-guild")
     original_tick = base_player.milestones["joined-guild"].tick
@@ -278,7 +278,7 @@ def test_grant_milestone_noop_if_already_held(base_player: CharacterState) -> No
 
 
 def test_from_dict_migrates_milestone_list(minimal_registry: ContentRegistry) -> None:
-    """Old list milestone format migrates to MilestoneRecord(tick=0, timestamp=0)."""
+    """Old list milestone format migrates to GrantRecord(tick=0, timestamp=0)."""
     assert minimal_registry.character_config is not None
     player = CharacterState.new_character(
         name="MigList",
@@ -291,12 +291,12 @@ def test_from_dict_migrates_milestone_list(minimal_registry: ContentRegistry) ->
     restored = CharacterState.from_dict(data=data, character_config=minimal_registry.character_config)
     assert "alpha" in restored.milestones
     assert "beta" in restored.milestones
-    assert restored.milestones["alpha"] == MilestoneRecord(tick=0, timestamp=0)
-    assert restored.milestones["beta"] == MilestoneRecord(tick=0, timestamp=0)
+    assert restored.milestones["alpha"] == GrantRecord(tick=0, timestamp=0)
+    assert restored.milestones["beta"] == GrantRecord(tick=0, timestamp=0)
 
 
 def test_from_dict_migrates_milestone_int_dict(minimal_registry: ContentRegistry) -> None:
-    """Intermediate int-dict milestone format migrates to MilestoneRecord(tick=N, timestamp=0)."""
+    """Intermediate int-dict milestone format migrates to GrantRecord(tick=N, timestamp=0)."""
     assert minimal_registry.character_config is not None
     player = CharacterState.new_character(
         name="MigInt",
@@ -307,8 +307,8 @@ def test_from_dict_migrates_milestone_int_dict(minimal_registry: ContentRegistry
     data["milestones"] = {"alpha": 42, "beta": 0}
 
     restored = CharacterState.from_dict(data=data, character_config=minimal_registry.character_config)
-    assert restored.milestones["alpha"] == MilestoneRecord(tick=42, timestamp=0)
-    assert restored.milestones["beta"] == MilestoneRecord(tick=0, timestamp=0)
+    assert restored.milestones["alpha"] == GrantRecord(tick=42, timestamp=0)
+    assert restored.milestones["beta"] == GrantRecord(tick=0, timestamp=0)
 
 
 # ---------------------------------------------------------------------------
@@ -426,3 +426,91 @@ def test_is_adventure_eligible_multiple_constraints_anded() -> None:
     # Both met → eligible
     player.internal_ticks = 15
     assert player.is_adventure_eligible(adventure_ref="test-adv", spec=spec, now_ts=base_ts + 3600) is True
+
+
+# ---------------------------------------------------------------------------
+# Archetype serialization tests (task 8.2)
+# ---------------------------------------------------------------------------
+
+
+def test_to_dict_emits_archetypes(base_player: CharacterState) -> None:
+    """to_dict() serializes archetypes as a nested tick/timestamp dict."""
+    base_player.archetypes["warrior"] = GrantRecord(tick=5, timestamp=1_700_000_000)
+    data = base_player.to_dict()
+    assert "archetypes" in data
+    assert data["archetypes"]["warrior"] == {"tick": 5, "timestamp": 1_700_000_000}
+
+
+def test_from_dict_round_trips_archetypes(
+    base_player: CharacterState,
+    minimal_registry: ContentRegistry,
+) -> None:
+    """from_dict() reconstructs GrantRecord objects from the serialized form."""
+    assert minimal_registry.character_config is not None
+    base_player.archetypes["warrior"] = GrantRecord(tick=5, timestamp=1_700_000_000)
+    data = base_player.to_dict()
+
+    restored = CharacterState.from_dict(data=data, character_config=minimal_registry.character_config)
+    assert "warrior" in restored.archetypes
+    assert restored.archetypes["warrior"].tick == 5
+    assert restored.archetypes["warrior"].timestamp == 1_700_000_000
+
+
+def test_from_dict_legacy_list_migrates_to_grant_record(
+    base_player: CharacterState,
+    minimal_registry: ContentRegistry,
+) -> None:
+    """A legacy list of archetype names migrates to GrantRecord(tick=0, timestamp=0)."""
+    assert minimal_registry.character_config is not None
+    data = base_player.to_dict()
+    data["archetypes"] = ["warrior", "mage"]
+
+    restored = CharacterState.from_dict(data=data, character_config=minimal_registry.character_config)
+    assert restored.archetypes["warrior"] == GrantRecord(tick=0, timestamp=0)
+    assert restored.archetypes["mage"] == GrantRecord(tick=0, timestamp=0)
+
+
+def test_from_dict_drops_unknown_archetypes_with_registry(
+    base_player: CharacterState,
+    minimal_registry: ContentRegistry,
+) -> None:
+    """With a registry, archetype names not in the registry are dropped (content drift)."""
+    from oscilla.engine.models.archetype import ArchetypeManifest, ArchetypeSpec
+    from oscilla.engine.models.base import Metadata
+
+    assert minimal_registry.character_config is not None
+    minimal_registry.archetypes.register(
+        ArchetypeManifest(
+            apiVersion="oscilla/v1",
+            kind="Archetype",
+            metadata=Metadata(name="warrior"),
+            spec=ArchetypeSpec(displayName="Warrior"),
+        )
+    )
+
+    data = base_player.to_dict()
+    data["archetypes"] = {
+        "warrior": {"tick": 1, "timestamp": 100},
+        "ghost": {"tick": 2, "timestamp": 200},  # not in registry
+    }
+
+    restored = CharacterState.from_dict(
+        data=data,
+        character_config=minimal_registry.character_config,
+        registry=minimal_registry,
+    )
+    assert "warrior" in restored.archetypes
+    assert "ghost" not in restored.archetypes
+
+
+def test_from_dict_keeps_unknown_archetypes_without_registry(
+    base_player: CharacterState,
+    minimal_registry: ContentRegistry,
+) -> None:
+    """Without a registry, unknown archetypes are preserved (no filter possible)."""
+    assert minimal_registry.character_config is not None
+    data = base_player.to_dict()
+    data["archetypes"] = {"ghost": {"tick": 2, "timestamp": 200}}
+
+    restored = CharacterState.from_dict(data=data, character_config=minimal_registry.character_config)
+    assert "ghost" in restored.archetypes

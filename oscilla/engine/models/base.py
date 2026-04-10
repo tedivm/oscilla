@@ -51,11 +51,11 @@ class LevelCondition(BaseModel):
     value: int = Field(ge=1)
 
 
-class MilestoneRecord(BaseModel):
-    """Records the tick and real-world timestamp at which a milestone was granted."""
+class GrantRecord(BaseModel):
+    """Records the tick and real-world timestamp at which a milestone or archetype was granted."""
 
-    tick: int = Field(description="Value of internal_ticks at the moment this milestone was granted.")
-    timestamp: int = Field(description="Unix timestamp (seconds) at the moment this milestone was granted.")
+    tick: int = Field(description="Value of internal_ticks at the moment this record was created.")
+    timestamp: int = Field(description="Unix timestamp (seconds) at the moment this record was created.")
 
 
 class MilestoneCondition(BaseModel):
@@ -80,6 +80,69 @@ class MilestoneTicksElapsedCondition(BaseModel):
     def require_comparator(self) -> "MilestoneTicksElapsedCondition":
         if self.gte is None and self.lte is None:
             raise ValueError("milestone_ticks_elapsed condition must specify at least one of: gte, lte")
+        return self
+
+
+class HasArchetypeCondition(BaseModel):
+    """True when the character currently holds the named archetype."""
+
+    type: Literal["has_archetype"]
+    name: str
+
+
+class HasAllArchetypesCondition(BaseModel):
+    """True when the character holds every archetype in the list."""
+
+    type: Literal["has_all_archetypes"]
+    names: List[str]
+
+
+class HasAnyArchetypeCondition(BaseModel):
+    """True when the character holds at least one archetype in the list."""
+
+    type: Literal["has_any_archetypes"]
+    names: List[str]
+
+
+class ArchetypeCountCondition(BaseModel):
+    """True when the number of held archetypes satisfies the comparator.
+
+    Same comparison pattern as PrestigeCountCondition.
+    At least one of gt / gte / lt / lte / eq / mod must be set.
+    """
+
+    type: Literal["archetype_count"]
+    gt: int | None = None
+    gte: int | None = None
+    lt: int | None = None
+    lte: int | None = None
+    eq: int | None = None
+    mod: ModComparison | None = None
+
+    @model_validator(mode="after")
+    def require_comparator(self) -> "ArchetypeCountCondition":
+        if all(v is None for v in [self.gt, self.gte, self.lt, self.lte, self.eq, self.mod]):
+            raise ValueError("archetype_count condition must specify at least one of: gt, gte, lt, lte, eq, mod")
+        return self
+
+
+class ArchetypeTicksElapsedCondition(BaseModel):
+    """True when the ticks elapsed since an archetype was granted satisfies the comparator.
+
+    elapsed = player.internal_ticks - archetype.tick (the grant tick).
+    Returns False if the archetype is not currently held.
+    At least one of gte / lte must be set.
+    """
+
+    type: Literal["archetype_ticks_elapsed"]
+    name: str = Field(description="Archetype name to look up.")
+    gte: int | None = None
+    lte: int | None = None
+
+    @model_validator(mode="after")
+    def require_comparator(self) -> "ArchetypeTicksElapsedCondition":
+        if self.gte is None and self.lte is None:
+            raise ValueError("archetype_ticks_elapsed condition must specify at least one of: gte, lte")
         return self
 
 
@@ -137,11 +200,6 @@ class PrestigeCountCondition(BaseModel):
         if all(v is None for v in [self.gt, self.gte, self.lt, self.lte, self.eq, self.mod]):
             raise ValueError("prestige_count condition must specify at least one of: gt, gte, lt, lte, eq, mod")
         return self
-
-
-class ClassCondition(BaseModel):
-    type: Literal["class"]
-    name: str  # always evaluates True in v1
 
 
 class EnemiesDefeatedCondition(BaseModel):
@@ -500,13 +558,17 @@ Condition = Annotated[
         LevelCondition,
         MilestoneCondition,
         MilestoneTicksElapsedCondition,
+        HasArchetypeCondition,
+        HasAllArchetypesCondition,
+        HasAnyArchetypeCondition,
+        ArchetypeCountCondition,
+        ArchetypeTicksElapsedCondition,
         ItemCondition,
         ItemEquippedCondition,
         ItemHeldLabelCondition,
         AnyItemEquippedCondition,
         CharacterStatCondition,
         PrestigeCountCondition,
-        ClassCondition,
         EnemiesDefeatedCondition,
         LocationsVisitedCondition,
         AdventuresCompletedCondition,

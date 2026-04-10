@@ -12,9 +12,13 @@ from oscilla.engine.models.base import (
     AdventuresCompletedCondition,
     AllCondition,
     AnyCondition,
+    ArchetypeCountCondition,
+    ArchetypeTicksElapsedCondition,
     CharacterStatCondition,
-    ClassCondition,
     EnemiesDefeatedCondition,
+    HasAllArchetypesCondition,
+    HasAnyArchetypeCondition,
+    HasArchetypeCondition,
     ItemCondition,
     LevelCondition,
     LocationsVisitedCondition,
@@ -149,17 +153,6 @@ def test_not_condition(base_player: CharacterState) -> None:
     inner_pass = LevelCondition(type="level", value=1)
     cond_false = NotCondition(type="not", condition=inner_pass)
     assert evaluate(condition=cond_false, player=base_player) is False
-
-
-def test_class_condition_always_passes(base_player: CharacterState) -> None:
-    """Test that ClassCondition always returns True (no-op in v1)."""
-    cond = ClassCondition(type="class", name="warrior")
-    assert evaluate(condition=cond, player=base_player) is True
-
-    # Test any class name
-    cond2 = ClassCondition(type="class", name="mage")
-    assert evaluate(condition=cond2, player=base_player) is True
-
 
 def test_character_stat_non_numeric_warning(base_player: CharacterState, caplog: pytest.LogCaptureFixture) -> None:
     """Test that non-numeric stats trigger a warning and are treated as 0."""
@@ -452,3 +445,171 @@ def test_milestone_ticks_elapsed_both_gte_and_lte(base_player: CharacterState) -
     assert evaluate(condition=cond, player=base_player) is True
     base_player.internal_ticks = 8  # too late
     assert evaluate(condition=cond, player=base_player) is False
+
+
+# ---------------------------------------------------------------------------
+# Archetype conditions (tasks 8.3-8.6b)
+# ---------------------------------------------------------------------------
+
+
+def test_has_archetype_true(base_player: CharacterState) -> None:
+    """Returns True when the named archetype is held."""
+    base_player.archetypes["warrior"] = base_player.make_grant_record()
+    cond = HasArchetypeCondition(type="has_archetype", name="warrior")
+    assert evaluate(condition=cond, player=base_player) is True
+
+
+def test_has_archetype_false(base_player: CharacterState) -> None:
+    """Returns False when the named archetype is absent."""
+    cond = HasArchetypeCondition(type="has_archetype", name="not-held")
+    assert evaluate(condition=cond, player=base_player) is False
+
+
+def test_has_all_archetypes_true(base_player: CharacterState) -> None:
+    """Returns True when all listed archetypes are held."""
+    base_player.archetypes["warrior"] = base_player.make_grant_record()
+    base_player.archetypes["mage"] = base_player.make_grant_record()
+    cond = HasAllArchetypesCondition(type="has_all_archetypes", names=["warrior", "mage"])
+    assert evaluate(condition=cond, player=base_player) is True
+
+
+def test_has_all_archetypes_false_missing_one(base_player: CharacterState) -> None:
+    """Returns False when any listed archetype is absent."""
+    base_player.archetypes["warrior"] = base_player.make_grant_record()
+    cond = HasAllArchetypesCondition(type="has_all_archetypes", names=["warrior", "mage"])
+    assert evaluate(condition=cond, player=base_player) is False
+
+
+def test_has_any_archetypes_true(base_player: CharacterState) -> None:
+    """Returns True when at least one listed archetype is held."""
+    base_player.archetypes["mage"] = base_player.make_grant_record()
+    cond = HasAnyArchetypeCondition(type="has_any_archetypes", names=["warrior", "mage"])
+    assert evaluate(condition=cond, player=base_player) is True
+
+
+def test_has_any_archetypes_false_none_held(base_player: CharacterState) -> None:
+    """Returns False when none of the listed archetypes are held."""
+    cond = HasAnyArchetypeCondition(type="has_any_archetypes", names=["warrior", "mage"])
+    assert evaluate(condition=cond, player=base_player) is False
+
+
+def test_archetype_count_gte_pass(base_player: CharacterState) -> None:
+    base_player.archetypes["a"] = base_player.make_grant_record()
+    base_player.archetypes["b"] = base_player.make_grant_record()
+    cond = ArchetypeCountCondition(type="archetype_count", gte=2)
+    assert evaluate(condition=cond, player=base_player) is True
+
+
+def test_archetype_count_gte_fail(base_player: CharacterState) -> None:
+    base_player.archetypes["a"] = base_player.make_grant_record()
+    cond = ArchetypeCountCondition(type="archetype_count", gte=2)
+    assert evaluate(condition=cond, player=base_player) is False
+
+
+def test_archetype_count_lte_pass(base_player: CharacterState) -> None:
+    base_player.archetypes["a"] = base_player.make_grant_record()
+    cond = ArchetypeCountCondition(type="archetype_count", lte=2)
+    assert evaluate(condition=cond, player=base_player) is True
+
+
+def test_archetype_count_eq(base_player: CharacterState) -> None:
+    base_player.archetypes["a"] = base_player.make_grant_record()
+    base_player.archetypes["b"] = base_player.make_grant_record()
+    assert evaluate(condition=ArchetypeCountCondition(type="archetype_count", eq=2), player=base_player) is True
+    assert evaluate(condition=ArchetypeCountCondition(type="archetype_count", eq=1), player=base_player) is False
+
+
+def test_archetype_count_requires_comparator() -> None:
+    with pytest.raises(Exception):
+        ArchetypeCountCondition(type="archetype_count")
+
+
+def test_archetype_ticks_elapsed_false_when_not_held(base_player: CharacterState) -> None:
+    """Returns False when the archetype is not held."""
+    cond = ArchetypeTicksElapsedCondition(type="archetype_ticks_elapsed", name="warrior", gte=1)
+    assert evaluate(condition=cond, player=base_player) is False
+
+
+def test_archetype_ticks_elapsed_gte_pass(base_player: CharacterState) -> None:
+    base_player.internal_ticks = 10
+    base_player.archetypes["warrior"] = base_player.make_grant_record()
+    base_player.internal_ticks = 15  # 5 elapsed
+    cond = ArchetypeTicksElapsedCondition(type="archetype_ticks_elapsed", name="warrior", gte=5)
+    assert evaluate(condition=cond, player=base_player) is True
+
+
+def test_archetype_ticks_elapsed_gte_fail(base_player: CharacterState) -> None:
+    base_player.internal_ticks = 10
+    base_player.archetypes["warrior"] = base_player.make_grant_record()
+    base_player.internal_ticks = 14  # only 4 elapsed
+    cond = ArchetypeTicksElapsedCondition(type="archetype_ticks_elapsed", name="warrior", gte=5)
+    assert evaluate(condition=cond, player=base_player) is False
+
+
+def test_archetype_ticks_elapsed_lte_pass(base_player: CharacterState) -> None:
+    base_player.internal_ticks = 10
+    base_player.archetypes["fresh"] = base_player.make_grant_record()
+    base_player.internal_ticks = 12  # 2 elapsed
+    cond = ArchetypeTicksElapsedCondition(type="archetype_ticks_elapsed", name="fresh", lte=5)
+    assert evaluate(condition=cond, player=base_player) is True
+
+
+def test_archetype_ticks_elapsed_lte_fail(base_player: CharacterState) -> None:
+    base_player.internal_ticks = 0
+    base_player.archetypes["old"] = base_player.make_grant_record()
+    base_player.internal_ticks = 10  # 10 elapsed
+    cond = ArchetypeTicksElapsedCondition(type="archetype_ticks_elapsed", name="old", lte=5)
+    assert evaluate(condition=cond, player=base_player) is False
+
+
+def test_archetype_ticks_elapsed_window(base_player: CharacterState) -> None:
+    """Both gte and lte: elapsed must be within [3, 7]."""
+    base_player.internal_ticks = 0
+    base_player.archetypes["event"] = base_player.make_grant_record()
+    cond = ArchetypeTicksElapsedCondition(type="archetype_ticks_elapsed", name="event", gte=3, lte=7)
+
+    base_player.internal_ticks = 2
+    assert evaluate(condition=cond, player=base_player) is False
+    base_player.internal_ticks = 5
+    assert evaluate(condition=cond, player=base_player) is True
+    base_player.internal_ticks = 8
+    assert evaluate(condition=cond, player=base_player) is False
+
+
+def test_archetype_ticks_elapsed_requires_comparator() -> None:
+    with pytest.raises(Exception):
+        ArchetypeTicksElapsedCondition(type="archetype_ticks_elapsed", name="warrior")
+
+
+# ---------------------------------------------------------------------------
+# Task 8.13 — ClassCondition / ClassManifest / ClassSpec are fully absent
+# ---------------------------------------------------------------------------
+
+
+def test_class_condition_not_importable() -> None:
+    """ClassCondition must not exist in the public namespace."""
+    import oscilla.engine.models.base as base_module
+
+    assert not hasattr(base_module, "ClassCondition"), "ClassCondition should have been removed"
+
+
+def test_class_manifest_not_importable() -> None:
+    """ClassManifest must not exist in the engine.models namespace."""
+    import oscilla.engine.models as models_module
+
+    assert not hasattr(models_module, "ClassManifest"), "ClassManifest should have been removed"
+
+
+def test_condition_evaluator_has_no_class_case(base_player: CharacterState) -> None:
+    """The condition evaluator should not reference ClassCondition in its logic.
+
+    Passing a raw dict with type 'class' must raise a ValidationError, confirming
+    the type discriminator no longer recognises it.
+    """
+    from pydantic import TypeAdapter
+
+    from oscilla.engine.models.base import Condition
+
+    adapter: TypeAdapter[Condition] = TypeAdapter(Condition)
+    with pytest.raises(Exception):
+        adapter.validate_python({"type": "class"})

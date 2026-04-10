@@ -447,6 +447,110 @@ requires:
 
 ---
 
+## Archetype Conditions
+
+[Archetypes](./archetypes.md) are persistent states held by a character — roles, ranks, or earned identities granted and revoked by effects. These conditions let you gate content on which archetypes a character holds, how many they hold, or how long ago one was granted.
+
+### `has_archetype`
+
+True when the character currently holds the named archetype.
+
+```yaml
+requires:
+  type: has_archetype
+  name: warrior
+```
+
+| Field  | Type  | Description                      |
+| ------ | ----- | -------------------------------- |
+| `name` | `str` | Archetype manifest name to check |
+
+### `has_all_archetypes`
+
+True when the character holds **every** archetype in the list. Useful for gating content behind a combination of earned states.
+
+```yaml
+requires:
+  type: has_all_archetypes
+  names:
+    - warrior
+    - guild-member
+```
+
+| Field   | Type          | Description                             |
+| ------- | ------------- | --------------------------------------- |
+| `names` | `List[str]`   | All of these archetype names must be held |
+
+### `has_any_archetypes`
+
+True when the character holds **at least one** archetype in the list. Useful for letting multiple paths unlock the same content.
+
+```yaml
+requires:
+  type: has_any_archetypes
+  names:
+    - warrior
+    - soldier
+    - veteran
+```
+
+| Field   | Type          | Description                              |
+| ------- | ------------- | ---------------------------------------- |
+| `names` | `List[str]`   | At least one of these names must be held |
+
+### `archetype_count`
+
+True when the number of archetypes currently held by the character satisfies the numeric comparison. At least one of `gte`, `lte`, or `eq` must be provided.
+
+```yaml
+requires:
+  type: archetype_count
+  gte: 2   # at least 2 archetypes held
+```
+
+```yaml
+requires:
+  type: archetype_count
+  eq: 1    # exactly 1 archetype held
+```
+
+| Field | Type  | Description                                     |
+| ----- | ----- | ----------------------------------------------- |
+| `gte` | `int` | Minimum number of held archetypes (inclusive)   |
+| `lte` | `int` | Maximum number of held archetypes (inclusive)   |
+| `eq`  | `int` | Exact number of held archetypes                 |
+
+### `archetype_ticks_elapsed`
+
+True when a certain number of internal adventure ticks have elapsed since the named archetype was granted. Returns false if the archetype is not currently held. At least one of `gte` or `lte` must be provided.
+
+```yaml
+requires:
+  type: archetype_ticks_elapsed
+  name: warrior
+  gte: 10   # held for at least 10 ticks
+```
+
+Both can be combined to create a tick window:
+
+```yaml
+requires:
+  type: archetype_ticks_elapsed
+  name: initiate
+  gte: 5
+  lte: 20   # held between 5 and 20 ticks
+```
+
+| Field  | Type  | Description                                                                              |
+| ------ | ----- | ---------------------------------------------------------------------------------------- |
+| `name` | `str` | Archetype to check. If not currently held, the condition is false.                       |
+| `gte`  | `int` | Minimum number of ticks that must have elapsed since the archetype was granted.          |
+| `lte`  | `int` | Maximum number of ticks that may have elapsed since the archetype was granted.           |
+
+See [Archetypes](./archetypes.md) for how to define archetypes and grant them via effects.
+
+---
+
 ## Combining Conditions
 
 A single condition is useful, but the real power comes from composing them.
@@ -548,6 +652,11 @@ requires:
 | `adventures_completed`    | `name`, one operator       | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                              |
 | `prestige_count`          | one operator               | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                              |
 | `milestone_ticks_elapsed` | `name`, one of `gte`/`lte` | —                          | True when ticks since milestone grant meet the comparison; false if milestone not held |
+| `has_archetype`           | `name`                     | —                          | True when the character holds the named archetype                                      |
+| `has_all_archetypes`      | `names`                    | —                          | True when the character holds **all** named archetypes                                 |
+| `has_any_archetypes`      | `names`                    | —                          | True when the character holds **at least one** of the named archetypes                 |
+| `archetype_count`         | one operator               | —                          | True when the number of held archetypes satisfies the comparison; operators: `gte`, `lte`, `eq` |
+| `archetype_ticks_elapsed` | `name`, one of `gte`/`lte` | —                          | True when ticks since archetype grant meet the comparison; false if archetype not held |
 | `all`                     | `conditions`               | —                          | All child conditions must pass (AND)                                                   |
 | `any`                     | `conditions`               | —                          | Any child condition must pass (OR)                                                     |
 | `not`                     | `condition`                | —                          | Inverts the single child condition                                                     |

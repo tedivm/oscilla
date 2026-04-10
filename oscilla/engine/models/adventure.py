@@ -218,6 +218,42 @@ class SetNameEffect(BaseModel):
     prompt: str = Field(default="What is your name?", description="Prompt shown to the player.")
 
 
+class ArchetypeAddEffect(BaseModel):
+    """Grant the named archetype to the character.
+
+    Dispatches the archetype's gain_effects on first grant.
+    If the archetype is already held and force is False, this is a no-op.
+    If force is True, gain_effects are re-dispatched even when already held.
+    """
+
+    type: Literal["archetype_add"]
+    name: str
+    force: bool = False
+
+
+class ArchetypeRemoveEffect(BaseModel):
+    """Remove the named archetype from the character.
+
+    Dispatches the archetype's lose_effects when removed.
+    If the archetype is not held and force is False, this is a no-op.
+    If force is True, lose_effects are re-dispatched even when not held.
+    """
+
+    type: Literal["archetype_remove"]
+    name: str
+    force: bool = False
+
+
+class SkillRevokeEffect(BaseModel):
+    """Remove the named skill from the character's known skills.
+
+    No-op when the skill is not present — never raises an error.
+    """
+
+    type: Literal["skill_revoke"]
+    skill: str
+
+
 Effect = Annotated[
     Union[
         ItemDropEffect,
@@ -237,6 +273,9 @@ Effect = Annotated[
         EmitTriggerEffect,
         PrestigeEffect,
         SetNameEffect,
+        ArchetypeAddEffect,
+        ArchetypeRemoveEffect,
+        SkillRevokeEffect,
     ],
     Field(discriminator="type"),
 ]
