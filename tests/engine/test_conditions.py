@@ -154,6 +154,7 @@ def test_not_condition(base_player: CharacterState) -> None:
     cond_false = NotCondition(type="not", condition=inner_pass)
     assert evaluate(condition=cond_false, player=base_player) is False
 
+
 def test_character_stat_non_numeric_warning(base_player: CharacterState, caplog: pytest.LogCaptureFixture) -> None:
     """Test that non-numeric stats trigger a warning and are treated as 0."""
     # Set a string stat

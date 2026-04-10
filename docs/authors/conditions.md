@@ -477,9 +477,9 @@ requires:
     - guild-member
 ```
 
-| Field   | Type          | Description                             |
-| ------- | ------------- | --------------------------------------- |
-| `names` | `List[str]`   | All of these archetype names must be held |
+| Field   | Type        | Description                               |
+| ------- | ----------- | ----------------------------------------- |
+| `names` | `List[str]` | All of these archetype names must be held |
 
 ### `has_any_archetypes`
 
@@ -494,9 +494,9 @@ requires:
     - veteran
 ```
 
-| Field   | Type          | Description                              |
-| ------- | ------------- | ---------------------------------------- |
-| `names` | `List[str]`   | At least one of these names must be held |
+| Field   | Type        | Description                              |
+| ------- | ----------- | ---------------------------------------- |
+| `names` | `List[str]` | At least one of these names must be held |
 
 ### `archetype_count`
 
@@ -505,20 +505,20 @@ True when the number of archetypes currently held by the character satisfies the
 ```yaml
 requires:
   type: archetype_count
-  gte: 2   # at least 2 archetypes held
+  gte: 2 # at least 2 archetypes held
 ```
 
 ```yaml
 requires:
   type: archetype_count
-  eq: 1    # exactly 1 archetype held
+  eq: 1 # exactly 1 archetype held
 ```
 
-| Field | Type  | Description                                     |
-| ----- | ----- | ----------------------------------------------- |
-| `gte` | `int` | Minimum number of held archetypes (inclusive)   |
-| `lte` | `int` | Maximum number of held archetypes (inclusive)   |
-| `eq`  | `int` | Exact number of held archetypes                 |
+| Field | Type  | Description                                   |
+| ----- | ----- | --------------------------------------------- |
+| `gte` | `int` | Minimum number of held archetypes (inclusive) |
+| `lte` | `int` | Maximum number of held archetypes (inclusive) |
+| `eq`  | `int` | Exact number of held archetypes               |
 
 ### `archetype_ticks_elapsed`
 
@@ -528,7 +528,7 @@ True when a certain number of internal adventure ticks have elapsed since the na
 requires:
   type: archetype_ticks_elapsed
   name: warrior
-  gte: 10   # held for at least 10 ticks
+  gte: 10 # held for at least 10 ticks
 ```
 
 Both can be combined to create a tick window:
@@ -538,14 +538,14 @@ requires:
   type: archetype_ticks_elapsed
   name: initiate
   gte: 5
-  lte: 20   # held between 5 and 20 ticks
+  lte: 20 # held between 5 and 20 ticks
 ```
 
-| Field  | Type  | Description                                                                              |
-| ------ | ----- | ---------------------------------------------------------------------------------------- |
-| `name` | `str` | Archetype to check. If not currently held, the condition is false.                       |
-| `gte`  | `int` | Minimum number of ticks that must have elapsed since the archetype was granted.          |
-| `lte`  | `int` | Maximum number of ticks that may have elapsed since the archetype was granted.           |
+| Field  | Type  | Description                                                                     |
+| ------ | ----- | ------------------------------------------------------------------------------- |
+| `name` | `str` | Archetype to check. If not currently held, the condition is false.              |
+| `gte`  | `int` | Minimum number of ticks that must have elapsed since the archetype was granted. |
+| `lte`  | `int` | Maximum number of ticks that may have elapsed since the archetype was granted.  |
 
 See [Archetypes](./archetypes.md) for how to define archetypes and grant them via effects.
 
@@ -637,38 +637,38 @@ requires:
 
 ### All Condition Types
 
-| Type                      | Required fields            | Optional fields            | Notes                                                                                  |
-| ------------------------- | -------------------------- | -------------------------- | -------------------------------------------------------------------------------------- |
-| `level`                   | `value`                    | —                          | True when player level ≥ value                                                         |
-| `milestone`               | `name`                     | —                          | True when player holds the milestone                                                   |
-| `item`                    | `item_ref`                 | `quantity` (default 1)     | Checks inventory count ≥ quantity                                                      |
-| `character_stat`          | `stat`, one operator       | `stat_source`              | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                              |
-| `item_equipped`           | `item`                     | —                          | Checks a specific item is equipped                                                     |
-| `item_held_label`         | `label`                    | —                          | Any inventory item has this label                                                      |
-| `any_item_equipped`       | `label`                    | —                          | Any equipped item has this label                                                       |
-| `skill`                   | `skill_ref`                | `mode` (default `learned`) | `mode`: `learned` or `available`                                                       |
-| `enemies_defeated`        | `name`, one operator       | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                              |
-| `locations_visited`       | `name`, one operator       | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                              |
-| `adventures_completed`    | `name`, one operator       | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                              |
-| `prestige_count`          | one operator               | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                              |
-| `milestone_ticks_elapsed` | `name`, one of `gte`/`lte` | —                          | True when ticks since milestone grant meet the comparison; false if milestone not held |
-| `has_archetype`           | `name`                     | —                          | True when the character holds the named archetype                                      |
-| `has_all_archetypes`      | `names`                    | —                          | True when the character holds **all** named archetypes                                 |
-| `has_any_archetypes`      | `names`                    | —                          | True when the character holds **at least one** of the named archetypes                 |
+| Type                      | Required fields            | Optional fields            | Notes                                                                                           |
+| ------------------------- | -------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------- |
+| `level`                   | `value`                    | —                          | True when player level ≥ value                                                                  |
+| `milestone`               | `name`                     | —                          | True when player holds the milestone                                                            |
+| `item`                    | `item_ref`                 | `quantity` (default 1)     | Checks inventory count ≥ quantity                                                               |
+| `character_stat`          | `stat`, one operator       | `stat_source`              | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                                       |
+| `item_equipped`           | `item`                     | —                          | Checks a specific item is equipped                                                              |
+| `item_held_label`         | `label`                    | —                          | Any inventory item has this label                                                               |
+| `any_item_equipped`       | `label`                    | —                          | Any equipped item has this label                                                                |
+| `skill`                   | `skill_ref`                | `mode` (default `learned`) | `mode`: `learned` or `available`                                                                |
+| `enemies_defeated`        | `name`, one operator       | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                                       |
+| `locations_visited`       | `name`, one operator       | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                                       |
+| `adventures_completed`    | `name`, one operator       | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                                       |
+| `prestige_count`          | one operator               | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                                       |
+| `milestone_ticks_elapsed` | `name`, one of `gte`/`lte` | —                          | True when ticks since milestone grant meet the comparison; false if milestone not held          |
+| `has_archetype`           | `name`                     | —                          | True when the character holds the named archetype                                               |
+| `has_all_archetypes`      | `names`                    | —                          | True when the character holds **all** named archetypes                                          |
+| `has_any_archetypes`      | `names`                    | —                          | True when the character holds **at least one** of the named archetypes                          |
 | `archetype_count`         | one operator               | —                          | True when the number of held archetypes satisfies the comparison; operators: `gte`, `lte`, `eq` |
-| `archetype_ticks_elapsed` | `name`, one of `gte`/`lte` | —                          | True when ticks since archetype grant meet the comparison; false if archetype not held |
-| `all`                     | `conditions`               | —                          | All child conditions must pass (AND)                                                   |
-| `any`                     | `conditions`               | —                          | Any child condition must pass (OR)                                                     |
-| `not`                     | `condition`                | —                          | Inverts the single child condition                                                     |
-| `season_is`               | `value`                    | —                          | True when meteorological season matches; `spring` \| `summer` \| `autumn` \| `winter`  |
-| `moon_phase_is`           | `value`                    | —                          | True when lunar phase matches (approximate ±1 day)                                     |
-| `zodiac_is`               | `value`                    | —                          | True when Western zodiac sign matches today's date                                     |
-| `chinese_zodiac_is`       | `value`                    | —                          | True when Chinese zodiac animal matches the current year                               |
-| `month_is`                | `value`                    | —                          | Integer 1–12 or full English month name                                                |
-| `day_of_week_is`          | `value`                    | —                          | Integer 0–6 (Mon=0) or full English weekday name                                       |
-| `date_is`                 | `month`, `day`             | `year`                     | Annual when `year` omitted; one-off when `year` included                               |
-| `date_between`            | `start`, `end`             | —                          | Each has `month` + `day`; wraps year boundary when `start` > `end`                     |
-| `time_between`            | `start`, `end`             | —                          | `HH:MM` 24-hour format; wraps midnight when `start` > `end`                            |
+| `archetype_ticks_elapsed` | `name`, one of `gte`/`lte` | —                          | True when ticks since archetype grant meet the comparison; false if archetype not held          |
+| `all`                     | `conditions`               | —                          | All child conditions must pass (AND)                                                            |
+| `any`                     | `conditions`               | —                          | Any child condition must pass (OR)                                                              |
+| `not`                     | `condition`                | —                          | Inverts the single child condition                                                              |
+| `season_is`               | `value`                    | —                          | True when meteorological season matches; `spring` \| `summer` \| `autumn` \| `winter`           |
+| `moon_phase_is`           | `value`                    | —                          | True when lunar phase matches (approximate ±1 day)                                              |
+| `zodiac_is`               | `value`                    | —                          | True when Western zodiac sign matches today's date                                              |
+| `chinese_zodiac_is`       | `value`                    | —                          | True when Chinese zodiac animal matches the current year                                        |
+| `month_is`                | `value`                    | —                          | Integer 1–12 or full English month name                                                         |
+| `day_of_week_is`          | `value`                    | —                          | Integer 0–6 (Mon=0) or full English weekday name                                                |
+| `date_is`                 | `month`, `day`             | `year`                     | Annual when `year` omitted; one-off when `year` included                                        |
+| `date_between`            | `start`, `end`             | —                          | Each has `month` + `day`; wraps year boundary when `start` > `end`                              |
+| `time_between`            | `start`, `end`             | —                          | `HH:MM` 24-hour format; wraps midnight when `start` > `end`                                     |
 
 ### `stat_source` Values
 

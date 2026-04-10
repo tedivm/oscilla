@@ -846,10 +846,10 @@ Archetype passive effects share the same `PassiveEffect` schema as global passiv
 
 `from_dict()` supports two legacy migration paths:
 
-| Input format | Migration behavior |
-| --- | --- |
-| `{"name": {"tick": N, "timestamp": N}}` | Reconstructed as `GrantRecord` — current format |
-| `["name1", "name2"]` | Each name migrated to `GrantRecord(tick=0, timestamp=0)` |
+| Input format                            | Migration behavior                                       |
+| --------------------------------------- | -------------------------------------------------------- |
+| `{"name": {"tick": N, "timestamp": N}}` | Reconstructed as `GrantRecord` — current format          |
+| `["name1", "name2"]`                    | Each name migrated to `GrantRecord(tick=0, timestamp=0)` |
 
 When a `ContentRegistry` is passed to `from_dict()`, any archetype names absent from the registry are silently dropped (content-drift resilience, same as milestone pruning).
 

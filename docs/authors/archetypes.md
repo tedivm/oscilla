@@ -25,7 +25,7 @@ An archetype is described by an `Archetype` manifest placed in your content pack
 apiVersion: oscilla/v1
 kind: Archetype
 metadata:
-  name: warrior           # kebab-case identifier used in effects and conditions
+  name: warrior # kebab-case identifier used in effects and conditions
 spec:
   displayName: "Warrior"
   description: "A trained combatant. Grants a bonus to strength."
@@ -53,13 +53,13 @@ spec:
 
 ### Field Reference
 
-| Field             | Type             | Required | Default | Description |
-| ----------------- | ---------------- | -------- | ------- | ----------- |
-| `displayName`     | `str`            | yes      | —       | Human-readable name shown in the TUI |
-| `description`     | `str`            | no       | `""`    | Optional summary text for author reference |
-| `gain_effects`    | `List[Effect]`   | no       | `[]`    | Effects dispatched once when the archetype is first granted |
-| `lose_effects`    | `List[Effect]`   | no       | `[]`    | Effects dispatched once when the archetype is removed |
-| `passive_effects` | `List[PassiveEffect]` | no  | `[]`    | Always-on bonuses applied while this archetype is held |
+| Field             | Type                  | Required | Default | Description                                                 |
+| ----------------- | --------------------- | -------- | ------- | ----------------------------------------------------------- |
+| `displayName`     | `str`                 | yes      | —       | Human-readable name shown in the TUI                        |
+| `description`     | `str`                 | no       | `""`    | Optional summary text for author reference                  |
+| `gain_effects`    | `List[Effect]`        | no       | `[]`    | Effects dispatched once when the archetype is first granted |
+| `lose_effects`    | `List[Effect]`        | no       | `[]`    | Effects dispatched once when the archetype is removed       |
+| `passive_effects` | `List[PassiveEffect]` | no       | `[]`    | Always-on bonuses applied while this archetype is held      |
 
 ---
 
@@ -124,12 +124,12 @@ passive_effects:
 
 Five condition types check archetype state. They work anywhere conditions are accepted — adventure `requires`, location `unlock`, choice option `requires`, stat-check `condition`, passive effect `condition`, etc.
 
-| Type                      | What it checks |
-| ------------------------- | -------------- |
-| `has_archetype`           | Character holds the named archetype |
-| `has_all_archetypes`      | Character holds every archetype in the list |
-| `has_any_archetypes`      | Character holds at least one archetype in the list |
-| `archetype_count`         | Number of held archetypes satisfies a numeric comparison (`gte`/`lte`/`eq`) |
+| Type                      | What it checks                                                                      |
+| ------------------------- | ----------------------------------------------------------------------------------- |
+| `has_archetype`           | Character holds the named archetype                                                 |
+| `has_all_archetypes`      | Character holds every archetype in the list                                         |
+| `has_any_archetypes`      | Character holds at least one archetype in the list                                  |
+| `archetype_count`         | Number of held archetypes satisfies a numeric comparison (`gte`/`lte`/`eq`)         |
 | `archetype_ticks_elapsed` | Ticks since the named archetype was granted satisfy a comparison; false if not held |
 
 See [Conditions — Archetype Conditions](./conditions.md#archetype-conditions) for the full syntax and field reference.

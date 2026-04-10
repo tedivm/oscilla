@@ -31,31 +31,31 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 
 ### All Items
 
-| Item                                                                                        | Effort | Group                   |
-| ------------------------------------------------------------------------------------------- | ------ | ----------------------- |
-| [Full TUI Upgrade](#full-tui-upgrade)                                                       | L      | —                       |
-| [Cross-Iteration Conditions/Templates/Effects](#cross-iteration-conditionstemplateseffects) | M      | Character Progression   |
-| [Adventure-Scoped Variables](#adventure-scoped-variables)                                   | M      | Adventure Authoring     |
-| [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems)        | XL     | Combat Overhaul         |
-| [Buff Blocking and Priority](#buff-blocking-and-priority)                                   | S      | Combat Refinement       |
-| [Buff Persistence Between Adventures](#buff-persistence-between-adventures)                 | S      | Combat Refinement       |
+| Item                                                                                        | Effort | Group                 |
+| ------------------------------------------------------------------------------------------- | ------ | --------------------- |
+| [Full TUI Upgrade](#full-tui-upgrade)                                                       | L      | —                     |
+| [Cross-Iteration Conditions/Templates/Effects](#cross-iteration-conditionstemplateseffects) | M      | Character Progression |
+| [Adventure-Scoped Variables](#adventure-scoped-variables)                                   | M      | Adventure Authoring   |
+| [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems)        | XL     | Combat Overhaul       |
+| [Buff Blocking and Priority](#buff-blocking-and-priority)                                   | S      | Combat Refinement     |
+| [Buff Persistence Between Adventures](#buff-persistence-between-adventures)                 | S      | Combat Refinement     |
 
-| [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades)                          | M      | Character Progression   |
-| [Extended Template Primitives](#extended-template-primitives)                               | S      | Engine Architecture     |
-| [Player-Defined Pronouns](#player-defined-pronouns)                                         | S      | Character Configuration |
-| [Shop and Vendor System](#shop-and-vendor-system)                                           | L      | Economy & NPCs          |
-| [Persistent NPCs and Dialogue](#persistent-npcs-and-dialogue)                               | L      | Economy & NPCs          |
-| [Enhanced Loot Tables](#enhanced-loot-tables)                                               | S      | Item System             |
-| [Inventory Storage](#inventory-storage)                                                     | L      | Item System             |
-| [Quest Branching](#quest-branching)                                                         | M      | Quest Depth & Factions  |
-| [Quest Progress Panel](#quest-progress-panel)                                               | M      | Quest Depth             |
-| [Faction and Reputation System](#faction-and-reputation-system)                             | M      | Quest Depth & Factions  |
-| [Content Inheritance / Prototypes](#content-inheritance--prototypes)                        | M      | Content Reuse           |
-| [Plugin and Extension System](#plugin-and-extension-system)                                 | L      | Engine Architecture     |
-| [HTTP API for Multi-User Support](#http-api-for-multi-user-support)                         | XL     | Multi-User Platform     |
-| [Front End Website](#front-end-website)                                                     | XL     | Multi-User Platform     |
-| [Picture Selection and ASCII Art](#picture-selection-and-ascii-art)                         | M      | —                       |
-| [Region Maps](#region-maps)                                                                 | M      | —                       |
+| [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades) | M | Character Progression |
+| [Extended Template Primitives](#extended-template-primitives) | S | Engine Architecture |
+| [Player-Defined Pronouns](#player-defined-pronouns) | S | Character Configuration |
+| [Shop and Vendor System](#shop-and-vendor-system) | L | Economy & NPCs |
+| [Persistent NPCs and Dialogue](#persistent-npcs-and-dialogue) | L | Economy & NPCs |
+| [Enhanced Loot Tables](#enhanced-loot-tables) | S | Item System |
+| [Inventory Storage](#inventory-storage) | L | Item System |
+| [Quest Branching](#quest-branching) | M | Quest Depth & Factions |
+| [Quest Progress Panel](#quest-progress-panel) | M | Quest Depth |
+| [Faction and Reputation System](#faction-and-reputation-system) | M | Quest Depth & Factions |
+| [Content Inheritance / Prototypes](#content-inheritance--prototypes) | M | Content Reuse |
+| [Plugin and Extension System](#plugin-and-extension-system) | L | Engine Architecture |
+| [HTTP API for Multi-User Support](#http-api-for-multi-user-support) | XL | Multi-User Platform |
+| [Front End Website](#front-end-website) | XL | Multi-User Platform |
+| [Picture Selection and ASCII Art](#picture-selection-and-ascii-art) | M | — |
+| [Region Maps](#region-maps) | M | — |
 
 ---
 
