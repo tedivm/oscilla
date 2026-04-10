@@ -1,0 +1,11 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: test-location
+spec:
+  displayName: "Test Location"
+  description: "A location that houses the loot table test adventures."
+  region: test-region-root
+  adventures:
+    - ref: test-inline-loot
+      weight: 100

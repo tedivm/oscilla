@@ -9,3 +9,7 @@ spec:
   attack: 50
   defense: 10
   xp_reward: 1000
+  loot:
+    - entries:
+        - item: test-widget
+          weight: 1

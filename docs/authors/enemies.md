@@ -19,12 +19,15 @@ spec:
   defense: 5
   xp_reward: 140
   loot:
-    - item: bone-fragment
-      weight: 60
-    - item: rusty-dagger
-      weight: 25
-    - item: ancient-coin
-      weight: 15
+    - count: 1
+      method: weighted
+      entries:
+        - item: bone-fragment
+          weight: 60
+        - item: rusty-dagger
+          weight: 25
+        - item: ancient-coin
+          weight: 15
 ```
 
 `metadata.name` is what you use in adventure `combat` steps: `enemy: dungeon-skeleton`.
@@ -52,23 +55,47 @@ Design enemies with meaningful tradeoffs:
 
 ---
 
-## Loot Tables
+## Loot
 
-The `loot` list defines what the enemy can drop when defeated. It is a weighted pool — the engine picks one item using the relative weights.
+The `loot` field defines what items the enemy drops when defeated. It uses the same group-based structure as standalone [Loot Tables](./loot-tables.md).
 
 ```yaml
 loot:
-  - item: goblin-ear
-    weight: 80 # most common drop
-  - item: goblin-sword
-    weight: 15
-  - item: golden-ring
-    weight: 5 # rare drop
+  - count: 1
+    method: weighted
+    entries:
+      - item: goblin-ear
+        weight: 80 # most common drop
+      - item: goblin-sword
+        weight: 15
+      - item: golden-ring
+        weight: 5 # rare drop
 ```
 
-The number of items dropped per kill is controlled by the [`item_drop` effect](./effects.md#dropping-items) on the combat step's `on_win` branch, **not** by the enemy manifest. The enemy just defines what items are available and their relative rarity. An `on_win` branch might reference the enemy's loot table or provide its own `item_drop` directly.
+The engine resolves all groups automatically when the player wins the combat — no `item_drop` effect needed in the `on_win` branch.
 
-An empty `loot` list means the enemy drops nothing.
+An empty `loot: []` means the enemy drops nothing.
+
+Multiple groups can be combined for enemies that always drop certain items alongside a randomized pool:
+
+```yaml
+loot:
+  # Fixed drop every kill
+  - count: 1
+    entries:
+      - item: enemy-essence
+        weight: 100
+  # Bonus item from a weighted pool
+  - count: 1
+    method: weighted
+    entries:
+      - item: common-material
+        weight: 70
+      - item: rare-core
+        weight: 30
+```
+
+See [Loot Tables](./loot-tables.md) for complete documentation on groups, entries, `count`, `method`, `amount`, conditional groups, and template expressions.
 
 ---
 
@@ -136,16 +163,13 @@ Because the engine discovers manifests by scanning all `.yaml` files recursively
 | `spec.attack`          | yes      | —       | Attack power per round (min 0)              |
 | `spec.defense`         | yes      | —       | Damage reduction (min 0)                    |
 | `spec.xp_reward`       | yes      | —       | XP granted to player on defeat (min 0)      |
-| `spec.loot`            | no       | `[]`    | Weighted loot table                         |
+| `spec.loot`            | no       | `[]`    | Loot groups resolved on enemy defeat        |
 | `spec.skills`          | no       | `[]`    | Skill entries for automatic skill use       |
 | `spec.skill_resources` | no       | `{}`    | Starting resource values for skill costs    |
 
-### Loot entry fields
+### Loot group and entry fields
 
-| Field    | Required | Description                                       |
-| -------- | -------- | ------------------------------------------------- |
-| `item`   | yes      | `metadata.name` of an [Item](./items.md) manifest |
-| `weight` | yes      | Relative probability (min 1)                      |
+See [Loot Tables §reference](./loot-tables.md#reference) for the complete field reference for `LootGroup` and `LootEntry`.
 
 ### Skill entry fields
 

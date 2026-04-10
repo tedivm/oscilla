@@ -10,6 +10,8 @@ spec:
       text: "A small wooden buckler leans against the wall."
       effects:
         - type: item_drop
-          loot:
-            - item: test-shield
-              weight: 100
+          groups:
+            - count: 1
+              entries:
+                - item: test-shield
+                  weight: 100

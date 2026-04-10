@@ -1,0 +1,24 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: loot-conditional-group
+spec:
+  displayName: "Conditional Group Drop Test"
+  description: "Always awards a widget. Also awards a bonus potion if the player has completed test-quest-complete milestone."
+  steps:
+    - type: narrative
+      text: "You find a chest. Its inner compartment is sealed behind a quest seal."
+      effects:
+        - type: item_drop
+          groups:
+            - count: 1
+              entries:
+                - item: test-widget
+                  weight: 100
+            - count: 1
+              requires:
+                type: milestone
+                name: test-quest-complete
+              entries:
+                - item: test-potion
+                  weight: 100

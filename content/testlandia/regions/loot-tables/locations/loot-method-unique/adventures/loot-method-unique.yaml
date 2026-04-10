@@ -1,0 +1,22 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: loot-method-unique
+spec:
+  displayName: "Unique Sampling Drop Test"
+  description: "Draws 2 items from a 3-entry pool using method: unique so no item repeats."
+  steps:
+    - type: narrative
+      text: "You may choose two distinct relics from the offering."
+      effects:
+        - type: item_drop
+          groups:
+            - count: 2
+              method: unique
+              entries:
+                - item: test-widget
+                  weight: 1
+                - item: test-potion
+                  weight: 1
+                - item: test-tonic
+                  weight: 1

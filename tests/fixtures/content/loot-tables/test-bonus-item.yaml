@@ -1,0 +1,10 @@
+apiVersion: oscilla/v1
+kind: Item
+metadata:
+  name: test-bonus-item
+spec:
+  displayName: "Test Bonus Item"
+  description: "A secondary item used to verify multi-group drops."
+  category: material
+  stackable: true
+  value: 2

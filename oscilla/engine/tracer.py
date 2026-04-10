@@ -272,9 +272,10 @@ def _summarise_effects(effects: list) -> List[TracedEffect]:
             case ItemDropEffect():
                 if eff.loot_ref:
                     result.append(TracedEffect("item_drop", f"drop from loot_table: {eff.loot_ref}"))
-                elif eff.loot:
-                    for entry in eff.loot:
-                        result.append(TracedEffect("item_drop", f"drop: {entry.item}"))
+                elif eff.groups:
+                    for group in eff.groups:
+                        for entry in group.entries:
+                            result.append(TracedEffect("item_drop", f"drop: {entry.item}"))
             case EndAdventureEffect(outcome=o):
                 result.append(TracedEffect("end_adventure", f"outcome: {o}"))
     return result

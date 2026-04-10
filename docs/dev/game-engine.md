@@ -333,7 +333,7 @@ Each step type has a dedicated handler module:
 - `EmitTriggerEffect`: Fires a named trigger for cross-step signaling
 - `EndAdventureEffect`: Terminates an adventure with a given outcome
 - `HealEffect`: Restores HP and optionally max HP
-- `ItemDropEffect`: Weighted random item distribution
+- `ItemDropEffect`: Multi-group weighted/unique item distribution. Supports inline `groups:` or a `loot_ref:` to a named `LootTable` manifest. Groups can have per-group and per-entry conditions, template `count`/`amount`, and `method: weighted` (with-replacement) or `method: unique` (without-replacement) sampling. Enemy `spec.loot` uses the same group schema and is resolved automatically on combat victory.
 - `MilestoneGrantEffect`: Unlocks story milestones; triggers quest advancement and failure checks
 - `PrestigeEffect`: Resets character stats for prestige runs, preserving specified fields
 - `QuestActivateEffect`: Starts a quest at its entry stage

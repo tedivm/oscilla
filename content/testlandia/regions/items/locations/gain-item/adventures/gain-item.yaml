@@ -10,6 +10,8 @@ spec:
       text: "Found a test widget."
       effects:
         - type: item_drop
-          loot:
-            - item: test-widget
-              weight: 100
+          groups:
+            - count: 1
+              entries:
+                - item: test-widget
+                  weight: 100

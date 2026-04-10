@@ -1,0 +1,11 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: loot-template-count
+spec:
+  displayName: "Template Count Drop"
+  description: "Tests that a templated count expression determines how many items are drawn from the group."
+  region: loot-tables
+  adventures:
+    - ref: loot-template-count
+      weight: 100

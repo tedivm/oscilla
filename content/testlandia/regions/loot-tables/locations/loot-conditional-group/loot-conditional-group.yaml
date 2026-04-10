@@ -1,0 +1,11 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: loot-conditional-group
+spec:
+  displayName: "Conditional Group Drop"
+  description: "Tests that a loot group guarded by a requires condition is skipped when the condition is not met."
+  region: loot-tables
+  adventures:
+    - ref: loot-conditional-group
+      weight: 100

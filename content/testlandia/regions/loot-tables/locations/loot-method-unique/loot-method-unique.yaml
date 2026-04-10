@@ -1,0 +1,11 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: loot-method-unique
+spec:
+  displayName: "Unique Sampling Drop"
+  description: "Tests method: unique — each selected entry appears at most once regardless of how many draws are made."
+  region: loot-tables
+  adventures:
+    - ref: loot-method-unique
+      weight: 100

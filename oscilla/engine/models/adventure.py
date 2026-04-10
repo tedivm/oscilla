@@ -7,7 +7,7 @@ from typing import Annotated, Dict, List, Literal, Union
 from pydantic import BaseModel, Field, model_validator
 
 from oscilla.engine.models.base import Condition, ManifestEnvelope
-from oscilla.engine.models.loot_table import LootEntry
+from oscilla.engine.models.loot_table import LootGroup
 
 # NOTE: Dict is imported for use in ApplyBuffEffect and DispelEffect.
 
@@ -18,26 +18,31 @@ from oscilla.engine.models.loot_table import LootEntry
 
 
 class ItemDropEffect(BaseModel):
+    """Drop items from one or more independent loot groups.
+
+    Exactly one of groups (inline) or loot_ref (named LootTable manifest) must
+    be provided. loot_ref is resolved exclusively against registry.loot_tables;
+    the historical enemy fallback is removed.
+    """
+
     type: Literal["item_drop"]
-    # str = template string resolving to a positive int.
-    count: int | str = Field(default=1, description="Roll count or template string resolving to int.")
-    # Exactly one of loot or loot_ref must be set. Enforced by model_validator.
-    loot: List[LootEntry] | None = None
+    groups: List[LootGroup] | None = Field(
+        default=None,
+        description="Inline loot group list. Mutually exclusive with loot_ref.",
+    )
     loot_ref: str | None = Field(
         default=None,
-        description=(
-            "Reference to a named LootTable manifest or an Enemy manifest name. Mutually exclusive with loot."
-        ),
+        description="Reference to a named LootTable manifest. Mutually exclusive with groups.",
     )
 
     @model_validator(mode="after")
     def exactly_one_loot_source(self) -> "ItemDropEffect":
-        has_inline = self.loot is not None and len(self.loot) > 0
+        has_inline = self.groups is not None and len(self.groups) > 0
         has_ref = self.loot_ref is not None
         if has_inline and has_ref:
-            raise ValueError("ItemDropEffect: specify either 'loot' or 'loot_ref', not both.")
+            raise ValueError("ItemDropEffect: specify either 'groups' or 'loot_ref', not both.")
         if not has_inline and not has_ref:
-            raise ValueError("ItemDropEffect: must specify either 'loot' (inline list) or 'loot_ref'.")
+            raise ValueError("ItemDropEffect: must specify either 'groups' (inline) or 'loot_ref'.")
         return self
 
 

@@ -1,0 +1,11 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: loot-conditional-entry
+spec:
+  displayName: "Conditional Entry Drop"
+  description: "Tests per-entry requires conditions: certain items only drop when the player meets the entry's condition."
+  region: loot-tables
+  adventures:
+    - ref: loot-conditional-entry
+      weight: 100

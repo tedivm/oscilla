@@ -1,0 +1,23 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: loot-conditional-entry
+spec:
+  displayName: "Conditional Entry Drop Test"
+  description: "Always awards a widget. Awards a tonic instead when the player already owns one (entry-level requires condition)."
+  steps:
+    - type: narrative
+      text: "The merchant offers what you need most."
+      effects:
+        - type: item_drop
+          groups:
+            - count: 1
+              method: weighted
+              entries:
+                - item: test-widget
+                  weight: 100
+                - item: test-tonic
+                  weight: 50
+                  requires:
+                    type: item
+                    name: test-tonic

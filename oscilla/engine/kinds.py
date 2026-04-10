@@ -58,7 +58,7 @@ def _load_kinds() -> List[ManifestKind]:
         ManifestKind("game", "games", "game", "Game", GameManifest, creatable=False),
         ManifestKind("item", "items", "items", "Item", ItemManifest, creatable=True),
         ManifestKind("location", "locations", "locations", "Location", LocationManifest, creatable=True),
-        ManifestKind("loot-table", "loot-tables", "loot_tables", "LootTable", LootTableManifest, creatable=False),
+        ManifestKind("loot-table", "loot-tables", "loot_tables", "LootTable", LootTableManifest, creatable=True),
         ManifestKind("quest", "quests", "quests", "Quest", QuestManifest, creatable=True),
         ManifestKind("recipe", "recipes", "recipes", "Recipe", RecipeManifest, creatable=False),
         ManifestKind("region", "regions", "regions", "Region", RegionManifest, creatable=True),

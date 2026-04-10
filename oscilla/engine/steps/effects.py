@@ -36,7 +36,7 @@ from oscilla.engine.signals import _EndSignal
 
 if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
-    from oscilla.engine.models.loot_table import LootEntry
+    from oscilla.engine.models.loot_table import LootGroup
     from oscilla.engine.pipeline import TUICallbacks
     from oscilla.engine.registry import ContentRegistry
     from oscilla.engine.templates import ExpressionContext
@@ -221,28 +221,63 @@ def _resolve_stat_bounds(stat: str, registry: "ContentRegistry") -> tuple[int, i
     return _INT64_MIN, _INT64_MAX
 
 
-def _resolve_loot_list(
-    effect: ItemDropEffect,
+def _resolve_loot_groups(
+    groups: "List[LootGroup]",
+    player: "CharacterState",
     registry: "ContentRegistry",
-) -> "List[LootEntry]":
-    """Return the effective loot entry list for an ItemDropEffect.
+    ctx: "ExpressionContext",
+) -> "List[tuple[str, int]]":
+    """Resolve a list of LootGroups into (item_ref, amount) pairs.
 
-    Precondition: the loader has already validated that every loot_ref resolves
-    to a known table or enemy (_validate_loot_refs). An unresolvable ref here
-    indicates a programming error or a hot-reload race — assert rather than
-    silently skip.
+    Each group is processed independently:
+    - group.requires is evaluated; the group is skipped if it returns False.
+    - Each entry's requires is evaluated; entries not passing are excluded from the pool.
+    - If the pool is empty after filtering, the group is silently skipped.
+    - group.count (template-capable) is resolved and clamped to max(0, value).
+    - method="weighted" draws with replacement using entry weights.
+    - method="unique" draws without replacement via random.sample; count is clamped
+      to min(count, len(pool)) since random.sample cannot exceed population size.
+    - entry.amount (template-capable) is resolved per chosen entry and clamped to max(0).
+
+    Returns a flat list of (item_ref, amount) tuples, one per drawn entry instance.
     """
+    from oscilla.engine.conditions import evaluate
 
-    if effect.loot is not None:
-        return effect.loot
-    # loot_ref path — guaranteed resolvable by load-time validation.
-    assert effect.loot_ref is not None
-    entries = registry.resolve_loot_entries(effect.loot_ref)
-    assert entries is not None, (
-        f"loot_ref {effect.loot_ref!r} not found at runtime — "
-        "this should have been caught by _validate_loot_refs at load time."
-    )
-    return entries
+    engine = registry.template_engine
+    results: List[tuple[str, int]] = []
+
+    for group in groups:
+        if group.requires is not None and not evaluate(group.requires, player, registry):
+            continue
+        pool = [e for e in group.entries if e.requires is None or evaluate(e.requires, player, registry)]
+        if not pool:
+            continue
+
+        # Resolve count — template string or plain int.
+        if isinstance(group.count, str) and engine is not None:
+            template_id = f"__lootgroup_count_{id(group)}"
+            count = max(0, engine.render_int(template_id, ctx))
+        else:
+            count = max(0, int(group.count))
+
+        if count == 0:
+            continue
+
+        if group.method == "unique":
+            chosen = random.sample(pool, k=min(count, len(pool)))
+        else:
+            weights = [e.weight for e in pool]
+            chosen = random.choices(pool, weights=weights, k=count)
+
+        for entry in chosen:
+            if isinstance(entry.amount, str) and engine is not None:
+                template_id = f"__lootentry_amount_{id(entry)}"
+                amount = max(0, engine.render_int(template_id, ctx))
+            else:
+                amount = max(0, int(entry.amount))
+            results.append((entry.item, amount))
+
+    return results
 
 
 async def run_effect(
@@ -284,35 +319,48 @@ async def run_effect(
                 target=effect.target,
             )
 
-        elif isinstance(effect, ItemDropEffect) and isinstance(effect.count, str):
-            template_id = f"__effect_itemdrop_{id(effect)}"
-            resolved_count = engine.render_int(template_id, ctx)
-            # Preserve whichever loot source was declared (inline or ref).
-            effect = ItemDropEffect(
-                type="item_drop",
-                count=resolved_count,
-                loot=effect.loot,
-                loot_ref=effect.loot_ref,
-            )
-
     match effect:
-        case ItemDropEffect(count=count) if isinstance(count, int):
-            loot_entries = _resolve_loot_list(effect=effect, registry=registry)
-            weights = [entry.weight for entry in loot_entries]
-            # Roll independently count times with replacement.
-            chosen_entries = random.choices(population=loot_entries, weights=weights, k=count)
-            for entry in chosen_entries:
-                player.add_item(ref=entry.item, quantity=entry.quantity, registry=registry)
-            # Announce grouped findings.
+        case ItemDropEffect():
+            # Resolve groups: either inline or via loot_ref.
+            groups: List[LootGroup]
+            if effect.groups is not None:
+                groups = effect.groups
+            else:
+                assert effect.loot_ref is not None
+                resolved = registry.resolve_loot_groups(effect.loot_ref)
+                assert resolved is not None, (
+                    f"loot_ref {effect.loot_ref!r} not found at runtime — "
+                    "this should have been caught by _validate_loot_refs at load time."
+                )
+                groups = resolved
+
+            # Build ExpressionContext if not already available.
+            if ctx is None:
+                from oscilla.engine.templates import ExpressionContext, GameContext, PlayerContext
+
+                game_spec = registry.game.spec if registry.game is not None else None
+                hemisphere = game_spec.season_hemisphere if game_spec is not None else "northern"
+                timezone = game_spec.timezone if game_spec is not None else None
+                ctx = ExpressionContext(
+                    player=PlayerContext.from_character(player),
+                    game=GameContext(season_hemisphere=hemisphere, timezone=timezone),
+                )
+
+            drop_results = _resolve_loot_groups(groups=groups, player=player, registry=registry, ctx=ctx)
+
+            # Add items to inventory and collect totals for announcement.
             item_totals: Counter[str] = Counter()
-            for entry in chosen_entries:
-                item_totals[entry.item] += entry.quantity
-            parts = []
-            for item_ref, total_qty in item_totals.items():
-                item = registry.items.get(item_ref)
-                name = item.spec.displayName if item is not None else item_ref
-                parts.append(f"{name} \u00d7 {total_qty}" if total_qty > 1 else name)
-            await tui.show_text(f"You found: {', '.join(parts)}")
+            for item_ref, amount in drop_results:
+                if amount > 0:
+                    player.add_item(ref=item_ref, quantity=amount, registry=registry)
+                    item_totals[item_ref] += amount
+            if item_totals:
+                parts = []
+                for item_ref, total_qty in item_totals.items():
+                    item = registry.items.get(item_ref)
+                    name = item.spec.displayName if item is not None else item_ref
+                    parts.append(f"{name} \u00d7 {total_qty}" if total_qty > 1 else name)
+                await tui.show_text(f"You found: {', '.join(parts)}")
 
         case MilestoneGrantEffect(milestone=milestone):
             player.grant_milestone(milestone)

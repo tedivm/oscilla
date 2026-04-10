@@ -10,8 +10,10 @@ spec:
       text: "A vendor hands you a tonic and immediately insists you drink it."
       effects:
         - type: item_drop
-          loot:
-            - item: test-tonic
-              weight: 100
+          groups:
+            - count: 1
+              entries:
+                - item: test-tonic
+                  weight: 100
         - type: use_item
           item: test-tonic

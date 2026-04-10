@@ -10,6 +10,8 @@ spec:
       text: "You pull a heavy double-headed axe from an ancient weapon rack. Its weight feels familiar in your hands."
       effects:
         - type: item_drop
-          loot:
-            - item: battle-axe
-              weight: 100
+          groups:
+            - count: 1
+              entries:
+                - item: battle-axe
+                  weight: 100

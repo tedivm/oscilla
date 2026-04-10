@@ -51,15 +51,19 @@ from oscilla.engine.models.base import (
     HasAllArchetypesCondition,
     HasAnyArchetypeCondition,
     HasArchetypeCondition,
+    ItemCondition,
+    ItemEquippedCondition,
     ManifestEnvelope,
     NotCondition,
     QuestStageCondition,
 )
 from oscilla.engine.models.buff import BuffManifest
 from oscilla.engine.models.character_config import CharacterConfigManifest
+from oscilla.engine.models.enemy import EnemyManifest
 from oscilla.engine.models.game import GameManifest
 from oscilla.engine.models.item import ItemManifest
 from oscilla.engine.models.location import LocationManifest
+from oscilla.engine.models.loot_table import LootGroup, LootTableManifest
 from oscilla.engine.models.quest import QuestManifest
 from oscilla.engine.models.recipe import RecipeManifest
 from oscilla.engine.models.region import RegionManifest
@@ -658,12 +662,56 @@ def _collect_archetype_refs_in_condition(condition: Condition | None) -> Set[str
     return refs
 
 
+def _collect_item_refs_in_condition(condition: Condition | None) -> Set[str]:
+    """Recursively collect item manifest name refs from a condition tree."""
+    if condition is None:
+        return set()
+    refs: Set[str] = set()
+    match condition:
+        case ItemCondition(name=n):
+            refs.add(n)
+        case ItemEquippedCondition(name=n):
+            refs.add(n)
+        case AllCondition(conditions=children):
+            for child in children:
+                refs.update(_collect_item_refs_in_condition(child))
+        case AnyCondition(conditions=children):
+            for child in children:
+                refs.update(_collect_item_refs_in_condition(child))
+        case NotCondition(condition=child):
+            refs.update(_collect_item_refs_in_condition(child))
+        case _:
+            pass
+    return refs
+
+
+def _collect_refs_from_loot_groups(
+    groups: List[LootGroup],
+) -> tuple[Set[str], Set[str]]:
+    """Collect archetype and item refs from all conditions in loot group trees.
+
+    Returns (archetype_refs, item_refs).
+    """
+    archetype_refs: Set[str] = set()
+    item_refs: Set[str] = set()
+    for group in groups:
+        archetype_refs.update(_collect_archetype_refs_in_condition(group.requires))
+        item_refs.update(_collect_item_refs_in_condition(group.requires))
+        for entry in group.entries:
+            archetype_refs.update(_collect_archetype_refs_in_condition(entry.requires))
+            item_refs.update(_collect_item_refs_in_condition(entry.requires))
+    return archetype_refs, item_refs
+
+
 def _collect_archetype_refs_in_effects(effects: List[Effect]) -> Set[str]:
-    """Collect archetype name refs from an effect list."""
+    """Collect archetype name refs from an effect list, including loot group conditions."""
     refs: Set[str] = set()
     for eff in effects:
         if isinstance(eff, ArchetypeAddEffect) or isinstance(eff, ArchetypeRemoveEffect):
             refs.add(eff.name)
+        elif isinstance(eff, ItemDropEffect) and eff.groups is not None:
+            arch_refs, _ = _collect_refs_from_loot_groups(eff.groups)
+            refs.update(arch_refs)
     return refs
 
 
@@ -748,6 +796,15 @@ def _collect_archetype_refs_from_manifest(manifest: ManifestEnvelope) -> Set[str
             game = cast(GameManifest, manifest)
             for pe in game.spec.passive_effects:
                 _add_cond(pe.condition)
+        case "LootTable":
+            lt = cast(LootTableManifest, manifest)
+            arch_refs, _ = _collect_refs_from_loot_groups(lt.spec.groups)
+            refs.update(arch_refs)
+        case "Enemy":
+            enemy = cast(EnemyManifest, manifest)
+            if enemy.spec.loot:
+                arch_refs, _ = _collect_refs_from_loot_groups(enemy.spec.loot)
+                refs.update(arch_refs)
 
     return refs
 
@@ -767,6 +824,50 @@ def _validate_archetype_refs(manifests: List[ManifestEnvelope]) -> List[LoadErro
                         message=f"archetype ref {ref!r} not found in declared Archetype manifests",
                     )
                 )
+
+    return errors
+
+
+def _validate_loot_condition_refs(manifests: List[ManifestEnvelope]) -> List[LoadError]:
+    """Validate item refs in LootGroup/LootEntry requires conditions at all three loot sites.
+
+    Loot sites checked:
+    1. LootTable manifests — groups directly on the spec
+    2. Enemy manifests — spec.loot groups
+    3. Adventure inline groups — item_drop effects with inline groups
+    """
+    errors: List[LoadError] = []
+    item_names: Set[str] = {m.metadata.name for m in manifests if m.kind == "Item"}
+
+    def _check_item_refs(groups: List[LootGroup], manifest_name: str) -> None:
+        _, item_refs = _collect_refs_from_loot_groups(groups)
+        for ref in sorted(item_refs):
+            if ref not in item_names:
+                errors.append(
+                    LoadError(
+                        file=Path(f"<{manifest_name}>"),
+                        message=f"loot condition references unknown item: {ref!r}",
+                    )
+                )
+
+    for m in manifests:
+        match m.kind:
+            case "LootTable":
+                lt = cast(LootTableManifest, m)
+                _check_item_refs(lt.spec.groups, m.metadata.name)
+            case "Enemy":
+                enemy = cast(EnemyManifest, m)
+                if enemy.spec.loot:
+                    _check_item_refs(enemy.spec.loot, m.metadata.name)
+            case "Adventure":
+                adv = cast(AdventureManifest, m)
+                # Collect all inline item_drop groups from adventure step trees.
+                item_drop_effects: List[ItemDropEffect] = []
+                for step in adv.spec.steps:
+                    _collect_step_item_drop_effects(step, item_drop_effects)
+                for eff in item_drop_effects:
+                    if eff.groups is not None:
+                        _check_item_refs(eff.groups, m.metadata.name)
 
     return errors
 
@@ -1045,6 +1146,7 @@ def validate_references(manifests: List[ManifestEnvelope]) -> List[LoadError]:
     errors.extend(_validate_prestige_effects(manifests))
     errors.extend(_validate_quest_stage_condition_refs(manifests))
     errors.extend(_validate_archetype_refs(manifests))
+    errors.extend(_validate_loot_condition_refs(manifests))
 
     return errors
 
@@ -1112,12 +1214,21 @@ def _collect_all_template_strings(
             return False
         return "{{" in value or "{%" in value or bool(re.search(r"\{[A-Za-z]+\}", value))
 
+    def _walk_loot_groups(groups: List[LootGroup], path: str, context_type: str) -> None:
+        """Collect template strings from LootGroup.count and LootEntry.amount fields."""
+        for group in groups:
+            if _is_template(group.count):
+                results.append((f"__lootgroup_count_{id(group)}", group.count, context_type))  # type: ignore[arg-type]
+            for entry in group.entries:
+                if _is_template(entry.amount):
+                    results.append((f"__lootentry_amount_{id(entry)}", entry.amount, context_type))  # type: ignore[arg-type]
+
     def _walk_effects(effects: List[Effect], path: str, context_type: str) -> None:
         for effect in effects:
             if isinstance(effect, StatChangeEffect) and _is_template(effect.amount):
                 results.append((f"__effect_statchange_{id(effect)}", effect.amount, context_type))  # type: ignore[arg-type]
-            elif isinstance(effect, ItemDropEffect) and _is_template(effect.count):
-                results.append((f"__effect_itemdrop_{id(effect)}", effect.count, context_type))  # type: ignore[arg-type]
+            elif isinstance(effect, ItemDropEffect) and effect.groups is not None:
+                _walk_loot_groups(effect.groups, f"{path}.groups", context_type)
 
     def _walk_branch(branch: OutcomeBranch, path: str, context_type: str) -> None:
         _walk_effects(branch.effects, path, context_type)
@@ -1146,12 +1257,24 @@ def _collect_all_template_strings(
             _walk_branch(step.on_fail, f"{path}.on_failure", context_type)
 
     for manifest in manifests:
-        if manifest.kind != "Adventure":
-            continue
-        adv_manifest = cast(AdventureManifest, manifest)
-        name = adv_manifest.metadata.name
-        for i, step in enumerate(adv_manifest.spec.steps):
-            _walk_step(step, f"{name}:step[{i}]", "adventure")
+        if manifest.kind == "Adventure":
+            adv_manifest = cast(AdventureManifest, manifest)
+            name = adv_manifest.metadata.name
+            for i, step in enumerate(adv_manifest.spec.steps):
+                _walk_step(step, f"{name}:step[{i}]", "adventure")
+
+    # Walk LootTable manifests for group/entry template strings.
+    for manifest in manifests:
+        if manifest.kind == "LootTable":
+            lt = cast(LootTableManifest, manifest)
+            _walk_loot_groups(lt.spec.groups, f"{lt.metadata.name}:groups", "adventure")
+
+    # Walk Enemy manifests for loot group/entry template strings.
+    for manifest in manifests:
+        if manifest.kind == "Enemy":
+            enemy = cast(EnemyManifest, manifest)
+            if enemy.spec.loot:
+                _walk_loot_groups(enemy.spec.loot, f"{enemy.metadata.name}:loot", "adventure")
 
     return results
 
@@ -1343,7 +1466,7 @@ def _collect_step_item_drop_effects(step: Step, effects: List[ItemDropEffect]) -
 
 
 def _validate_loot_refs(registry: "ContentRegistry") -> List[LoadError]:
-    """Verify every loot_ref in ItemDropEffect resolves to a known table or enemy."""
+    """Verify every loot_ref in ItemDropEffect resolves to a known LootTable manifest."""
     errors: List[LoadError] = []
     for adv_manifest in registry.adventures.all():
         item_drop_effects: List[ItemDropEffect] = []
@@ -1352,12 +1475,12 @@ def _validate_loot_refs(registry: "ContentRegistry") -> List[LoadError]:
         for effect in item_drop_effects:
             if effect.loot_ref is None:
                 continue
-            entries = registry.resolve_loot_entries(effect.loot_ref)
-            if entries is None:
+            groups = registry.resolve_loot_groups(effect.loot_ref)
+            if groups is None:
                 errors.append(
                     LoadError(
                         file=Path(f"<{adv_manifest.metadata.name}>"),
-                        message=(f"loot_ref {effect.loot_ref!r} not found in loot_tables or enemies registry."),
+                        message=(f"loot_ref {effect.loot_ref!r} not found in loot_tables registry."),
                     )
                 )
     return errors

@@ -1,0 +1,25 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: loot-multi-group
+spec:
+  displayName: "Multi-Group Drop Test"
+  description: "Validates that multiple groups in a single item_drop effect each resolve independently."
+  steps:
+    - type: narrative
+      text: "You discover a treasure cache with two separate compartments."
+      effects:
+        - type: item_drop
+          groups:
+            - count: 1
+              method: weighted
+              entries:
+                - item: test-widget
+                  weight: 100
+                  amount: 1
+            - count: 1
+              method: weighted
+              entries:
+                - item: test-potion
+                  weight: 100
+                  amount: 1

@@ -1,0 +1,11 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: loot-ref-drop
+spec:
+  displayName: "Loot Table Reference Drop"
+  description: "Tests item_drop using a loot_ref to a LootTable manifest rather than inline groups."
+  region: loot-tables
+  adventures:
+    - ref: loot-ref-drop
+      weight: 100

@@ -1,0 +1,11 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: loot-template-amount
+spec:
+  displayName: "Template Amount Drop"
+  description: "Tests that a templated amount expression scales how many of an item the player receives."
+  region: loot-tables
+  adventures:
+    - ref: loot-template-amount
+      weight: 100

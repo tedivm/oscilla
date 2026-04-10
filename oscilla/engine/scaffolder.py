@@ -147,6 +147,51 @@ def scaffold_item(
     return path
 
 
+def scaffold_loot_table(
+    games_path: Path,
+    game_name: str,
+    name: str,
+    display_name: str,
+    description: str = "",
+) -> Path:
+    """Scaffold a LootTable manifest with a minimal two-group example.
+
+    Group A: a common weighted drop (weight 10).
+    Group B: a rare conditional group (requires a milestone) demonstrating
+             the requires field and a template-capable count expression.
+    """
+    data: Dict = {
+        "apiVersion": "oscilla/v1",
+        "kind": "LootTable",
+        "metadata": {"name": name},
+        "spec": {
+            "displayName": display_name,
+            "description": description,
+            "groups": [
+                {
+                    "count": 1,
+                    "method": "weighted",
+                    "entries": [
+                        {"item": "common-item", "weight": 10},
+                        {"item": "uncommon-item", "weight": 3},
+                    ],
+                },
+                {
+                    "count": 1,
+                    "method": "unique",
+                    "requires": {"type": "milestone", "name": "some-milestone"},
+                    "entries": [
+                        {"item": "rare-item", "weight": 1, "amount": 2},
+                    ],
+                },
+            ],
+        },
+    }
+    path = games_path / game_name / "loot-tables" / f"{name}.yaml"
+    _write_yaml(path, data)
+    return path
+
+
 def scaffold_quest(
     games_path: Path,
     game_name: str,

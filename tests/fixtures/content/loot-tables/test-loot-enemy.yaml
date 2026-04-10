@@ -1,0 +1,17 @@
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: test-loot-enemy
+spec:
+  displayName: "Test Loot Enemy"
+  description: "A weak enemy that always drops test-item via enemy spec loot."
+  hp: 1
+  attack: 0
+  defense: 0
+  xp_reward: 5
+  loot:
+    - count: 1
+      entries:
+        - item: test-item
+          weight: 100
+          amount: 1

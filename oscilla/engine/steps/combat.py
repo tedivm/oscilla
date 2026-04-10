@@ -6,7 +6,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Awaitable, Callable, List, Literal, Set
 
 from oscilla.engine.combat_context import CombatContext
-from oscilla.engine.models.adventure import ApplyBuffEffect, CombatStep, OutcomeBranch
+from oscilla.engine.models.adventure import ApplyBuffEffect, CombatStep, ItemDropEffect, OutcomeBranch
 from oscilla.engine.pipeline import AdventureOutcome, TUICallbacks
 from oscilla.engine.steps.effects import run_effect
 
@@ -387,6 +387,10 @@ async def run_combat(
 
         if ctx.enemy_hp <= 0:
             player.statistics.record_enemy_defeated(step.enemy)
+            # Automatically apply the enemy's own loot groups before the on_win branch.
+            if enemy.spec.loot:
+                loot_effect = ItemDropEffect(type="item_drop", groups=enemy.spec.loot)
+                await run_effect(effect=loot_effect, player=player, registry=registry, tui=tui)
             await run_outcome_branch(step.on_win)
             return AdventureOutcome.COMPLETED
 

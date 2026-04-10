@@ -88,27 +88,29 @@ def _check_undefined_item_refs(registry: "ContentRegistry") -> List[SemanticIssu
     issues = []
     for adv in registry.adventures.all():
         for effect in _walk_all_effects(adv.spec.steps):
-            if isinstance(effect, ItemDropEffect) and effect.loot:
-                for entry in effect.loot:
-                    if registry.items.get(entry.item) is None:
-                        issues.append(
-                            SemanticIssue(
-                                kind="undefined_ref",
-                                message=f"item_drop references unknown item {entry.item!r}",
-                                manifest=f"adventure:{adv.metadata.name}",
+            if isinstance(effect, ItemDropEffect) and effect.groups:
+                for group in effect.groups:
+                    for entry in group.entries:
+                        if registry.items.get(entry.item) is None:
+                            issues.append(
+                                SemanticIssue(
+                                    kind="undefined_ref",
+                                    message=f"item_drop references unknown item {entry.item!r}",
+                                    manifest=f"adventure:{adv.metadata.name}",
+                                )
                             )
-                        )
 
     for lt in registry.loot_tables.all():
-        for entry in lt.spec.loot:
-            if registry.items.get(entry.item) is None:
-                issues.append(
-                    SemanticIssue(
-                        kind="undefined_ref",
-                        message=f"LootTable entry references unknown item {entry.item!r}",
-                        manifest=f"loot-table:{lt.metadata.name}",
+        for group in lt.spec.groups:
+            for entry in group.entries:
+                if registry.items.get(entry.item) is None:
+                    issues.append(
+                        SemanticIssue(
+                            kind="undefined_ref",
+                            message=f"LootTable entry references unknown item {entry.item!r}",
+                            manifest=f"loot-table:{lt.metadata.name}",
+                        )
                     )
-                )
     return issues
 
 

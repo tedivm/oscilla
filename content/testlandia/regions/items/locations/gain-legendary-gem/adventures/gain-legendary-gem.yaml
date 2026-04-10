@@ -12,6 +12,8 @@ spec:
       text: "Half-buried in the earth you find a gem that glows with an inner light. You feel stronger just holding it."
       effects:
         - type: item_drop
-          loot:
-            - item: test-legendary-gem
-              weight: 100
+          groups:
+            - count: 1
+              entries:
+                - item: test-legendary-gem
+                  weight: 100

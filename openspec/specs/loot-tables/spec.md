@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the `LootTable` manifest kind for authoring named, reusable loot definitions that can be referenced from `item_drop` effects and enemy manifests. Establishes a unified `LootEntry` schema used by all loot sources.
+Defines the `LootTable` manifest kind for authoring named, reusable loot definitions that can be referenced from `item_drop` effects and enemy manifests. Establishes the `groups`-based schema used by all loot sources.
 
 ---
 
@@ -14,84 +14,86 @@ A `LootTable` manifest kind SHALL exist with `kind: LootTable` and a `spec` cont
 
 - `displayName: str` (required)
 - `description: str` (optional, defaults to empty string)
-- `loot: List[LootEntry]` (required, minimum one entry)
+- `groups: List[LootGroup]` (required, minimum one group)
 
-`LootTable` manifests SHALL be loaded and registered in the content registry under `registry.loot_tables`. Names SHALL be unique within the `LootTable` kind.
+The previous `loot: List[LootEntry]` field is removed and replaced by `groups`. `LootTable` manifests SHALL be loaded and registered in `registry.loot_tables`. Names SHALL be unique within the `LootTable` kind. `LootTable` SHALL be a creatable kind (`oscilla content create loot-table` SHALL be supported).
 
-#### Scenario: Valid LootTable loads successfully
+#### Scenario: Valid LootTable with groups loads successfully
 
-- **WHEN** the content loader reads a valid `LootTable` manifest with at least one loot entry
+- **WHEN** the content loader reads a valid `LootTable` manifest with at least one group
 - **THEN** it is registered in `registry.loot_tables` with no errors
 
-#### Scenario: LootTable with empty loot list is a load error
+#### Scenario: LootTable with empty groups list is a load error
 
-- **WHEN** a `LootTable` manifest declares `loot: []`
-- **THEN** the content loader raises a validation error (Pydantic `min_length=1`)
-
----
-
-### Requirement: Unified LootEntry schema
-
-All loot sources (LootTable manifests, enemy `loot` fields, and inline `item_drop` loot lists) SHALL use the same `LootEntry` schema with fields:
-
-- `item: str` — manifest name of the item
-- `weight: int` (minimum 1) — relative probability weight
-- `quantity: int` (minimum 1, default 1) — how many of the item are added when this entry is selected
-
-#### Scenario: LootEntry with quantity grants multiple items
-
-- **WHEN** an item_drop effect resolves a loot entry with `quantity: 3`
-- **THEN** the player receives 3 of the specified item in a single selection
-
-#### Scenario: LootEntry with default quantity grants one item
-
-- **WHEN** a loot entry omits `quantity`
-- **THEN** the player receives 1 of the specified item (default behavior, backwards compatible)
-
----
-
-### Requirement: loot_ref on ItemDropEffect
-
-`ItemDropEffect` SHALL accept an optional `loot_ref: str` field as an alternative to the inline `loot` list. Exactly one of `loot` or `loot_ref` SHALL be set; declaring both or neither SHALL be a Pydantic validation error at load time.
-
-When `loot_ref` is specified, the engine SHALL resolve it as follows:
-
-1. Check `registry.loot_tables` for a `LootTable` manifest with that name.
-2. If not found, check `registry.enemies` for an enemy manifest with that name and use its `loot` field.
-3. If neither resolves, log an error and skip the drop (no crash, no silent success).
-
-#### Scenario: loot_ref resolves to a LootTable manifest
-
-- **WHEN** an `item_drop` effect with `loot_ref: "treasure-hoard"` is executed and `registry.loot_tables` contains a manifest named `"treasure-hoard"`
-- **THEN** the loot is drawn from that manifest's `loot` list
-
-#### Scenario: loot_ref resolves to an enemy's loot field
-
-- **WHEN** an `item_drop` effect with `loot_ref: "goblin"` is executed and no `LootTable` named `"goblin"` exists, but an enemy named `"goblin"` does
-- **THEN** the loot is drawn from the enemy's `loot` list
-
-#### Scenario: loot_ref not found in either registry
-
-- **WHEN** an `item_drop` effect uses a `loot_ref` that does not resolve to any known LootTable or enemy
-- **THEN** an error is logged, the TUI shows no item-found message, and no items are added to inventory
-
-#### Scenario: Both loot and loot_ref declared is a load error
-
-- **WHEN** an `item_drop` effect in a manifest declares both `loot:` and `loot_ref:`
+- **WHEN** a `LootTable` manifest declares `groups: []`
 - **THEN** the content loader raises a Pydantic validation error
 
-#### Scenario: Neither loot nor loot_ref declared is a load error
+#### Scenario: LootTable is creatable via CLI
 
-- **WHEN** an `item_drop` effect in a manifest declares neither `loot:` nor `loot_ref:`
-- **THEN** the content loader raises a Pydantic validation error
+- **WHEN** an author runs `oscilla content create loot-table <name>`
+- **THEN** a valid scaffolded LootTable YAML file is generated at the appropriate path
 
 ---
 
 ### Requirement: Load-time cross-reference validation for loot_ref
 
-The content loader SHALL validate every `loot_ref` in every `ItemDropEffect` across all adventure manifests after the full registry is assembled. Any `loot_ref` that resolves to neither a `LootTable` manifest nor an enemy manifest SHALL produce a `LoadError`.
+The content loader SHALL validate every `loot_ref` in every `ItemDropEffect` across all adventure manifests after the full registry is assembled. Any `loot_ref` that does not resolve to a `LootTable` manifest SHALL produce a `LoadError`.
 
 #### Scenario: Invalid loot_ref produces a load error
 
 - **WHEN** an adventure manifest contains an `item_drop` effect with `loot_ref: "nonexistent"`
 - **THEN** the content loader reports a `LoadError` identifying the adventure and the bad ref, and the content package fails to load
+
+---
+
+### Requirement: ItemDropEffect uses groups exclusively
+
+`ItemDropEffect` SHALL accept exactly one of:
+
+- `groups: List[LootGroup]` — inline group definitions (minimum one group)
+- `loot_ref: str` — reference to a named `LootTable` manifest
+
+Declaring both or neither SHALL be a Pydantic `model_validator` error at load time. The `loot` (flat list) and `count` (top-level roll count) fields are removed entirely.
+
+When `loot_ref` is specified, the engine SHALL resolve it against `registry.loot_tables`. If the reference does not resolve, a `LoadError` is produced at load time (same validation as before). The fallback to enemy loot via `resolve_loot_entries` is removed.
+
+#### Scenario: ItemDropEffect with inline groups is valid
+
+- **WHEN** an `item_drop` effect declares `groups:` with at least one group
+- **THEN** the manifest loads successfully
+
+#### Scenario: ItemDropEffect with loot_ref is valid
+
+- **WHEN** an `item_drop` effect declares `loot_ref: "treasure-hoard"` and a `LootTable` named `"treasure-hoard"` exists
+- **THEN** the manifest loads successfully and resolves to that table's groups at runtime
+
+#### Scenario: ItemDropEffect with both groups and loot_ref is a load error
+
+- **WHEN** an `item_drop` effect declares both `groups:` and `loot_ref:`
+- **THEN** the content loader raises a Pydantic validation error
+
+#### Scenario: ItemDropEffect with neither groups nor loot_ref is a load error
+
+- **WHEN** an `item_drop` effect declares neither `groups:` nor `loot_ref:`
+- **THEN** the content loader raises a Pydantic validation error
+
+#### Scenario: loot_ref not found in loot_tables is a load error
+
+- **WHEN** an `item_drop` effect uses `loot_ref: "nonexistent"`
+- **THEN** the content loader reports a `LoadError`; the content package fails to load
+
+---
+
+### Requirement: EnemySpec.loot uses List[LootGroup]
+
+`EnemySpec.loot` SHALL accept `List[LootGroup]` (not `List[LootEntry]`). Enemies with simple single-pool drops use a single group with no `requires`. The field name `loot` is retained on the enemy manifest for semantic clarity.
+
+#### Scenario: Enemy with groups-based loot loads and drops items
+
+- **WHEN** an enemy manifest declares `loot: [{entries: [{item: sword}]}]`
+- **THEN** it loads successfully and the loot resolves to the group model at runtime
+
+#### Scenario: Enemy with empty loot list is valid
+
+- **WHEN** an enemy manifest omits `loot:` or declares `loot: []`
+- **THEN** it loads successfully and no loot drops occur in combat

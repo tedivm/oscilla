@@ -1,0 +1,12 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: test-combat-loot
+spec:
+  displayName: "Combat Loot Test"
+  description: "Combat against test-loot-enemy to exercise automatic enemy loot drops."
+  steps:
+    - type: combat
+      enemy: test-loot-enemy
+      on_win:
+        text: "You defeated the enemy!"

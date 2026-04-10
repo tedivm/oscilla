@@ -560,13 +560,14 @@ def content_create(
         scaffold_enemy,
         scaffold_item,
         scaffold_location,
+        scaffold_loot_table,
         scaffold_quest,
         scaffold_region,
     )
     from oscilla.settings import settings
 
     kind = kind.lower()
-    valid_create_kinds = {"region", "location", "adventure", "enemy", "item", "quest"}
+    valid_create_kinds = {"region", "location", "adventure", "enemy", "item", "loot-table", "quest"}
     if kind not in valid_create_kinds:
         _err_console.print(f"[red]Cannot create {kind!r}. Supported: {', '.join(sorted(valid_create_kinds))}[/red]")
         raise SystemExit(1)
@@ -620,6 +621,8 @@ def content_create(
             out_path = scaffold_item(gp, game, name, display_name, category, description)
         case "quest":
             out_path = scaffold_quest(gp, game, name, display_name, description=description)
+        case "loot-table":
+            out_path = scaffold_loot_table(gp, game, name, display_name, description=description)
         case _:
             _err_console.print(f"[red]Internal error: unhandled kind {kind!r}[/red]")
             raise SystemExit(1)

@@ -1,0 +1,7 @@
+apiVersion: oscilla/v1
+kind: Region
+metadata:
+  name: loot-tables
+spec:
+  displayName: "Loot Table QA Realm"
+  description: "A realm for testing the enhanced loot table system: multi-group drops, conditions, templates, and sampling methods."

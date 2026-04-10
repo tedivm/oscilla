@@ -10,6 +10,8 @@ spec:
       text: "A glowing vial sits on a pedestal, waiting to be claimed."
       effects:
         - type: item_drop
-          loot:
-            - item: test-potion
-              weight: 100
+          groups:
+            - count: 1
+              entries:
+                - item: test-potion
+                  weight: 100

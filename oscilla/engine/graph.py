@@ -299,10 +299,11 @@ def build_deps_graph(
                 if effect.loot_ref:
                     tgt = _node("loot-table", effect.loot_ref, effect.loot_ref)
                     _edge(aid, tgt, "drops", "references")
-                elif effect.loot:
-                    for loot_entry in effect.loot:
-                        iid = _node("item", loot_entry.item, loot_entry.item)
-                        _edge(aid, iid, "drops", "references")
+                elif effect.groups:
+                    for group in effect.groups:
+                        for loot_entry in group.entries:
+                            iid = _node("item", loot_entry.item, loot_entry.item)
+                            _edge(aid, iid, "drops", "references")
             elif isinstance(effect, SkillGrantEffect):
                 sid = _node("skill", effect.skill, effect.skill)
                 _edge(aid, sid, "grants", "references")
@@ -313,9 +314,10 @@ def build_deps_graph(
     # Enemies → loot
     for enemy in registry.enemies.all():
         eid = _node("enemy", enemy.metadata.name, enemy.spec.displayName)
-        for loot_entry in enemy.spec.loot:
-            iid = _node("item", loot_entry.item, loot_entry.item)
-            _edge(eid, iid, "loot", "references")
+        for group in enemy.spec.loot:
+            for loot_entry in group.entries:
+                iid = _node("item", loot_entry.item, loot_entry.item)
+                _edge(eid, iid, "loot", "references")
         for skill_entry in enemy.spec.skills:
             sid = _node("skill", skill_entry.skill_ref, skill_entry.skill_ref)
             _edge(eid, sid, "uses", "references")
@@ -332,9 +334,10 @@ def build_deps_graph(
     # LootTables → items
     for lt in registry.loot_tables.all():
         lid = _node("loot-table", lt.metadata.name, lt.metadata.name)
-        for loot_entry in lt.spec.loot:
-            iid = _node("item", loot_entry.item, loot_entry.item)
-            _edge(lid, iid, "drops", "references")
+        for group in lt.spec.groups:
+            for loot_entry in group.entries:
+                iid = _node("item", loot_entry.item, loot_entry.item)
+                _edge(lid, iid, "drops", "references")
 
     # Quests → milestones (advance_on entries)
     for quest in registry.quests.all():
@@ -492,9 +495,10 @@ def build_manifest_xrefs(
                 if isinstance(effect, ItemDropEffect):
                     if effect.loot_ref:
                         refs.append(f"loot-table:{effect.loot_ref}")
-                    elif effect.loot:
-                        for loot_entry in effect.loot:
-                            refs.append(f"item:{loot_entry.item}")
+                    elif effect.groups:
+                        for group in effect.groups:
+                            for loot_entry in group.entries:
+                                refs.append(f"item:{loot_entry.item}")
                 if isinstance(effect, SkillGrantEffect):
                     refs.append(f"skill:{effect.skill}")
             # referenced_by: find locations that include this adventure in their pool

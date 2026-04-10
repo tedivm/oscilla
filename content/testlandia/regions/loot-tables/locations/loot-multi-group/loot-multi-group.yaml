@@ -1,0 +1,11 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: loot-multi-group
+spec:
+  displayName: "Multi-Group Drop"
+  description: "Tests that multiple loot groups in a single item_drop effect all resolve and award items."
+  region: loot-tables
+  adventures:
+    - ref: loot-multi-group
+      weight: 100

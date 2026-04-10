@@ -1,0 +1,13 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: test-loot-ref
+spec:
+  displayName: "Loot Ref Test"
+  description: "Adventure that drops items via loot_ref to the test-loot-table manifest."
+  steps:
+    - type: narrative
+      text: "The treasure vault opens."
+      effects:
+        - type: item_drop
+          loot_ref: test-loot-table

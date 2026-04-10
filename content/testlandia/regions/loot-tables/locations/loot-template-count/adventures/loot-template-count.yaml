@@ -1,0 +1,18 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: loot-template-count
+spec:
+  displayName: "Template Count Drop Test"
+  description: "Awards a number of widgets equal to the player's current level (min 1)."
+  steps:
+    - type: narrative
+      text: "The vault rewards you proportional to your renown."
+      effects:
+        - type: item_drop
+          groups:
+            - count: "{{ [player.stats['level'], 1] | max }}"
+              method: weighted
+              entries:
+                - item: test-widget
+                  weight: 100

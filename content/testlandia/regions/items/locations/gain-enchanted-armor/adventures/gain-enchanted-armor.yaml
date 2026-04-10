@@ -10,6 +10,8 @@ spec:
       text: "You find a gleaming breastplate inscribed with protective runes. Even unequipped, it radiates magical protection."
       effects:
         - type: item_drop
-          loot:
-            - item: enchanted-breastplate
-              weight: 100
+          groups:
+            - count: 1
+              entries:
+                - item: enchanted-breastplate
+                  weight: 100

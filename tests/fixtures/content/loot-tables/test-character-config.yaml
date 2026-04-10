@@ -1,0 +1,19 @@
+apiVersion: oscilla/v1
+kind: CharacterConfig
+metadata:
+  name: test-character-config
+spec:
+  public_stats:
+    - name: hp
+      type: int
+      default: 20
+      bounds:
+        min: 0
+      description: "Hit points"
+    - name: level
+      type: int
+      default: 1
+      bounds:
+        min: 1
+      description: "Character level"
+  hidden_stats: []

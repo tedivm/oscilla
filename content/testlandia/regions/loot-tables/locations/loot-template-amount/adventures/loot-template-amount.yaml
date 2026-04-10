@@ -1,0 +1,18 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: loot-template-amount
+spec:
+  displayName: "Template Amount Drop Test"
+  description: "Awards one widget stack sized by the player's current level (min 1)."
+  steps:
+    - type: narrative
+      text: "The generous merchant doubles your reward with each rank."
+      effects:
+        - type: item_drop
+          groups:
+            - count: 1
+              entries:
+                - item: test-widget
+                  weight: 100
+                  amount: "{{ [player.stats['level'], 1] | max }}"

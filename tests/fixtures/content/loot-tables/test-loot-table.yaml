@@ -1,0 +1,20 @@
+apiVersion: oscilla/v1
+kind: LootTable
+metadata:
+  name: test-loot-table
+spec:
+  displayName: "Test Loot Table"
+  description: "Two-group loot table: first group always drops test-item, second drops test-bonus-item."
+  groups:
+    - count: 1
+      method: weighted
+      entries:
+        - item: test-item
+          weight: 100
+          amount: 1
+    - count: 1
+      method: weighted
+      entries:
+        - item: test-bonus-item
+          weight: 100
+          amount: 2

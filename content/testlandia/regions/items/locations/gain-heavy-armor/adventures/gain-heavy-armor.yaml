@@ -12,6 +12,8 @@ spec:
       text: "You stumble upon a set of imposing steel plate. It is too heavy to wear unless you are sufficiently strong."
       effects:
         - type: item_drop
-          loot:
-            - item: test-heavy-armor
-              weight: 100
+          groups:
+            - count: 1
+              entries:
+                - item: test-heavy-armor
+                  weight: 100

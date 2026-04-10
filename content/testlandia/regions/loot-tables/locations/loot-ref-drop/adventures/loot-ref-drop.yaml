@@ -1,0 +1,13 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: loot-ref-drop
+spec:
+  displayName: "Loot Table Reference Drop Test"
+  description: "Awards items via a loot_ref pointing to the test-loot LootTable manifest."
+  steps:
+    - type: narrative
+      text: "The archivist reaches into the shared repository and draws your reward."
+      effects:
+        - type: item_drop
+          loot_ref: test-loot

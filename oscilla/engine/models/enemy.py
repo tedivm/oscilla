@@ -5,7 +5,7 @@ from typing import Dict, List, Literal
 from pydantic import BaseModel, Field
 
 from oscilla.engine.models.base import ManifestEnvelope
-from oscilla.engine.models.loot_table import LootEntry  # noqa: F401 — re-exported for callers
+from oscilla.engine.models.loot_table import LootGroup  # noqa: F401 — re-exported for callers
 
 
 class EnemySkillEntry(BaseModel):
@@ -27,7 +27,9 @@ class EnemySpec(BaseModel):
     attack: int = Field(ge=0)
     defense: int = Field(ge=0)
     xp_reward: int = Field(ge=0)
-    loot: List[LootEntry] = []
+    # Each element is an independent draw pool. Simple single-pool drops use a
+    # single group with no requires and method: weighted (the defaults).
+    loot: List[LootGroup] = []
     # Fixed skill list — enemies never acquire new skills.
     skills: List[EnemySkillEntry] = []
     # Initial resource values for skill costs (resource_name → starting value).

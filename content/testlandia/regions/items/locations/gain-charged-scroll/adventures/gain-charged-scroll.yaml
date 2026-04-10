@@ -10,6 +10,8 @@ spec:
       text: "You find a scroll crackling with stored energy. It has three uses before it crumbles."
       effects:
         - type: item_drop
-          loot:
-            - item: test-charged-scroll
-              weight: 100
+          groups:
+            - count: 1
+              entries:
+                - item: test-charged-scroll
+                  weight: 100

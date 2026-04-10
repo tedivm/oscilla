@@ -60,6 +60,7 @@ These documents cover each manifest kind in depth.
 | [World Building](./world-building.md)         | Regions, nested regions, locations, adventure pools, unlock conditions.                                                            |
 | [Adventures](./adventures.md)                 | Narrative, combat, choice, and stat-check steps; goto/labels; outcome branches.                                                    |
 | [Items](./items.md)                           | Consumables, gear, charges, equip requirements, labels, skill/buff grants.                                                         |
+| [Loot Tables](./loot-tables.md)               | Reusable item pools: groups, weighted/unique sampling, conditional groups and entries, template count/amount, enemy loot.          |
 | [Enemies](./enemies.md)                       | Combat stats, loot tables, enemy skills and resources.                                                                             |
 | [Skills](./skills.md)                         | Skill and Buff manifests, costs, cooldowns, buff modifiers, item skill/buff grants, enemy skills, CharacterConfig skill resources. |
 | [Archetypes](./archetypes.md)                 | Archetype manifests, `archetype_add`/`archetype_remove`/`skill_revoke` effects, archetype conditions, passive effects.             |
@@ -85,6 +86,7 @@ Not sure which guide to read? Find your goal:
 | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | Branch an adventure based on player level or a stat        | [Conditions §stat-check](./conditions.md) + [Adventures §stat-check](./adventures.md#stat-check)                           |
 | Give the player XP, loot, or a stat change                 | [Effects](./effects.md)                                                                                                    |
+| Create a reusable item drop pool                           | [Loot Tables](./loot-tables.md)                                                                                            |
 | Make narrative text mention the player's stats or pronouns | [Templates](./templates.md)                                                                                                |
 | Let players equip weapons and armor                        | [Game Configuration §equipment-slots](./game-configuration.md#equipment-slots) + [Items §gear](./items.md#equippable-gear) |
 | Create a boss fight                                        | [Enemies](./enemies.md) + [Adventures §combat](./adventures.md#combat) + [Skills](./skills.md)                             |
