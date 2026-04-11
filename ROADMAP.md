@@ -37,6 +37,7 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems)        | XL     | Combat Overhaul         |
 | [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades)                          | M      | Character Progression   |
 | [Extended Template Primitives](#extended-template-primitives)                               | S      | Engine Architecture     |
+| [Adventure Pipeline State-Machine Refactor](#adventure-pipeline-state-machine-refactor)     | XL     | Engine Architecture     |
 | [Player-Defined Pronouns](#player-defined-pronouns)                                         | S      | Character Configuration |
 | [Cross-Iteration Conditions/Templates/Effects](#cross-iteration-conditionstemplateseffects) | M      | Character Progression   |
 | [Adventure-Scoped Variables](#adventure-scoped-variables)                                   | M      | Adventure Authoring     |
@@ -50,6 +51,7 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [Plugin and Extension System](#plugin-and-extension-system)                                 | L      | Engine Architecture     |
 | [HTTP API for Multi-User Support](#http-api-for-multi-user-support)                         | XL     | Multi-User Platform     |
 | [Front End Website](#front-end-website)                                                     | XL     | Multi-User Platform     |
+| [API-Level Active Adventure Enforcement](#api-level-active-adventure-enforcement)           | S      | Multi-User Platform     |
 | [Full TUI Upgrade](#full-tui-upgrade)                                                       | L      | Media and Presentation  |
 | [Region Maps](#region-maps)                                                                 | M      | Media and Presentation  |
 | [Picture Selection and ASCII Art](#picture-selection-and-ascii-art)                         | M      | Media and Presentation  |
@@ -378,6 +380,29 @@ The engine discovers these at startup using `importlib.metadata.entry_points()` 
 
 This also cleanly separates the engine core from content-specific extensions, and enables community-contributed condition packs (e.g., a date/time condition library, a dice-rolling filter pack) to be distributed independently.
 
+### Adventure Pipeline State-Machine Refactor
+
+**Effort: XL** · **Group: Engine Architecture**
+
+Replace the current coroutine-based adventure pipeline with an explicit step-function / saga model where each step handler returns a typed result — `Decision(event)`, `Continue`, or `Complete(outcome)` — rather than calling into a blocking callback. The pipeline runner becomes a simple loop: call the current step, if it returns `Decision` stop and persist state, if it returns `Continue` advance the step index and loop.
+
+The motivation is MU3's `DecisionPauseException` mechanism, which is a deliberate workaround for a fundamental mismatch between the coroutine model and the stateless HTTP request model. It works, but it uses exceptions as control flow and requires careful management of `asyncio.create_task` lifetimes. A step-function model eliminates both.
+
+Benefits of the refactor:
+
+- No exception-as-control-flow at decision points
+- No coroutine lifetime or `create_task` complexity in the web path
+- Step handlers become ordinary functions, trivially unit-testable without async machinery
+- State is fully serializable by definition — it is just a step index and a typed return value
+- Both TUI and web runners share identical step logic; they differ only in how they handle a `Decision` result (block on terminal input vs. emit SSE and return HTTP response)
+- Horizontal scaling becomes straightforward — any server can resume any adventure from DB state
+
+This is the same pattern used by workflow engines (AWS Step Functions, Temporal, Prefect) for processes that must survive across process boundaries. It is the architecturally correct model for this use case.
+
+The refactor does not change the content authoring model — manifests, effects, conditions, and step types are unchanged. It is a rewrite of the execution scaffolding only. The TUI must be rebuilt around the new runner interface, but its behavior is functionally identical.
+
+Prerequisite: MU3 must be complete and stable before this refactor begins, as MU3 establishes and validates the full SSE event contract that the new runner must preserve.
+
 ---
 
 ## Multi-User Platform
@@ -397,6 +422,23 @@ Goals:
 - The TUI remains a valid client; the API is an additional interface layer, not a replacement
 
 This is the prerequisite for a web front end and mobile clients.
+
+### API-Level Active Adventure Enforcement
+
+**Effort: S** · **Group: Multi-User Platform**
+
+When a character has an active adventure, the API should reject state-mutating requests made from outside the adventure flow. Currently the frontend enforces this by redirecting to the play screen and blocking navigation away from it, but a determined client (or a bug) can still call endpoints like inventory management, character updates, or location navigation directly while a session lock is held.
+
+Goals:
+
+- Add an `active_adventure_guard` dependency or middleware that checks whether the character has a live session lock before processing requests to endpoints that mutate character state outside the play flow (e.g., `POST /characters/{id}/inventory`, `POST /characters/{id}/navigate`)
+- Play-flow endpoints (`/play/begin`, `/play/advance`, `/play/takeover`, `/play/current`) are exempt
+- Return `409 Conflict` with a clear error body when the guard fires, consistent with the existing session conflict response
+- Document which endpoint groups are covered by the guard in the API reference
+
+This is a defense-in-depth measure alongside the frontend redirect behavior introduced in the MU5 web frontend. It prevents state corruption if a client bypasses the frontend guard or if the frontend has a bug.
+
+---
 
 ### Front End Website
 
