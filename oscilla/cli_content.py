@@ -7,17 +7,36 @@ in oscilla/cli.py.
 
 from __future__ import annotations
 
+import dataclasses
 import io
 import json
 import logging
 from pathlib import Path
-from typing import Annotated, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Annotated, Any, Dict, List, Optional, Tuple
 
 import typer
 from rich.console import Console
 from rich.table import Table
+from ruamel.yaml import YAML as _YAML
 
+from oscilla.engine.graph import build_adventure_graph, build_deps_graph, build_manifest_xrefs, build_world_graph
+from oscilla.engine.graph_renderers import render as render_graph
 from oscilla.engine.kinds import ALL_KINDS
+from oscilla.engine.loader import ContentLoadError, load_from_disk, load_games
+from oscilla.engine.models.base import ManifestEnvelope
+from oscilla.engine.registry import ContentRegistry, KindRegistry
+from oscilla.engine.scaffolder import (
+    scaffold_adventure,
+    scaffold_enemy,
+    scaffold_item,
+    scaffold_location,
+    scaffold_loot_table,
+    scaffold_quest,
+    scaffold_region,
+)
+from oscilla.engine.schema_export import export_all_schemas, export_schema, export_union_schema
+from oscilla.engine.tracer import trace_adventure
+from oscilla.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +68,6 @@ def _resolve_registry(game_name: str | None) -> "tuple[str, ContentRegistry]":
     If game_name is given, load only that package. If omitted and exactly one
     game exists it is selected automatically. Raises SystemExit(1) on error.
     """
-    from oscilla.engine.loader import ContentLoadError, load_from_disk, load_games
-    from oscilla.settings import settings
-
     gpath = settings.games_path
     if game_name is not None:
         game_path = gpath / game_name
@@ -96,8 +112,6 @@ def _emit_structured_output(data: object, output_format: OutputFormat) -> None:
     if output_format == "json":
         typer.echo(json.dumps(data, indent=2))
     elif output_format == "yaml":
-        from ruamel.yaml import YAML as _YAML
-
         _y = _YAML()
         _y.default_flow_style = False
         buf = io.StringIO()
@@ -166,8 +180,6 @@ def content_list(
     output_format: Annotated[str, typer.Option("--format", "-F", help="Output format: text | json | yaml.")] = "text",
 ) -> None:
     """List all manifests of a given kind in the content package."""
-    from oscilla.engine.registry import KindRegistry
-
     kind = kind.lower()
     if kind not in _KIND_MAP:
         _err_console.print(f"[bold red]Unknown kind {kind!r}. Valid: {', '.join(_KIND_MAP)}[/bold red]")
@@ -215,9 +227,6 @@ def content_show(
     output_format: Annotated[str, typer.Option("--format", "-F", help="Output format: text | json | yaml.")] = "text",
 ) -> None:
     """Print a detailed description of one manifest including cross-references."""
-    from oscilla.engine.graph import build_manifest_xrefs
-    from oscilla.engine.registry import KindRegistry
-
     kind = kind.lower().rstrip("s")  # allow both "adventure" and "adventures"
     # Normalize to plural slug
     singular_to_plural = {v[1].lower(): k for k, v in _KIND_MAP.items()}
@@ -301,9 +310,6 @@ def content_graph(
     ] = None,
 ) -> None:
     """Generate a graph visualization of game content."""
-    from oscilla.engine.graph import build_adventure_graph, build_deps_graph, build_world_graph
-    from oscilla.engine.graph_renderers import render
-
     valid_types = {"world", "adventure", "deps"}
     valid_formats = {"dot", "mermaid", "ascii"}
 
@@ -341,7 +347,7 @@ def content_graph(
             built_graph = build_deps_graph(registry, focus=focus, include_kinds=include_set, exclude_kinds=exclude_set)
 
     assert built_graph is not None
-    result = render(built_graph, fmt)  # type: ignore[arg-type]
+    result = render_graph(built_graph, fmt)  # type: ignore[arg-type]
 
     if output:
         Path(output).write_text(result)
@@ -383,8 +389,6 @@ def content_schema(
     With --vscode, also writes manifest.json and updates .vscode/settings.json with a
     content-path glob association. Output defaults to .vscode/oscilla-schemas/.
     """
-    from oscilla.engine.schema_export import export_all_schemas, export_schema, export_union_schema
-
     # Resolve effective output: --vscode has a default; without --vscode, --output is optional.
     effective_output = output or (".vscode/oscilla-schemas" if vscode else None)
 
@@ -432,12 +436,10 @@ def _write_vscode_schema_associations(
     Creates .vscode/settings.json if it does not exist. Merges into any existing
     yaml.schemas dict so that other schema associations are preserved.
     """
-    import json as _json
-
     settings_path = Path(".vscode") / "settings.json"
     settings_path.parent.mkdir(exist_ok=True)
     try:
-        existing: dict = _json.loads(settings_path.read_text()) if settings_path.exists() else {}
+        existing: dict = json.loads(settings_path.read_text()) if settings_path.exists() else {}
     except Exception:
         existing = {}
     # Use a relative path so the association is portable across machines.
@@ -445,7 +447,7 @@ def _write_vscode_schema_associations(
     # **/*.yaml is safe because manifest.json uses an if/then guard on
     # apiVersion: oscilla/v1 — non-Oscilla files receive no validation.
     existing.setdefault("yaml.schemas", {})[manifest_schema_path] = "**/*.yaml"
-    settings_path.write_text(_json.dumps(existing, indent=2))
+    settings_path.write_text(json.dumps(existing, indent=2))
     _console.print(f"[green]Updated {settings_path} with content glob → {manifest_schema_path}[/green]")
 
 
@@ -465,6 +467,9 @@ def content_test(
     Kept for backwards compatibility. Use 'oscilla validate' for the full
     feature set including --no-references and stdin support.
     """
+    # Deferred import to break a circular dependency: cli.py imports cli_content.py
+    # at module level (to register the content subapp), so cli_content.py cannot
+    # import from cli.py at module level without causing a circular import error.
     from oscilla.cli import _validate_games
 
     _validate_games(
@@ -488,10 +493,6 @@ def content_trace(
     output_format: Annotated[str, typer.Option("--format", "-F", help="Output format: text | json | yaml.")] = "text",
 ) -> None:
     """Trace all execution paths through an adventure (no character state changes)."""
-    import dataclasses
-
-    from oscilla.engine.tracer import trace_adventure
-
     _, registry = _resolve_registry(game)
     manifest = registry.adventures.get(adventure_name)
     if manifest is None:
@@ -536,17 +537,6 @@ def content_create(
     no_interactive: Annotated[bool, typer.Option("--no-interactive", help="Skip all prompts.")] = False,
 ) -> None:
     """Scaffold a new manifest YAML file at the conventional directory path."""
-    from oscilla.engine.scaffolder import (
-        scaffold_adventure,
-        scaffold_enemy,
-        scaffold_item,
-        scaffold_location,
-        scaffold_loot_table,
-        scaffold_quest,
-        scaffold_region,
-    )
-    from oscilla.settings import settings
-
     kind = kind.lower()
     valid_create_kinds = {"region", "location", "adventure", "enemy", "item", "loot-table", "quest"}
     if kind not in valid_create_kinds:
@@ -613,6 +603,5 @@ def content_create(
 
 
 # Type alias for type-checker — not evaluated at runtime.
-if False:  # pragma: no cover
-    from oscilla.engine.models.base import ManifestEnvelope
-    from oscilla.engine.registry import ContentRegistry
+if TYPE_CHECKING:
+    pass

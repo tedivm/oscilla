@@ -123,8 +123,12 @@ def test_cache_persistent_ttl_value() -> None:
 
 
 def test_debug_defaults_to_false() -> None:
-    """Test that debug defaults to False."""
-    test_settings = Settings()
+    """Test that the code default for debug is False.
+
+    Pass _env_file=None so the developer's local .env (which may set DEBUG=True)
+    does not interfere with testing the compiled-in default.
+    """
+    test_settings = Settings(_env_file=None)
     assert test_settings.debug is False
 
 

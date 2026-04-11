@@ -6,6 +6,7 @@ __all__ = [basename(f)[:-3] for f in modules if isfile(f) and not f.endswith("__
 
 # Explicit imports ensure Alembic autogenerate sees all models via `from oscilla.models import *`
 from oscilla.models import base  # noqa: E402, F401
+from oscilla.models.auth import AuthRefreshTokenRecord  # noqa: E402, F401
 from oscilla.models.character import CharacterRecord  # noqa: E402, F401
 from oscilla.models.character_iteration import (  # noqa: E402, F401
     CharacterIterationAdventureState,

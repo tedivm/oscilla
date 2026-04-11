@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Verify your Oscilla account</title>
+  </head>
+
+  <body
+    style="
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+    "
+  >
+    <table
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      style="background-color: #f4f4f4; padding: 40px 0"
+    >
+      <tr>
+        <td align="center">
+          <table
+            width="600"
+            cellpadding="0"
+            cellspacing="0"
+            style="background-color: #ffffff; border-radius: 8px; padding: 40px"
+          >
+            <tr>
+              <td>
+                <h1
+                  style="color: #333333; font-size: 24px; margin-bottom: 16px"
+                >
+                  Verify your Oscilla account
+                </h1>
+                <p style="color: #555555; font-size: 16px; line-height: 1.5">
+                  Hello {{ display_name }},
+                </p>
+                <p style="color: #555555; font-size: 16px; line-height: 1.5">
+                  Thank you for registering. Please verify your email address by
+                  clicking the button below.
+                </p>
+                <p style="text-align: center; margin: 32px 0">
+                  <a
+                    href="{{ action_url }}"
+                    style="
+                      background-color: #4a90d9;
+                      color: #ffffff;
+                      text-decoration: none;
+                      padding: 14px 28px;
+                      border-radius: 4px;
+                      font-size: 16px;
+                      font-weight: bold;
+                    "
+                  >
+                    Verify email
+                  </a>
+                </p>
+                <p style="color: #888888; font-size: 13px; margin-top: 32px">
+                  This link expires in {{ expiry_description }}.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

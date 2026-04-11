@@ -29,6 +29,10 @@ Redis-backed caching with aiocache for performance optimization.
 
 FastAPI web framework, endpoints, middleware, and API development.
 
+### [Authentication](./authentication.md)
+
+JWT access tokens, refresh token rotation, email verification, password reset, and the `get_current_user` dependency.
+
 ### [CLI](./cli.md)
 
 Command-line interface built with Typer for management and automation tasks.

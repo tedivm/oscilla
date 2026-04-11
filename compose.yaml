@@ -28,3 +28,9 @@ services:
       POSTGRES_PASSWORD: main12345
       POSTGRES_USER: main
       POSTGRES_DB: main
+
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "8025:8025"
+      - "1025:1025"

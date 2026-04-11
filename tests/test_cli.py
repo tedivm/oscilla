@@ -271,9 +271,11 @@ def test_test_data_calls_db_function(db_session: Any, monkeypatch: Any) -> None:
     async def mock_test_data(session: Any) -> None:
         called.append(True)
 
-    import oscilla.services.db as db_module
+    # cli.py imports test_data as _install_test_data at module level, so we must
+    # patch the reference in oscilla.cli rather than the source module.
+    import oscilla.cli as cli_module
 
-    monkeypatch.setattr(db_module, "test_data", mock_test_data)
+    monkeypatch.setattr(cli_module, "_install_test_data", mock_test_data)
 
     result = runner.invoke(app, ["test-data"])
     assert result.exit_code == 0

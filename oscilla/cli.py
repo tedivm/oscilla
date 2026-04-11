@@ -11,9 +11,20 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 
+from oscilla.engine.loader import ContentLoadError, LoadWarning, load_from_disk, load_from_text, load_games
+from oscilla.engine.semantic_validator import validate_semantic
+from oscilla.engine.tui import OscillaApp
+from oscilla.services.character import delete_user_characters
+from oscilla.services.user import derive_tui_user_key, get_or_create_user
+
+from . import __version__
 from .cli_content import content_app
 from .services.crash import _GITHUB_ISSUES_URL, write_crash_report
+from .services.db import engine, get_session, migrate_database
+from .services.db import test_data as _install_test_data
 from .settings import settings
+
+logger = logging.getLogger(__name__)
 
 app = typer.Typer()
 app.add_typer(content_app, name="content")
@@ -76,21 +87,16 @@ def syncify(f: Callable[P, Coroutine[object, object, T]]) -> Callable[P, T]:
 @app.command(help="Install testing data for local development.")
 @syncify
 async def test_data() -> None:
-    from . import __version__
-    from .services.db import get_session, test_data
-
     typer.echo(f"{settings.project_name} - {__version__}")
 
     async with get_session() as session:
-        await test_data(session)
+        await _install_test_data(session)
 
     typer.echo("Development data installed successfully.")
 
 
 @app.command(help=f"Display the current installed version of {settings.project_name}.")
 def version() -> None:
-    from . import __version__
-
     typer.echo(f"{settings.project_name} - {__version__}")
 
 
@@ -116,17 +122,12 @@ def _load_games() -> "Dict[str, ContentRegistry]":
     the CLI exit code is reliable and shell scripts can detect content errors.
     Warnings are surfaced via the logger but do not cause early exit.
     """
-    from rich.console import Console
-
-    from oscilla.engine.loader import ContentLoadError, load_games
-
-    _logger = logging.getLogger(__name__)
     _console = Console(stderr=True)
     try:
         games, all_warnings = load_games(settings.games_path)
         for pkg_name, warnings in all_warnings.items():
             for warning in warnings:
-                _logger.warning("[%s] %s", pkg_name, warning)
+                logger.warning("[%s] %s", pkg_name, warning)
         return games
     except ContentLoadError as exc:
         _console.print("[bold red]Content validation failed:[/bold red]")
@@ -157,11 +158,6 @@ async def game(
     ] = False,
 ) -> None:
     """Load games, resolve user identity, select or create a character, and launch the game."""
-    from oscilla.engine.tui import OscillaApp
-    from oscilla.services.character import delete_user_characters
-    from oscilla.services.db import get_session, migrate_database
-    from oscilla.services.user import derive_tui_user_key, get_or_create_user
-
     migrate_database()
     _configure_logging()
 
@@ -207,8 +203,6 @@ async def game(
                 raise SystemExit(1)
 
             # Dispose the connection pool after TUI exits
-            from oscilla.services.db import engine
-
             try:
                 await engine.dispose()
             except asyncio.CancelledError:
@@ -247,8 +241,6 @@ async def game(
     # remaining aiosqlite connections are closed while the event loop is still
     # running cleanly.  Without this, garbage-collected pool connections can
     # trigger a CancelledError during their async rollback.
-    from oscilla.services.db import engine
-
     try:
         await engine.dispose()
     except asyncio.CancelledError:
@@ -319,9 +311,6 @@ def _validate_stdin(
     no_references: bool,
 ) -> None:
     """Validate YAML manifests piped to stdin."""
-    from oscilla.engine.loader import ContentLoadError, load_from_text
-    from oscilla.engine.semantic_validator import validate_semantic
-
     _console = Console(stderr=True)
 
     text = sys.stdin.read()
@@ -372,9 +361,6 @@ def _validate_games(
     no_references: bool,
 ) -> None:
     """Validate game packages from disk."""
-    from oscilla.engine.loader import ContentLoadError, LoadWarning, load_from_disk, load_games
-    from oscilla.engine.semantic_validator import validate_semantic
-
     all_pkg_warnings: Dict[str, List[LoadWarning]] = {}
 
     if game_name is not None:

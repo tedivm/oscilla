@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
+from pydantic_settings import SettingsConfigDict
 
 from .cache import CacheSettings
 from .db import DatabaseSettings
@@ -11,6 +12,10 @@ _DEFAULT_GAMES_PATH = Path(__file__).parent.parent.parent / "content"
 
 
 class Settings(DatabaseSettings, CacheSettings):
+    # Multiple inheritance with pydantic-settings does not automatically merge
+    # model_config from parent classes, so we must declare it explicitly here.
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
     project_name: str = "oscilla"
     debug: bool = False
     games_path: Path = Field(
@@ -39,3 +44,60 @@ class Settings(DatabaseSettings, CacheSettings):
     graph_color_choice: str = Field(default="#f8f8d0", description="Graph node color for choice step nodes.")
     graph_color_stat_check: str = Field(default="#d8d0f8", description="Graph node color for stat_check step nodes.")
     graph_color_passive: str = Field(default="#d0f8d8", description="Graph node color for passive step nodes.")
+
+    # Auth
+    jwt_secret: SecretStr = Field(
+        description="Secret key for JWT signing and itsdangerous HMAC tokens. Must be a long random string.",
+    )
+    access_token_expire_minutes: int = Field(
+        default=15,
+        description="Lifetime of JWT access tokens in minutes.",
+    )
+    refresh_token_expire_days: int = Field(
+        default=30,
+        description="Lifetime of opaque refresh tokens in days.",
+    )
+    email_verify_token_expire_hours: int = Field(
+        default=24,
+        description="Lifetime of email verification tokens in hours.",
+    )
+    password_reset_token_expire_hours: int = Field(
+        default=1,
+        description="Lifetime of password reset tokens in hours.",
+    )
+    require_email_verification: bool = Field(
+        default=False,
+        description="When True, unverified accounts cannot access game content.",
+    )
+
+    # SMTP
+    smtp_host: str | None = Field(
+        default=None,
+        description="SMTP server hostname. Required when email features are used.",
+    )
+    smtp_port: int = Field(
+        default=587,
+        description="SMTP server port.",
+    )
+    smtp_user: str | None = Field(
+        default=None,
+        description="SMTP authentication username.",
+    )
+    smtp_password: SecretStr | None = Field(
+        default=None,
+        description="SMTP authentication password.",
+    )
+    smtp_from_address: str | None = Field(
+        default=None,
+        description="From address used on all outbound emails.",
+    )
+    smtp_use_tls: bool = Field(
+        default=True,
+        description="Use STARTTLS when connecting to the SMTP server.",
+    )
+
+    # Application
+    base_url: str = Field(
+        default="http://localhost:8000",
+        description="Base URL of the application, used to build absolute links in emails.",
+    )

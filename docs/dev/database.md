@@ -776,6 +776,15 @@ make document_schema
 <!-- BEGIN_SQLALCHEMY_DOCS -->
 ```mermaid
 erDiagram
+  auth_refresh_tokens {
+    CHAR(32) id PK
+    CHAR(32) user_id FK
+    DATETIME expires_at
+    DATETIME issued_at
+    BOOLEAN revoked
+    VARCHAR token_hash UK
+  }
+
   character_iteration_active_buffs {
     VARCHAR buff_ref PK
     CHAR(32) iteration_id PK,FK
@@ -902,9 +911,16 @@ erDiagram
   users {
     CHAR(32) id PK
     DATETIME created_at
-    VARCHAR user_key UK
+    VARCHAR display_name "nullable"
+    VARCHAR email UK "nullable"
+    VARCHAR hashed_password "nullable"
+    BOOLEAN is_active
+    BOOLEAN is_email_verified
+    DATETIME updated_at
+    VARCHAR user_key UK "nullable"
   }
 
+  users ||--o{ auth_refresh_tokens : user_id
   character_iterations ||--o| character_iteration_active_buffs : iteration_id
   character_iterations ||--o| character_iteration_adventure_state : iteration_id
   character_iterations ||--o| character_iteration_equipment : iteration_id

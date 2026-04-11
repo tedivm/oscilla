@@ -5,6 +5,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
+
+from oscilla.routers.auth import router as auth_router
 from oscilla.services.cache import configure_caches
 
 
@@ -21,6 +23,7 @@ app = FastAPI(lifespan=lifespan)
 
 static_file_path = os.path.dirname(os.path.realpath(__file__)) + "/static"
 app.mount("/static", StaticFiles(directory=static_file_path), name="static")
+app.include_router(auth_router, prefix="/auth", tags=["auth"])
 
 
 @app.get("/", include_in_schema=False)

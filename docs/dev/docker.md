@@ -72,6 +72,35 @@ The project includes a `compose.yaml` file for orchestrating all services in dev
 - Data persists across container restarts
 - Port 5432 (internal only by default)
 
+**mailhog**: MailHog SMTP interceptor for local email development
+
+- Captures all outbound SMTP traffic — no email is delivered to real inboxes
+- SMTP port: 1025 (host + container)
+- Web UI port: 8025 (host) → 8025 (container)
+
+#### MailHog web UI
+
+After running `docker compose up -d`, the captured emails are visible at:
+
+```
+http://localhost:8025
+```
+
+All emails sent by the application (verification, password reset) appear here immediately.
+
+#### Pointing the application at MailHog
+
+Add the following SMTP settings to your `.env` file (or copy from `.env.example`):
+
+```ini
+SMTP_HOST=localhost
+SMTP_PORT=1025
+SMTP_USE_TLS=false
+SMTP_FROM_ADDRESS=oscilla@localhost
+```
+
+No `SMTP_USER` or `SMTP_PASSWORD` are required for MailHog.
+
 ### Running with Docker Compose
 
 ```bash

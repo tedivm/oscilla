@@ -364,3 +364,24 @@ docker-compose up www
 - [FastAPI Tutorial](https://fastapi.tiangolo.com/tutorial/)
 - [Pydantic Documentation](https://docs.pydantic.dev/)
 - [Uvicorn Documentation](https://www.uvicorn.org/)
+
+## Authentication Endpoints
+
+The `/auth` router handles user registration, login, token refresh, and email
+verification. For a full description of the authentication system see
+[Authentication](./authentication.md).
+
+| Method | Path                           | Auth required | Description                             |
+| ------ | ------------------------------ | ------------- | --------------------------------------- |
+| POST   | `/auth/register`               | No            | Create a new account (201)              |
+| POST   | `/auth/login`                  | No            | Exchange credentials for tokens         |
+| POST   | `/auth/refresh`                | No            | Rotate refresh token, get new pair      |
+| POST   | `/auth/logout`                 | No            | Revoke refresh token (204)              |
+| POST   | `/auth/request-verify`         | Bearer JWT    | Resend verification email (204)         |
+| GET    | `/auth/verify/{token}`         | No            | Verify email address (204)              |
+| POST   | `/auth/request-password-reset` | No            | Send password-reset email (204)         |
+| POST   | `/auth/password-reset/{token}` | No            | Set new password with reset token (204) |
+| GET    | `/auth/me`                     | Bearer JWT    | Get current user profile                |
+| PATCH  | `/auth/me`                     | Bearer JWT    | Update display name / password          |
+
+All endpoints are documented interactively at `/docs`.

@@ -1,6 +1,10 @@
 SHELL := /bin/bash
 MIGRATION_DATABASE:=./migrate.db
 
+# Test environment variables — used by pytest in CI and local runs.
+# The JWT_SECRET value here is intentionally weak and for testing only.
+export JWT_SECRET ?= ci-test-secret-not-for-production-use-only
+
 PACKAGE_SLUG=oscilla
 PYTHON_VERSION := $(shell cat .python-version)
 PYTHON_SHORT_VERSION := $(shell echo $(PYTHON_VERSION) | grep -o '[0-9].[0-9]*')

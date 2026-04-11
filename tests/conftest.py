@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator, Dict, List
 
 import pytest_asyncio
 from fastapi.testclient import TestClient
@@ -64,3 +64,35 @@ async def fastapi_client(db_session_maker: async_sessionmaker[AsyncSession]) -> 
 
     app.dependency_overrides[get_session_depends] = get_session_depends_override
     yield client
+
+
+@pytest_asyncio.fixture
+async def auth_client(
+    db_session_maker: async_sessionmaker[AsyncSession], monkeypatch: Any
+) -> AsyncGenerator[TestClient, None]:
+    """FastAPI TestClient with:
+    - test database session injected via dependency override
+    - ``oscilla.services.email.send_email`` patched to a no-op async coroutine
+
+    The patched send_email records calls in ``auth_client.sent_emails`` for
+    assertions.
+    """
+    sent_emails: List[Dict[str, Any]] = []
+
+    async def fake_send_email(to: str, subject: str, body_html: str, body_text: str) -> None:
+        sent_emails.append({"to": to, "subject": subject, "body_html": body_html, "body_text": body_text})
+
+    # auth.py imports send_email at module level, so we must patch the reference
+    # in oscilla.services.auth rather than the source module.
+    monkeypatch.setattr("oscilla.services.auth.send_email", fake_send_email)
+
+    client = TestClient(app)
+    client.sent_emails = sent_emails  # type: ignore[attr-defined]
+
+    async def get_session_depends_override() -> AsyncGenerator[AsyncSession, None]:
+        async with db_session_maker() as session:
+            yield session
+
+    app.dependency_overrides[get_session_depends] = get_session_depends_override
+    yield client
+    app.dependency_overrides.pop(get_session_depends, None)
