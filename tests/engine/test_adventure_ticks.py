@@ -190,10 +190,10 @@ async def test_custom_ticks_cost_advances_by_spec_value(
     )
     from pathlib import Path
 
-    from oscilla.engine.loader import load
+    from oscilla.engine.loader import load_from_disk
 
     FIXTURES = Path(__file__).parent.parent / "fixtures" / "content"
-    base_registry, _ = load(FIXTURES / "ingame-time")
+    base_registry, _ = load_from_disk(FIXTURES / "ingame-time")
     # Inject the new adventure and location into the existing registry
     base_registry.adventures.register(adv)
     base_registry.locations.register(loc)
@@ -217,11 +217,11 @@ async def test_adjust_game_ticks_positive_delta(
     """adjust_game_ticks with positive delta advances game_ticks beyond normal tick cost."""
     from pathlib import Path
 
-    from oscilla.engine.loader import load
+    from oscilla.engine.loader import load_from_disk
     from oscilla.engine.models.location import AdventurePoolEntry, LocationManifest, LocationSpec
 
     FIXTURES = Path(__file__).parent.parent / "fixtures" / "content"
-    registry, _ = load(FIXTURES / "ingame-time")
+    registry, _ = load_from_disk(FIXTURES / "ingame-time")
 
     adv = _adjust_ticks_adventure(delta=10, name="test-adjust-pos")
     loc = LocationManifest(
@@ -253,11 +253,11 @@ async def test_adjust_game_ticks_negative_delta_clamp(
     """adjust_game_ticks clamps to 0 when pre_epoch_behavior=clamp and delta pushes below 0."""
     from pathlib import Path
 
-    from oscilla.engine.loader import load
+    from oscilla.engine.loader import load_from_disk
     from oscilla.engine.models.location import AdventurePoolEntry, LocationManifest, LocationSpec
 
     FIXTURES = Path(__file__).parent.parent / "fixtures" / "content"
-    registry, _ = load(FIXTURES / "ingame-time")
+    registry, _ = load_from_disk(FIXTURES / "ingame-time")
 
     # delta=-100 on tick 0 — net game_ticks would go negative; clamp kicks in
     adv = _adjust_ticks_adventure(delta=-100, name="test-adjust-neg")
@@ -292,11 +292,11 @@ async def test_adjust_game_ticks_does_not_affect_internal_ticks(
     """adjust_game_ticks never changes internal_ticks."""
     from pathlib import Path
 
-    from oscilla.engine.loader import load
+    from oscilla.engine.loader import load_from_disk
     from oscilla.engine.models.location import AdventurePoolEntry, LocationManifest, LocationSpec
 
     FIXTURES = Path(__file__).parent.parent / "fixtures" / "content"
-    registry, _ = load(FIXTURES / "ingame-time")
+    registry, _ = load_from_disk(FIXTURES / "ingame-time")
 
     adv = _adjust_ticks_adventure(delta=50, name="test-adjust-internal")
     loc = LocationManifest(

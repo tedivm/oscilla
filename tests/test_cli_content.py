@@ -9,7 +9,7 @@ import pytest
 from typer.testing import CliRunner
 
 from oscilla.cli import app
-from oscilla.engine.loader import load
+from oscilla.engine.loader import load_from_disk
 
 # TERM=dumb prevents Rich from injecting ANSI escape codes into captured output.
 runner = CliRunner(env={"TERM": "dumb"})
@@ -135,13 +135,13 @@ _TESTLANDIA_PATH = Path(__file__).parent.parent / "content" / "testlandia"
 
 def test_testlandia_character_creation_adventure_is_in_registry() -> None:
     """The character-creation adventure must be present in the loaded testlandia registry."""
-    registry, _warnings = load(_TESTLANDIA_PATH)
+    registry, _warnings = load_from_disk(_TESTLANDIA_PATH)
     assert "character-creation" in registry.adventures
 
 
 def test_testlandia_character_creation_adventure_has_at_least_three_steps() -> None:
     """The testlandia character-creation adventure must have at least 3 steps."""
-    registry, _warnings = load(_TESTLANDIA_PATH)
+    registry, _warnings = load_from_disk(_TESTLANDIA_PATH)
     adventure = registry.adventures.require("character-creation", "Adventure")
     assert len(adventure.spec.steps) >= 3
 
@@ -185,3 +185,27 @@ def test_schema_vscode_preserves_existing_settings(tmp_path: Path, monkeypatch: 
     assert "peacock.color" in settings
     assert settings["peacock.color"] == "#ff0000"
     assert "yaml.schemas" in settings
+
+
+# ---------------------------------------------------------------------------
+# content test: alias tests (4.11 – 4.12)
+# ---------------------------------------------------------------------------
+
+
+def test_content_test_still_works_as_alias() -> None:
+    """content test on testlandia should still exit 0 after it became a thin wrapper."""
+    result = runner.invoke(app, ["content", "test", "--game", "testlandia"])
+    assert result.exit_code == 0
+
+
+def test_content_test_json_format() -> None:
+    """content test --format json returns valid JSON with errors/warnings/summary."""
+    result = runner.invoke(
+        app,
+        ["content", "test", "--game", "testlandia", "--format", "json"],
+    )
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)
+    assert "errors" in data
+    assert "warnings" in data
+    assert "summary" in data

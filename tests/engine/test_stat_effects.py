@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from oscilla.engine.character import CharacterState
-from oscilla.engine.loader import ContentLoadError, load
+from oscilla.engine.loader import ContentLoadError, load_from_disk
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "content"
 STAT_EFFECTS_FIXTURE = FIXTURES / "stat-effects"
@@ -15,7 +15,7 @@ STAT_EFFECTS_FIXTURE = FIXTURES / "stat-effects"
 
 def test_valid_stat_effects_load_successfully() -> None:
     """Stat effects with correct types should load without error."""
-    registry, _warnings = load(STAT_EFFECTS_FIXTURE)
+    registry, _warnings = load_from_disk(STAT_EFFECTS_FIXTURE)
     assert registry.game is not None
     assert registry.character_config is not None
     assert len(registry.adventures) == 1
@@ -23,7 +23,7 @@ def test_valid_stat_effects_load_successfully() -> None:
 
 def test_stat_change_int_positive() -> None:
     """stat_change with positive int amount on int stat should work."""
-    registry, _warnings = load(STAT_EFFECTS_FIXTURE)
+    registry, _warnings = load_from_disk(STAT_EFFECTS_FIXTURE)
     assert registry.game is not None
     assert registry.character_config is not None
     player = CharacterState.new_character(
@@ -50,7 +50,7 @@ def test_stat_change_int_positive() -> None:
 
 def test_stat_set_bool() -> None:
     """stat_set with bool value on bool stat should work."""
-    registry, _warnings = load(STAT_EFFECTS_FIXTURE)
+    registry, _warnings = load_from_disk(STAT_EFFECTS_FIXTURE)
     assert registry.game is not None
     assert registry.character_config is not None
     player = CharacterState.new_character(
@@ -93,7 +93,7 @@ spec:
 """)
 
     with pytest.raises(ContentLoadError):
-        load(tmp_path)
+        load_from_disk(tmp_path)
 
 
 def test_invalid_stat_change_on_bool_fails(tmp_path: Path) -> None:
@@ -160,7 +160,7 @@ spec:
 """)
 
     with pytest.raises(ContentLoadError) as exc_info:
-        load(tmp_path)
+        load_from_disk(tmp_path)
 
     error_msg = str(exc_info.value)
     assert "stat_change not valid for bool stat" in error_msg
@@ -231,7 +231,7 @@ spec:
 
     # Pydantic rejects string values for stat_set since str is not a valid stat type
     with pytest.raises(ContentLoadError):
-        load(tmp_path)
+        load_from_disk(tmp_path)
 
 
 def test_unknown_stat_in_effect_fails(tmp_path: Path) -> None:
@@ -297,7 +297,7 @@ spec:
 """)
 
     with pytest.raises(ContentLoadError) as exc_info:
-        load(tmp_path)
+        load_from_disk(tmp_path)
 
     error_msg = str(exc_info.value)
     assert "Unknown stat in effect: 'nonexistent_stat'" in error_msg

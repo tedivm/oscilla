@@ -24,7 +24,7 @@ import pytest
 from pydantic import ValidationError
 
 from oscilla.engine.character import CharacterState
-from oscilla.engine.loader import ContentLoadError, load
+from oscilla.engine.loader import ContentLoadError, load_from_disk
 from oscilla.engine.models.adventure import ItemDropEffect
 from oscilla.engine.models.base import GrantRecord, Metadata
 from oscilla.engine.models.enemy import EnemyManifest, EnemySpec
@@ -476,7 +476,7 @@ def test_resolve_loot_groups_multi_group_all_resolve() -> None:
 
 def test_loot_table_fixture_loads_and_registers() -> None:
     """LootTable manifest loads and registers in the registry."""
-    registry, _warnings = load(LOOT_FIXTURE)
+    registry, _warnings = load_from_disk(LOOT_FIXTURE)
     tables = list(registry.loot_tables.all())
     assert len(tables) == 1
     lt = tables[0]
@@ -486,7 +486,7 @@ def test_loot_table_fixture_loads_and_registers() -> None:
 
 def test_loot_table_fixture_group_structure() -> None:
     """Loaded LootTable has correct group and entry structure."""
-    registry, _warnings = load(LOOT_FIXTURE)
+    registry, _warnings = load_from_disk(LOOT_FIXTURE)
     lt = registry.loot_tables.require("test-loot-table", "LootTable")
     g1 = lt.spec.groups[0]
     assert g1.count == 1
@@ -500,7 +500,7 @@ def test_loot_table_fixture_group_structure() -> None:
 
 def test_loot_table_resolve_loot_groups() -> None:
     """registry.resolve_loot_groups returns the loot table's groups list."""
-    registry, _warnings = load(LOOT_FIXTURE)
+    registry, _warnings = load_from_disk(LOOT_FIXTURE)
     groups = registry.resolve_loot_groups("test-loot-table")
     assert groups is not None
     assert len(groups) == 2
@@ -508,7 +508,7 @@ def test_loot_table_resolve_loot_groups() -> None:
 
 def test_resolve_loot_groups_returns_none_for_unknown_ref() -> None:
     """resolve_loot_groups returns None for an unknown reference."""
-    registry, _warnings = load(LOOT_FIXTURE)
+    registry, _warnings = load_from_disk(LOOT_FIXTURE)
     result = registry.resolve_loot_groups("nonexistent-table")
     assert result is None
 
@@ -521,7 +521,7 @@ def test_resolve_loot_groups_returns_none_for_unknown_ref() -> None:
 @pytest.mark.asyncio
 async def test_inline_loot_groups_add_items_to_inventory() -> None:
     """item_drop with inline groups runs end-to-end and adds items to the player."""
-    registry, _warnings = load(LOOT_FIXTURE)
+    registry, _warnings = load_from_disk(LOOT_FIXTURE)
     player = _make_player(registry)
     tui = AsyncMock()
     effect = ItemDropEffect(
@@ -537,7 +537,7 @@ async def test_inline_loot_groups_add_items_to_inventory() -> None:
 @pytest.mark.asyncio
 async def test_loot_ref_resolves_and_drops_items() -> None:
     """item_drop with loot_ref resolves the named LootTable and awards items."""
-    registry, _warnings = load(LOOT_FIXTURE)
+    registry, _warnings = load_from_disk(LOOT_FIXTURE)
     player = _make_player(registry)
     tui = AsyncMock()
     effect = ItemDropEffect(type="item_drop", loot_ref="test-loot-table")
@@ -552,7 +552,7 @@ async def test_loot_ref_resolves_and_drops_items() -> None:
 @pytest.mark.asyncio
 async def test_multi_group_drop_awards_items_from_all_groups() -> None:
     """Multiple groups in one item_drop all fire and contribute to inventory."""
-    registry, _warnings = load(LOOT_FIXTURE)
+    registry, _warnings = load_from_disk(LOOT_FIXTURE)
     player = _make_player(registry)
     tui = AsyncMock()
     effect = ItemDropEffect(
@@ -582,7 +582,7 @@ async def test_enemy_loot_groups_applied_automatically_on_combat_win() -> None:
     from oscilla.engine.steps.combat import run_combat
     from tests.engine.conftest import MockTUI
 
-    registry, _warnings = load(LOOT_FIXTURE)
+    registry, _warnings = load_from_disk(LOOT_FIXTURE)
     player = _make_player(registry)
     # Player needs enough HP to survive; test-loot-enemy has attack=0.
     player.stats["hp"] = 20
@@ -657,7 +657,7 @@ def test_unknown_item_in_loot_entry_requires_raises_load_error(tmp_path: Path) -
     )
 
     with pytest.raises(ContentLoadError) as exc_info:
-        load(tmp_path)
+        load_from_disk(tmp_path)
 
     messages = [e.message for e in exc_info.value.errors]
     assert any("ghost-item-does-not-exist" in m for m in messages)
@@ -710,7 +710,7 @@ def test_unknown_item_in_loot_group_requires_raises_load_error(tmp_path: Path) -
     )
 
     with pytest.raises(ContentLoadError) as exc_info:
-        load(tmp_path)
+        load_from_disk(tmp_path)
 
     messages = [e.message for e in exc_info.value.errors]
     assert any("phantom-item-does-not-exist" in m for m in messages)
@@ -756,7 +756,7 @@ def test_unknown_loot_ref_raises_load_error(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ContentLoadError) as exc_info:
-        load(tmp_path)
+        load_from_disk(tmp_path)
 
     messages = [e.message for e in exc_info.value.errors]
     assert any("nonexistent-table" in m for m in messages)

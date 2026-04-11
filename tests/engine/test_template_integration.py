@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from oscilla.engine.loader import ContentLoadError, load
+from oscilla.engine.loader import ContentLoadError, load_from_disk
 from oscilla.engine.pipeline import AdventurePipeline
 from tests.engine.conftest import MockTUI
 
@@ -33,7 +33,7 @@ FIXTURES = Path(__file__).parent.parent / "fixtures" / "content"
 
 @pytest.fixture(scope="module")
 def template_registry() -> "ContentRegistry":
-    registry, _warnings = load(FIXTURES / "template-system")
+    registry, _warnings = load_from_disk(FIXTURES / "template-system")
     return registry
 
 
@@ -162,4 +162,4 @@ spec:
     )
 
     with pytest.raises(ContentLoadError):
-        load(content_dir)
+        load_from_disk(content_dir)

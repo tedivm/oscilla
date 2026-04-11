@@ -15,9 +15,9 @@ All commands run via `uv run oscilla ...`. Never invoke `oscilla` directly — i
 
 | Command                              | Purpose                                                             |
 | ------------------------------------ | ------------------------------------------------------------------- |
-| `oscilla validate`                   | Validate all game packages (schema + semantic checks)               |
+| `oscilla validate`                   | Validate game packages (schema + semantic checks); supports `--stdin` and `--format` |
 | `oscilla content schema`             | Export JSON Schema for manifest kinds; configure VS Code validation |
-| `oscilla content test`               | Run semantic checks on content packages                             |
+| `oscilla content test`               | Backwards-compat alias for `oscilla validate`; same flags except no `--stdin`/`--no-references` |
 | `oscilla content list <kind>`        | List all manifests of a given kind                                  |
 | `oscilla content show <kind> <name>` | Inspect one manifest with cross-references                          |
 | `oscilla content graph <type>`       | Visualize world/adventure/dependency graphs                         |
@@ -109,7 +109,14 @@ This is the primary validation command. It runs both schema validation and seman
 uv run oscilla validate --game myworld          # validate one game only
 uv run oscilla validate --strict                # treat warnings as errors
 uv run oscilla validate --no-semantic           # skip semantic checks (schema only)
+uv run oscilla validate --format json           # machine-readable JSON output
+uv run oscilla validate --no-references         # skip cross-reference resolution
+cat my.yaml | uv run oscilla validate --stdin --no-semantic --no-references  # validate from stdin
 ```
+
+**`--stdin` mode**: reads all YAML manifests from stdin and validates without loading any game package from disk. The `--game` flag is ignored in stdin mode. Useful for quickly checking a single manifest file in isolation. Only available on `oscilla validate`, not `oscilla content test`.
+
+**`--no-references`**: skips cross-reference resolution — useful for manifest snippets that reference kinds defined in other packages. Only available on `oscilla validate`, not `oscilla content test`.
 
 ### 2. Interpret output
 
@@ -118,13 +125,15 @@ uv run oscilla validate --no-semantic           # skip semantic checks (schema o
 
 ### 3. For more detail: use `oscilla content test`
 
-`oscilla content test` is the content-focused alias with identical semantics:
+`oscilla content test` is a backwards-compat alias for `oscilla validate`. It delegates to the same validation pipeline and supports `--game`, `--strict`, and `--format`:
 
 ```bash
 uv run oscilla content test --game myworld
 uv run oscilla content test --game myworld --strict
 uv run oscilla content test --game myworld --format json   # machine-readable output
 ```
+
+> **Note:** `--stdin` and `--no-references` are only available on `oscilla validate`, not on `oscilla content test`. Prefer `oscilla validate` for full feature access.
 
 ---
 

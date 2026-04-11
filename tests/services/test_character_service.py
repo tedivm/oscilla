@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
 from oscilla.engine.character import CharacterState
-from oscilla.engine.loader import load
+from oscilla.engine.loader import load_from_disk
 from oscilla.engine.registry import ContentRegistry
 from oscilla.models.character_iteration import CharacterIterationRecord
 from oscilla.services.character import (
@@ -50,7 +50,7 @@ def _make_player(registry: ContentRegistry, name: str = "TestHero") -> Character
 
 @pytest.fixture(scope="module")
 def minimal_registry() -> ContentRegistry:
-    registry, _warnings = load(FIXTURES / "minimal")
+    registry, _warnings = load_from_disk(FIXTURES / "minimal")
     return registry
 
 

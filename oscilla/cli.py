@@ -1,8 +1,10 @@
 import asyncio
+import io
+import json
 import logging
 import sys
 from functools import wraps
-from typing import Annotated, Callable, Coroutine, Dict, List, ParamSpec, TypeVar
+from typing import Annotated, Any, Callable, Coroutine, Dict, List, ParamSpec, TypeVar
 
 import platformdirs
 import typer
@@ -256,9 +258,12 @@ async def game(
         pass
 
 
-@app.command(help="Validate all game packages and report any errors or warnings.")
+@app.command(help="Validate game packages or manifest content and report errors and warnings.")
 def validate(
-    game_name: Annotated[str | None, typer.Option("--game", "-g", help="Validate only this game package.")] = None,
+    game_name: Annotated[
+        str | None,
+        typer.Option("--game", "-g", help="Validate only this game package (ignored when --stdin is used)."),
+    ] = None,
     strict: Annotated[
         bool,
         typer.Option("--strict", help="Treat warnings as errors and exit with code 1 if any are found."),
@@ -270,27 +275,119 @@ def validate(
             help="Skip semantic checks (undefined refs, circular chains, orphaned/unreachable content).",
         ),
     ] = False,
+    no_references: Annotated[
+        bool,
+        typer.Option(
+            "--no-references",
+            help="Skip cross-manifest reference validation.",
+        ),
+    ] = False,
+    output_format: Annotated[
+        str,
+        typer.Option("--format", "-F", help="Output format: text | json | yaml."),
+    ] = "text",
+    stdin: Annotated[
+        bool,
+        typer.Option(
+            "--stdin",
+            help="Read YAML manifest content from stdin instead of from GAMES_PATH. Ignores --game.",
+        ),
+    ] = False,
 ) -> None:
-    """Load and validate all manifests in GAMES_PATH, then print a summary, warnings, or error list."""
-    from rich.console import Console
+    """Load and validate manifests from disk or stdin, then report errors and warnings."""
+    if stdin:
+        _validate_stdin(
+            output_format=output_format,
+            strict=strict,
+            no_semantic=no_semantic,
+            no_references=no_references,
+        )
+    else:
+        _validate_games(
+            game_name=game_name,
+            output_format=output_format,
+            strict=strict,
+            no_semantic=no_semantic,
+            no_references=no_references,
+        )
 
-    from oscilla.engine.loader import ContentLoadError, LoadWarning, load, load_games
 
-    _console = Console()
+def _validate_stdin(
+    output_format: str,
+    strict: bool,
+    no_semantic: bool,
+    no_references: bool,
+) -> None:
+    """Validate YAML manifests piped to stdin."""
+    from oscilla.engine.loader import ContentLoadError, load_from_text
+    from oscilla.engine.semantic_validator import validate_semantic
+
+    _console = Console(stderr=True)
+
+    text = sys.stdin.read()
+    if not text.strip():
+        _console.print("[bold red]✗ No content provided on stdin.[/bold red]")
+        raise SystemExit(1)
+
+    try:
+        registry, load_warnings = load_from_text(text, skip_references=no_references)
+    except ContentLoadError as exc:
+        error_list: List[Dict[str, Any]] = [{"message": str(e)} for e in exc.errors]
+        _render_validate_output(
+            output_format=output_format,
+            strict=strict,
+            pkg_summaries={"<stdin>": {}},
+            error_list=error_list,
+            warning_list=[],
+        )
+        raise SystemExit(1)
+
+    pkg_summaries: Dict[str, Dict[str, int]] = {"<stdin>": _registry_summary(registry)}
+    warning_list: List[Dict[str, Any]] = [{"message": str(w)} for w in load_warnings]
+    error_list = []
+
+    if not no_semantic:
+        for issue in validate_semantic(registry):
+            if issue.severity == "error":
+                error_list.append({"kind": issue.kind, "message": issue.message, "manifest": issue.manifest})
+            else:
+                warning_list.append({"kind": issue.kind, "message": issue.message, "manifest": issue.manifest})
+
+    _render_validate_output(
+        output_format=output_format,
+        strict=strict,
+        pkg_summaries=pkg_summaries,
+        error_list=error_list,
+        warning_list=warning_list,
+    )
+    if error_list or (strict and warning_list):
+        raise SystemExit(1)
+
+
+def _validate_games(
+    game_name: str | None,
+    output_format: str,
+    strict: bool,
+    no_semantic: bool,
+    no_references: bool,
+) -> None:
+    """Validate game packages from disk."""
+    from oscilla.engine.loader import ContentLoadError, LoadWarning, load_from_disk, load_games
+    from oscilla.engine.semantic_validator import validate_semantic
+
     all_pkg_warnings: Dict[str, List[LoadWarning]] = {}
 
     if game_name is not None:
-        # Validate a single game package
         game_path = settings.games_path / game_name
         if not game_path.is_dir():
-            _console.print(f"[bold red]✗ Game package {game_name!r} not found in GAMES_PATH[/bold red]")
+            error_list: List[Dict[str, Any]] = [{"message": f"Game package {game_name!r} not found in GAMES_PATH"}]
+            _render_validate_output(output_format, strict, {}, error_list, [])
             raise SystemExit(1)
         try:
-            registry, warnings = load(game_path)
+            registry, warnings = load_from_disk(game_path)
         except ContentLoadError as exc:
-            _console.print(f"[bold red]✗ {game_name}: {len(exc.errors)} error(s) found:[/bold red]\n")
-            for error in exc.errors:
-                _console.print(f"  [red]•[/red] {error}")
+            error_list = [{"message": str(e)} for e in exc.errors]
+            _render_validate_output(output_format, strict, {}, error_list, [])
             raise SystemExit(1)
         games = {game_name: registry}
         all_pkg_warnings[game_name] = warnings
@@ -298,54 +395,116 @@ def validate(
         try:
             games, all_pkg_warnings = load_games(settings.games_path)
         except ContentLoadError as exc:
-            _console.print(f"[bold red]✗ {len(exc.errors)} error(s) found:[/bold red]\n")
-            for error in exc.errors:
-                _console.print(f"  [red]•[/red] {error}")
+            error_list = [{"message": str(e)} for e in exc.errors]
+            _render_validate_output(output_format, strict, {}, error_list, [])
             raise SystemExit(1)
 
-    total_warnings = 0
-    for pkg_name, registry in sorted(games.items()):
-        counts = {
-            "regions": len(registry.regions),
-            "locations": len(registry.locations),
-            "adventures": len(registry.adventures),
-            "archetypes": len(registry.archetypes),
-            "enemies": len(registry.enemies),
-            "items": len(registry.items),
-            "recipes": len(registry.recipes),
-            "quests": len(registry.quests),
-        }
-        summary = ", ".join(f"{count} {kind}" for kind, count in counts.items() if count > 0)
-        _console.print(f"[bold green]✓ {pkg_name}: {summary}[/bold green]")
+    pkg_summaries: Dict[str, Dict[str, int]] = {}
+    error_list = []
+    warning_list: List[Dict[str, Any]] = []
 
-        pkg_warnings = all_pkg_warnings.get(pkg_name, [])
-        total_warnings += len(pkg_warnings)
-        for warning in pkg_warnings:
-            color = "bold red" if strict else "yellow"
-            _console.print(f"  [{color}]⚠[/{color}] {warning}")
+    for pkg_name, registry in sorted(games.items()):
+        pkg_summaries[pkg_name] = _registry_summary(registry)
+        for w in all_pkg_warnings.get(pkg_name, []):
+            warning_list.append({"message": str(w)})
 
     if not no_semantic:
-        from oscilla.engine.semantic_validator import validate_semantic
-
-        semantic_total_warnings = 0
         for pkg_name, registry in sorted(games.items()):
-            semantic_issues = validate_semantic(registry)
-            for issue in semantic_issues:
+            for issue in validate_semantic(registry):
+                entry: Dict[str, Any] = {
+                    "kind": issue.kind,
+                    "message": issue.message,
+                    "manifest": issue.manifest,
+                    "package": pkg_name,
+                }
                 if issue.severity == "error":
-                    _console.print(f"  [red]✗[/red] [{pkg_name}] [{issue.kind}] {issue}")
-                    total_warnings += 1  # re-use exit logic
+                    error_list.append(entry)
                 else:
-                    semantic_total_warnings += 1
-                    total_warnings += 1 if strict else 0
-                    color = "bold red" if strict else "yellow"
-                    _console.print(f"  [{color}]⚠[/{color}] [{pkg_name}] [{issue.kind}] {issue}")
-        if semantic_total_warnings and not strict:
-            _console.print(
-                f"\n[dim]{semantic_total_warnings} semantic warning(s). Use --strict to treat as errors.[/dim]"
-            )
+                    warning_list.append(entry)
 
-    if strict and total_warnings > 0:
-        _console.print(f"\n[bold red]Strict mode: {total_warnings} warning(s) treated as errors.[/bold red]")
+    _render_validate_output(
+        output_format=output_format,
+        strict=strict,
+        pkg_summaries=pkg_summaries,
+        error_list=error_list,
+        warning_list=warning_list,
+    )
+    if error_list or (strict and warning_list):
+        raise SystemExit(1)
+
+
+def _render_validate_output(
+    output_format: str,
+    strict: bool,
+    pkg_summaries: Dict[str, Dict[str, int]],
+    error_list: List[Dict[str, Any]],
+    warning_list: List[Dict[str, Any]],
+) -> None:
+    """Emit validation results in the requested format.
+
+    For text output: prints per-package summary lines, then errors/warnings.
+    For json/yaml: emits a single structured document to stdout.
+    """
+    if output_format != "text":
+        _emit_structured_output(
+            {"errors": error_list, "warnings": warning_list, "summary": pkg_summaries},
+            output_format,
+        )
+        return
+
+    _console = Console()
+    # Text output: print one summary line per package.
+    for pkg_name, counts in pkg_summaries.items():
+        if counts:
+            summary_str = ", ".join(f"{count} {kind}" for kind, count in counts.items())
+            _console.print(f"[bold green]✓ {pkg_name}: {summary_str}[/bold green]")
+        else:
+            _console.print(f"[bold green]✓ {pkg_name}[/bold green]")
+
+    for entry in warning_list:
+        color = "bold red" if strict else "yellow"
+        kind_tag = f"[{entry['kind']}] " if "kind" in entry else ""
+        pkg_tag = f"[{entry['package']}] " if "package" in entry else ""
+        _console.print(f"  [{color}]⚠[/{color}] {pkg_tag}{kind_tag}{entry['message']}")
+
+    for entry in error_list:
+        kind_tag = f"[{entry['kind']}] " if "kind" in entry else ""
+        pkg_tag = f"[{entry['package']}] " if "package" in entry else ""
+        _console.print(f"  [red]✗[/red] {pkg_tag}{kind_tag}{entry['message']}")
+
+    if strict and warning_list:
+        _console.print(f"\n[bold red]Strict mode: {len(warning_list)} warning(s) treated as errors.[/bold red]")
+
+
+def _registry_summary(registry: "ContentRegistry") -> Dict[str, int]:
+    """Build a non-zero count summary from a ContentRegistry."""
+    counts = {
+        "regions": len(registry.regions),
+        "locations": len(registry.locations),
+        "adventures": len(registry.adventures),
+        "archetypes": len(registry.archetypes),
+        "enemies": len(registry.enemies),
+        "items": len(registry.items),
+        "recipes": len(registry.recipes),
+        "quests": len(registry.quests),
+    }
+    return {k: v for k, v in counts.items() if v > 0}
+
+
+def _emit_structured_output(data: object, output_format: str) -> None:
+    """Serialize data to stdout in the requested format."""
+    if output_format == "json":
+        typer.echo(json.dumps(data, indent=2, default=str))
+    elif output_format == "yaml":
+        from ruamel.yaml import YAML as _YAML
+
+        _y = _YAML()
+        _y.default_flow_style = False
+        buf = io.StringIO()
+        _y.dump(data, buf)
+        typer.echo(buf.getvalue())
+    else:
+        Console(stderr=True).print(f"[red]Unknown format {output_format!r}. Valid: text, json, yaml.[/red]")
         raise SystemExit(1)
 
 

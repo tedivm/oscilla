@@ -280,9 +280,9 @@ async def test_dot_buff_ticks_and_expires() -> None:
     """A DoT buff damages the enemy each turn and expires after duration_turns."""
 
     # Use the skill-combat fixture registry which already has the DoT buff.
-    from oscilla.engine.loader import load
+    from oscilla.engine.loader import load_from_disk
 
-    registry, _warnings = load(FIXTURES / "skill-combat")
+    registry, _warnings = load_from_disk(FIXTURES / "skill-combat")
     assert registry.game is not None
     assert registry.character_config is not None
 

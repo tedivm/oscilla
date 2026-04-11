@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from oscilla.engine.character import CharacterState
-from oscilla.engine.loader import load
+from oscilla.engine.loader import load_from_disk
 from oscilla.engine.registry import ContentRegistry
 from oscilla.engine.steps.effects import _recompute_derived_stats
 from tests.engine.conftest import MockTUI
@@ -32,7 +32,7 @@ _FIXTURES = Path(__file__).parent.parent / "fixtures" / "content"
 @pytest.fixture(scope="module")
 def derived_registry() -> ContentRegistry:
     """Registry loaded from the derived-stats fixture package."""
-    registry, _warnings = load(_FIXTURES / "derived-stats")
+    registry, _warnings = load_from_disk(_FIXTURES / "derived-stats")
     return registry
 
 

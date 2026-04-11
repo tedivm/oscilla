@@ -8,7 +8,7 @@ from typing import Any, Dict, List
 import pytest
 
 from oscilla.engine.character import CharacterState
-from oscilla.engine.loader import load
+from oscilla.engine.loader import load_from_disk
 from oscilla.engine.registry import ContentRegistry
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "content"
@@ -82,31 +82,31 @@ class MockTUI:
 
 @pytest.fixture(scope="session")
 def minimal_registry() -> ContentRegistry:
-    registry, _warnings = load(FIXTURES / "minimal")
+    registry, _warnings = load_from_disk(FIXTURES / "minimal")
     return registry
 
 
 @pytest.fixture(scope="session")
 def combat_registry() -> ContentRegistry:
-    registry, _warnings = load(FIXTURES / "combat-pipeline")
+    registry, _warnings = load_from_disk(FIXTURES / "combat-pipeline")
     return registry
 
 
 @pytest.fixture(scope="session")
 def condition_gates_registry() -> ContentRegistry:
-    registry, _warnings = load(FIXTURES / "condition-gates")
+    registry, _warnings = load_from_disk(FIXTURES / "condition-gates")
     return registry
 
 
 @pytest.fixture(scope="session")
 def region_chain_registry() -> ContentRegistry:
-    registry, _warnings = load(FIXTURES / "region-chain")
+    registry, _warnings = load_from_disk(FIXTURES / "region-chain")
     return registry
 
 
 @pytest.fixture(scope="session")
 def ingame_time_registry() -> ContentRegistry:
-    registry, _warnings = load(FIXTURES / "ingame-time")
+    registry, _warnings = load_from_disk(FIXTURES / "ingame-time")
     return registry
 
 

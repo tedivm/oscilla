@@ -541,7 +541,7 @@ python -m oscilla.cli --help
 
 ## Validate Command
 
-The `validate` command checks all game packages in the configured `GAMES_PATH` and reports errors and warnings:
+The `validate` command checks game packages and reports errors and warnings. It supports both disk mode (loading from `GAMES_PATH`) and stdin mode (piped YAML):
 
 ```bash
 # Validate all game packages
@@ -552,15 +552,46 @@ uv run oscilla validate --game my-game
 
 # Strict mode: treat warnings as errors (exit 1 if any warnings exist)
 uv run oscilla validate --strict
-uv run oscilla validate --game my-game --strict
+
+# Machine-readable output (json or yaml)
+uv run oscilla validate --format json
+uv run oscilla validate --format yaml
+
+# Skip reference resolution (useful when a manifest references kinds defined elsewhere)
+uv run oscilla validate --no-references
+
+# Validate YAML piped from stdin (skips disk scan entirely)
+cat my-manifest.yaml | uv run oscilla validate --stdin
+cat my-manifest.yaml | uv run oscilla validate --stdin --no-semantic --no-references
 ```
 
-**Output format:**
+**Stdin mode** reads all YAML documents from stdin and runs the full parse + validation pipeline without touching `GAMES_PATH`. The `--game` flag is silently ignored in stdin mode. The package name in output is `<stdin>`.
+
+**Output format (text):**
 
 ```
 ✓ my-game: 3 regions, 5 locations, 12 adventures, 8 items
   ⚠ <undeclared-label-item>: item label 'rae' is not declared in GameSpec.item_labels — Did you mean 'rare'?
 ```
+
+**Output format (JSON/YAML):**
+
+```json
+{
+  "errors": [],
+  "warnings": [],
+  "summary": {
+    "my-game": {
+      "regions": 3,
+      "locations": 5,
+      "adventures": 12,
+      "items": 8
+    }
+  }
+}
+```
+
+`summary` contains one key per validated package (or `"<stdin>"` in stdin mode). Only non-zero counts are included.
 
 Warnings appear in yellow. With `--strict` they are re-printed in red and the command exits with code 1 — useful in CI pipelines to enforce clean content packages before release.
 
@@ -572,6 +603,9 @@ Warnings appear in yellow. With `--strict` they are re-printed in red and the co
 | Warnings present, no `--strict`  | `0`       |
 | Warnings present, `--strict` set | `1`       |
 | Load error (malformed content)   | `1`       |
+| Empty stdin input                | `1`       |
+
+**Note:** `oscilla content test` is a backwards-compat alias for `oscilla validate`. It delegates directly to the same `_validate_games()` helper. Use `oscilla validate` for the full feature set including `--stdin`, `--no-references`, and `--format`.
 
 ## Game Command
 
@@ -644,15 +678,15 @@ _KIND_MAP: Dict[str, KindInfo] = {k.plural: k for k in ALL_KINDS}
 
 ### Available Commands
 
-| Command                      | Description                                               |
-| ---------------------------- | --------------------------------------------------------- |
-| `content list <kind>`        | List all loaded manifests of a kind.                      |
-| `content show <kind> <name>` | Pretty-print fields of a single manifest.                 |
-| `content graph`              | Render the world dependency graph.                        |
-| `content schema <kind>`      | Export JSON Schema for a manifest kind.                   |
-| `content test`               | Run semantic validation on all content and report issues. |
-| `content trace <adventure>`  | Trace all paths through an adventure's step graph.        |
-| `content create <kind>`      | Scaffold a new manifest YAML file interactively.          |
+| Command                      | Description                                                                      |
+| ---------------------------- | -------------------------------------------------------------------------------- |
+| `content list <kind>`        | List all loaded manifests of a kind.                                             |
+| `content show <kind> <name>` | Pretty-print fields of a single manifest.                                        |
+| `content graph`              | Render the world dependency graph.                                               |
+| `content schema <kind>`      | Export JSON Schema for a manifest kind.                                          |
+| `content test`               | Backwards-compat alias for `oscilla validate`. Delegates to `_validate_games()`. |
+| `content trace <adventure>`  | Trace all paths through an adventure's step graph.                               |
+| `content create <kind>`      | Scaffold a new manifest YAML file interactively.                                 |
 
 ### Extending the Subapp
 

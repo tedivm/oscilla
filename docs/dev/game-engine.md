@@ -128,15 +128,15 @@ content/                    ← library root
 - Game names come from the `metadata.name` field in `game.yaml`, not directory names
 - If any game package fails validation, `ContentLoadError` is raised for the entire library
 
-### `load()` Return Value and `LoadWarning`
+### `load_from_disk()` Return Value and `LoadWarning`
 
-Both `load()` and `load_games()` now return warnings alongside the registry:
+Both `load_from_disk()` and `load_games()` return warnings alongside the registry:
 
 ```python
-from oscilla.engine.loader import load, load_games, LoadWarning
+from oscilla.engine.loader import load_from_disk, load_games, LoadWarning
 
 # Single package
-registry, warnings = load(Path("content/my-game"))
+registry, warnings = load_from_disk(Path("content/my-game"))
 
 # All packages
 games, per_game_warnings = load_games(Path("content"))

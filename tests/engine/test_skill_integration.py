@@ -11,7 +11,7 @@ import pytest
 
 from oscilla.engine.combat_context import CombatContext
 from oscilla.engine.conditions import evaluate
-from oscilla.engine.loader import ContentLoadError, load
+from oscilla.engine.loader import ContentLoadError, load_from_disk
 from oscilla.engine.models.adventure import ApplyBuffEffect, SkillGrantEffect, StatChangeEffect
 from oscilla.engine.models.base import SkillCondition
 from oscilla.engine.steps.effects import run_effect
@@ -30,7 +30,7 @@ FIXTURES = Path(__file__).parent.parent / "fixtures" / "content"
 
 @pytest.fixture(scope="module")
 def skill_combat_registry() -> "ContentRegistry":
-    registry, _warnings = load(FIXTURES / "skill-combat")
+    registry, _warnings = load_from_disk(FIXTURES / "skill-combat")
     return registry
 
 
@@ -89,7 +89,7 @@ spec:
         encoding="utf-8",
     )
     with pytest.raises(ContentLoadError, match="nonexistent-skill"):
-        load(tmp_path)
+        load_from_disk(tmp_path)
 
 
 def test_loader_rejects_unknown_skill_ref_in_enemy(tmp_path: Path) -> None:
@@ -116,7 +116,7 @@ spec:
         encoding="utf-8",
     )
     with pytest.raises(ContentLoadError, match="nonexistent-skill"):
-        load(tmp_path)
+        load_from_disk(tmp_path)
 
 
 # ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ spec:
         encoding="utf-8",
     )
     with pytest.raises(ContentLoadError, match="nonexistent-buff"):
-        load(tmp_path)
+        load_from_disk(tmp_path)
 
 
 # ---------------------------------------------------------------------------
@@ -195,7 +195,7 @@ spec:
         encoding="utf-8",
     )
     with pytest.raises(ContentLoadError, match="undeclared_key"):
-        load(tmp_path)
+        load_from_disk(tmp_path)
 
 
 # ---------------------------------------------------------------------------
@@ -224,7 +224,7 @@ spec:
         encoding="utf-8",
     )
     with pytest.raises(ContentLoadError, match="nonexistent-buff"):
-        load(tmp_path)
+        load_from_disk(tmp_path)
 
 
 def test_loader_rejects_grants_buffs_with_unknown_variable_key(tmp_path: Path) -> None:
@@ -266,7 +266,7 @@ spec:
         encoding="utf-8",
     )
     with pytest.raises(ContentLoadError, match="undeclared"):
-        load(tmp_path)
+        load_from_disk(tmp_path)
 
 
 # ---------------------------------------------------------------------------

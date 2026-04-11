@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from oscilla.engine.loader import ContentLoadError, load
+from oscilla.engine.loader import ContentLoadError, load_from_disk
 
 # ---------------------------------------------------------------------------
 # Common inline YAML helpers
@@ -108,7 +108,7 @@ spec:
         encoding="utf-8",
     )
     with pytest.raises(ContentLoadError) as exc_info:
-        load(tmp_path)
+        load_from_disk(tmp_path)
     assert "power_mod" in str(exc_info.value)
 
 
@@ -134,7 +134,7 @@ spec:
         encoding="utf-8",
     )
     with pytest.raises(ContentLoadError) as exc_info:
-        load(tmp_path)
+        load_from_disk(tmp_path)
     assert "power_mod" in str(exc_info.value)
 
 
@@ -203,7 +203,7 @@ spec:
         encoding="utf-8",
     )
     with pytest.raises(ContentLoadError) as exc_info:
-        load(tmp_path)
+        load_from_disk(tmp_path)
     # Error message should mention circularity
     assert "circular" in str(exc_info.value).lower() or "cycle" in str(exc_info.value).lower()
 
@@ -263,7 +263,7 @@ spec:
         encoding="utf-8",
     )
     with pytest.raises(ContentLoadError) as exc_info:
-        load(tmp_path)
+        load_from_disk(tmp_path)
     assert "circular" in str(exc_info.value).lower() or "cycle" in str(exc_info.value).lower()
 
 
@@ -328,7 +328,7 @@ spec:
         encoding="utf-8",
     )
     with pytest.raises(ContentLoadError):
-        load(tmp_path)
+        load_from_disk(tmp_path)
 
 
 def test_bool_derived_stat_raises(tmp_path: Path) -> None:
@@ -386,4 +386,4 @@ spec:
         encoding="utf-8",
     )
     with pytest.raises(ContentLoadError):
-        load(tmp_path)
+        load_from_disk(tmp_path)

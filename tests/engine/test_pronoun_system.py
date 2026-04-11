@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from oscilla.engine.character import CharacterState
-from oscilla.engine.loader import ContentLoadError, load
+from oscilla.engine.loader import ContentLoadError, load_from_disk
 from oscilla.engine.registry import ContentRegistry
 from oscilla.engine.templates import (
     DEFAULT_PRONOUN_SET,
@@ -244,4 +244,4 @@ spec:
     )
 
     with pytest.raises(ContentLoadError, match="they_them"):
-        load(content_dir)
+        load_from_disk(content_dir)

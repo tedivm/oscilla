@@ -19,7 +19,7 @@ import pytest
 
 from oscilla.engine.character import CharacterState, cascade_unequip_invalid, validate_equipped_requires
 from oscilla.engine.conditions import evaluate
-from oscilla.engine.loader import LoadWarning, load
+from oscilla.engine.loader import LoadWarning, load_from_disk
 from oscilla.engine.models.base import (
     AnyItemEquippedCondition,
     CharacterStatCondition,
@@ -42,7 +42,7 @@ FIXTURE_DIR = FIXTURES / "item-enhancements"
 @pytest.fixture(scope="module")
 def enh_registry() -> "ContentRegistry":
     """Load the item-enhancements fixture set once per test module."""
-    registry, _warnings = load(FIXTURE_DIR)
+    registry, _warnings = load_from_disk(FIXTURE_DIR)
     return registry
 
 
@@ -77,14 +77,14 @@ def test_load_warning_str_with_suggestion() -> None:
 
 def test_load_returns_warnings_for_undeclared_label() -> None:
     """_validate_labels emits a warning for the undeclared label 'rae' (typo of 'rare')."""
-    _registry, warnings = load(FIXTURE_DIR)
+    _registry, warnings = load_from_disk(FIXTURE_DIR)
     messages = [w.message for w in warnings]
     assert any("rae" in m for m in messages), f"Expected warning about 'rae', got: {messages}"
 
 
 def test_undeclared_label_warning_has_levenshtein_suggestion() -> None:
     """'rae' is distance 1 from 'rare', so the suggestion should be present."""
-    _registry, warnings = load(FIXTURE_DIR)
+    _registry, warnings = load_from_disk(FIXTURE_DIR)
     matching = [w for w in warnings if "rae" in w.message]
     assert matching, "No warning found for undeclared label 'rae'"
     assert "rare" in matching[0].suggestion, f"Expected 'rare' suggestion, got: {matching[0].suggestion}"
@@ -92,7 +92,7 @@ def test_undeclared_label_warning_has_levenshtein_suggestion() -> None:
 
 def test_declared_labels_produce_no_warnings(enh_registry: "ContentRegistry") -> None:
     """Items with properly declared labels (rare, quest) should not produce label warnings."""
-    _registry, warnings = load(FIXTURE_DIR)
+    _registry, warnings = load_from_disk(FIXTURE_DIR)
     label_warn_messages = [w.message for w in warnings if "rare" in w.message or "quest" in w.message]
     assert not label_warn_messages, f"Unexpected warnings for declared labels: {label_warn_messages}"
 

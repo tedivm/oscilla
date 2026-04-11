@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List
 
-from oscilla.engine.loader import _build_stat_threshold_index, _build_trigger_index, load
+from oscilla.engine.loader import _build_stat_threshold_index, _build_trigger_index, load_from_disk
 from oscilla.engine.models.game import GameRejoinTrigger, StatThresholdTrigger
 from oscilla.engine.registry import ContentRegistry
 
@@ -39,7 +39,7 @@ def build_trigger_test_registry(
     Returns:
         A fully-initialized ContentRegistry ready for use in integration tests.
     """
-    registry, _warnings = load(_FIXTURE_DIR)
+    registry, _warnings = load_from_disk(_FIXTURE_DIR)
 
     if registry.game is None:
         raise RuntimeError("trigger_tests fixture is missing a Game manifest")

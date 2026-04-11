@@ -201,20 +201,107 @@ Once configured, your YAML editor validates manifest fields inline as you type a
 
 ---
 
-## `oscilla content test`
+## `oscilla validate`
 
-Run schema validation and semantic checks on one or all game packages.
+Validate one or all game packages, or pipe standalone YAML manifests from stdin. This is the primary validation command; `oscilla content test` is a backwards-compat alias for it.
 
 ```bash
-oscilla content test [--game NAME] [--strict]
+oscilla validate [--game NAME] [--format text|json|yaml] [--strict] [--no-references] [--stdin]
 ```
 
 **Options**
 
-| Option         | Description                                                               |
-| -------------- | ------------------------------------------------------------------------- |
-| `--game`, `-g` | Test only this game package. Defaults to all.                             |
-| `--strict`     | Treat semantic warnings as errors (exits non-zero if any warnings found). |
+| Option            | Default | Description                                                                          |
+| ----------------- | ------- | ------------------------------------------------------------------------------------ |
+| `--game`, `-g`    | all     | Validate only this game package. Defaults to all packages in `GAMES_PATH`.           |
+| `--format`, `-F`  | `text`  | Output format: `text`, `json`, `yaml`.                                               |
+| `--strict`        | off     | Treat warnings as errors; exits non-zero if any warnings are found.                  |
+| `--no-references` | off     | Skip cross-reference resolution (useful for snippets that reference other packages). |
+| `--no-semantic`   | off     | Skip semantic validation (only run schema/parse checks).                             |
+| `--stdin`         | off     | Read YAML manifests from stdin instead of scanning `GAMES_PATH`.                     |
+
+**Examples**
+
+```bash
+# Validate all game packages
+oscilla validate
+
+# Validate a single package
+oscilla validate --game myworld
+
+# Strict mode — useful in CI
+oscilla validate --game myworld --strict
+
+# Get machine-readable JSON output
+oscilla validate --format json
+
+# Pipe a manifest for quick syntax checking
+cat my-item.yaml | oscilla validate --stdin --no-semantic --no-references
+
+# Validate a manifest snippet that references other packages (skip ref errors)
+cat my-adventure.yaml | oscilla validate --stdin --no-references
+```
+
+**JSON/YAML output shape:**
+
+```json
+{
+  "errors": [],
+  "warnings": [],
+  "summary": {
+    "myworld": {
+      "regions": 3,
+      "locations": 5,
+      "adventures": 12,
+      "items": 8
+    }
+  }
+}
+```
+
+`summary` contains one key per package. In stdin mode the key is `"<stdin>"`. Only non-zero counts are included.
+
+**Exit codes:**
+
+| Condition                        | Exit code |
+| -------------------------------- | --------- |
+| No errors, no warnings           | `0`       |
+| Warnings present, no `--strict`  | `0`       |
+| Warnings present, `--strict` set | `1`       |
+| Any load or parse errors         | `1`       |
+| Empty stdin                      | `1`       |
+
+### Validating standalone manifests
+
+Use `--stdin` together with `--no-references` to validate a single manifest file without loading a full game package. This is useful when writing a new manifest that references kinds defined elsewhere:
+
+```bash
+# Check schema only — no cross-ref or semantic checks
+cat draft-item.yaml | oscilla validate --stdin --no-semantic --no-references
+
+# Check schema + semantic rules, but skip cross-ref resolution
+cat draft-adventure.yaml | oscilla validate --stdin --no-references
+```
+
+---
+
+## `oscilla content test`
+
+Backwards-compat alias for `oscilla validate`. Runs full validation (schema + references + semantics) on one or all game packages.
+
+```bash
+oscilla content test [--game NAME] [--strict] [--format text|json|yaml]
+```
+
+**Options**
+
+| Option           | Default | Description                                                               |
+| ---------------- | ------- | ------------------------------------------------------------------------- |
+| `--game`, `-g`   | auto    | Test only this game package. Defaults to all.                             |
+| `--strict`       | off     | Treat semantic warnings as errors (exits non-zero if any warnings found). |
+| `--format`, `-F` | `text`  | Output format: `text`, `json`, `yaml`.                                    |
+
+> **Tip:** Use `oscilla validate` for the full feature set including `--stdin` and `--no-references`. `oscilla content test` does not expose those flags.
 
 Semantic checks include:
 

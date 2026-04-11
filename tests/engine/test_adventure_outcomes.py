@@ -8,7 +8,7 @@ from uuid import uuid4
 import pytest
 
 from oscilla.engine.character import CharacterState, CharacterStatistics
-from oscilla.engine.loader import ContentLoadError, load
+from oscilla.engine.loader import ContentLoadError, load_from_disk
 
 # ---------------------------------------------------------------------------
 # Helpers — inline YAML snippets for loader-based tests
@@ -98,7 +98,7 @@ def test_loader_accepts_builtin_outcome_completed(tmp_path: Path) -> None:
     """Built-in outcome 'completed' is accepted without declaring in game.yaml."""
     _write_base_content(tmp_path)
     (tmp_path / "adventure.yaml").write_text(_adventure_yaml("completed"), encoding="utf-8")
-    registry, _ = load(tmp_path)
+    registry, _ = load_from_disk(tmp_path)
     assert registry.adventures.require("test-adventure", "Adventure") is not None
 
 
@@ -106,7 +106,7 @@ def test_loader_accepts_builtin_outcome_defeated(tmp_path: Path) -> None:
     """Built-in outcome 'defeated' is accepted without declaring in game.yaml."""
     _write_base_content(tmp_path)
     (tmp_path / "adventure.yaml").write_text(_adventure_yaml("defeated"), encoding="utf-8")
-    registry, _ = load(tmp_path)
+    registry, _ = load_from_disk(tmp_path)
     assert registry.adventures.require("test-adventure", "Adventure") is not None
 
 
@@ -114,7 +114,7 @@ def test_loader_accepts_builtin_outcome_fled(tmp_path: Path) -> None:
     """Built-in outcome 'fled' is accepted without declaring in game.yaml."""
     _write_base_content(tmp_path)
     (tmp_path / "adventure.yaml").write_text(_adventure_yaml("fled"), encoding="utf-8")
-    registry, _ = load(tmp_path)
+    registry, _ = load_from_disk(tmp_path)
     assert registry.adventures.require("test-adventure", "Adventure") is not None
 
 
@@ -122,7 +122,7 @@ def test_loader_accepts_custom_outcome_declared_in_game_yaml(tmp_path: Path) -> 
     """A custom outcome declared in game.yaml outcomes list is accepted."""
     _write_base_content(tmp_path, game_yaml=_GAME_YAML_WITH_OUTCOMES)
     (tmp_path / "adventure.yaml").write_text(_adventure_yaml("discovered"), encoding="utf-8")
-    registry, _ = load(tmp_path)
+    registry, _ = load_from_disk(tmp_path)
     assert registry.adventures.require("test-adventure", "Adventure") is not None
 
 
@@ -131,7 +131,7 @@ def test_loader_rejects_undeclared_custom_outcome(tmp_path: Path) -> None:
     _write_base_content(tmp_path)
     (tmp_path / "adventure.yaml").write_text(_adventure_yaml("secret-ending"), encoding="utf-8")
     with pytest.raises(ContentLoadError) as exc_info:
-        load(tmp_path)
+        load_from_disk(tmp_path)
     assert "secret-ending" in str(exc_info.value)
 
 
@@ -141,7 +141,7 @@ def test_loader_rejects_undeclared_custom_outcome_not_in_list(tmp_path: Path) ->
     # "rescued" is in game.yaml but "mystery" is not
     (tmp_path / "adventure.yaml").write_text(_adventure_yaml("mystery"), encoding="utf-8")
     with pytest.raises(ContentLoadError) as exc_info:
-        load(tmp_path)
+        load_from_disk(tmp_path)
     assert "mystery" in str(exc_info.value)
 
 

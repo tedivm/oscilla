@@ -30,10 +30,10 @@ def test_to_dict_round_trips_all_fields(base_player: CharacterState) -> None:
     )
 
     data = base_player.to_dict()
-    from oscilla.engine.loader import load
+    from oscilla.engine.loader import load_from_disk
     from tests.engine.conftest import FIXTURES
 
-    minimal, _warnings = load(FIXTURES / "minimal")
+    minimal, _warnings = load_from_disk(FIXTURES / "minimal")
     assert minimal.character_config is not None
 
     restored = CharacterState.from_dict(

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from oscilla.engine.loader import ContentLoadError, load, parse, scan
+from oscilla.engine.loader import ContentLoadError, load_from_disk, parse, scan
 from oscilla.engine.models.base import AllCondition, LevelCondition
 from oscilla.engine.registry import ContentRegistry
 
@@ -32,7 +32,7 @@ def test_load_minimal_succeeds(minimal_registry: ContentRegistry) -> None:
 
 def test_load_broken_refs_raises() -> None:
     with pytest.raises(ContentLoadError) as exc_info:
-        load(FIXTURES / "broken-refs")
+        load_from_disk(FIXTURES / "broken-refs")
     # The error message should mention the missing adventure reference
     assert "nonexistent-adventure" in str(exc_info.value)
 
@@ -104,7 +104,7 @@ spec:
         encoding="utf-8",
     )
     with pytest.raises(ContentLoadError):
-        load(tmp_path)
+        load_from_disk(tmp_path)
 
 
 def test_loader_rejects_bounds_on_bool_stat(tmp_path: Path) -> None:
@@ -128,7 +128,7 @@ spec:
         encoding="utf-8",
     )
     with pytest.raises(ContentLoadError):
-        load(tmp_path)
+        load_from_disk(tmp_path)
 
 
 _GAME_YAML_WITHOUT_PRESTIGE = """\
@@ -171,7 +171,7 @@ def test_loader_rejects_prestige_effect_without_prestige_config(tmp_path: Path) 
     (tmp_path / "game.yaml").write_text(_GAME_YAML_WITHOUT_PRESTIGE, encoding="utf-8")
     (tmp_path / "adventure.yaml").write_text(_ADVENTURE_WITH_PRESTIGE_EFFECT, encoding="utf-8")
     with pytest.raises(ContentLoadError) as exc_info:
-        load(tmp_path)
+        load_from_disk(tmp_path)
     assert "prestige" in str(exc_info.value).lower()
 
 
@@ -180,7 +180,7 @@ def test_loader_accepts_prestige_effect_when_prestige_config_declared(tmp_path: 
     (tmp_path / "game.yaml").write_text(_GAME_YAML_WITH_PRESTIGE, encoding="utf-8")
     (tmp_path / "adventure.yaml").write_text(_ADVENTURE_WITH_PRESTIGE_EFFECT, encoding="utf-8")
     # Should not raise — warnings are fine.
-    load(tmp_path)
+    load_from_disk(tmp_path)
 
 
 # ---------------------------------------------------------------------------
@@ -320,10 +320,10 @@ spec:
 
 
 def test_load_single_file_path(tmp_path: Path) -> None:
-    """load() accepts a path to a single YAML file and processes all documents in it."""
+    """load_from_disk() accepts a path to a single YAML file and processes all documents in it."""
     content_file = tmp_path / "content.yaml"
     content_file.write_text(_MINIMAL_GAME_YAML + "---\n" + _MINIMAL_CHAR_CONFIG_YAML, encoding="utf-8")
-    registry, warnings = load(content_file)
+    registry, warnings = load_from_disk(content_file)
     assert registry.game is not None
     assert registry.character_config is not None
 
@@ -392,7 +392,7 @@ def test_archetype_refs_valid_passes(tmp_path: Path) -> None:
     (tmp_path / "archetype.yaml").write_text(_MINIMAL_ARCHETYPE_YAML, encoding="utf-8")
     (tmp_path / "adventure.yaml").write_text(_MINIMAL_ADVENTURE_HAS_ARCHETYPE_YAML, encoding="utf-8")
     # Should not raise
-    load(tmp_path)
+    load_from_disk(tmp_path)
 
 
 def test_archetype_add_unknown_ref_raises(tmp_path: Path) -> None:
@@ -400,7 +400,7 @@ def test_archetype_add_unknown_ref_raises(tmp_path: Path) -> None:
     (tmp_path / "game.yaml").write_text(_MINIMAL_GAME_YAML, encoding="utf-8")
     (tmp_path / "adventure.yaml").write_text(_ADVENTURE_UNKNOWN_ARCHETYPE_YAML, encoding="utf-8")
     with pytest.raises(ContentLoadError) as exc_info:
-        load(tmp_path)
+        load_from_disk(tmp_path)
     assert "undeclared-archetype" in str(exc_info.value)
 
 
@@ -409,5 +409,5 @@ def test_archetype_condition_unknown_ref_raises(tmp_path: Path) -> None:
     (tmp_path / "game.yaml").write_text(_MINIMAL_GAME_YAML, encoding="utf-8")
     (tmp_path / "adventure.yaml").write_text(_ADVENTURE_HAS_ARCHETYPE_CONDITION_YAML, encoding="utf-8")
     with pytest.raises(ContentLoadError) as exc_info:
-        load(tmp_path)
+        load_from_disk(tmp_path)
     assert "undeclared-archetype" in str(exc_info.value)

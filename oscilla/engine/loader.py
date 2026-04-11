@@ -76,11 +76,11 @@ _yaml = YAML(typ="safe")
 
 @dataclass
 class LoadError:
-    file: Path
+    file: Path | None
     message: str
 
     def __str__(self) -> str:
-        return f"{self.file}: {self.message}"
+        return f"{self.file}: {self.message}" if self.file is not None else self.message
 
 
 @dataclass
@@ -92,12 +92,12 @@ class LoadWarning:
     human-readable fix hint for both authors and AI tooling.
     """
 
-    file: Path
+    file: Path | None
     message: str
     suggestion: str = ""
 
     def __str__(self) -> str:
-        base = f"{self.file}: {self.message}"
+        base = f"{self.file}: {self.message}" if self.file is not None else self.message
         return f"{base} — {self.suggestion}" if self.suggestion else base
 
 
@@ -111,6 +111,50 @@ class ContentLoadError(Exception):
 def scan(content_dir: Path) -> List[Path]:
     """Return all .yaml / .yml files found recursively under content_dir, sorted."""
     return sorted(p for p in content_dir.rglob("*") if p.suffix in {".yaml", ".yml"})
+
+
+def _parse_text(
+    text: str,
+    source: Path,
+) -> Tuple[List[ManifestEnvelope], List[LoadError]]:
+    """Parse all YAML documents from a string.
+
+    Uses source as the Path label in errors so messages are identifiable.
+    Mirrors the per-path inner loop of parse() exactly.
+    """
+    manifests: List[ManifestEnvelope] = []
+    errors: List[LoadError] = []
+
+    try:
+        # Wrap in list() to eagerly evaluate so parse errors are caught here.
+        docs = list(_yaml.load_all(text))
+    except YAMLError as exc:
+        errors.append(LoadError(file=source, message=f"YAML parse error: {exc}"))
+        return manifests, errors
+
+    for doc_index, raw in enumerate(docs):
+        # Suffix added only when there is more than one document to keep
+        # single-document error messages identical to the existing format.
+        label = f"{source} [doc {doc_index + 1}]" if len(docs) > 1 else str(source)
+
+        if not isinstance(raw, dict):
+            errors.append(LoadError(file=source, message=f"{label}: Manifest must be a YAML mapping"))
+            continue
+
+        kind = raw.get("kind", "<missing>")
+        model_cls = MANIFEST_REGISTRY.get(str(kind))
+        if model_cls is None:
+            errors.append(LoadError(file=source, message=f"{label}: Unknown kind: {kind!r}"))
+            continue
+
+        try:
+            manifests.append(model_cls.model_validate(raw))
+        except ValidationError as exc:
+            for err in exc.errors():
+                loc = " → ".join(str(x) for x in err["loc"])
+                errors.append(LoadError(file=source, message=f"{label}: {loc}: {err['msg']}"))
+
+    return manifests, errors
 
 
 def parse(paths: List[Path]) -> Tuple[List[ManifestEnvelope], List[LoadError]]:
@@ -130,34 +174,9 @@ def parse(paths: List[Path]) -> Tuple[List[ManifestEnvelope], List[LoadError]]:
             errors.append(LoadError(file=path, message=f"File read error: {exc}"))
             continue
 
-        try:
-            # Wrap in list() to eagerly evaluate so parse errors are caught here.
-            docs = list(_yaml.load_all(text))
-        except YAMLError as exc:
-            errors.append(LoadError(file=path, message=f"YAML parse error: {exc}"))
-            continue
-
-        for doc_index, raw in enumerate(docs):
-            # Suffix added only when there is more than one document to keep
-            # single-document error messages identical to the existing format.
-            label = f"{path} [doc {doc_index + 1}]" if len(docs) > 1 else str(path)
-
-            if not isinstance(raw, dict):
-                errors.append(LoadError(file=path, message=f"{label}: Manifest must be a YAML mapping"))
-                continue
-
-            kind = raw.get("kind", "<missing>")
-            model_cls = MANIFEST_REGISTRY.get(str(kind))
-            if model_cls is None:
-                errors.append(LoadError(file=path, message=f"{label}: Unknown kind: {kind!r}"))
-                continue
-
-            try:
-                manifests.append(model_cls.model_validate(raw))
-            except ValidationError as exc:
-                for err in exc.errors():
-                    loc = " → ".join(str(x) for x in err["loc"])
-                    errors.append(LoadError(file=path, message=f"{label}: {loc}: {err['msg']}"))
+        path_manifests, path_errors = _parse_text(text, source=path)
+        manifests.extend(path_manifests)
+        errors.extend(path_errors)
 
     return manifests, errors
 
@@ -1804,29 +1823,21 @@ def _build_derived_eval_order(
     return sorted_stats
 
 
-def load(content_path: Path) -> Tuple[ContentRegistry, List[LoadWarning]]:
-    """Orchestrate scan → parse → validate_references → build_effective_conditions → template validation.
+def _run_pipeline(
+    manifests: List[ManifestEnvelope],
+    parse_errors: List[LoadError],
+    skip_references: bool,
+) -> Tuple["ContentRegistry", List[LoadWarning]]:
+    """Run the full post-parse validation and registry-build pipeline.
 
-    content_path may be either a directory (scanned recursively for .yaml/.yml files)
-    or a path to a single YAML file (all documents in that file are used directly).
-    Single-file mode is the path taken by compiled content archives.
-
-    Returns a tuple of (ContentRegistry, warnings). Warnings are non-fatal issues
-    that are surfaced in `oscilla validate` output but do not prevent the game from running.
-
-    Raises ContentLoadError with all accumulated errors if any hard errors are found.
+    Called by both load_from_disk() and load_from_text(). All validation logic lives
+    here exactly once; adding a new pipeline step requires touching only this function.
     """
     from oscilla.engine.templates import GameTemplateEngine
 
     t0 = time.perf_counter()
-    # Single-file mode: treat the file itself as the complete manifest list.
-    if content_path.is_file():
-        paths = [content_path]
-    else:
-        paths = scan(content_path)
-    manifests, parse_errors = parse(paths)
 
-    ref_errors = validate_references(manifests) if manifests else []
+    ref_errors = validate_references(manifests) if (manifests and not skip_references) else []
     manifests, compile_errors = build_effective_conditions(manifests)
 
     all_errors = parse_errors + ref_errors + compile_errors
@@ -1846,8 +1857,6 @@ def load(content_path: Path) -> Tuple[ContentRegistry, List[LoadWarning]]:
     game_manifest = next((m for m in manifests if m.kind == "Game"), None)
     has_ingame_time = False
     if game_manifest is not None:
-        from oscilla.engine.models.game import GameManifest
-
         gm = cast(GameManifest, game_manifest)
         has_ingame_time = gm.spec.time is not None
 
@@ -1908,6 +1917,42 @@ def load(content_path: Path) -> Tuple[ContentRegistry, List[LoadWarning]]:
         registry.stat_threshold_index = _build_stat_threshold_index(registry.game)
 
     return registry, warnings
+
+
+def load_from_disk(content_path: Path) -> Tuple["ContentRegistry", List[LoadWarning]]:
+    """Orchestrate scan → parse → validate_references → build_effective_conditions → template validation.
+
+    content_path may be either a directory (scanned recursively for .yaml/.yml files)
+    or a path to a single YAML file (all documents in that file are used directly).
+    Single-file mode is the path taken by compiled content archives.
+
+    Returns a tuple of (ContentRegistry, warnings). Warnings are non-fatal issues
+    that are surfaced in `oscilla validate` output but do not prevent the game from running.
+
+    Raises ContentLoadError with all accumulated errors if any hard errors are found.
+    """
+    if content_path.is_file():
+        paths = [content_path]
+    else:
+        paths = scan(content_path)
+    manifests, parse_errors = parse(paths)
+    return _run_pipeline(manifests=manifests, parse_errors=parse_errors, skip_references=False)
+
+
+def load_from_text(
+    text: str,
+    skip_references: bool = False,
+) -> Tuple["ContentRegistry", List[LoadWarning]]:
+    """Load and validate manifests from a YAML string rather than the filesystem.
+
+    skip_references disables cross-manifest reference checks, useful when
+    validating isolated manifest snippets that intentionally omit referenced
+    content (e.g. documentation examples).
+
+    Raises ContentLoadError on hard errors; returns (registry, warnings) on success.
+    """
+    manifests, parse_errors = _parse_text(text, source=Path("<stdin>"))
+    return _run_pipeline(manifests=manifests, parse_errors=parse_errors, skip_references=skip_references)
 
 
 def compute_epoch_offset(spec: "GameTimeSpec") -> int:
@@ -1981,7 +2026,7 @@ def load_games(library_root: Path) -> Tuple[Dict[str, ContentRegistry], Dict[str
             logger.debug("Skipping %s — no game.yaml found", subdir.name)
             continue
         try:
-            registry, warnings = load(subdir)
+            registry, warnings = load_from_disk(subdir)
         except ContentLoadError as exc:
             for err in exc.errors:
                 accumulated.append(LoadError(file=err.file, message=f"[{subdir.name}] {err.message}"))

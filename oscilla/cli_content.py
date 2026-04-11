@@ -49,7 +49,7 @@ def _resolve_registry(game_name: str | None) -> "tuple[str, ContentRegistry]":
     If game_name is given, load only that package. If omitted and exactly one
     game exists it is selected automatically. Raises SystemExit(1) on error.
     """
-    from oscilla.engine.loader import ContentLoadError, load, load_games
+    from oscilla.engine.loader import ContentLoadError, load_from_disk, load_games
     from oscilla.settings import settings
 
     gpath = settings.games_path
@@ -59,7 +59,7 @@ def _resolve_registry(game_name: str | None) -> "tuple[str, ContentRegistry]":
             _err_console.print(f"[bold red]Game {game_name!r} not found in GAMES_PATH[/bold red]")
             raise SystemExit(1)
         try:
-            registry, _ = load(game_path)
+            registry, _ = load_from_disk(game_path)
         except ContentLoadError as exc:
             _err_console.print("[bold red]Content load failed:[/bold red]")
             for e in exc.errors:
@@ -460,39 +460,20 @@ def content_test(
     strict: Annotated[bool, typer.Option("--strict", help="Treat warnings as errors.")] = False,
     output_format: Annotated[str, typer.Option("--format", "-F", help="Output format: text | json | yaml.")] = "text",
 ) -> None:
-    """Run semantic validation checks on the content package."""
-    from oscilla.engine.semantic_validator import validate_semantic
+    """Alias for 'oscilla validate'. Runs full validation on the content package.
 
-    _, registry = _resolve_registry(game)
-    issues = validate_semantic(registry)
+    Kept for backwards compatibility. Use 'oscilla validate' for the full
+    feature set including --no-references and stdin support.
+    """
+    from oscilla.cli import _validate_games
 
-    errors = [i for i in issues if i.severity == "error"]
-    warnings = [i for i in issues if i.severity == "warning"]
-
-    if output_format != "text":
-        data = {
-            "errors": [{"kind": i.kind, "message": i.message, "manifest": i.manifest} for i in errors],
-            "warnings": [{"kind": i.kind, "message": i.message, "manifest": i.manifest} for i in warnings],
-        }
-        _emit_structured_output(data, output_format)
-        exit_code = 1 if errors or (strict and warnings) else 0
-        raise SystemExit(exit_code)
-
-    if not issues:
-        _console.print("[bold green]✓ No semantic issues found.[/bold green]")
-        return
-
-    for issue in errors:
-        _console.print(f"  [red]✗[/red] [{issue.kind}] {issue}")
-    for issue in warnings:
-        color = "bold red" if strict else "yellow"
-        _console.print(f"  [{color}]⚠[/{color}] [{issue.kind}] {issue}")
-
-    if errors:
-        raise SystemExit(1)
-    if strict and warnings:
-        _console.print(f"\n[bold red]Strict mode: {len(warnings)} warning(s) treated as errors.[/bold red]")
-        raise SystemExit(1)
+    _validate_games(
+        game_name=game,
+        output_format=output_format,
+        strict=strict,
+        no_semantic=False,
+        no_references=False,
+    )
 
 
 # ---------------------------------------------------------------------------

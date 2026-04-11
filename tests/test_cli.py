@@ -346,3 +346,125 @@ def test_data_path_output_is_parseable_as_path() -> None:
     result = runner.invoke(app, ["data-path"])
     assert result.exit_code == 0
     Path(result.output.strip())  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# validate: new flags (4.1 – 4.10)
+# ---------------------------------------------------------------------------
+
+_VALID_ITEM_YAML = """\
+apiVersion: oscilla/v1
+kind: Item
+metadata:
+  name: test-item
+spec:
+  category: weapon
+  displayName: Test Item
+"""
+
+
+def test_validate_format_flag_in_help() -> None:
+    """--format and -F appear in validate --help output."""
+    result = runner.invoke(app, ["validate", "--help"])
+    assert result.exit_code == 0
+    assert "--format" in result.stdout
+    assert "-F" in result.stdout
+
+
+def test_validate_no_references_flag_in_help() -> None:
+    """--no-references appears in validate --help output."""
+    result = runner.invoke(app, ["validate", "--help"])
+    assert result.exit_code == 0
+    assert "--no-references" in result.stdout
+
+
+def test_validate_json_format_disk_mode() -> None:
+    """validate --format json exits 0 and returns valid JSON with required keys."""
+    import json as _json
+
+    result = runner.invoke(app, ["validate", "--format", "json"])
+    assert result.exit_code == 0
+    data = _json.loads(result.stdout)
+    assert "errors" in data
+    assert "warnings" in data
+    assert "summary" in data
+    assert len(data["summary"]) >= 1
+
+
+def test_validate_yaml_format_disk_mode() -> None:
+    """validate --format yaml exits 0 and returns parseable YAML with required keys."""
+    from ruamel.yaml import YAML as _YAML
+
+    result = runner.invoke(app, ["validate", "--format", "yaml"])
+    assert result.exit_code == 0
+    _y = _YAML(typ="safe")
+    data = _y.load(result.stdout)
+    assert "errors" in data
+    assert "warnings" in data
+    assert "summary" in data
+
+
+def test_validate_stdin_valid_manifest() -> None:
+    """Piping a valid Item YAML with --no-semantic --no-references exits 0."""
+    result = runner.invoke(
+        app,
+        ["validate", "--stdin", "--no-semantic", "--no-references"],
+        input=_VALID_ITEM_YAML,
+    )
+    assert result.exit_code == 0
+
+
+def test_validate_stdin_invalid_yaml() -> None:
+    """Piping malformed YAML exits 1 and includes a parse error in output."""
+    result = runner.invoke(
+        app,
+        ["validate", "--stdin", "--no-semantic", "--no-references"],
+        input=": invalid: yaml: [[[",
+    )
+    assert result.exit_code == 1
+
+
+def test_validate_stdin_unknown_kind() -> None:
+    """Piping a manifest with an unknown kind exits 1."""
+    result = runner.invoke(
+        app,
+        ["validate", "--stdin", "--no-semantic", "--no-references"],
+        input="kind: Nonexistent\nmetadata:\n  name: test\n",
+    )
+    assert result.exit_code == 1
+
+
+def test_validate_stdin_empty() -> None:
+    """Piping empty string to --stdin exits 1."""
+    result = runner.invoke(
+        app,
+        ["validate", "--stdin", "--no-semantic", "--no-references"],
+        input="",
+    )
+    assert result.exit_code == 1
+
+
+def test_validate_stdin_json_output() -> None:
+    """Piping valid Item YAML with --format json shows summary with items count == 1."""
+    import json as _json
+
+    result = runner.invoke(
+        app,
+        ["validate", "--stdin", "--format", "json", "--no-semantic", "--no-references"],
+        input=_VALID_ITEM_YAML,
+    )
+    assert result.exit_code == 0
+    data = _json.loads(result.stdout)
+    assert "summary" in data
+    assert "<stdin>" in data["summary"]
+    assert data["summary"]["<stdin>"].get("items") == 1
+
+
+def test_validate_game_flag_ignored_in_stdin_mode() -> None:
+    """--game is ignored when --stdin is used; exits 0 for valid manifest."""
+    result = runner.invoke(
+        app,
+        ["validate", "--stdin", "--game", "nonexistent-game", "--no-semantic", "--no-references"],
+        input=_VALID_ITEM_YAML,
+    )
+    assert result.exit_code == 0

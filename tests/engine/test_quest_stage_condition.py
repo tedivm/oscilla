@@ -9,7 +9,7 @@ import pytest
 
 from oscilla.engine.character import CharacterState
 from oscilla.engine.conditions import evaluate
-from oscilla.engine.loader import ContentLoadError, load
+from oscilla.engine.loader import ContentLoadError, load_from_disk
 from oscilla.engine.models.base import QuestStageCondition
 
 # ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ def test_loader_accepts_valid_quest_stage_condition(tmp_path: Path) -> None:
         extra="  unlock:\n    type: quest_stage\n    quest: test-quest\n    stage: searching"
     )
     (tmp_path / "location.yaml").write_text(location_yaml, encoding="utf-8")
-    registry, _ = load(tmp_path)
+    registry, _ = load_from_disk(tmp_path)
     assert registry.locations.require("test-location", "Location") is not None
 
 
@@ -152,7 +152,7 @@ def test_loader_rejects_unknown_quest_ref(tmp_path: Path) -> None:
     )
     (tmp_path / "location.yaml").write_text(location_yaml, encoding="utf-8")
     with pytest.raises(ContentLoadError) as exc_info:
-        load(tmp_path)
+        load_from_disk(tmp_path)
     assert "nonexistent-quest" in str(exc_info.value)
 
 
@@ -164,5 +164,5 @@ def test_loader_rejects_unknown_stage_name(tmp_path: Path) -> None:
     )
     (tmp_path / "location.yaml").write_text(location_yaml, encoding="utf-8")
     with pytest.raises(ContentLoadError) as exc_info:
-        load(tmp_path)
+        load_from_disk(tmp_path)
     assert "nonexistent-stage" in str(exc_info.value)
