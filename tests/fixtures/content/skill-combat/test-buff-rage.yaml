@@ -5,7 +5,8 @@ metadata:
 spec:
   displayName: "Rage"
   description: "Amplifies outgoing player damage by a configurable percent."
-  duration_turns: 2
+  duration:
+    turns: 2
   variables:
     rage_percent: 50
   modifiers:

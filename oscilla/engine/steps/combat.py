@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import time
 from logging import getLogger
-from typing import TYPE_CHECKING, Awaitable, Callable, List, Literal, Set
+from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Literal, Set
 
-from oscilla.engine.combat_context import CombatContext
+from oscilla.engine.combat_context import ActiveCombatEffect, CombatContext
 from oscilla.engine.models.adventure import ApplyBuffEffect, CombatStep, ItemDropEffect, OutcomeBranch
+from oscilla.engine.models.buff import StoredBuff
 from oscilla.engine.pipeline import AdventureOutcome, TUICallbacks
 from oscilla.engine.steps.effects import run_effect
 
@@ -271,6 +273,48 @@ async def run_combat(
         enemy_resources=dict(enemy.spec.skill_resources),
     )
 
+    # Sweep and re-inject persistent buffs from CharacterState.
+    now_ts = int(time.time())
+    player.sweep_expired_buffs(
+        now_tick=player.internal_ticks,
+        now_game_tick=player.game_ticks,
+        now_ts=now_ts,
+    )
+    # Track all buff refs injected from StoredBuff; needed for correct writeback even when
+    # a buff expires during combat and is removed from ctx.active_effects before the loop ends.
+    injected_persistent_refs: Set[str] = set()
+    for stored in player.active_buffs:
+        buff_manifest = registry.buffs.get(stored.buff_ref)
+        if buff_manifest is None:
+            logger.warning(
+                "Stored buff %r not found in registry at combat start — skipping.",
+                stored.buff_ref,
+            )
+            continue
+        spec = buff_manifest.spec
+        resolved_vars: Dict[str, int] = {**spec.variables, **stored.variables}
+        resolved_modifiers = [
+            mod.model_copy(
+                update={"percent": resolved_vars.get(mod.percent, 0) if isinstance(mod.percent, str) else mod.percent}
+            )
+            for mod in spec.modifiers
+        ]
+        ae = ActiveCombatEffect(
+            source_skill=buff_manifest.metadata.name,
+            target="player",
+            remaining_turns=stored.remaining_turns,
+            per_turn_effects=list(spec.per_turn_effects),
+            modifiers=resolved_modifiers,
+            label=stored.buff_ref,
+            exclusion_group=spec.exclusion_group or "",
+            priority=resolved_vars.get(spec.priority, 0) if isinstance(spec.priority, str) else int(spec.priority),
+            exclusion_mode=spec.exclusion_mode,
+            is_persistent=True,
+            variables=dict(resolved_vars),
+        )
+        ctx.active_effects.append(ae)
+        injected_persistent_refs.add(stored.buff_ref)
+
     # Apply combat-entry buffs granted by equipped and held items.
     equipped_refs: Set[str] = {
         inst.item_ref for inst in player.instances if inst.instance_id in player.equipment.values()
@@ -316,6 +360,8 @@ async def run_combat(
         if (s := registry.skills.get(skill_ref)) is not None and "combat" in s.spec.contexts
     ]
 
+    outcome: AdventureOutcome = AdventureOutcome.COMPLETED  # default; set by break statements
+
     while True:
         # Tick periodic effects at the top of each round.
         await _tick_active_effects(ctx=ctx, player=player, registry=registry, tui=tui)
@@ -343,7 +389,8 @@ async def run_combat(
 
         if action == flee_index:
             await run_outcome_branch(step.on_flee)
-            return AdventureOutcome.FLED
+            outcome = AdventureOutcome.FLED
+            break
 
         if action == 1:
             # Standard attack — strength reduces enemy defence.
@@ -392,8 +439,27 @@ async def run_combat(
                 loot_effect = ItemDropEffect(type="item_drop", groups=enemy.spec.loot)
                 await run_effect(effect=loot_effect, player=player, registry=registry, tui=tui)
             await run_outcome_branch(step.on_win)
-            return AdventureOutcome.COMPLETED
+            outcome = AdventureOutcome.COMPLETED
+            break
 
         if (player.stats.get("hp") or 0) <= 0:
             await run_outcome_branch(step.on_defeat)
-            return AdventureOutcome.DEFEATED
+            outcome = AdventureOutcome.DEFEATED
+            break
+
+    # Write back persistent buffs to CharacterState after combat.
+    # Buffs that still have remaining turns are updated; exhausted buffs are removed.
+    # Use injected_persistent_refs (not just currently active) so buffs that expired
+    # during combat (ticked to 0 and already popped) are also cleared from active_buffs.
+    player.active_buffs = [sb for sb in player.active_buffs if sb.buff_ref not in injected_persistent_refs]
+    for ae in ctx.active_effects:
+        if ae.is_persistent and ae.remaining_turns > 0:
+            player.active_buffs.append(
+                StoredBuff(
+                    buff_ref=ae.label,
+                    remaining_turns=ae.remaining_turns,
+                    variables=dict(ae.variables),
+                )
+            )
+
+    return outcome

@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Set
 from uuid import UUID, uuid4
 
 from oscilla.engine.models.base import GrantRecord
+from oscilla.engine.models.buff import StoredBuff
 from oscilla.engine.templates import DEFAULT_PRONOUN_SET, PRONOUN_SETS, PronounSet
 
 if TYPE_CHECKING:
@@ -195,6 +196,9 @@ class CharacterState:
     prestige_pending: "PrestigeCarryForward | None" = None
     # Archetypes held this iteration: name → GrantRecord(tick, timestamp).
     archetypes: Dict[str, GrantRecord] = field(default_factory=dict)
+    # Persistent buffs carried across combat encounters.
+    # Encounter-scoped buffs are never stored here.
+    active_buffs: List[StoredBuff] = field(default_factory=list)
 
     # --- Methods ---
 
@@ -215,6 +219,22 @@ class CharacterState:
             )
             return
         self.pending_triggers.append(trigger_name)
+
+    def sweep_expired_buffs(self, now_tick: int, now_game_tick: int, now_ts: int) -> None:
+        """Remove persistent buffs whose expiry conditions are satisfied.
+
+        A buff is removed when ANY single expiry condition is met (tick, game_tick, or real_ts).
+        Called before injecting stored buffs at combat start and after adventure completion.
+        """
+        self.active_buffs = [
+            sb
+            for sb in self.active_buffs
+            if not (
+                (sb.tick_expiry is not None and now_tick >= sb.tick_expiry)
+                or (sb.game_tick_expiry is not None and now_game_tick >= sb.game_tick_expiry)
+                or (sb.real_ts_expiry is not None and now_ts >= sb.real_ts_expiry)
+            )
+        ]
 
     # --- Factory ---
 
@@ -702,6 +722,7 @@ class CharacterState:
             "era_started_at_ticks": dict(self.era_started_at_ticks),
             "era_ended_at_ticks": dict(self.era_ended_at_ticks),
             "archetypes": {name: {"tick": r.tick, "timestamp": r.timestamp} for name, r in self.archetypes.items()},
+            "active_buffs": [sb.model_dump() for sb in self.active_buffs],
         }
 
     @classmethod
@@ -902,6 +923,7 @@ class CharacterState:
             era_ended_at_ticks=dict(data.get("era_ended_at_ticks", {})),
             pending_triggers=list(data.get("pending_triggers", [])),
             archetypes=archetypes,
+            active_buffs=[StoredBuff.model_validate(sb) for sb in data.get("active_buffs", [])],
         )
 
         # Warn about equipped items whose requires condition is no longer satisfied.

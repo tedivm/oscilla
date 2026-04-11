@@ -1,0 +1,13 @@
+apiVersion: oscilla/v1
+kind: Buff
+metadata:
+  name: test-encounter-buff
+spec:
+  displayName: "Encounter Rage"
+  description: "A damage-amplification buff with turns-only duration (not persistent across combats)."
+  duration:
+    turns: 2
+  modifiers:
+    - type: damage_amplify
+      target: player
+      percent: 25

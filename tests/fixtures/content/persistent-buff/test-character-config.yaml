@@ -1,0 +1,23 @@
+apiVersion: oscilla/v1
+kind: CharacterConfig
+metadata:
+  name: test-character-config
+spec:
+  public_stats:
+    - name: strength
+      type: int
+      default: 10
+      description: "Physical power"
+    - name: dexterity
+      type: int
+      default: 10
+      description: "Agility"
+    - name: hp
+      type: int
+      default: 50
+      description: "Hit points"
+    - name: max_hp
+      type: int
+      default: 50
+      description: "Maximum hit points"
+  hidden_stats: []

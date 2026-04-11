@@ -5,7 +5,8 @@ metadata:
 spec:
   displayName: "Thorns"
   description: "Reflects a configurable percent of incoming damage back to the attacker."
-  duration_turns: 2
+  duration:
+    turns: 2
   variables:
     reflect_percent: 30
   modifiers:

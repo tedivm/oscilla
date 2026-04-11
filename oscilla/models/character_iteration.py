@@ -121,6 +121,9 @@ class CharacterIterationRecord(Base):
         order_by="CharacterIterationPendingTrigger.position",
         cascade="all, delete-orphan",
     )
+    active_buff_rows: Mapped[List["CharacterIterationActiveBuff"]] = relationship(
+        "CharacterIterationActiveBuff", back_populates="iteration", cascade="all, delete-orphan"
+    )
     character: Mapped["CharacterRecord"] = relationship(  # noqa: F821
         "CharacterRecord", back_populates="iterations"
     )
@@ -393,4 +396,27 @@ class CharacterIterationPendingTrigger(Base):
 
     iteration: Mapped["CharacterIterationRecord"] = relationship(
         "CharacterIterationRecord", back_populates="pending_trigger_rows"
+    )
+
+
+class CharacterIterationActiveBuff(Base):
+    """One row per persistent buff active on the character in this iteration.
+
+    Composite PK (iteration_id, buff_ref) — one stored entry per buff manifest name.
+    variables_json is the JSON-serialized Dict[str, int] of resolved variables at apply time.
+    Nullable expiry columns mirror the BuffDuration time-based fields.
+    """
+
+    __tablename__ = "character_iteration_active_buffs"
+
+    iteration_id: Mapped[UUID] = mapped_column(ForeignKey("character_iterations.id"), primary_key=True, nullable=False)
+    buff_ref: Mapped[str] = mapped_column(String, primary_key=True)
+    remaining_turns: Mapped[int] = mapped_column(Integer, nullable=False)
+    variables_json: Mapped[str] = mapped_column(String, nullable=False, default="{}")
+    tick_expiry: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    game_tick_expiry: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    real_ts_expiry: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+
+    iteration: Mapped["CharacterIterationRecord"] = relationship(
+        "CharacterIterationRecord", back_populates="active_buff_rows"
     )

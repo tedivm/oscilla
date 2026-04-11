@@ -30,6 +30,15 @@ class ActiveCombatEffect:
     # Passive modifiers consulted by the combat loop during damage arithmetic.
     # Not dispatched as discrete effects — simply read each round.
     modifiers: List["CombatModifier"] = field(default_factory=list)
+    # Exclusion group tracking — mirrors BuffSpec fields for in-combat eviction logic.
+    exclusion_group: str = ""
+    priority: int = 0
+    exclusion_mode: str = "block"
+    # True when this effect was loaded from CharacterState.active_buffs and should be
+    # written back after combat ends.
+    is_persistent: bool = False
+    # Original resolved variables carried for writeback to StoredBuff.
+    variables: Dict[str, int] = field(default_factory=dict)
 
 
 @dataclass

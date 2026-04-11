@@ -98,6 +98,12 @@ When a Buff manifest is applied, an `ActiveCombatEffect` is added to `CombatCont
 
 `CombatModifier` supports four types: `damage_reduction`, `damage_amplify`, `damage_reflect`, `damage_vulnerability`. Each carries a `percent` (`int | str` — string values are variable names resolved at apply time from `BuffSpec.variables`) and a `target` (`"player"` | `"enemy"`).
 
+`ActiveCombatEffect` SHALL include the following new fields in addition to its existing ones:
+
+- `exclusion_group: str = ""` — mirrors `BuffSpec.exclusion_group`; empty string when no group.
+- `priority: int = 0` — mirrors `BuffSpec.priority`; used by the exclusion-group check.
+- `is_persistent: bool = False` — `True` when this effect was loaded from `CharacterState.active_buffs` or was created from a buff with a time-based expiry field. Tracked to control writeback at combat exit.
+
 The combat loop SHALL:
 
 - Consult `damage_amplify` modifiers (via `_apply_damage_amplify`) when computing the player's basic attack damage, scaling outgoing damage by `(1 + total_amplify_percent/100)`.
@@ -157,9 +163,9 @@ At the top of each combat round (before the player acts), the combat loop SHALL 
 3. Decrement `remaining_turns` by 1.
 4. Remove entries whose `remaining_turns` has reached 0.
 
-#### Scenario: Poison ticks for declared duration
+#### Scenario: Buff ticks for declared duration
 
-- **WHEN** an `apply_buff` effect applies a buff with `duration_turns: 3` and `per_turn_effects: [{type: stat_change, amount: -5, target: enemy}]`
+- **WHEN** an `apply_buff` effect applies a buff with `duration: {turns: 3}` and `per_turn_effects: [{type: stat_change, amount: -5, target: enemy}]`
 - **THEN** the enemy takes -5 HP each at the top of the next 3 rounds; no tick occurs on round 4
 
 #### Scenario: Expired effects are removed from active_effects

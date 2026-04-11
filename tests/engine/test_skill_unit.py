@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 from oscilla.engine.combat_context import ActiveCombatEffect, CombatContext
 from oscilla.engine.models.base import SkillCondition
 from oscilla.engine.models.buff import (
+    BuffDuration,
     BuffSpec,
     DamageAmplifyModifier,
     DamageReductionModifier,
@@ -86,13 +87,13 @@ def _reflect_effect(target: str, percent: int) -> ActiveCombatEffect:
 
 def test_buffspec_rejects_empty_modifiers_and_effects() -> None:
     with pytest.raises(Exception, match="at least one"):
-        BuffSpec(displayName="Empty", duration_turns=2, per_turn_effects=[], modifiers=[])
+        BuffSpec(displayName="Empty", duration=BuffDuration(turns=2), per_turn_effects=[], modifiers=[])
 
 
 def test_buffspec_accepts_modifier_only() -> None:
     spec = BuffSpec(
         displayName="Shield",
-        duration_turns=3,
+        duration=BuffDuration(turns=3),
         modifiers=[DamageReductionModifier(type="damage_reduction", target="player", percent=50)],
     )
     assert len(spec.modifiers) == 1
@@ -104,7 +105,7 @@ def test_buffspec_accepts_tick_only() -> None:
 
     spec = BuffSpec(
         displayName="Poison",
-        duration_turns=3,
+        duration=BuffDuration(turns=3),
         per_turn_effects=[StatChangeEffect(type="stat_change", stat="hp", amount=-3)],
     )
     assert len(spec.per_turn_effects) == 1
@@ -116,7 +117,7 @@ def test_buffspec_accepts_combined_tick_and_modifier() -> None:
 
     spec = BuffSpec(
         displayName="BurningShield",
-        duration_turns=3,
+        duration=BuffDuration(turns=3),
         per_turn_effects=[StatChangeEffect(type="stat_change", stat="hp", amount=-1)],
         modifiers=[DamageReductionModifier(type="damage_reduction", target="player", percent=25)],
     )
@@ -267,7 +268,7 @@ def test_incoming_enemy_target() -> None:
 def test_buffspec_int_percent_resolves_directly() -> None:
     spec = BuffSpec(
         displayName="Shield",
-        duration_turns=3,
+        duration=BuffDuration(turns=3),
         modifiers=[DamageReductionModifier(type="damage_reduction", target="player", percent=50)],
     )
     mod = spec.modifiers[0]
@@ -278,7 +279,7 @@ def test_buffspec_int_percent_resolves_directly() -> None:
 def test_buffspec_variable_name_resolves_from_variables() -> None:
     spec = BuffSpec(
         displayName="Rage",
-        duration_turns=2,
+        duration=BuffDuration(turns=2),
         variables={"rage_percent": 40},
         modifiers=[DamageAmplifyModifier(type="damage_amplify", target="player", percent="rage_percent")],
     )
@@ -292,7 +293,7 @@ def test_buffspec_undeclared_variable_raises_error() -> None:
     with pytest.raises(Exception, match="not declared in variables"):
         BuffSpec(
             displayName="Bad Buff",
-            duration_turns=2,
+            duration=BuffDuration(turns=2),
             variables={},  # empty — rage_percent is not declared
             modifiers=[DamageAmplifyModifier(type="damage_amplify", target="player", percent="rage_percent")],
         )

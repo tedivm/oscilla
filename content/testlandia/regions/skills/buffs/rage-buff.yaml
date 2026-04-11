@@ -5,7 +5,8 @@ metadata:
 spec:
   displayName: "Battle Rage"
   description: "Amplifies player outgoing damage by 50% for 2 turns."
-  duration_turns: 2
+  duration:
+    turns: 2
   modifiers:
     - type: damage_amplify
       target: player

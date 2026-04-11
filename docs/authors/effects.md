@@ -326,6 +326,18 @@ effects:
     target: enemy
 ```
 
+The optional `permanent` flag also removes a [persistent buff](./skills.md#buff-blocking) from the player's stored buff list, so it will not be re-injected into a future combat:
+
+```yaml
+effects:
+  - type: dispel
+    label: regen
+    target: player
+    permanent: true # also clears the stored buff; prevents re-injection
+```
+
+Without `permanent: true`, `dispel` only removes the buff from the current combat. A persistent buff that was dispelled mid-combat will still be re-injected (with its remaining turns) into the next combat.
+
 ---
 
 ## Composing Multiple Effects
@@ -358,22 +370,22 @@ Four things happen at once: XP, item, milestone, reputation. That's the composab
 
 ### All Effect Types
 
-| Type               | Required fields      | Optional fields                             | Notes                                                                                 |
-| ------------------ | -------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `stat_change`      | `stat`, `amount`     | —                                           | `int` stats only; `amount` can be template; use for XP, gold, damage, etc.            |
-| `stat_set`         | `stat`, `value`      | —                                           | Works on `int` and `bool` stats                                                       |
-| `item_drop`        | `loot` or `loot_ref` | `count` (default 1), `quantity` (per entry) | Weighted table; `count` can be template; `loot_ref` names a LootTable or Enemy        |
-| `use_item`         | `item`               | —                                           | Player must already hold the item                                                     |
-| `milestone_grant`  | `milestone`          | —                                           | Sets a permanent story flag; triggers quest advancement                               |
-| `quest_activate`   | `quest_ref`          | —                                           | Activates a named quest; no-op if already active/complete                             |
-| `skill_grant`      | `skill`              | —                                           | Player permanently learns the skill                                                   |
-| `skill_revoke`     | `skill`              | —                                           | Removes a permanently learned skill; no-op if not known                               |
-| `archetype_add`    | `name`               | `force` (default `false`)                   | Grants an archetype; fires `gain_effects`; no-op if already held unless `force: true` |
-| `archetype_remove` | `name`               | `force` (default `false`)                   | Removes an archetype; fires `lose_effects`; no-op if not held unless `force: true`    |
-| `apply_buff`       | `buff_ref`           | `target`, `variables`                       | Combat only; `target`: `player` or `enemy`                                            |
-| `dispel`           | `label`              | `target`                                    | Combat only; removes buff by manifest name                                            |
-| `end_adventure`    | `outcome`            | —                                           | Terminates the adventure                                                              |
-| `goto`             | `target`             | —                                           | Jumps to a labeled step                                                               |
+| Type               | Required fields      | Optional fields                             | Notes                                                                                            |
+| ------------------ | -------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `stat_change`      | `stat`, `amount`     | —                                           | `int` stats only; `amount` can be template; use for XP, gold, damage, etc.                       |
+| `stat_set`         | `stat`, `value`      | —                                           | Works on `int` and `bool` stats                                                                  |
+| `item_drop`        | `loot` or `loot_ref` | `count` (default 1), `quantity` (per entry) | Weighted table; `count` can be template; `loot_ref` names a LootTable or Enemy                   |
+| `use_item`         | `item`               | —                                           | Player must already hold the item                                                                |
+| `milestone_grant`  | `milestone`          | —                                           | Sets a permanent story flag; triggers quest advancement                                          |
+| `quest_activate`   | `quest_ref`          | —                                           | Activates a named quest; no-op if already active/complete                                        |
+| `skill_grant`      | `skill`              | —                                           | Player permanently learns the skill                                                              |
+| `skill_revoke`     | `skill`              | —                                           | Removes a permanently learned skill; no-op if not known                                          |
+| `archetype_add`    | `name`               | `force` (default `false`)                   | Grants an archetype; fires `gain_effects`; no-op if already held unless `force: true`            |
+| `archetype_remove` | `name`               | `force` (default `false`)                   | Removes an archetype; fires `lose_effects`; no-op if not held unless `force: true`               |
+| `apply_buff`       | `buff_ref`           | `target`, `variables`                       | Combat only; `target`: `player` or `enemy`                                                       |
+| `dispel`           | `label`              | `target`, `permanent` (default `false`)     | Combat only; removes buff by manifest name; `permanent: true` also clears stored persistent buff |
+| `end_adventure`    | `outcome`            | —                                           | Terminates the adventure                                                                         |
+| `goto`             | `target`             | —                                           | Jumps to a labeled step                                                                          |
 
 ### `item_drop` loot entry fields
 

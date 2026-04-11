@@ -54,7 +54,7 @@ def test_skill_combat_fixture_has_skills(skill_combat_registry: "ContentRegistry
 def test_skill_combat_fixture_has_buffs(skill_combat_registry: "ContentRegistry") -> None:
     buff = skill_combat_registry.buffs.get("test-buff-dot")
     assert buff is not None
-    assert buff.spec.duration_turns == 3
+    assert buff.spec.duration.turns == 3
 
 
 def test_skill_combat_fixture_has_enemies(skill_combat_registry: "ContentRegistry") -> None:
@@ -165,7 +165,8 @@ metadata:
   name: test-buff-rage
 spec:
   displayName: "Rage"
-  duration_turns: 2
+  duration:
+    turns: 2
   variables:
     rage_percent: 50
   modifiers:
@@ -238,7 +239,8 @@ metadata:
   name: test-buff-shield
 spec:
   displayName: "Shield"
-  duration_turns: 3
+  duration:
+    turns: 3
   variables: {}
   modifiers:
     - type: damage_reduction

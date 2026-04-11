@@ -5,7 +5,8 @@ metadata:
 spec:
   displayName: "Regeneration"
   description: "Restores 15 HP each turn for 3 turns."
-  duration_turns: 3
+  duration:
+    turns: 3
   per_turn_effects:
     - type: heal
       amount: 15

@@ -5,7 +5,8 @@ metadata:
 spec:
   displayName: "Shield"
   description: "Reduces incoming damage by 50%."
-  duration_turns: 3
+  duration:
+    turns: 3
   variables: {}
   modifiers:
     - type: damage_reduction

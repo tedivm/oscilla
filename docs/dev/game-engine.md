@@ -527,7 +527,7 @@ This ensures that content updates (renaming stats, removing adventures) do not b
 
 ### Overview
 
-Skills and buffs are first-class manifest kinds processed by the content loader alongside enemies, items, and adventures. The runtime objects that hold live combat state (`CombatContext`, `ActiveCombatEffect`) are ephemeral dataclasses — they exist only for the duration of a single `run_combat()` call and are never persisted.
+Skills and buffs are first-class manifest kinds processed by the content loader alongside enemies, items, and adventures. The runtime objects that hold live combat state (`CombatContext`, `ActiveCombatEffect`) are ephemeral dataclasses — they exist only for the duration of a single `run_combat()` call. **Persistent buffs** (whose `BuffDuration` includes any time-based expiry field) are an exception: their remaining state is written back to `CharacterState.active_buffs` after combat ends and re-injected into the next combat.
 
 ### `CombatContext` Lifecycle
 
@@ -541,19 +541,37 @@ Skills and buffs are first-class manifest kinds processed by the content loader 
 | `skill_uses_this_combat` | `Dict[str, int]`           | Turn-scope cooldown tracking: skill_ref → last turn used                                  |
 | `enemy_resources`        | `Dict[str, int]`           | Live resource values for enemy skill costs (initialized from `EnemySpec.skill_resources`) |
 
-On combat exit, `CombatContext` is discarded. Adventure-scope cooldowns (`CharacterState.skill_tick_expiry` and `CharacterState.skill_real_expiry`) are written back to the player state.
+On combat exit, `CombatContext` is discarded. Adventure-scope cooldowns (`CharacterState.skill_tick_expiry` and `CharacterState.skill_real_expiry`) are written back to the player state. For persistent buffs, `run_combat()` records which `StoredBuff` entries it injected at entry (`injected_persistent_refs`). On exit, those entries are removed from `player.active_buffs` and any still-active persistent effects are re-added with their updated `remaining_turns`.
 
 ### `ActiveCombatEffect`
 
 Each active buff is represented as an `ActiveCombatEffect`:
 
-| Field              | Type                    | Purpose                                                           |
-| ------------------ | ----------------------- | ----------------------------------------------------------------- |
-| `label`            | `str`                   | Buff manifest `name` — stable identity used by `DispelEffect`     |
-| `target`           | `"player"` \| `"enemy"` | Who the buff is applied to                                        |
-| `turns_remaining`  | `int`                   | Decremented at round start; removed when 0                        |
-| `per_turn_effects` | `List[Effect]`          | Dispatched through `run_effect()` each round                      |
-| `modifiers`        | `List[CombatModifier]`  | Passive damage-arithmetic modifiers queried during attack/defense |
+| Field              | Type                     | Purpose                                                                                       |
+| ------------------ | ------------------------ | --------------------------------------------------------------------------------------------- |
+| `label`            | `str`                    | Buff manifest `name` — stable identity used by `DispelEffect`                                 |
+| `target`           | `"player"` \| `"enemy"`  | Who the buff is applied to                                                                    |
+| `turns_remaining`  | `int`                    | Decremented at round start; removed when 0                                                    |
+| `per_turn_effects` | `List[Effect]`           | Dispatched through `run_effect()` each round                                                  |
+| `modifiers`        | `List[CombatModifier]`   | Passive damage-arithmetic modifiers queried during attack/defense                             |
+| `exclusion_group`  | `str \| None`            | Group name used for priority-based blocking; `None` means this buff stacks freely             |
+| `priority`         | `int`                    | Resolved priority value for exclusion checks (after variable substitution)                    |
+| `exclusion_mode`   | `"block"` \| `"replace"` | Whether a stronger incoming buff evicts this one (`replace`) or leaves it to expire naturally |
+| `is_persistent`    | `bool`                   | True when the source `BuffDuration` has any time-based expiry field set                       |
+| `variables`        | `Dict[str, int]`         | Resolved variable values used during writeback to `StoredBuff`                                |
+
+### `BuffDuration`
+
+`BuffDuration` is the nested field on `BuffSpec` that controls how long a buff lasts and whether it survives between combats.
+
+| Field        | Type                 | Default  | Description                                                            |
+| ------------ | -------------------- | -------- | ---------------------------------------------------------------------- |
+| `turns`      | `int \| str`         | required | Combat turns active per encounter; `str` values are compiled templates |
+| `ticks`      | `int \| str \| None` | `None`   | Internal adventure ticks before expiry; makes the buff persistent      |
+| `game_ticks` | `int \| str \| None` | `None`   | Game-time ticks before expiry; makes the buff persistent               |
+| `seconds`    | `int \| str \| None` | `None`   | Real-world seconds before expiry; makes the buff persistent            |
+
+`BuffDuration.is_persistent` is a computed property that returns `True` when any of `ticks`, `game_ticks`, or `seconds` is set. The combat entry path calls `sweep_expired_buffs()` before re-injection to discard any `StoredBuff` whose time-based thresholds have already been reached.
 
 ### `available_skills()` Contract
 

@@ -5,7 +5,8 @@ metadata:
 spec:
   displayName: "Iron Skin"
   description: "Reduces incoming damage by 30% for 3 turns."
-  duration_turns: 3
+  duration:
+    turns: 3
   modifiers:
     - type: damage_reduction
       target: player

@@ -1,0 +1,14 @@
+apiVersion: oscilla/v1
+kind: Buff
+metadata:
+  name: test-persistent-buff
+spec:
+  displayName: "Persistent Shield"
+  description: "A damage-reduction buff that persists across combats (turn + tick duration)."
+  duration:
+    turns: 3
+    ticks: 10
+  modifiers:
+    - type: damage_reduction
+      target: player
+      percent: 30

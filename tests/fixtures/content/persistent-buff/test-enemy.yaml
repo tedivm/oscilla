@@ -1,0 +1,12 @@
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: test-enemy
+spec:
+  displayName: "Test Enemy"
+  description: "A weak enemy for buff lifecycle testing."
+  hp: 5
+  attack: 1
+  defense: 0
+  xp_reward: 10
+  loot: []

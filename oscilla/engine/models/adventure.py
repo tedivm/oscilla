@@ -118,6 +118,13 @@ class DispelEffect(BaseModel):
         default="player",
         description="Only effects targeting this participant are removed.",
     )
+    permanent: bool = Field(
+        default=False,
+        description=(
+            "When True, also removes the buff from CharacterState.active_buffs so it does not "
+            "re-enter future combats. When False (default), only the in-combat instance is removed."
+        ),
+    )
 
 
 class SetPronounsEffect(BaseModel):

@@ -776,6 +776,16 @@ make document_schema
 <!-- BEGIN_SQLALCHEMY_DOCS -->
 ```mermaid
 erDiagram
+  character_iteration_active_buffs {
+    VARCHAR buff_ref PK
+    CHAR(32) iteration_id PK,FK
+    BIGINT game_tick_expiry "nullable"
+    BIGINT real_ts_expiry "nullable"
+    INTEGER remaining_turns
+    BIGINT tick_expiry "nullable"
+    VARCHAR variables_json
+  }
+
   character_iteration_adventure_state {
     VARCHAR adventure_ref PK
     CHAR(32) iteration_id PK,FK
@@ -895,6 +905,7 @@ erDiagram
     VARCHAR user_key UK
   }
 
+  character_iterations ||--o| character_iteration_active_buffs : iteration_id
   character_iterations ||--o| character_iteration_adventure_state : iteration_id
   character_iterations ||--o| character_iteration_equipment : iteration_id
   character_iterations ||--o| character_iteration_era_state : iteration_id

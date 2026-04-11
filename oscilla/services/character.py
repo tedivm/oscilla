@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, Dict, List, Literal
@@ -9,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from oscilla.models.character import CharacterRecord
 from oscilla.models.character_iteration import (
+    CharacterIterationActiveBuff,
     CharacterIterationAdventureState,
     CharacterIterationEquipment,
     CharacterIterationEraState,
@@ -208,6 +210,20 @@ async def save_character(session: AsyncSession, state: "CharacterState", user_id
                     real_expiry=real_exp,
                 )
             )
+    import json
+
+    for sb in state.active_buffs:
+        session.add(
+            CharacterIterationActiveBuff(
+                iteration_id=iteration.id,
+                buff_ref=sb.buff_ref,
+                remaining_turns=sb.remaining_turns,
+                variables_json=json.dumps(sb.variables),
+                tick_expiry=sb.tick_expiry,
+                game_tick_expiry=sb.game_tick_expiry,
+                real_ts_expiry=sb.real_ts_expiry,
+            )
+        )
 
     await session.commit()
 
@@ -259,6 +275,7 @@ async def load_character(
             selectinload(CharacterIterationRecord.adventure_state_rows),
             selectinload(CharacterIterationRecord.era_state_rows),
             selectinload(CharacterIterationRecord.pending_trigger_rows),
+            selectinload(CharacterIterationRecord.active_buff_rows),
         )
     )
     iter_result = await session.execute(iter_stmt)
@@ -380,6 +397,17 @@ async def load_character(
         "era_ended_at_ticks": era_ended_at_ticks,
         # Rows are already ordered ascending by position via the relationship order_by.
         "pending_triggers": [row.trigger_name for row in iteration.pending_trigger_rows],
+        "active_buffs": [
+            {
+                "buff_ref": row.buff_ref,
+                "remaining_turns": row.remaining_turns,
+                "variables": json.loads(row.variables_json),
+                "tick_expiry": row.tick_expiry,
+                "game_tick_expiry": row.game_tick_expiry,
+                "real_ts_expiry": row.real_ts_expiry,
+            }
+            for row in iteration.active_buff_rows
+        ],
     }
 
     return CharacterState.from_dict(data=data, character_config=character_config, registry=registry)

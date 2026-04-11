@@ -7,6 +7,7 @@ functions in oscilla/engine/steps/.
 
 from __future__ import annotations
 
+import time
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Protocol
 
@@ -195,6 +196,12 @@ class AdventurePipeline:
             # Record tick snapshots for cooldown evaluation.
             self._player.adventure_last_completed_at_ticks[adventure_ref] = self._player.internal_ticks
             self._player.adventure_last_completed_game_ticks[adventure_ref] = self._player.game_ticks
+            # Sweep persistent buffs whose expiry conditions are now met after tick advancement.
+            self._player.sweep_expired_buffs(
+                now_tick=self._player.internal_ticks,
+                now_game_tick=self._player.game_ticks,
+                now_ts=int(time.time()),
+            )
             # Evaluate era start/end conditions and latch activation ticks.
             if self._registry.game is not None and self._registry.game.spec.time is not None:
                 from oscilla.engine.ingame_time import update_era_states

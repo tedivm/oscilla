@@ -67,7 +67,7 @@ black_fixes:
 
 .PHONY: prettier_fixes
 prettier_fixes:
-	npx --yes prettier --write .
+	npx --yes prettier --write . --log-level warn
 
 .PHONY: tomlsort_fixes
 tomlsort_fixes:
@@ -105,7 +105,7 @@ validate:
 
 .PHONY: prettier_check
 prettier_check:
-	npx --yes prettier --check .
+	npx --yes prettier --check . --log-level warn
 
 .PHONY: tomlsort_check
 tomlsort_check:
@@ -162,7 +162,7 @@ clear_db:
 create_migration:
 	@if [ -z "$(MESSAGE)" ]; then echo "Please add a message parameter for the migration (make create_migration MESSAGE=\"database migration notes\")."; exit 1; fi
 	rm $(MIGRATION_DATABASE) | true
-	DATABASE_URL=sqlite:///$(MIGRATION_DATABASE) $(UV) run alembic upgrade head
+	DATABASE_URL=sqlite:///$(MIGRATION_DATABASE) $(UV) run alembic upgrade head 2>/dev/null
 	DATABASE_URL=sqlite:///$(MIGRATION_DATABASE) $(UV) run alembic revision --autogenerate -m "$(MESSAGE)"
 	rm $(MIGRATION_DATABASE)
 	$(UV) run ruff format ./db
@@ -170,8 +170,8 @@ create_migration:
 .PHONY: check_ungenerated_migrations
 check_ungenerated_migrations:
 	rm -f $(MIGRATION_DATABASE)
-	DATABASE_URL=sqlite:///$(MIGRATION_DATABASE) $(UV) run alembic upgrade head
-	DATABASE_URL=sqlite:///$(MIGRATION_DATABASE) $(UV) run alembic check
+	DATABASE_URL=sqlite:///$(MIGRATION_DATABASE) $(UV) run alembic upgrade head 2>/dev/null | tail -5
+	DATABASE_URL=sqlite:///$(MIGRATION_DATABASE) $(UV) run alembic check 2>/dev/null | tail -5
 	rm -f $(MIGRATION_DATABASE)
 
 #

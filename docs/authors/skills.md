@@ -126,7 +126,8 @@ metadata:
 spec:
   displayName: Arcane Shield
   description: "A shimmering barrier that absorbs 40% of incoming damage."
-  duration_turns: 3
+  duration:
+    turns: 3
   modifiers:
     - type: damage_reduction
       percent: 40
@@ -135,16 +136,95 @@ spec:
 
 ### `BuffSpec` Fields
 
-| Field              | Type                    | Default        | Description                                                                   |
-| ------------------ | ----------------------- | -------------- | ----------------------------------------------------------------------------- |
-| `displayName`      | `str`                   | required       | Player-facing name shown when the buff is applied                             |
-| `description`      | `str`                   | `""`           | Flavor text                                                                   |
-| `duration_turns`   | `int`                   | required (≥ 1) | Number of combat turns this buff remains active                               |
-| `per_turn_effects` | list of Effects         | `[]`           | Effects dispatched at the start of each round while active                    |
-| `modifiers`        | list of CombatModifiers | `[]`           | Passive damage-arithmetic adjustments active until the buff expires           |
-| `variables`        | dict[str, int]          | `{}`           | Named integer parameters with default values; can be overridden at apply time |
+| Field              | Type                     | Default   | Description                                                                                                           |
+| ------------------ | ------------------------ | --------- | --------------------------------------------------------------------------------------------------------------------- |
+| `displayName`      | `str`                    | required  | Player-facing name shown when the buff is applied                                                                     |
+| `description`      | `str`                    | `""`      | Flavor text                                                                                                           |
+| `duration`         | `BuffDuration`           | required  | Duration and persistence settings (see [BuffDuration and Buff Persistence](#buffduration-and-buff-persistence) below) |
+| `per_turn_effects` | list of Effects          | `[]`      | Effects dispatched at the start of each round while active                                                            |
+| `modifiers`        | list of CombatModifiers  | `[]`      | Passive damage-arithmetic adjustments active until the buff expires                                                   |
+| `variables`        | dict[str, int]           | `{}`      | Named integer parameters with default values; can be overridden at apply time                                         |
+| `exclusion_group`  | `str` \| `null`          | `null`    | Group name for priority-based exclusion (see [Buff Blocking](#buff-blocking))                                         |
+| `priority`         | `int` \| variable name   | `0`       | Priority within the exclusion group; higher value wins                                                                |
+| `exclusion_mode`   | `"block"` \| `"replace"` | `"block"` | Whether a stronger incoming buff evicts lower-priority active entries                                                 |
 
 **At least one of `per_turn_effects` or `modifiers` must be non-empty.** A buff with neither is rejected at load time.
+
+### `BuffDuration` and Buff Persistence
+
+The `duration` block controls how long a buff lasts and whether it persists across combats.
+
+| Field        | Type              | Default        | Description                                               |
+| ------------ | ----------------- | -------------- | --------------------------------------------------------- |
+| `turns`      | `int` \| template | required (≥ 1) | Combat turns the buff fires per encounter                 |
+| `ticks`      | `int` \| null     | `null`         | Internal adventure ticks before the buff expires entirely |
+| `game_ticks` | `int` \| null     | `null`         | Game-time ticks before expiry                             |
+| `seconds`    | `int` \| null     | `null`         | Real-world seconds before expiry                          |
+
+**Encounter-scoped** (default): omit `ticks`, `game_ticks`, and `seconds`. The buff is discarded when combat ends — it never carries over.
+
+**Persistent**: set any one (or more) of `ticks`, `game_ticks`, or `seconds`. The buff is stored on the player after combat and re-injected into each subsequent combat until all the time-based conditions are met. Multiple fields are AND-ed.
+
+```yaml
+# Encounter-scoped: lasts 3 turns, gone after combat
+duration:
+  turns: 3
+
+# Persistent: 3 turns per combat, survives until 500 internal ticks have elapsed
+duration:
+  turns: 3
+  ticks: 500
+```
+
+### Buff Blocking
+
+Buffs can be organized into **exclusion groups** so that only the strongest active buff in a group applies at any one time. This prevents stacking multiple copies of the same class of effect (e.g., two different defense buffs).
+
+Key fields on `BuffSpec`:
+
+- `exclusion_group` — a string name shared by competing buffs. Only buffs in the same group compete.
+- `priority` — an integer (or variable name) determining which buff wins. Higher wins.
+- `exclusion_mode` — controls what happens when a new, stronger buff tries to apply while a weaker one is already active:
+  - `block` (default): the existing lower-priority buff stays active and expires naturally.
+  - `replace`: the existing lower-priority buff is immediately removed, then the new buff is applied.
+
+Example — two shield buffs in the same group, `replace` mode:
+
+```yaml
+# minor-shield.yaml
+spec:
+  duration:
+    turns: 5
+  exclusion_group: defense
+  priority: 20
+  exclusion_mode: replace
+  modifiers:
+    - type: damage_reduction
+      percent: 20
+      target: player
+
+# major-shield.yaml
+spec:
+  duration:
+    turns: 5
+  exclusion_group: defense
+  priority: 50
+  exclusion_mode: replace
+  modifiers:
+    - type: damage_reduction
+      percent: 50
+      target: player
+```
+
+If `minor-shield` is active when `major-shield` is applied:
+
+- The engine sees `minor-shield.priority (20) < major-shield.priority (50)`, so `major-shield` wins.
+- With `replace` mode, `minor-shield` is immediately evicted and `major-shield` is applied.
+- If `exclusion_mode` were `block`, `minor-shield` would continue ticking down and `major-shield` would simply not be applied.
+
+If `major-shield` is already active when `minor-shield` tries to apply, the application is blocked regardless of mode — the weaker buff never gets in.
+
+Buffs **without** an `exclusion_group` are never blocked or evicted; they stack freely.
 
 ### Tick Effects (`per_turn_effects`)
 
@@ -158,7 +238,8 @@ metadata:
 spec:
   displayName: On Fire
   description: "Burning flames — deals 10 damage per turn."
-  duration_turns: 3
+  duration:
+    turns: 3
   per_turn_effects:
     - type: heal
       amount: -10 # negative heal = damage
@@ -227,7 +308,8 @@ metadata:
 spec:
   displayName: Thorns
   description: "Reflects a percentage of incoming damage back at attackers."
-  duration_turns: 3
+  duration:
+    turns: 3
   variables:
     reflect_percent: 30 # default value
   modifiers:

@@ -1,0 +1,16 @@
+apiVersion: oscilla/v1
+kind: Buff
+metadata:
+  name: test-buff-low
+spec:
+  displayName: "Low Priority Shield"
+  description: "A low-priority buff for testing exclusion-group blocking."
+  duration:
+    turns: 5
+  exclusion_group: test-defense-group
+  priority: 30
+  exclusion_mode: block
+  modifiers:
+    - type: damage_reduction
+      target: player
+      percent: 20

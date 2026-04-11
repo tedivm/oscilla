@@ -33,18 +33,16 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 
 | Item                                                                                        | Effort | Group                   |
 | ------------------------------------------------------------------------------------------- | ------ | ----------------------- |
-| [Full TUI Upgrade](#full-tui-upgrade)                                                       | L      | —                       |
-| [Cross-Iteration Conditions/Templates/Effects](#cross-iteration-conditionstemplateseffects) | M      | Character Progression   |
-| [Adventure-Scoped Variables](#adventure-scoped-variables)                                   | M      | Adventure Authoring     |
+| [Decision Tree AI for Enemies](#decision-tree-ai-for-enemies)                               | L      | Combat Overhaul         |
 | [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems)        | XL     | Combat Overhaul         |
-| [Buff Blocking and Priority](#buff-blocking-and-priority)                                   | S      | Combat Refinement       |
-| [Buff Persistence Between Adventures](#buff-persistence-between-adventures)                 | S      | Combat Refinement       |
 | [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades)                          | M      | Character Progression   |
 | [Extended Template Primitives](#extended-template-primitives)                               | S      | Engine Architecture     |
 | [Player-Defined Pronouns](#player-defined-pronouns)                                         | S      | Character Configuration |
+| [Cross-Iteration Conditions/Templates/Effects](#cross-iteration-conditionstemplateseffects) | M      | Character Progression   |
+| [Adventure-Scoped Variables](#adventure-scoped-variables)                                   | M      | Adventure Authoring     |
+| [Inventory Storage](#inventory-storage)                                                     | L      | Item System             |
 | [Shop and Vendor System](#shop-and-vendor-system)                                           | L      | Economy & NPCs          |
 | [Persistent NPCs and Dialogue](#persistent-npcs-and-dialogue)                               | L      | Economy & NPCs          |
-| [Inventory Storage](#inventory-storage)                                                     | L      | Item System             |
 | [Quest Branching](#quest-branching)                                                         | M      | Quest Depth & Factions  |
 | [Quest Progress Panel](#quest-progress-panel)                                               | M      | Quest Depth             |
 | [Faction and Reputation System](#faction-and-reputation-system)                             | M      | Quest Depth & Factions  |
@@ -52,8 +50,10 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [Plugin and Extension System](#plugin-and-extension-system)                                 | L      | Engine Architecture     |
 | [HTTP API for Multi-User Support](#http-api-for-multi-user-support)                         | XL     | Multi-User Platform     |
 | [Front End Website](#front-end-website)                                                     | XL     | Multi-User Platform     |
-| [Picture Selection and ASCII Art](#picture-selection-and-ascii-art)                         | M      | —                       |
-| [Region Maps](#region-maps)                                                                 | M      | —                       |
+| [Full TUI Upgrade](#full-tui-upgrade)                                                       | L      | Media and Presentation  |
+| [Region Maps](#region-maps)                                                                 | M      | Media and Presentation  |
+| [Picture Selection and ASCII Art](#picture-selection-and-ascii-art)                         | M      | Media and Presentation  |
+| [Content Documentation Generator](#content-documentation-generator)                         | M      | Author Tooling          |
 
 ---
 
@@ -90,83 +90,9 @@ Goals:
 
 This is a prerequisite for games that want combat to feel meaningfully different from the default turn-based model.
 
-### Buff Blocking and Priority
-
-**Effort: S** · **Group: Combat Refinement**
-
-Currently, the same buff can be applied multiple times simultaneously regardless of whether a weaker version is already active. For example, if a `thorns-60pct` buff is applied and then `thorns-30pct` is also applied, both fire independently — leading to unintended stacking and counter-intuitive results.
-
-Add a priority or exclusion mechanism to buff manifests. Buffs in the same exclusion group should block lower-priority applications:
-
-```yaml
-spec:
-  name: thorns
-  exclusion_group: thorns # only the highest-priority instance in this group applies
-  priority: 60 # numeric priority; higher wins
-```
-
-When a buff is applied, the engine checks for existing active effects in the same `exclusion_group` and skips the new application if a higher-priority instance is already running.
-
-### Buff Persistence Between Adventures
-
-**Effort: S** · **Group: Combat Refinement**
-
-Buffs are currently ephemeral — they apply at the start of a combat encounter and are discarded when the encounter ends. This prevents authors from creating persistent status effects that carry between fights (e.g. a curse from losing a boss encounter, a blessing that lasts for three adventures, or a "well-rested" bonus that expires after the next combat).
-
-Add an optional `duration` scope to buff manifests:
-
-- `scope: encounter` (default) — current behavior, cleared after combat
-- `scope: adventure` — persists until the adventure ends
-- `scope: persistent` — stored on the player and persists until explicitly dispelled or a duration expires
-
-The unified `Cooldown` model (which already drives adventure and skill cooldowns) is the natural fit for expressing buff durations — a persistent buff can declare `ticks`, `game_ticks`, or `seconds` before it expires, using the same schema authors already know. Persistent buffs require a small addition to the player state serialization.
-
 ---
 
 ## Player Progression
-
-### Character Archetypes
-
-**Effort: M** · **Group: Character Progression**
-
-Rather than a single hard-wired class system, the engine provides a generic **archetypes** collection on each character — a set of string keys whose legal values and meaning are fully defined by the author in `game.yaml`. Characters can hold any number of archetypes simultaneously, enabling multi-classing, dual guilds, overlapping faction memberships, or any other multi-category scheme a content package needs.
-
-Authors define their archetype vocabulary in `game.yaml`:
-
-```yaml
-archetypes:
-  warrior:
-    label: "Warrior"
-    stat_growth: # per-level stat bonuses stack across all held archetypes
-      hp: 3
-      strength: 1
-    skill_categories: # union of all held archetypes' lists determines what can be learned
-      - melee
-      - defense
-  mage:
-    label: "Mage"
-    stat_growth:
-      hp: 1
-      intelligence: 2
-    skill_categories:
-      - arcane
-      - support
-  guild_member: # a social archetype with no mechanical stat growth
-    label: "Guild Member"
-  wanderer: # open archetype — no restrictions added or removed
-    label: "Wanderer"
-```
-
-A character who holds both `warrior` and `mage` gets the combined `stat_growth` bonuses each level and can learn from both `melee`/`defense` and `arcane`/`support` categories.
-
-Archetypes are first-class across all three authoring systems:
-
-- **Selection**: archetypes are granted or revoked via `archetype_add` and `archetype_remove` effects, available at character creation, in adventure steps, or via triggered adventures (enabling in-world multi-classing quests)
-- **Condition system**: predicates operate on the set — `has_archetype: warrior` (holds at least one), `has_all_archetypes: [warrior, mage]` (holds all), `has_any_archetype: [warrior, paladin]` (holds at least one of the list), `archetype_count_gte: 2` (holds N or more)
-- **Template system**: the character's full archetype set and each archetype's definition from `game.yaml` are exposed, so templates can list classes, display combined bonuses, or branch on membership
-- **Skill gating**: the union of `skill_categories` across all held archetypes determines what the character may learn; a character with no archetypes falls back to package-level defaults
-
-Content packages that don't want a class system simply omit the `archetypes` key and the feature is invisible.
 
 ### Talent Trees / Passive Upgrades
 
@@ -485,13 +411,11 @@ Considerations:
 - Accessibility: keyboard navigation, screen reader support, sufficient color contrast
 - The existing static file serving in `oscilla/static/` and template system in `oscilla/templates/` are starting points but likely need significant expansion
 
----
-
 ## Media and Presentation
 
 ### Full TUI Upgrade
 
-**Effort: L** · **Group: —**
+**Effort: L** · **Group: Media and Presentation**
 
 A comprehensive pass over the terminal TUI to surface all engine features that have been added since the original TUI was written but are not yet represented with dedicated UI — inventory management, the skill system, quests, faction reputations, NPC interactions, and prestige state among them. The current TUI shows the player's location and adventure choices but leaves most character depth invisible.
 
@@ -517,7 +441,7 @@ Dependencies:
 
 ### Region Maps
 
-**Effort: M** · **Group: —**
+**Effort: M** · **Group: Media and Presentation**
 
 Automatically generated visual maps of a region and the locations within it, rendered in the terminal TUI and optionally as a static image asset for the web front end. Maps give players spatial orientation — they can see which locations are nearby, which they have visited, and how the world is structured — without requiring content authors to hand-draw any art.
 
@@ -539,7 +463,7 @@ Design considerations:
 
 ### Picture Selection and ASCII Art
 
-**Effort: M** · **Group: —**
+**Effort: M** · **Group: Media and Presentation**
 
 Allow content manifests to associate images with locations, characters, enemies, items, and adventures. In the terminal TUI, images are rendered as ASCII art; in the web front end, they are displayed as standard images.
 
@@ -550,3 +474,34 @@ Implementation notes:
 - The TUI rendering layer checks terminal width and scales ASCII output accordingly
 - The web front end ignores the ASCII conversion and serves the original image
 - Content authors are not required to provide images; the field is always optional and the engine renders gracefully without one
+
+---
+
+## Author Tooling
+
+### Content Documentation Generator
+
+**Effort: M** · **Group: Author Tooling**
+
+A CLI command (`oscilla content docs`) that reads a loaded content bundle and emits a self-contained set of interlinked Markdown files documenting every entity in the game — items, enemies, regions, locations, adventures, quests, archetypes, skills, and more. Authors control whether to ship the output alongside their content package, host it as a dedicated site, or keep it as a private reference.
+
+The generator produces one Markdown file per entity plus index pages per kind (e.g. `items/index.md`, `enemies/index.md`). Every generated page cross-links to related entities: an item page links to the adventures where it can be found, an adventure page links to the items it can grant, an enemy page links to its loot table entries, a region page links to its locations and the adventures accessible there.
+
+Key design points:
+
+- Output is pure Markdown with relative links so it renders correctly in any Markdown viewer, static site generator (MkDocs, Docusaurus, Jekyll), or GitHub repository browser without additional tooling
+- The command accepts an output directory argument and an optional `--game` flag to select the content package, consistent with other `oscilla content` subcommands
+- Author-provided `description` and `displayName` fields from manifests are the primary narrative content; generated pages annotate them with structured data (stats, effects, conditions, loot weights) rendered as Markdown tables
+- Cross-reference maps are built by walking all manifests once and resolving references before writing any output — item names appearing in loot tables, effect targets, adventure prerequisites, etc. are linked wherever they appear
+- Effect and condition blocks are rendered in a human-readable summary format rather than raw YAML so pages are useful to players as well as authors
+- An `index.md` at the output root provides a top-level table of contents with counts and links to each kind index
+- The generator is entirely read-only and works against any valid content bundle, including third-party packages the author did not write
+- Authors can suppress individual entities from documentation output with a `hidden: true` metadata flag, allowing spoiler content or internal test fixtures to be excluded
+
+Example invocation:
+
+```bash
+oscilla content docs --game testlandia --output ./docs/game/
+```
+
+This pairs naturally with the `oscilla content graph` command (which already generates region graphs) and would reuse the same content-loading pipeline.

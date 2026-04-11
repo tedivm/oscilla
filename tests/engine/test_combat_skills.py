@@ -13,14 +13,16 @@ from uuid import uuid4
 import pytest
 
 from oscilla.engine.character import AdventurePosition, CharacterState, ItemInstance
-from oscilla.engine.models.adventure import ApplyBuffEffect, CombatStep, Cooldown, OutcomeBranch
+from oscilla.engine.models.adventure import ApplyBuffEffect, CombatStep, Cooldown, DispelEffect, OutcomeBranch
 from oscilla.engine.models.base import Metadata
 from oscilla.engine.models.buff import (
+    BuffDuration,
     BuffManifest,
     BuffSpec,
     DamageAmplifyModifier,
     DamageReductionModifier,
     DamageReflectModifier,
+    StoredBuff,
 )
 from oscilla.engine.models.character_config import CharacterConfigManifest, CharacterConfigSpec, StatDefinition
 from oscilla.engine.models.enemy import EnemyManifest, EnemySkillEntry, EnemySpec
@@ -155,7 +157,7 @@ def _add_buff_to_registry(
         metadata=Metadata(name=name),
         spec=BuffSpec(
             displayName=name.replace("-", " ").title(),
-            duration_turns=duration_turns,
+            duration=BuffDuration(turns=duration_turns),
             modifiers=modifiers or [],
             per_turn_effects=per_turn_effects or [],
             variables=variables or {},
@@ -669,3 +671,609 @@ async def test_apply_buff_with_variables_override_during_combat() -> None:
     ae = ctx.active_effects[0]
     # The percent on the resolved modifier should be 60.
     assert ae.modifiers[0].percent == 60
+
+
+# ---------------------------------------------------------------------------
+# Task 3.3 — exclusion-group blocking (buff blocking system)
+# ---------------------------------------------------------------------------
+
+
+def _add_buff_with_exclusion(
+    registry: ContentRegistry,
+    name: str,
+    duration_turns: int,
+    exclusion_group: str | None = None,
+    priority: int = 0,
+    exclusion_mode: str = "block",
+    modifiers: list | None = None,
+    variables: dict | None = None,
+) -> None:
+    """Helper to add a Buff with exclusion_group/priority to the registry."""
+    buff = BuffManifest(
+        apiVersion="oscilla/v1",
+        kind="Buff",
+        metadata=Metadata(name=name),
+        spec=BuffSpec(
+            displayName=name.replace("-", " ").title(),
+            duration=BuffDuration(turns=duration_turns),
+            exclusion_group=exclusion_group,
+            priority=priority,
+            exclusion_mode=exclusion_mode,
+            modifiers=modifiers or [DamageReductionModifier(type="damage_reduction", target="player", percent=10)],
+            variables=variables or {},
+        ),
+    )
+    registry.buffs.register(buff)
+
+
+@pytest.mark.asyncio
+async def test_exclusion_block_mode_stronger_blocks_weaker() -> None:
+    """In block mode, an active high-priority buff blocks a lower-priority buff from the same group."""
+    from oscilla.engine.combat_context import CombatContext
+    from oscilla.engine.steps.effects import run_effect
+
+    registry = _make_game_registry()
+    _add_buff_with_exclusion(registry, "buff-high", duration_turns=3, exclusion_group="def-group", priority=60)
+    _add_buff_with_exclusion(registry, "buff-low", duration_turns=3, exclusion_group="def-group", priority=30)
+
+    player = _make_player_with_mana(registry)
+    ctx = CombatContext(enemy_hp=10, enemy_ref="test-enemy")
+    tui = MockTUI()
+
+    # Apply the stronger buff first.
+    await run_effect(
+        effect=ApplyBuffEffect(type="apply_buff", buff_ref="buff-high", target="player", variables={}),
+        player=player,
+        registry=registry,
+        tui=tui,
+        combat=ctx,
+    )
+    assert len(ctx.active_effects) == 1
+
+    # Try to apply the weaker buff — it must be blocked.
+    await run_effect(
+        effect=ApplyBuffEffect(type="apply_buff", buff_ref="buff-low", target="player", variables={}),
+        player=player,
+        registry=registry,
+        tui=tui,
+        combat=ctx,
+    )
+    assert len(ctx.active_effects) == 1
+    assert ctx.active_effects[0].label == "buff-high"
+
+
+@pytest.mark.asyncio
+async def test_exclusion_block_mode_equal_priority_blocks() -> None:
+    """In block mode, an equal-priority existing buff blocks the incoming buff."""
+    from oscilla.engine.combat_context import CombatContext
+    from oscilla.engine.steps.effects import run_effect
+
+    registry = _make_game_registry()
+    _add_buff_with_exclusion(registry, "buff-a", duration_turns=3, exclusion_group="def-group", priority=50)
+    _add_buff_with_exclusion(registry, "buff-b", duration_turns=3, exclusion_group="def-group", priority=50)
+
+    player = _make_player_with_mana(registry)
+    ctx = CombatContext(enemy_hp=10, enemy_ref="test-enemy")
+    tui = MockTUI()
+
+    await run_effect(
+        effect=ApplyBuffEffect(type="apply_buff", buff_ref="buff-a", target="player", variables={}),
+        player=player,
+        registry=registry,
+        tui=tui,
+        combat=ctx,
+    )
+    await run_effect(
+        effect=ApplyBuffEffect(type="apply_buff", buff_ref="buff-b", target="player", variables={}),
+        player=player,
+        registry=registry,
+        tui=tui,
+        combat=ctx,
+    )
+    # Only the first one should be present.
+    assert len(ctx.active_effects) == 1
+    assert ctx.active_effects[0].label == "buff-a"
+
+
+@pytest.mark.asyncio
+async def test_exclusion_block_mode_no_group_never_blocked() -> None:
+    """Buffs without an exclusion_group are never blocked by group logic."""
+    from oscilla.engine.combat_context import CombatContext
+    from oscilla.engine.steps.effects import run_effect
+
+    registry = _make_game_registry()
+    _add_buff_with_exclusion(registry, "buff-no-group-a", duration_turns=3, exclusion_group=None, priority=0)
+    _add_buff_with_exclusion(registry, "buff-no-group-b", duration_turns=3, exclusion_group=None, priority=0)
+
+    player = _make_player_with_mana(registry)
+    ctx = CombatContext(enemy_hp=10, enemy_ref="test-enemy")
+    tui = MockTUI()
+
+    await run_effect(
+        effect=ApplyBuffEffect(type="apply_buff", buff_ref="buff-no-group-a", target="player", variables={}),
+        player=player,
+        registry=registry,
+        tui=tui,
+        combat=ctx,
+    )
+    await run_effect(
+        effect=ApplyBuffEffect(type="apply_buff", buff_ref="buff-no-group-b", target="player", variables={}),
+        player=player,
+        registry=registry,
+        tui=tui,
+        combat=ctx,
+    )
+    # Both must be applied since neither belongs to an exclusion group.
+    assert len(ctx.active_effects) == 2
+
+
+@pytest.mark.asyncio
+async def test_exclusion_block_mode_per_target_isolation() -> None:
+    """Exclusion group is scoped to target: player and enemy can each hold the same group."""
+    from oscilla.engine.combat_context import CombatContext
+    from oscilla.engine.steps.effects import run_effect
+
+    registry = _make_game_registry()
+    # Single buff manifest that can be applied to any target.
+    _add_buff_with_exclusion(registry, "shared-buff", duration_turns=3, exclusion_group="shared-group", priority=50)
+
+    player = _make_player_with_mana(registry)
+    ctx = CombatContext(enemy_hp=10, enemy_ref="test-enemy")
+    tui = MockTUI()
+
+    await run_effect(
+        effect=ApplyBuffEffect(type="apply_buff", buff_ref="shared-buff", target="player", variables={}),
+        player=player,
+        registry=registry,
+        tui=tui,
+        combat=ctx,
+    )
+    await run_effect(
+        effect=ApplyBuffEffect(type="apply_buff", buff_ref="shared-buff", target="enemy", variables={}),
+        player=player,
+        registry=registry,
+        tui=tui,
+        combat=ctx,
+    )
+    # Both targets may hold the buff independently.
+    assert len(ctx.active_effects) == 2
+
+
+@pytest.mark.asyncio
+async def test_exclusion_replace_mode_stronger_evicts_weaker() -> None:
+    """In replace mode, applying a higher-priority buff removes the existing lower-priority one."""
+    from oscilla.engine.combat_context import CombatContext
+    from oscilla.engine.steps.effects import run_effect
+
+    registry = _make_game_registry()
+    _add_buff_with_exclusion(
+        registry, "buff-weak", duration_turns=3, exclusion_group="def-group", priority=20, exclusion_mode="replace"
+    )
+    _add_buff_with_exclusion(
+        registry, "buff-strong", duration_turns=3, exclusion_group="def-group", priority=60, exclusion_mode="replace"
+    )
+
+    player = _make_player_with_mana(registry)
+    ctx = CombatContext(enemy_hp=10, enemy_ref="test-enemy")
+    tui = MockTUI()
+
+    await run_effect(
+        effect=ApplyBuffEffect(type="apply_buff", buff_ref="buff-weak", target="player", variables={}),
+        player=player,
+        registry=registry,
+        tui=tui,
+        combat=ctx,
+    )
+    assert len(ctx.active_effects) == 1
+
+    # Stronger buff evicts weaker and applies itself.
+    await run_effect(
+        effect=ApplyBuffEffect(type="apply_buff", buff_ref="buff-strong", target="player", variables={}),
+        player=player,
+        registry=registry,
+        tui=tui,
+        combat=ctx,
+    )
+    assert len(ctx.active_effects) == 1
+    assert ctx.active_effects[0].label == "buff-strong"
+
+
+@pytest.mark.asyncio
+async def test_exclusion_replace_mode_weaker_does_not_apply() -> None:
+    """In replace mode, applying a lower-priority buff does not replace the existing stronger one."""
+    from oscilla.engine.combat_context import CombatContext
+    from oscilla.engine.steps.effects import run_effect
+
+    registry = _make_game_registry()
+    _add_buff_with_exclusion(
+        registry, "buff-strong", duration_turns=3, exclusion_group="def-group", priority=60, exclusion_mode="replace"
+    )
+    _add_buff_with_exclusion(
+        registry, "buff-weak", duration_turns=3, exclusion_group="def-group", priority=20, exclusion_mode="replace"
+    )
+
+    player = _make_player_with_mana(registry)
+    ctx = CombatContext(enemy_hp=10, enemy_ref="test-enemy")
+    tui = MockTUI()
+
+    await run_effect(
+        effect=ApplyBuffEffect(type="apply_buff", buff_ref="buff-strong", target="player", variables={}),
+        player=player,
+        registry=registry,
+        tui=tui,
+        combat=ctx,
+    )
+    await run_effect(
+        effect=ApplyBuffEffect(type="apply_buff", buff_ref="buff-weak", target="player", variables={}),
+        player=player,
+        registry=registry,
+        tui=tui,
+        combat=ctx,
+    )
+    # Strong buff remains; weak one was blocked.
+    assert len(ctx.active_effects) == 1
+    assert ctx.active_effects[0].label == "buff-strong"
+
+
+# ---------------------------------------------------------------------------
+# Task 4.3 — permanent dispel clears active_buffs; non-permanent leaves it intact
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_permanent_dispel_clears_stored_buff() -> None:
+    """A DispelEffect with permanent=True removes matching entries from player.active_buffs."""
+    from oscilla.engine.combat_context import CombatContext
+    from oscilla.engine.steps.effects import run_effect
+
+    registry = _make_game_registry()
+    player = _make_player_with_mana(registry)
+
+    # Pre-populate active_buffs so permanent dispel has something to clear.
+    player.active_buffs = [
+        StoredBuff(buff_ref="strong-shield", remaining_turns=2, variables={}),
+        StoredBuff(buff_ref="other-buff", remaining_turns=3, variables={}),
+    ]
+
+    ctx = CombatContext(enemy_hp=20, enemy_ref="test-enemy")
+    ctx.active_effects = []  # No active in-combat effects needed for this test.
+
+    tui = MockTUI()
+    dispel = DispelEffect(type="dispel", label="strong-shield", target="player", permanent=True)
+    await run_effect(effect=dispel, player=player, registry=registry, tui=tui, combat=ctx)
+
+    # strong-shield must be gone; other-buff must remain.
+    remaining_refs = [sb.buff_ref for sb in player.active_buffs]
+    assert "strong-shield" not in remaining_refs
+    assert "other-buff" in remaining_refs
+
+
+@pytest.mark.asyncio
+async def test_non_permanent_dispel_leaves_stored_buff_intact() -> None:
+    """A DispelEffect without permanent=True does not touch player.active_buffs."""
+    from oscilla.engine.combat_context import ActiveCombatEffect, CombatContext
+    from oscilla.engine.steps.effects import run_effect
+
+    registry = _make_game_registry()
+    player = _make_player_with_mana(registry)
+
+    player.active_buffs = [
+        StoredBuff(buff_ref="strong-shield", remaining_turns=2, variables={}),
+    ]
+
+    ctx = CombatContext(enemy_hp=20, enemy_ref="test-enemy")
+    # Put a combat-scope entry so the dispel has something to remove there.
+    ctx.active_effects = [
+        ActiveCombatEffect(
+            source_skill="strong-shield",
+            target="player",
+            remaining_turns=2,
+            per_turn_effects=[],
+            label="strong-shield",
+        ),
+    ]
+
+    tui = MockTUI()
+    dispel = DispelEffect(type="dispel", label="strong-shield", target="player", permanent=False)
+    await run_effect(effect=dispel, player=player, registry=registry, tui=tui, combat=ctx)
+
+    # The stored buff must still be there — non-permanent dispel does not touch it.
+    assert len(player.active_buffs) == 1
+    assert player.active_buffs[0].buff_ref == "strong-shield"
+
+
+# ---------------------------------------------------------------------------
+# Tasks 5.4 / 6.2 — persistent buff lifecycle integration tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_persistent_buff_written_back_after_partial_use() -> None:
+    """A persistent buff with remaining turns > 0 is written back to active_buffs after combat."""
+    registry = _make_game_registry(enemy_hp=5, enemy_attack=1)
+    _add_buff_with_exclusion(
+        registry,
+        "persist-shield",
+        duration_turns=5,
+        exclusion_group=None,
+        priority=0,
+        modifiers=[DamageReductionModifier(type="damage_reduction", target="player", percent=20)],
+    )
+    # Make the buff persistent by adding a tick duration value.
+    buff_manifest = registry.buffs.get("persist-shield")
+    assert buff_manifest is not None
+    buff_manifest.spec.duration.ticks = 100  # tick-based expiry makes it persistent
+
+    player = _make_player_with_mana(registry, hp=100)
+    player.active_buffs = [
+        StoredBuff(buff_ref="persist-shield", remaining_turns=5, variables={}),
+    ]
+
+    # One-turn combat: attack and win immediately.
+    tui = MockTUI(menu_responses=[1, 1, 1, 1, 1])
+    step = _combat_step()
+
+    async def mock_outcome(branch: OutcomeBranch) -> AdventureOutcome:
+        return AdventureOutcome.COMPLETED
+
+    await run_combat(step=step, player=player, registry=registry, tui=tui, run_outcome_branch=mock_outcome)
+
+    # The buff must be written back (remaining_turns may decrease but should be > 0).
+    assert any(sb.buff_ref == "persist-shield" for sb in player.active_buffs)
+
+
+@pytest.mark.asyncio
+async def test_persistent_buff_not_stored_after_turns_exhausted() -> None:
+    """A persistent buff exhausted (remaining_turns == 0) during combat is not written back."""
+    registry = _make_game_registry(enemy_hp=100, enemy_attack=1)
+    _add_buff_with_exclusion(
+        registry,
+        "short-persist",
+        duration_turns=1,  # Expires after one tick
+        exclusion_group=None,
+        priority=0,
+        modifiers=[DamageReductionModifier(type="damage_reduction", target="player", percent=10)],
+    )
+    buff_manifest = registry.buffs.get("short-persist")
+    assert buff_manifest is not None
+    buff_manifest.spec.duration.ticks = 100  # persistent
+
+    player = _make_player_with_mana(registry, hp=100)
+    player.active_buffs = [
+        StoredBuff(buff_ref="short-persist", remaining_turns=1, variables={}),
+    ]
+
+    # Run two turns (buff expires after turn 1), then flee.
+    tui = MockTUI(menu_responses=[1, 2])  # Attack, then Flee (no player skills → menu: 1=Attack, 2=Flee)
+    step = _combat_step()
+
+    async def mock_outcome(branch: OutcomeBranch) -> AdventureOutcome:
+        return AdventureOutcome.FLED
+
+    await run_combat(step=step, player=player, registry=registry, tui=tui, run_outcome_branch=mock_outcome)
+
+    # Buff had remaining_turns=1, should have ticked to 0 in turn 1 and not been stored back.
+    assert not any(sb.buff_ref == "short-persist" for sb in player.active_buffs)
+
+
+@pytest.mark.asyncio
+async def test_stored_buff_re_injected_into_second_combat() -> None:
+    """A StoredBuff in player.active_buffs is re-injected as an ActiveCombatEffect at combat start."""
+
+    registry = _make_game_registry()
+    _add_buff_with_exclusion(
+        registry,
+        "injected-buff",
+        duration_turns=3,
+        exclusion_group=None,
+        priority=0,
+        modifiers=[DamageReductionModifier(type="damage_reduction", target="player", percent=15)],
+    )
+    buff_manifest = registry.buffs.get("injected-buff")
+    assert buff_manifest is not None
+    buff_manifest.spec.duration.ticks = 100  # persistent
+
+    player = _make_player_with_mana(registry)
+    player.active_buffs = [
+        StoredBuff(buff_ref="injected-buff", remaining_turns=3, variables={}),
+    ]
+
+    # Run a very short combat (flee immediately) to observe injection.
+    tui = MockTUI(
+        menu_responses=[1]
+    )  # immediate flee via menu (1=Attack, 2=Flee → but enemy dies in 1 hit with strength=20)
+    step = _combat_step()
+
+    async def capture_outcome(branch: OutcomeBranch) -> AdventureOutcome:
+        return AdventureOutcome.FLED
+
+    # Patch run_combat to intercept the CombatContext at entry by observing effect count.
+    # Instead, run it and then inspect active_buffs for the writeback.
+    tui = MockTUI(menu_responses=[2])  # Flee immediately (1=Attack, 2=Flee)
+    await run_combat(step=step, player=player, registry=registry, tui=tui, run_outcome_branch=capture_outcome)
+
+    # After fleeing, the buff must still be in active_buffs (writeback).
+    assert any(sb.buff_ref == "injected-buff" for sb in player.active_buffs)
+
+
+@pytest.mark.asyncio
+async def test_sweep_removes_tick_expired_buff() -> None:
+    """sweep_expired_buffs removes a buff when internal_ticks >= tick_expiry."""
+    player_registry = _make_game_registry()
+    player = _make_player_with_mana(player_registry)
+
+    # Simulate a buff that expired at tick 10, with current tick at 15.
+    import time as _time
+
+    player.active_buffs = [
+        StoredBuff(buff_ref="expired-shield", remaining_turns=2, variables={}, tick_expiry=10),
+        StoredBuff(buff_ref="active-buff", remaining_turns=5, variables={}, tick_expiry=1000),
+    ]
+    player.internal_ticks = 15
+
+    player.sweep_expired_buffs(
+        now_tick=player.internal_ticks,
+        now_game_tick=player.game_ticks,
+        now_ts=int(_time.time()),
+    )
+
+    refs = [sb.buff_ref for sb in player.active_buffs]
+    assert "expired-shield" not in refs
+    assert "active-buff" in refs
+
+
+# ---------------------------------------------------------------------------
+# Task 7.5 — CharacterState active_buffs round-trips through to_dict / from_dict
+# ---------------------------------------------------------------------------
+
+
+def test_active_buffs_round_trip_through_serialization() -> None:
+    """active_buffs survive a to_dict / from_dict round-trip."""
+    registry = _make_game_registry()
+    player = _make_player_with_mana(registry)
+
+    stored = StoredBuff(
+        buff_ref="persist-regen",
+        remaining_turns=4,
+        variables={"regen_amount": 10},
+        tick_expiry=500,
+        game_tick_expiry=None,
+        real_ts_expiry=None,
+    )
+    player.active_buffs = [stored]
+
+    serialized = player.to_dict()
+    assert "active_buffs" in serialized
+    assert len(serialized["active_buffs"]) == 1
+
+    restored = CharacterState.from_dict(serialized, character_config=registry.character_config)
+    assert len(restored.active_buffs) == 1
+    sb = restored.active_buffs[0]
+    assert sb.buff_ref == "persist-regen"
+    assert sb.remaining_turns == 4
+    assert sb.variables == {"regen_amount": 10}
+    assert sb.tick_expiry == 500
+
+
+def test_active_buffs_empty_list_serializes_and_restores() -> None:
+    """Empty active_buffs round-trips correctly."""
+    registry = _make_game_registry()
+    player = _make_player_with_mana(registry)
+    player.active_buffs = []
+
+    serialized = player.to_dict()
+    restored = CharacterState.from_dict(serialized, character_config=registry.character_config)
+    assert restored.active_buffs == []
+
+
+def test_active_buffs_absent_key_defaults_to_empty() -> None:
+    """from_dict with no 'active_buffs' key defaults to empty list (backward compat)."""
+    registry = _make_game_registry()
+    player = _make_player_with_mana(registry)
+
+    serialized = player.to_dict()
+    serialized.pop("active_buffs", None)  # Remove key to simulate old save data.
+
+    restored = CharacterState.from_dict(serialized, character_config=registry.character_config)
+    assert restored.active_buffs == []
+
+
+# ---------------------------------------------------------------------------
+# W1(c) — variable-name priority: same manifest at two priority levels (replace mode)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_variable_priority_replace_evicts_weaker() -> None:
+    """A buff applied with a higher variable-resolved priority evicts the weaker prior application."""
+    from oscilla.engine.combat_context import CombatContext
+    from oscilla.engine.steps.effects import run_effect
+
+    registry = _make_game_registry()
+    # Single manifest whose priority is driven by the variable "strength".
+    _add_buff_with_exclusion(
+        registry,
+        "thorns-var",
+        duration_turns=5,
+        exclusion_group="thorns-group",
+        priority="strength",
+        exclusion_mode="replace",
+        variables={"strength": 0},
+    )
+
+    player = _make_player_with_mana(registry)
+    ctx = CombatContext(enemy_hp=10, enemy_ref="test-enemy")
+    tui = MockTUI()
+
+    # Apply with strength=30.
+    await run_effect(
+        effect=ApplyBuffEffect(type="apply_buff", buff_ref="thorns-var", target="player", variables={"strength": 30}),
+        player=player,
+        registry=registry,
+        tui=tui,
+        combat=ctx,
+    )
+    assert len(ctx.active_effects) == 1
+    assert ctx.active_effects[0].priority == 30
+
+    # Apply with strength=50 — should evict the 30-priority entry.
+    await run_effect(
+        effect=ApplyBuffEffect(type="apply_buff", buff_ref="thorns-var", target="player", variables={"strength": 50}),
+        player=player,
+        registry=registry,
+        tui=tui,
+        combat=ctx,
+    )
+    assert len(ctx.active_effects) == 1
+    assert ctx.active_effects[0].priority == 50
+
+
+# ---------------------------------------------------------------------------
+# W1(d) — undeclared string priority raises a load-time ValidationError
+# ---------------------------------------------------------------------------
+
+
+def test_undeclared_string_priority_raises_load_error() -> None:
+    """BuffSpec with priority referencing an undeclared variable name is rejected at load time."""
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="priority references variable"):
+        BuffSpec(
+            displayName="Bad Priority Buff",
+            duration=BuffDuration(turns=3),
+            priority="undeclared_var",  # not in variables
+            variables={},
+            modifiers=[DamageReductionModifier(type="damage_reduction", target="player", percent=10)],
+        )
+
+
+# ---------------------------------------------------------------------------
+# W2 — unknown buff_ref in active_buffs is skipped with a WARNING log
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_unknown_stored_buff_ref_skipped_with_warning(caplog: pytest.LogCaptureFixture) -> None:
+    """A StoredBuff referencing an absent manifest is skipped with a WARNING; no crash."""
+    import logging
+
+    registry = _make_game_registry(enemy_hp=5, enemy_attack=1)
+    player = _make_player_with_mana(registry)
+
+    # Inject a stored buff whose manifest no longer exists in the registry.
+    player.active_buffs = [
+        StoredBuff(buff_ref="deleted-buff", remaining_turns=3, variables={}),
+    ]
+
+    tui = MockTUI()
+
+    with caplog.at_level(logging.WARNING, logger="oscilla.engine.steps.combat"):
+        await run_combat(
+            player=player,
+            step=_combat_step(),
+            registry=registry,
+            tui=tui,
+            run_outcome_branch=_noop_branch,
+        )
+
+    assert any("deleted-buff" in record.message for record in caplog.records)

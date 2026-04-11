@@ -587,7 +587,7 @@ async def run_effect(
                 await tui.show_text(f"You learned: {name}!")
             # Already-known — silent no-op (grant_skill returns False)
 
-        case DispelEffect(label=label, target=target):
+        case DispelEffect(label=label, target=target, permanent=permanent):
             if combat is None:
                 # Outside combat there are no active effects to remove.
                 logger.debug("dispel(%r) called outside combat — no-op.", label)
@@ -601,6 +601,9 @@ async def run_effect(
                 await tui.show_text(f"[green]{removed} effect(s) with label {label!r} dispelled.[/green]")
             else:
                 logger.debug("dispel(%r): no matching active effects found.", label)
+            # When permanent, also clear the stored buff so it cannot re-enter future combats.
+            if permanent:
+                player.active_buffs = [sb for sb in player.active_buffs if sb.buff_ref != label]
 
         case ApplyBuffEffect(buff_ref=buff_ref, target=buff_target, variables=call_vars):
             if combat is None:
@@ -626,23 +629,58 @@ async def run_effect(
                 logger.error("apply_buff: variable %r not in resolved_vars — using 0.", v)
                 return 0
 
+            # Resolve priority: a string is a variable name; int is used directly.
+            resolved_priority: int = (
+                _resolve_percent(spec.priority) if isinstance(spec.priority, str) else int(spec.priority)
+            )
+
+            # Exclusion check: when an exclusion_group is set, block or replace.
+            if spec.exclusion_group is not None:
+                same_group = [
+                    ae
+                    for ae in combat.active_effects
+                    if ae.exclusion_group == spec.exclusion_group and ae.target == buff_target
+                ]
+                if any(ae.priority >= resolved_priority for ae in same_group):
+                    logger.debug(
+                        "apply_buff(%r): blocked by equal-or-higher priority entry in exclusion_group %r.",
+                        buff_ref,
+                        spec.exclusion_group,
+                    )
+                    return
+                # Evict lower-priority entries in replace mode.
+                if spec.exclusion_mode == "replace" and same_group:
+                    evict_labels = {ae.label for ae in same_group}
+                    combat.active_effects = [
+                        ae for ae in combat.active_effects if ae.label not in evict_labels or ae.target != buff_target
+                    ]
+
             # Build resolved modifier copies with concrete int percent values.
             resolved_modifiers = [
                 mod.model_copy(update={"percent": _resolve_percent(mod.percent)}) for mod in spec.modifiers
             ]
+
+            # Resolve turns from BuffDuration (may be a template string or int).
+            turns_value = spec.duration.turns
+            resolved_turns: int = _resolve_percent(turns_value) if isinstance(turns_value, str) else int(turns_value)
 
             # Buff manifest name is used as the stable label for DispelEffect matching.
             combat.active_effects.append(
                 ActiveCombatEffect(
                     source_skill=buff_manifest.metadata.name,
                     target=buff_target,
-                    remaining_turns=spec.duration_turns,
+                    remaining_turns=resolved_turns,
                     per_turn_effects=list(spec.per_turn_effects),
                     modifiers=resolved_modifiers,
                     label=buff_manifest.metadata.name,
+                    exclusion_group=spec.exclusion_group or "",
+                    priority=resolved_priority,
+                    exclusion_mode=spec.exclusion_mode,
+                    is_persistent=spec.duration.is_persistent,
+                    variables=dict(resolved_vars),
                 )
             )
-            await tui.show_text(f"[bold]{spec.displayName}[/bold] applied for {spec.duration_turns} turn(s).")
+            await tui.show_text(f"[bold]{spec.displayName}[/bold] applied for {resolved_turns} turn(s).")
 
         case QuestFailEffect(quest_ref=quest_ref):
             if quest_ref not in player.active_quests:

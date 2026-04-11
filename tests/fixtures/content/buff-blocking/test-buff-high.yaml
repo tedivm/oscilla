@@ -1,0 +1,16 @@
+apiVersion: oscilla/v1
+kind: Buff
+metadata:
+  name: test-buff-high
+spec:
+  displayName: "High Priority Shield"
+  description: "A high-priority buff for testing exclusion-group blocking."
+  duration:
+    turns: 5
+  exclusion_group: test-defense-group
+  priority: 60
+  exclusion_mode: block
+  modifiers:
+    - type: damage_reduction
+      target: player
+      percent: 50
