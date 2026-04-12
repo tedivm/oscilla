@@ -14,7 +14,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# Note: 'lib/' excluded here intentionally — it would match frontend/src/lib/
+# which contains all SvelteKit source files. Use more specific patterns instead.
 lib64/
 parts/
 sdist/
