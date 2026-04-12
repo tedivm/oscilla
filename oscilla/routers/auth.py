@@ -32,7 +32,6 @@ from oscilla.services.auth import (
     verify_reset_token,
 )
 from oscilla.services.db import get_session_depends
-from oscilla.settings import settings
 
 router = APIRouter()
 logger = getLogger(__name__)
@@ -129,8 +128,7 @@ async def register(
     await db.flush()
     await db.commit()
 
-    if settings.smtp_host is not None:
-        background_tasks.add_task(send_verification_email, user.email or "", user.id, user.display_name)
+    background_tasks.add_task(send_verification_email, user.email or "", user.id, user.display_name)
 
     return _user_read(user)
 
@@ -193,8 +191,7 @@ async def request_verify(
     """Resend the verification email for the authenticated user."""
     if user.is_email_verified:
         return
-    if settings.smtp_host is not None:
-        background_tasks.add_task(send_verification_email, user.email or "", user.id, user.display_name)
+    background_tasks.add_task(send_verification_email, user.email or "", user.id, user.display_name)
 
 
 @router.get("/verify/{token}", status_code=HTTP_204_NO_CONTENT)
@@ -227,7 +224,7 @@ async def request_password_reset(
     stmt = select(UserRecord).where(UserRecord.email == request.email)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
-    if user is not None and settings.smtp_host is not None:
+    if user is not None:
         background_tasks.add_task(send_reset_email, user.email or "", user.id, user.display_name)
 
 

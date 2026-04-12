@@ -272,7 +272,7 @@ validate:
 	$(UV) run oscilla validate
 
 .PHONY: prettier_check
-prettier_check:
+prettier_check: frontend_install
 	npx --yes prettier --check . --log-level warn
 	cd frontend && npx prettier --check . --log-level warn
 
