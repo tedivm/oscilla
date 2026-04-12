@@ -58,7 +58,19 @@ app.include_router(characters_router, prefix="/characters", tags=["characters"])
 app.include_router(play_router, tags=["play"])
 app.include_router(overworld_router, tags=["overworld"])
 
+# Mount the SvelteKit frontend at /app. This must come after all API routers so that
+# API routes take precedence. If the build directory doesn't exist (local Python-only
+# development), the mount is skipped and /app returns 404.
+if settings.frontend_build_path.exists():
+    app.mount("/app", StaticFiles(directory=str(settings.frontend_build_path), html=True), name="frontend")
+else:
+    logger.warning(
+        "Frontend build directory not found at %s — /app will return 404. "
+        "Run `make frontend_build` to generate the frontend assets.",
+        settings.frontend_build_path,
+    )
+
 
 @app.get("/", include_in_schema=False)
 async def root() -> RedirectResponse:
-    return RedirectResponse("/docs")
+    return RedirectResponse("/app")

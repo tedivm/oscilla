@@ -30,18 +30,19 @@ def test_static_files_mounted() -> None:
     assert has_static, "Static files should be mounted"
 
 
-def test_root_redirects_to_docs(fastapi_client: TestClient) -> None:
-    """Test that root path redirects to /docs."""
+def test_root_redirects_to_app(fastapi_client: TestClient) -> None:
+    """Test that root path redirects to /app."""
     response = fastapi_client.get("/", follow_redirects=False)
     assert response.status_code == 307  # Temporary redirect
-    assert response.headers["location"] == "/docs"
+    assert response.headers["location"] == "/app"
 
 
 def test_root_redirect_follows(fastapi_client: TestClient) -> None:
-    """Test that following redirect from root goes to docs."""
+    """Test that following redirect from root reaches the frontend mount."""
     response = fastapi_client.get("/", follow_redirects=True)
-    assert response.status_code == 200
-    # Should reach the OpenAPI docs page
+    # In local and CI tests the frontend build may not exist, so the mount can
+    # return 404 even though the redirect itself is correct.
+    assert response.status_code in [200, 404]
 
 
 def test_docs_accessible(fastapi_client: TestClient) -> None:
@@ -89,8 +90,8 @@ def test_app_can_start(fastapi_client: TestClient) -> None:
 
 def test_basic_health(fastapi_client: TestClient) -> None:
     """Test basic application health by accessing root."""
-    response = fastapi_client.get("/")
-    assert response.status_code in [200, 307], "App should respond to requests"
+    response = fastapi_client.get("/", follow_redirects=False)
+    assert response.status_code == 307, "App should redirect from root"
 
 
 def test_lifespan_skips_broken_game_and_loads_healthy(tmp_path: Path) -> None:

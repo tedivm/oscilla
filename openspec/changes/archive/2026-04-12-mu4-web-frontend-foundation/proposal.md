@@ -14,11 +14,13 @@ The frontend must be architected with future per-game customization in mind. Dif
 - **New**: Docker multi-stage build — Node build stage compiles `frontend/` into `frontend/build`; Python image copies built assets; FastAPI serves them from `/app`.
 - **New**: TypeScript API client layer typed against all Pydantic response models from MU1 and MU2.
 - **New**: Base layout: navigation bar, auth state display, responsive shell.
-- **New**: Pages: login, register, email verification landing, game selection, character list, character creation wizard (name, pronoun set, archetype selection if game supports archetypes).
+- **New**: Pages: login, register, email verification landing, game selection, character list, character creation (game selection form only — `POST /characters` accepts only `game_name`; name, pronoun set, and archetype selection are handled by the game's triggered creation adventure in MU5).
 - **New**: Character sheet page — all panels driven by `GameFeatureFlags`: stats, inventory (stackable + instance items), equipment, skills (with cooldown state), active buffs, quests (active + completed), prestige count, in-game time, current location. Read-only; no adventure actions.
 - **New**: Feature-flag panel visibility — panels not supported by the current game are hidden, not just empty.
 - **New**: CSS custom properties design token layer — all colors, fonts, spacing, and visual variables defined as CSS custom properties in a single theme file. Components reference only these tokens, never hardcoded values. This is the seam that a future per-game customization system will override; no customization logic ships in MU4.
 - **New**: `Makefile` targets for frontend build, dev server, and type-check integrated into the project's developer workflow.
+- **New**: GitHub Actions workflows for frontend Playwright and accessibility checks across Chromium/Firefox/WebKit.
+- **Updated**: Dependabot configuration to include npm dependency updates for `frontend/`.
 
 ## Capabilities
 
@@ -34,6 +36,9 @@ The frontend must be architected with future per-game customization in mind. Dif
 - `dockerfile.www` — multi-stage build updated with Node build stage
 - `compose.yaml` — frontend build step wired into development workflow
 - `makefile` — frontend build, type-check, and dev server targets
+- `.github/workflows/frontend-playwright.yaml` — browser-matrix frontend Playwright CI
+- `.github/workflows/frontend-accessibility.yaml` — browser-matrix accessibility CI
+- `.github/dependabot.yml` — npm updates for `frontend/`
 - `docs/dev/` — new frontend development document covering project structure, build pipeline, and local dev setup
 
 ## Context

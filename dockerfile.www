@@ -1,4 +1,15 @@
 ARG PYTHON_VERSION=3.13
+
+FROM node:22-alpine AS frontend-build
+
+WORKDIR /app/frontend
+
+COPY frontend/package*.json /app/frontend/
+RUN npm ci
+
+COPY frontend/ /app/frontend/
+RUN npm run build
+
 FROM ghcr.io/multi-py/python-uvicorn:py${PYTHON_VERSION}-slim-LATEST
 
 ENV APP_MODULE=oscilla.www:app
@@ -28,6 +39,7 @@ RUN uv sync --frozen --no-install-project --python /usr/local/bin/python
 # Copy application code
 COPY ./docker/www/prestart.sh /app/prestart.sh
 COPY . /app/
+COPY --from=frontend-build /app/frontend/build /app/frontend/build
 
 # Install project
 RUN uv sync --frozen --python /usr/local/bin/python

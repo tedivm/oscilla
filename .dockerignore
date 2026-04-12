@@ -3,6 +3,7 @@
 
 # Explicitly define directories and files to pass into docker.
 !/oscilla
+!/frontend
 !/.python-version
 !/db
 !/docker

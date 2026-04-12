@@ -1,0 +1,50 @@
+name: Frontend Playwright
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  frontend-playwright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+
+      - name: Install Dependencies
+        run: make install
+
+      - name: Install Playwright Browsers
+        run: make frontend_playwright_install_ci
+
+      - name: Run Playwright Tests (${{ matrix.browser }})
+        run: make frontend_playwright_browser BROWSER=${{ matrix.browser }}
+
+      - name: Upload Playwright Artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ matrix.browser }}
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+            tmp/frontend-e2e.log
+            tmp/e2e-backend.log
+          if-no-files-found: ignore
+          retention-days: 7

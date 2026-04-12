@@ -277,17 +277,17 @@ On success, the user is redirected to the new character sheet. Any name, pronoun
 
 **Decision:** The character sheet page fetches `GET /games/{game_name}` and `GET /characters/{id}` in parallel on mount. `GameFeatureFlags` from the game response controls which panels are rendered:
 
-| Panel        | Shown when                                             |
-| ------------ | ------------------------------------------------------ |
-| Stats        | Always                                                 |
-| Inventory    | Always                                                 |
-| Equipment    | Always                                                 |
-| Skills       | `has_skills == true`                                   |
-| Buffs        | Always (empty list renders as empty panel, not hidden) |
-| Quests       | `has_quests == true`                                   |
-| Milestones   | Always (non-empty check handled by component)          |
-| Archetypes   | `has_archetypes == true`                               |
-| In-game time | `has_ingame_time == true`                              |
+| Panel        | Shown when                                                                                                                                    |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stats        | Always                                                                                                                                        |
+| Inventory    | Always                                                                                                                                        |
+| Equipment    | Always                                                                                                                                        |
+| Skills       | `has_skills == true` — lists skill refs/display names; cooldown state is not exposed by the current API and is therefore not displayed in MU4 |
+| Buffs        | Always (empty list renders as empty panel, not hidden)                                                                                        |
+| Quests       | `has_quests == true`                                                                                                                          |
+| Milestones   | Always (non-empty check handled by component)                                                                                                 |
+| Archetypes   | `has_archetypes == true`                                                                                                                      |
+| In-game time | `has_ingame_time == true`                                                                                                                     |
 
 No panel is hardcoded as always-visible in the component logic — the `GameFeatureFlags` check is the only source of truth. A game with no quests declared shows no quests panel at all, not an empty quests panel.
 
@@ -815,7 +815,9 @@ export const api = {
 
 ### `frontend/src/lib/api/types.ts` — Complete Interface List
 
-All interfaces mirror the Pydantic models from MU1 and MU2. Field names use `snake_case` to match FastAPI's default JSON serialization. UUIDs are typed as `string`; timestamps are ISO 8601 strings.
+All interfaces mirror the Pydantic models from MU1–MU3 exactly as implemented. Field names use `snake_case` to match FastAPI's default JSON serialization. UUIDs are typed as `string`; timestamps are ISO 8601 strings. Integer tick values (e.g. `grant_tick`, `grant_timestamp`) are typed as `number`.
+
+> **Deviation note:** Several sub-models in the MU2 `CharacterStateRead` were implemented with a different field set than originally envisioned. Specifically: `StackedItemRead` carries only `ref` and `quantity` (no `display_name` or `description`); `ItemInstanceRead` uses `instance_id`/`item_ref`/`charges_remaining`/`modifiers` (not `id`/`ref`/`display_name`/`slot`); `SkillRead` exposes only `ref` and `display_name` (no cooldown fields); `BuffRead` exposes tick-based expiry fields rather than a single `expires_at_ticks`; `MilestoneRead` and `ArchetypeRead` carry grant timing fields rather than display metadata; `CharacterSummaryRead` does not include `updated_at`; `GameFeatureFlags` does not include `has_factions`. `CharacterStateRead` contains a `character_class` field that is always `null` and is scheduled for removal — the frontend MUST NOT use it. The interfaces below match the actual API — frontends must use `ref` as the display key wherever `display_name` is absent.
 
 ```typescript
 // ── Auth (MU1) ───────────────────────────────────────────────────────────────
@@ -839,7 +841,7 @@ export interface TokenPair {
 export interface GameFeatureFlags {
   has_skills: boolean;
   has_quests: boolean;
-  has_factions: boolean;
+  // has_factions is NOT in the current API — omitted until a factions system ships
   has_archetypes: boolean;
   has_ingame_time: boolean;
   has_recipes: boolean;
@@ -855,14 +857,13 @@ export interface GameRead {
 
 // ── Characters (MU2) ─────────────────────────────────────────────────────────
 
+/** Lightweight summary returned by GET /characters. Does NOT include `updated_at`. */
 export interface CharacterSummaryRead {
   id: string;
   name: string;
   game_name: string;
-  character_class: string | null;
   prestige_count: number;
   created_at: string;
-  updated_at: string;
 }
 
 export interface StatValue {
@@ -871,55 +872,73 @@ export interface StatValue {
   value: number | boolean | null;
 }
 
+/** Stackable item in inventory. Display name is not included — use `ref` for display. */
 export interface StackedItemRead {
   ref: string;
-  display_name: string;
   quantity: number;
-  description: string | null;
 }
 
+/**
+ * Non-stackable item instance.
+ * Field names differ from original roadmap design: `instance_id` (not `id`),
+ * `item_ref` (not `ref`), `charges_remaining` (not `slot`).
+ */
 export interface ItemInstanceRead {
-  id: string;
-  ref: string;
-  display_name: string;
-  description: string | null;
-  slot: string | null;
+  instance_id: string;
+  item_ref: string;
+  charges_remaining: number | null;
+  modifiers: Record<string, number>;
 }
 
+/**
+ * A skill known by the character.
+ * Cooldown state is not exposed by the current API — the Skills panel
+ * renders a plain list of known skills without cooldown indicators in MU4.
+ */
 export interface SkillRead {
   ref: string;
-  display_name: string;
-  description: string | null;
-  on_cooldown: boolean;
-  cooldown_remaining_ticks: number | null;
+  display_name: string | null;
 }
 
+/**
+ * An active persistent buff on the character.
+ * Display name is not exposed — use `ref` for display.
+ * Expiry is expressed as tick values; `null` means the buff does not expire.
+ */
 export interface BuffRead {
   ref: string;
-  display_name: string;
-  description: string | null;
-  expires_at_ticks: number | null;
-  source: string | null;
+  remaining_turns: number | null;
+  tick_expiry: number | null;
+  game_tick_expiry: number | null;
+  real_ts_expiry: number | null;
 }
 
+/** A quest currently tracked by the character. Display name is not in this model. */
 export interface ActiveQuestRead {
   ref: string;
-  display_name: string;
-  description: string | null;
-  current_stage: string | null;
+  current_stage: string;
 }
 
+/**
+ * A milestone held by the character.
+ * `grant_tick` and `grant_timestamp` are the internal tick counter and Unix
+ * timestamp at which the milestone was earned.
+ */
 export interface MilestoneRead {
   ref: string;
-  display_name: string;
-  description: string | null;
-  earned_at: string;
+  grant_tick: number;
+  grant_timestamp: number;
 }
 
+/**
+ * An archetype held by the character this iteration.
+ * `grant_tick` and `grant_timestamp` are the internal tick counter and Unix
+ * timestamp at which the archetype was assigned.
+ */
 export interface ArchetypeRead {
   ref: string;
-  display_name: string;
-  description: string | null;
+  grant_tick: number;
+  grant_timestamp: number;
 }
 
 export interface ActiveAdventureRead {
@@ -932,7 +951,8 @@ export interface CharacterStateRead {
   id: string;
   name: string;
   game_name: string;
-  character_class: string | null;
+  // character_class is NOT in this interface — the field exists in the backend
+  // but is always null and scheduled for removal (see ROADMAP: Remove character_class Dead Field)
   prestige_count: number;
   pronoun_set: string;
   created_at: string;
@@ -942,7 +962,7 @@ export interface CharacterStateRead {
   current_location_name: string | null;
   current_region_name: string | null;
 
-  // Stats (all declared stats, including unset ones with value: null)
+  // Stats (all declared stats; value is null for unset or derived stats)
   stats: Record<string, StatValue>;
 
   // Inventory
@@ -1147,15 +1167,16 @@ Tokens are stored in `localStorage` (not `HttpOnly` cookies) because the SPA has
 
 MU4 introduces a new language and toolchain (TypeScript/SvelteKit) to the project. The testing approach follows the same principle used in the Python suite: catch errors at the earliest possible point, and test every meaningful behavior at the appropriate layer. Nothing is deferred — this is a foundation milestone and its tests are part of the deliverable.
 
-| Check                                                   | Tool                                                            | When it runs | What it catches                                                                                                                                                                                                                                                                                |
-| ------------------------------------------------------- | --------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| TypeScript type errors in `.svelte` and `.ts` files     | `svelte-check` (`frontend-typecheck`)                           | `make tests` | Type mismatches between `types.ts` interfaces and component usage; missing properties; incorrect function signatures                                                                                                                                                                           |
-| JavaScript/TypeScript code quality + accessibility lint | ESLint with `eslint-plugin-svelte` a11y rules (`frontend-lint`) | `make tests` | Unused variables, `no-console`, incorrect import patterns, Svelte component rule violations; also catches missing `alt` attributes, missing `<label>` associations, improper ARIA usage, interactive elements without accessible names                                                         |
-| Store and client unit tests                             | Vitest (`frontend-unit`)                                        | `make tests` | Pure TypeScript logic: `authStore` token lifecycle and expiry; `themeStore` `toggle()`/`reset()`/localStorage persistence; `client.ts` error handling, request building, and 401 redirect behavior                                                                                             |
-| Component integration tests                             | Vitest + `@testing-library/svelte` (`frontend-component`)       | `make tests` | Key component behaviors with mocked API responses and stores: `ErrorBanner` renders and dismisses; `NavBar` shows/hides based on auth state; `ThemeToggle` flips `themeStore`; `LoginForm` validation feedback and submission; character selection screen renders list and handles empty state |
-| Automated accessibility audit (DOM-level)               | Playwright + `@axe-core/playwright` (`frontend-a11y`)           | `make tests` | Runs `checkA11y()` against the rendered login page, home screen, and character selection screen; catches contrast failures, missing landmarks, focus management errors, and ARIA violations that static lint cannot see                                                                        |
-| Code formatting                                         | Prettier (`prettier_check`)                                     | `make tests` | Whitespace, quote style, trailing commas — already runs project-wide and covers `.svelte` and `.ts` files                                                                                                                                                                                      |
-| Python backend tests                                    | pytest                                                          | `make tests` | API endpoint behavior, persistence, auth logic — unchanged from MU1–MU3                                                                                                                                                                                                                        |
+| Check                                                   | Tool                                                            | When it runs                           | What it catches                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TypeScript type errors in `.svelte` and `.ts` files     | `svelte-check` (`frontend-typecheck`)                           | `make tests`                           | Type mismatches between `types.ts` interfaces and component usage; missing properties; incorrect function signatures                                                                                                                                                                           |
+| JavaScript/TypeScript code quality + accessibility lint | ESLint with `eslint-plugin-svelte` a11y rules (`frontend-lint`) | `make tests`                           | Unused variables, `no-console`, incorrect import patterns, Svelte component rule violations; also catches missing `alt` attributes, missing `<label>` associations, improper ARIA usage, interactive elements without accessible names                                                         |
+| Store and client unit tests                             | Vitest (`frontend-unit`)                                        | `make tests`                           | Pure TypeScript logic: `authStore` token lifecycle and expiry; `themeStore` `toggle()`/`reset()`/localStorage persistence; `client.ts` error handling, request building, and 401 redirect behavior                                                                                             |
+| Component integration tests                             | Vitest + `@testing-library/svelte` (`frontend-component`)       | `make tests`                           | Key component behaviors with mocked API responses and stores: `ErrorBanner` renders and dismisses; `NavBar` shows/hides based on auth state; `ThemeToggle` flips `themeStore`; `LoginForm` validation feedback and submission; character selection screen renders list and handles empty state |
+| Automated accessibility audit (DOM-level)               | Playwright + `@axe-core/playwright` (`frontend-a11y`)           | `make tests`                           | Runs `checkA11y()` against the rendered login page, home screen, and character selection screen; catches contrast failures, missing landmarks, focus management errors, and ARIA violations that static lint cannot see                                                                        |
+| E2E integration tests                                   | Playwright (`frontend-e2e`)                                     | `make frontend_e2e` (NOT `make tests`) | Full user flows against the live stack: register, login, create character, view character sheet, logout. Requires running FastAPI + PostgreSQL + SvelteKit preview server. Excluded from the standard CI gate because it depends on external services.                                         |
+| Code formatting                                         | Prettier (`prettier_check`)                                     | `make tests`                           | Whitespace, quote style, trailing commas — already runs project-wide and covers `.svelte` and `.ts` files                                                                                                                                                                                      |
+| Python backend tests                                    | pytest                                                          | `make tests`                           | API endpoint behavior, persistence, auth logic — unchanged from MU1–MU3                                                                                                                                                                                                                        |
 
 ### Store and client unit tests (`frontend/tests/unit/`)
 
@@ -1205,11 +1226,42 @@ The Playwright suite uses `@axe-core/playwright`. It starts the Vite dev server 
 
 Any axe violation fails the build. Violations are reported with the violating element selector, the WCAG criterion, and the axe remediation hint.
 
+### E2E integration tests (`frontend/tests/e2e/`)
+
+The E2E suite exercises full user flows against the complete running system. Unlike the unit, component, and a11y suites, these tests do not mock any external calls — they talk to a live FastAPI backend connected to a real PostgreSQL database.
+
+**Prerequisites before running `make frontend_e2e`:**
+
+The simplest path is `make frontend_e2e_stack`, which brings up the full service stack (PostgreSQL, Redis, FastAPI, and the SvelteKit preview server), runs the Playwright suite, and tears everything down on completion. This makes the tests clean and repeatable with a single command and no leftover state.
+
+For developers who want to run the suite against an already-running stack:
+
+- `docker compose up db redis` — database and cache must be up
+- `uv run uvicorn oscilla.www:app --reload` — FastAPI backend running on port 8000
+- `cd frontend && npm run preview` — SvelteKit production preview on port 4173
+
+Then invoke `make frontend_e2e` directly (without the stack target).
+
+**Configuration:** A separate `frontend/playwright.e2e.config.ts` configures the E2E project. It uses `baseURL: 'http://localhost:4173'` (preview server) and does not set `webServer` — the developer is responsible for starting the stack before running. The a11y config (`playwright.config.ts`) remains unchanged.
+
+**Test flows covered:**
+
+| Flow               | File                                           | Steps                                                                                                                                                    |
+| ------------------ | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Registration       | `frontend/tests/e2e/auth/register.spec.ts`     | Navigate to `/app/register`, fill form with generated test credentials, submit, assert redirect to character selection                                   |
+| Login / logout     | `frontend/tests/e2e/auth/login.spec.ts`        | Login with test account, assert home screen visible, click logout, assert redirect to `/app/login`                                                       |
+| Character creation | `frontend/tests/e2e/characters/create.spec.ts` | From character selection, click New Character, fill name, select archetype, confirm, assert character appears in list                                    |
+| Character sheet    | `frontend/tests/e2e/characters/sheet.spec.ts`  | Select an existing character, assert `CharacterHeader` displays name, assert at least one panel is visible based on `features` flags returned by the API |
+
+**Test data:** Each E2E test run registers a unique user with a generated email (e.g. `e2e-{uuid}@test.invalid`) so runs are isolated. No test relies on pre-existing data.
+
+**Makefile target:** `make frontend_e2e` runs `npx playwright test --config playwright.e2e.config.ts` inside `frontend/`. It is intentionally absent from the `make tests` recipe.
+
 ### Conventions
 
 - No test may reference `content/` or any game-specific content.
-- All tests that require API responses use mock data constructed from the `types.ts` interfaces directly — no network calls.
-- Test files mirror the source file tree: `frontend/tests/unit/` for `.ts` modules, `frontend/tests/component/` for `.svelte` components, `frontend/tests/a11y/` for Playwright axe tests.
+- All tests that require API responses use mock data constructed from the `types.ts` interfaces directly — no network calls. This applies to unit, component, and a11y tests only; E2E tests use the live API.
+- Test files mirror the source file tree: `frontend/tests/unit/` for `.ts` modules, `frontend/tests/component/` for `.svelte` components, `frontend/tests/a11y/` for Playwright axe tests, `frontend/tests/e2e/` for full-stack integration flows.
 
 ---
 

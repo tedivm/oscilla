@@ -9,6 +9,7 @@ from .db import DatabaseSettings
 # Default games path: the `content/` directory at the project root is the library root.
 # Override via GAMES_PATH env var to point at a different game library.
 _DEFAULT_GAMES_PATH = Path(__file__).parent.parent.parent / "content"
+_DEFAULT_FRONTEND_BUILD_PATH = Path("frontend/build")
 
 
 class Settings(DatabaseSettings, CacheSettings):
@@ -21,6 +22,10 @@ class Settings(DatabaseSettings, CacheSettings):
     games_path: Path = Field(
         default=_DEFAULT_GAMES_PATH,
         description="Path to the game library root directory containing game package subdirectories.",
+    )
+    frontend_build_path: Path = Field(
+        default=_DEFAULT_FRONTEND_BUILD_PATH,
+        description="Path to the SvelteKit static build output. Mounted at /app by the web server.",
     )
 
     # Graph node color overrides. Each key maps a manifest kind slug to a hex color.

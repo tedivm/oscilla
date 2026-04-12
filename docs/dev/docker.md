@@ -48,6 +48,40 @@ COPY . /app/
 - Runs on port 80 by default
 - Includes health check support
 
+## Multi-stage Build
+
+The web image uses a two-stage build in `dockerfile.www`:
+
+1. `frontend-build` stage (`node:22-alpine`):
+
+- Inputs: `frontend/package*.json`, then the full `frontend/` source tree.
+- Build steps: `npm ci` then `npm run build`.
+- Output: static assets in `/app/frontend/build`.
+
+2. Python runtime stage (`ghcr.io/multi-py/python-uvicorn`):
+
+- Copies backend code and dependencies.
+- Copies frontend artifact with:
+  - `COPY --from=frontend-build /app/frontend/build /app/frontend/build`
+- Serves built SPA assets through FastAPI static mounting at `/app`.
+
+When frontend code changes, rebuild the image so the new static bundle is included:
+
+```bash
+docker compose build
+```
+
+### Frontend Build Path Override
+
+FastAPI reads `FRONTEND_BUILD_PATH` from settings and mounts that directory at `/app`.
+
+- Default: `frontend/build`
+- Override example for deployments with a custom artifact location:
+
+```bash
+FRONTEND_BUILD_PATH=/app/frontend/build
+```
+
 ## Docker Compose
 
 The project includes a `compose.yaml` file for orchestrating all services in development and testing.

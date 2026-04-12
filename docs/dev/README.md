@@ -41,6 +41,10 @@ Command-line interface built with Typer for management and automation tasks.
 
 Jinja2 templating for HTML rendering and template-based content generation.
 
+### [Frontend](./frontend.md)
+
+The SvelteKit SPA architecture, API client conventions, route patterns, component structure, and frontend test workflows.
+
 ## Game Engine
 
 ### [Game Engine](./game-engine.md)
@@ -61,8 +65,8 @@ The oscilla project is designed with clear separation between interface layers:
 
 - **Game Engine** - Core game logic and content processing (above)
 - **CLI Interface** - Terminal user interface and commands (above)
-- **REST API** - Web service endpoints _(future)_
-- **Frontend** - Web browser interface _(future)_
+- **REST API** - Web service endpoints
+- **Frontend** - Web browser interface
 
 ## Development Practices
 

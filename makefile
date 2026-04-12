@@ -32,7 +32,7 @@ PYTHON_DEPS := $(PACKAGE_CHECK)
 all: $(PACKAGE_CHECK)
 
 .PHONY: install
-install: uv $(PYTHON_VENV) sync
+install: uv $(PYTHON_VENV) sync frontend_install
 
 .venv:
 	$(UV) venv --python $(PYTHON_VERSION)
@@ -59,7 +59,7 @@ pre-commit:
 # Formatting
 #
 .PHONY: chores
-chores: ruff_fixes black_fixes prettier_fixes tomlsort_fixes document_schema
+chores: ruff_fixes black_fixes prettier_fixes tomlsort_fixes frontend_format_fix document_schema
 
 .PHONY: ruff_fixes
 ruff_fixes:
@@ -72,6 +72,7 @@ black_fixes:
 .PHONY: prettier_fixes
 prettier_fixes:
 	npx --yes prettier --write . --log-level warn
+	cd frontend && npx prettier --write . --log-level warn
 
 .PHONY: tomlsort_fixes
 tomlsort_fixes:
@@ -81,11 +82,174 @@ tomlsort_fixes:
 # Testing
 #
 .PHONY: tests
-tests: install pytest ruff_check black_check mypy_check prettier_check tomlsort_check paracelsus_check check_ungenerated_migrations validate
+tests: install pytest ruff_check black_check mypy_check prettier_check tomlsort_check paracelsus_check check_ungenerated_migrations validate frontend_check frontend_test
 
 .PHONY: pytest
 pytest:
 	$(UV) run pytest --cov=./${PACKAGE_SLUG} --cov-report=term-missing tests
+
+#
+# Frontend
+#
+.PHONY: frontend_install
+frontend_install:
+	cd frontend && npm ci
+
+.PHONY: frontend_build
+frontend_build:
+	cd frontend && npm run build
+
+.PHONY: frontend_dev
+frontend_dev:
+	cd frontend && npm run dev
+
+.PHONY: frontend_check
+frontend_check:
+	cd frontend && npx svelte-check --tsconfig ./tsconfig.json
+
+.PHONY: frontend_test
+frontend_test:
+	cd frontend && npx vitest run
+
+.PHONY: frontend_format_check
+frontend_format_check:
+	cd frontend && npx prettier --check src/
+
+.PHONY: frontend_format_fix
+frontend_format_fix:
+	cd frontend && npx prettier --write src/
+
+.PHONY: frontend_a11y
+frontend_a11y: frontend_playwright_install
+	cd frontend && if [ -n "$(BROWSER)" ]; then npm run a11y -- --project "$(BROWSER)"; else npm run a11y; fi
+
+.PHONY: frontend_playwright_install
+frontend_playwright_install: frontend_install
+	cd frontend && npm run playwright:install
+
+.PHONY: frontend_playwright_install_ci
+frontend_playwright_install_ci: frontend_install
+	cd frontend && npx playwright install --with-deps chromium firefox webkit
+
+.PHONY: frontend_e2e_run
+frontend_e2e_run: frontend_playwright_install
+	cd frontend && if [ -n "$(BROWSER)" ]; then npm run e2e -- --project "$(BROWSER)"; else npm run e2e; fi
+
+.PHONY: frontend_a11y_chromium
+frontend_a11y_chromium:
+	$(MAKE) frontend_a11y BROWSER=chromium
+
+.PHONY: frontend_a11y_firefox
+frontend_a11y_firefox:
+	$(MAKE) frontend_a11y BROWSER=firefox
+
+.PHONY: frontend_a11y_webkit
+frontend_a11y_webkit:
+	$(MAKE) frontend_a11y BROWSER=webkit
+
+.PHONY: frontend_a11y_all
+frontend_a11y_all: frontend_a11y_chromium frontend_a11y_firefox frontend_a11y_webkit
+
+.PHONY: frontend_e2e_chromium
+frontend_e2e_chromium:
+	$(MAKE) frontend_e2e BROWSER=chromium
+
+.PHONY: frontend_e2e_firefox
+frontend_e2e_firefox:
+	$(MAKE) frontend_e2e BROWSER=firefox
+
+.PHONY: frontend_e2e_webkit
+frontend_e2e_webkit:
+	$(MAKE) frontend_e2e BROWSER=webkit
+
+.PHONY: frontend_e2e_all
+frontend_e2e_all: frontend_e2e_chromium frontend_e2e_firefox frontend_e2e_webkit
+
+.PHONY: frontend_playwright_chromium
+frontend_playwright_chromium: frontend_a11y_chromium frontend_e2e_chromium
+
+.PHONY: frontend_playwright_firefox
+frontend_playwright_firefox: frontend_a11y_firefox frontend_e2e_firefox
+
+.PHONY: frontend_playwright_webkit
+frontend_playwright_webkit: frontend_a11y_webkit frontend_e2e_webkit
+
+.PHONY: frontend_playwright_all
+frontend_playwright_all: frontend_playwright_chromium frontend_playwright_firefox frontend_playwright_webkit
+
+.PHONY: frontend_playwright_browser
+frontend_playwright_browser:
+	@if [ -z "$(BROWSER)" ]; then \
+		echo "BROWSER is required (chromium|firefox|webkit)"; \
+		exit 1; \
+	fi
+	@if [ "$(BROWSER)" != "chromium" ] && [ "$(BROWSER)" != "firefox" ] && [ "$(BROWSER)" != "webkit" ]; then \
+		echo "Invalid BROWSER='$(BROWSER)'. Use chromium, firefox, or webkit."; \
+		exit 1; \
+	fi
+	$(MAKE) frontend_a11y BROWSER=$(BROWSER)
+	$(MAKE) frontend_e2e BROWSER=$(BROWSER)
+
+.PHONY: frontend_e2e
+frontend_e2e: frontend_e2e_stack
+
+.PHONY: frontend_e2e_cleanup
+frontend_e2e_cleanup:
+	-@if command -v lsof >/dev/null 2>&1; then \
+		PIDS_4173=$$(lsof -t -iTCP:4173 -sTCP:LISTEN); \
+		if [ -n "$$PIDS_4173" ]; then \
+			echo "Stopping stale process(es) on port 4173: $$PIDS_4173"; \
+			kill $$PIDS_4173 2>/dev/null || true; \
+		fi; \
+		PIDS_8000=$$(lsof -t -iTCP:8000 -sTCP:LISTEN); \
+		if [ -n "$$PIDS_8000" ]; then \
+			echo "Stopping stale process(es) on port 8000: $$PIDS_8000"; \
+			kill $$PIDS_8000 2>/dev/null || true; \
+		fi; \
+	fi
+	-@docker compose down >/dev/null 2>&1 || true
+
+.PHONY: frontend_e2e_stack
+frontend_e2e_stack: frontend_playwright_install frontend_e2e_cleanup
+	mkdir -p ./tmp
+	docker compose up -d db redis mailhog
+	rm -f ./tmp/e2e.db
+	DATABASE_URL=sqlite:///./tmp/e2e.db $(UV) run alembic upgrade head
+	DATABASE_URL=sqlite+aiosqlite:///./tmp/e2e.db $(UV) run uvicorn oscilla.www:app --host 127.0.0.1 --port 8000 > ./tmp/e2e-backend.log 2>&1 & \
+	API_PID=$$!; \
+	cd frontend && npm run build
+	cd frontend && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort & \
+	PREVIEW_PID=$$!; \
+	trap 'kill $$PREVIEW_PID $$API_PID 2>/dev/null || true; $(MAKE) frontend_e2e_cleanup' EXIT; \
+	BACKEND_READY=0; \
+	for i in $$(seq 1 120); do \
+		if curl --silent --fail http://127.0.0.1:8000/docs >/dev/null; then \
+			BACKEND_READY=1; \
+			break; \
+		fi; \
+		sleep 1; \
+	done; \
+	if [ $$BACKEND_READY -ne 1 ]; then \
+		echo 'Backend did not become ready at http://127.0.0.1:8000/docs within 120s'; \
+		docker compose ps; \
+		tail -n 200 ./tmp/e2e-backend.log; \
+		exit 1; \
+	fi; \
+	FRONTEND_READY=0; \
+	for i in $$(seq 1 120); do \
+		if curl --silent --fail http://127.0.0.1:4173/app/ >/dev/null; then \
+			FRONTEND_READY=1; \
+			break; \
+		fi; \
+		sleep 1; \
+	done; \
+	if [ $$FRONTEND_READY -ne 1 ]; then \
+		echo 'Frontend preview did not become ready at http://127.0.0.1:4173/app/ within 120s'; \
+		docker compose ps; \
+		tail -n 200 ./tmp/e2e-backend.log; \
+		exit 1; \
+	fi; \
+	$(MAKE) frontend_e2e_run
 
 .PHONY: pytest_loud
 pytest_loud:
@@ -110,6 +274,7 @@ validate:
 .PHONY: prettier_check
 prettier_check:
 	npx --yes prettier --check . --log-level warn
+	cd frontend && npx prettier --check . --log-level warn
 
 .PHONY: tomlsort_check
 tomlsort_check:

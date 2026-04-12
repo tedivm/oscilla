@@ -31,31 +31,35 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 
 ### All Items
 
-| Item                                                                                        | Effort | Group                   |
-| ------------------------------------------------------------------------------------------- | ------ | ----------------------- |
-| [Decision Tree AI for Enemies](#decision-tree-ai-for-enemies)                               | L      | Combat Overhaul         |
-| [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems)        | XL     | Combat Overhaul         |
-| [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades)                          | M      | Character Progression   |
-| [Extended Template Primitives](#extended-template-primitives)                               | S      | Engine Architecture     |
-| [Adventure Pipeline State-Machine Refactor](#adventure-pipeline-state-machine-refactor)     | XL     | Engine Architecture     |
-| [Player-Defined Pronouns](#player-defined-pronouns)                                         | S      | Character Configuration |
-| [Cross-Iteration Conditions/Templates/Effects](#cross-iteration-conditionstemplateseffects) | M      | Character Progression   |
-| [Adventure-Scoped Variables](#adventure-scoped-variables)                                   | M      | Adventure Authoring     |
-| [Inventory Storage](#inventory-storage)                                                     | L      | Item System             |
-| [Shop and Vendor System](#shop-and-vendor-system)                                           | L      | Economy & NPCs          |
-| [Persistent NPCs and Dialogue](#persistent-npcs-and-dialogue)                               | L      | Economy & NPCs          |
-| [Quest Branching](#quest-branching)                                                         | M      | Quest Depth & Factions  |
-| [Quest Progress Panel](#quest-progress-panel)                                               | M      | Quest Depth             |
-| [Faction and Reputation System](#faction-and-reputation-system)                             | M      | Quest Depth & Factions  |
-| [Content Inheritance / Prototypes](#content-inheritance--prototypes)                        | M      | Content Reuse           |
-| [Plugin and Extension System](#plugin-and-extension-system)                                 | L      | Engine Architecture     |
-| [HTTP API for Multi-User Support](#http-api-for-multi-user-support)                         | XL     | Multi-User Platform     |
-| [Front End Website](#front-end-website)                                                     | XL     | Multi-User Platform     |
-| [API-Level Active Adventure Enforcement](#api-level-active-adventure-enforcement)           | S      | Multi-User Platform     |
-| [Full TUI Upgrade](#full-tui-upgrade)                                                       | L      | Media and Presentation  |
-| [Region Maps](#region-maps)                                                                 | M      | Media and Presentation  |
-| [Picture Selection and ASCII Art](#picture-selection-and-ascii-art)                         | M      | Media and Presentation  |
-| [Content Documentation Generator](#content-documentation-generator)                         | M      | Author Tooling          |
+| Item                                                                                            | Effort | Group                   |
+| ----------------------------------------------------------------------------------------------- | ------ | ----------------------- |
+| [Decision Tree AI for Enemies](#decision-tree-ai-for-enemies)                                   | L      | Combat Overhaul         |
+| [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems)            | XL     | Combat Overhaul         |
+| [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades)                              | M      | Character Progression   |
+| [Extended Template Primitives](#extended-template-primitives)                                   | S      | Engine Architecture     |
+| [Adventure Pipeline State-Machine Refactor](#adventure-pipeline-state-machine-refactor)         | XL     | Engine Architecture     |
+| [Player-Defined Pronouns](#player-defined-pronouns)                                             | S      | Character Configuration |
+| [Cross-Iteration Conditions/Templates/Effects](#cross-iteration-conditionstemplateseffects)     | M      | Character Progression   |
+| [Adventure-Scoped Variables](#adventure-scoped-variables)                                       | M      | Adventure Authoring     |
+| [Inventory Storage](#inventory-storage)                                                         | L      | Item System             |
+| [Shop and Vendor System](#shop-and-vendor-system)                                               | L      | Economy & NPCs          |
+| [Persistent NPCs and Dialogue](#persistent-npcs-and-dialogue)                                   | L      | Economy & NPCs          |
+| [Quest Branching](#quest-branching)                                                             | M      | Quest Depth & Factions  |
+| [Quest Progress Panel](#quest-progress-panel)                                                   | M      | Quest Depth             |
+| [Faction and Reputation System](#faction-and-reputation-system)                                 | M      | Quest Depth & Factions  |
+| [Content Inheritance / Prototypes](#content-inheritance--prototypes)                            | M      | Content Reuse           |
+| [Plugin and Extension System](#plugin-and-extension-system)                                     | L      | Engine Architecture     |
+| [HTTP API for Multi-User Support](#http-api-for-multi-user-support)                             | XL     | Multi-User Platform     |
+| [Front End Website](#front-end-website)                                                         | XL     | Multi-User Platform     |
+| [API-Level Active Adventure Enforcement](#api-level-active-adventure-enforcement)               | S      | Multi-User Platform     |
+| [Skill Cooldown State in API](#skill-cooldown-state-in-api)                                     | S      | Multi-User Platform     |
+| [Display Metadata in CharacterState Sub-models](#display-metadata-in-characterstate-sub-models) | S      | Multi-User Platform     |
+| [CharacterSummaryRead Enrichment](#charactersummaryread-enrichment)                             | XS     | Multi-User Platform     |
+| [Remove `character_class` Dead Field](#remove-character_class-dead-field)                       | S      | Multi-User Platform     |
+| [Full TUI Upgrade](#full-tui-upgrade)                                                           | L      | Media and Presentation  |
+| [Region Maps](#region-maps)                                                                     | M      | Media and Presentation  |
+| [Picture Selection and ASCII Art](#picture-selection-and-ascii-art)                             | M      | Media and Presentation  |
+| [Content Documentation Generator](#content-documentation-generator)                             | M      | Author Tooling          |
 
 ---
 
@@ -318,6 +322,8 @@ This is largely syntactic sugar over what already exists — authors could manua
 - Faction reward/penalty effects without authors knowing which underlying stat to modify
 - Content to reference factions by name rather than by raw stat name, making manifests more readable
 
+When this system ships, `GameFeatureFlags` in the API must also gain a `has_factions: bool` field so that clients can conditionally show the Factions panel. This flag was intentionally omitted from the MU2 `GameFeatureFlags` model until the faction system is implemented.
+
 ---
 
 ## Content Organization
@@ -439,6 +445,84 @@ Goals:
 This is a defense-in-depth measure alongside the frontend redirect behavior introduced in the MU5 web frontend. It prevents state corruption if a client bypasses the frontend guard or if the frontend has a bug.
 
 ---
+
+### Display Metadata in CharacterState Sub-models
+
+**Effort: S** · **Group: Multi-User Platform**
+
+Several sub-models returned inside `CharacterStateRead` expose only a `ref` identifier — `display_name` and `description` fields were not included when these models were initially implemented. The frontend is therefore forced to display raw manifest reference keys to the player instead of human-readable names.
+
+Affected models:
+
+| Model              | Missing fields                |
+| ------------------ | ----------------------------- |
+| `StackedItemRead`  | `display_name`, `description` |
+| `ItemInstanceRead` | `display_name`, `description` |
+| `BuffRead`         | `display_name`, `description` |
+| `ActiveQuestRead`  | `display_name`, `description` |
+| `MilestoneRead`    | `display_name`, `description` |
+| `ArchetypeRead`    | `display_name`, `description` |
+
+Goals:
+
+- Add `display_name: str | None` and `description: str | None` to each model above; default both to `None` to keep the change backward-compatible
+- Populate them from the content registry in the `CharacterStateRead.from_state()` factory method — resolve the manifest for each `ref` and extract metadata at serialization time
+- Update `types.ts` in the web frontend to add the fields to the corresponding TypeScript interfaces
+- Once shipped, update all panels in the character sheet that currently fall back to `ref` for display to prefer `display_name` instead
+- Add tests confirming the fields are populated when the game registry contains the referenced manifests and are `None` when the ref is not found (defensive — registry should always be consistent, but defensive null is safer than a hard error)
+
+Note: `SkillRead` is handled separately by the [Skill Cooldown State in API](#skill-cooldown-state-in-api) item, which also adds `description` alongside the cooldown fields.
+
+### Remove `character_class` Dead Field
+
+**Effort: S** · **Group: Multi-User Platform**
+
+`character_class` is a scaffolded field that was never wired up. It exists throughout the stack but is always `None` — no effect, condition, content manifest, or endpoint ever sets it. It is not part of the archetypes system, which is the correct mechanism for character classification. Its presence is misleading to developers and content authors.
+
+Locations to remove:
+
+- `oscilla/engine/character.py` — `CharacterState.character_class` field, initialization, serialization, and deserialization
+- `oscilla/engine/session.py` — two scalar-field diff blocks that track `character_class` changes
+- `oscilla/engine/steps/effects.py` — `player.character_class = None` in the prestige reset
+- `oscilla/models/character_iteration.py` — `CharacterIterationRecord.character_class` ORM column
+- `oscilla/models/api/characters.py` — `CharacterStateRead.character_class` field
+- `oscilla/services/character.py` — two `character_class=state.character_class` assignments
+- `tests/engine/test_character_persistence.py` — four fixture dicts that include `"character_class": None`
+- DB migration — new Alembic migration dropping the `character_class` column from `character_iterations`
+- `docs/dev/database.md` and `docs/dev/api.md` — remove all references
+
+When removed, run `make document_schema` to regenerate the database schema documentation and `make tests` to confirm all checks pass.
+
+### CharacterSummaryRead Enrichment
+
+**Effort: XS** · **Group: Multi-User Platform**
+
+The `CharacterSummaryRead` model returned by `GET /characters` is missing `updated_at: datetime` — the timestamp of the last write to the character record. This is useful for sorting the character list by "most recently played" and for informational display in the character card.
+
+Goals:
+
+- Add `updated_at: datetime` to `CharacterSummaryRead` in `oscilla/models/api/characters.py`
+- Ensure `updated_at` is populated from `CharacterRecord.updated_at` (add this column if it does not already exist via a migration)
+- Update the `CharacterSummaryRead` TypeScript interface in `types.ts` and the `CharacterCard` component to display the last-played date once available
+
+### Skill Cooldown State in API
+
+**Effort: S** · **Group: Multi-User Platform**
+
+The current `SkillRead` Pydantic model returned by `GET /characters/{id}` exposes only `ref` and `display_name`. It does not expose cooldown state, even though the engine tracks cooldowns as absolute tick and real-time timestamps on `CharacterIterationRecord`.
+
+The web frontend (MU4) cannot display cooldown state for this reason. The Skills panel shows only the skill name — it cannot show whether a skill is on cooldown or how many ticks remain.
+
+Goals:
+
+- Add `description: str | None`, `on_cooldown: bool`, and `cooldown_remaining_ticks: int | None` to `SkillRead`
+- `on_cooldown` is `True` when the current game tick is less than the skill's cooldown expiry tick stored in character state
+- `cooldown_remaining_ticks` is the difference between the expiry tick and the current game tick when on cooldown, `None` otherwise
+- Update `CharacterStateRead` and the character router to populate these fields
+- Update the `types.ts` TypeScript interface in the web frontend to match
+- Once shipped, update the Skills panel in the web frontend to display cooldown state
+
+This is a prerequisite for the Skills panel showing meaningful cooldown information in the web UI.
 
 ### Front End Website
 
