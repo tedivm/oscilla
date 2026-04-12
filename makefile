@@ -120,7 +120,7 @@ frontend_format_fix:
 	cd frontend && npx prettier --write src/
 
 .PHONY: frontend_a11y
-frontend_a11y: frontend_playwright_install
+frontend_a11y: frontend_build frontend_playwright_install
 	cd frontend && if [ -n "$(BROWSER)" ]; then npm run a11y -- --project "$(BROWSER)"; else npm run a11y; fi
 
 .PHONY: frontend_playwright_install
