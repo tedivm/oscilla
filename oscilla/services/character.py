@@ -582,6 +582,7 @@ async def rename_character(session: AsyncSession, character_id: UUID, new_name: 
 
     record.name = new_name
     await touch_character_updated_at(session=session, character_id=character_id)
+    await session.commit()
 
 
 async def load_all_iterations(
@@ -1100,3 +1101,92 @@ async def update_character_tick_state(
         )
 
     await session.commit()
+
+
+# ---------------------------------------------------------------------------
+# API helper service functions
+# ---------------------------------------------------------------------------
+
+
+async def list_all_characters_for_user(
+    session: AsyncSession,
+    user_id: UUID,
+    game_name: str | None = None,
+) -> List[CharacterRecord]:
+    """Return CharacterRecords belonging to user_id, optionally filtered by game_name.
+
+    When game_name is None, all characters across all games are returned.
+    Records are ordered updated_at DESC.
+    """
+    conditions = [CharacterRecord.user_id == user_id]
+    if game_name is not None:
+        conditions.append(CharacterRecord.game_name == game_name)
+    stmt = select(CharacterRecord).where(and_(*conditions)).order_by(CharacterRecord.updated_at.desc())
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def delete_character_by_owner(
+    session: AsyncSession,
+    character_id: UUID,
+    user_id: UUID,
+) -> bool:
+    """Delete a single character and all its iteration rows by owner.
+
+    Returns True if deleted, False if the character does not exist or is not owned
+    by user_id (either way the caller receives a 404-equivalent result).
+
+    Mirrors the cascade strategy in delete_user_characters: loads each iteration
+    with its child relation selectinloads so that ORM cascade ("all, delete-orphan")
+    removes child rows before the iteration row is deleted.
+    """
+    char_stmt = select(CharacterRecord).where(
+        and_(CharacterRecord.id == character_id, CharacterRecord.user_id == user_id)
+    )
+    char_result = await session.execute(char_stmt)
+    character = char_result.scalar_one_or_none()
+    if character is None:
+        return False
+
+    iter_stmt = (
+        select(CharacterIterationRecord)
+        .where(and_(CharacterIterationRecord.character_id == character.id))
+        .options(
+            selectinload(CharacterIterationRecord.stat_values),
+            selectinload(CharacterIterationRecord.inventory_rows),
+            selectinload(CharacterIterationRecord.equipment_rows),
+            selectinload(CharacterIterationRecord.item_instance_rows).selectinload(
+                CharacterIterationItemInstance.modifier_rows
+            ),
+            selectinload(CharacterIterationRecord.milestone_rows),
+            selectinload(CharacterIterationRecord.quest_rows),
+            selectinload(CharacterIterationRecord.statistic_rows),
+            selectinload(CharacterIterationRecord.skill_rows),
+            selectinload(CharacterIterationRecord.skill_cooldown_rows),
+        )
+    )
+    iter_result = await session.execute(iter_stmt)
+    for iteration in iter_result.scalars().all():
+        await session.delete(iteration)
+    await session.delete(character)
+    await session.commit()
+    return True
+
+
+async def get_prestige_count(
+    session: AsyncSession,
+    character_id: UUID,
+) -> int:
+    """Return the prestige count (active iteration ordinal) for the given character.
+
+    Returns 0 if no active iteration row is found (should not occur in practice).
+    """
+    stmt = select(CharacterIterationRecord.iteration).where(
+        and_(
+            CharacterIterationRecord.character_id == character_id,
+            CharacterIterationRecord.is_active == True,  # noqa: E712
+        )
+    )
+    result = await session.execute(stmt)
+    value = result.scalar_one_or_none()
+    return int(value) if value is not None else 0

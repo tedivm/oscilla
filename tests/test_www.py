@@ -1,5 +1,9 @@
 """Tests for FastAPI web application."""
 
+from pathlib import Path
+from typing import Any
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 
 from oscilla.www import app
@@ -87,3 +91,64 @@ def test_basic_health(fastapi_client: TestClient) -> None:
     """Test basic application health by accessing root."""
     response = fastapi_client.get("/")
     assert response.status_code in [200, 307], "App should respond to requests"
+
+
+def test_lifespan_skips_broken_game_and_loads_healthy(tmp_path: Path) -> None:
+    """Lifespan handler skips a failing game and still loads the healthy one.
+
+    Spec requirement: "If loading any single game raises an exception, the handler
+    SHALL log the error at ERROR level with a full traceback and skip that game —
+    it MUST NOT abort startup or crash the server."
+    """
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from oscilla.www import lifespan
+
+    # Minimal fake registry returned by the healthy game load
+    fake_registry: Any = type(
+        "_FakeRegistry",
+        (),
+        {
+            "game": type(
+                "_FakeGame",
+                (),
+                {
+                    "metadata": type("_Meta", (), {"name": "healthy-game"})(),
+                },
+            )()
+        },
+    )()
+
+    call_count = 0
+
+    def _load_side_effect(content_path: Path) -> Any:
+        nonlocal call_count
+        call_count += 1
+        if "broken" in content_path.name:
+            raise ValueError("Simulated parse failure")
+        return (fake_registry, [])
+
+    # Create two dummy game directories so the lifespan scans both
+    (tmp_path / "broken-game").mkdir()
+    (tmp_path / "broken-game" / "game.yaml").write_text("invalid: yaml: [")
+    (tmp_path / "healthy-game").mkdir()
+    (tmp_path / "healthy-game" / "game.yaml").write_text("valid: true")
+
+    test_app = FastAPI(lifespan=lifespan)
+
+    with (
+        patch("oscilla.www.settings") as mock_settings,
+        patch("oscilla.www.load_from_disk", side_effect=_load_side_effect),
+    ):
+        mock_settings.games_path = tmp_path
+        with TestClient(test_app) as client:
+            # Server must start without raising
+            response = client.get("/openapi.json")
+            assert response.status_code == 200
+
+            # Healthy game is present; broken game is absent
+            assert "healthy-game" in test_app.state.registries
+            assert "broken-game" not in test_app.state.registries
+            # Both directories were attempted
+            assert call_count == 2

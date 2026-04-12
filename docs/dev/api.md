@@ -385,3 +385,72 @@ verification. For a full description of the authentication system see
 | PATCH  | `/auth/me`                     | Bearer JWT    | Update display name / password          |
 
 All endpoints are documented interactively at `/docs`.
+
+## Games Endpoints
+
+The `/games` router exposes read-only discovery endpoints for loaded game
+packages. These endpoints are unauthenticated.
+
+| Method | Path                 | Auth required | Description                           |
+| ------ | -------------------- | ------------- | ------------------------------------- |
+| GET    | `/games`             | No            | List all loaded games as `GameRead[]` |
+| GET    | `/games/{game_name}` | No            | Get one loaded game as `GameRead`     |
+
+`GameRead` includes:
+
+- `name`: machine-readable game key (from manifest metadata)
+- `display_name`: game display name (from `game.yaml`)
+- `description`: nullable game description
+- `features`: derived `GameFeatureFlags` from the live `ContentRegistry`
+
+`GameFeatureFlags` fields:
+
+- `has_skills`
+- `has_quests`
+- `has_archetypes`
+- `has_ingame_time` (true when `registry.game.spec.time` is present)
+- `has_recipes`
+- `has_loot_tables`
+
+## Characters Endpoints
+
+The `/characters` router exposes authenticated character CRUD APIs. All routes
+require a Bearer JWT and enforce ownership using the current user id.
+
+| Method | Path               | Auth required | Description                                            |
+| ------ | ------------------ | ------------- | ------------------------------------------------------ |
+| GET    | `/characters`      | Bearer JWT    | List the caller's characters (`?game=<name>` optional) |
+| POST   | `/characters`      | Bearer JWT    | Create a character for a loaded game (201)             |
+| GET    | `/characters/{id}` | Bearer JWT    | Get full `CharacterStateRead`                          |
+| PATCH  | `/characters/{id}` | Bearer JWT    | Rename character (`name`)                              |
+| DELETE | `/characters/{id}` | Bearer JWT    | Delete character (204)                                 |
+
+### CharacterStateRead Field Reference
+
+| Category  | Fields                                                                                                              |
+| --------- | ------------------------------------------------------------------------------------------------------------------- |
+| Identity  | `id`, `name`, `game_name`, `character_class`, `prestige_count`, `pronoun_set`, `created_at`                         |
+| Location  | `current_location`, `current_location_name`, `current_region_name`                                                  |
+| Stats     | `stats: Dict[str, StatValue]`                                                                                       |
+| Inventory | `stacks: Dict[str, StackedItemRead]`, `instances: List[ItemInstanceRead]`, `equipment: Dict[str, ItemInstanceRead]` |
+| Skills    | `skills: List[SkillRead]`                                                                                           |
+| Buffs     | `active_buffs: List[BuffRead]`                                                                                      |
+| Quests    | `active_quests: List[ActiveQuestRead]`, `completed_quests: List[str]`, `failed_quests: List[str]`                   |
+| Progress  | `internal_ticks`, `game_ticks`, `active_adventure`                                                                  |
+
+`stats` always includes all declared stats from `character_config.yaml`,
+including unset or derived stats where `StatValue.value` is `null`.
+
+## Registry Loading and get_registry Dependency
+
+At startup, `oscilla/www.py` scans `settings.games_path` for child directories
+containing `game.yaml` and calls `load_from_disk(...)` for each game package.
+Loaded registries are stored in `app.state.registries: Dict[str, ContentRegistry]`
+keyed by game name.
+
+- If an individual game fails to load, the error is logged and startup continues.
+- New or changed game content requires a server restart to be reloaded.
+
+The `get_registry(game_name, request)` dependency in
+`oscilla/dependencies/games.py` resolves a registry from
+`request.app.state.registries` and raises HTTP 404 when missing.

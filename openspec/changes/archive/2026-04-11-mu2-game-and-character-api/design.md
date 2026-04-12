@@ -50,7 +50,7 @@ def get_registry(game_name: str, request: Request) -> ContentRegistry:
     return registry
 ```
 
-Startup loading is wrapped in the lifespan handler — a load failure for any game logs a warning but does not crash the process. A game with a broken manifest is skipped and absent from `registries`. This is acceptable: the server should not refuse to start because one content package has an authoring error.
+Startup loading is wrapped in the lifespan handler — a load failure for any game logs at ERROR level with a full traceback but does not crash the process. A game with a broken manifest is skipped and absent from `registries`. This is acceptable: the server should not refuse to start because one content package has an authoring error.
 
 **Alternatives considered:**
 
@@ -70,7 +70,7 @@ class GameFeatureFlags:
     has_quests: bool
     has_factions: bool      # future
     has_archetypes: bool
-    has_ingame_time: bool   # true if game.yaml declares era_length_ticks > 0
+    has_ingame_time: bool   # true if game.yaml includes a time: block (spec.time is not None)
     has_recipes: bool
     has_loot_tables: bool
 ```
@@ -89,21 +89,21 @@ Frontend panel visibility is driven exclusively by this struct. No frontend logi
 
 Fields included in MU2 `CharacterStateRead`:
 
-| Category   | Fields                                                                                  |
-| ---------- | --------------------------------------------------------------------------------------- | ----- |
-| Identity   | `id`, `name`, `game_name`, `character_class`, `prestige_count`, `pronoun_set`           |
-| Location   | `current_location` (ref), `current_location_name`, `current_region_name`                |
-| Stats      | `stats: Dict[str, StatValue]` — all stat refs and current values                        |
-| Inventory  | `stacks: Dict[str, StackedItemRead]`, `instances: List[ItemInstanceRead]`               |
-| Equipment  | `equipment: Dict[str, ItemInstanceRead]` — slot → equipped item                         |
-| Skills     | `skills: List[SkillRead]` — ref, display name, cooldown status                          |
-| Buffs      | `active_buffs: List[BuffRead]` — only persistent buffs (encounter-scope are mid-combat) |
-| Quests     | `active_quests: List[ActiveQuestRead]`, `completed_quests: List[str]`                   |
-| Milestones | `milestones: Dict[str, MilestoneRead]`                                                  |
-| Progress   | `internal_ticks`, `game_ticks`                                                          |
-| Archetypes | `archetypes: Dict[str, ArchetypeRead]`                                                  |
-| Adventure  | `active_adventure: ActiveAdventureRead                                                  | None` |
-| Created    | `created_at`                                                                            |
+| Category   | Fields                                                                                            |
+| ---------- | ------------------------------------------------------------------------------------------------- | ----- |
+| Identity   | `id`, `name`, `game_name`, `character_class`, `prestige_count`, `pronoun_set`                     |
+| Location   | `current_location` (ref), `current_location_name`, `current_region_name`                          |
+| Stats      | `stats: Dict[str, StatValue]` — all stat refs and current values                                  |
+| Inventory  | `stacks: Dict[str, StackedItemRead]`, `instances: List[ItemInstanceRead]`                         |
+| Equipment  | `equipment: Dict[str, ItemInstanceRead]` — slot → equipped item                                   |
+| Skills     | `skills: List[SkillRead]` — ref, display name, cooldown status                                    |
+| Buffs      | `active_buffs: List[BuffRead]` — only persistent buffs (encounter-scope are mid-combat)           |
+| Quests     | `active_quests: List[ActiveQuestRead]`, `completed_quests: List[str]`, `failed_quests: List[str]` |
+| Milestones | `milestones: Dict[str, MilestoneRead]`                                                            |
+| Progress   | `internal_ticks`, `game_ticks`                                                                    |
+| Archetypes | `archetypes: List[ArchetypeRead]`                                                                 |
+| Adventure  | `active_adventure: ActiveAdventureRead                                                            | None` |
+| Created    | `created_at`                                                                                      |
 
 The `StatValue` type carries both the current value and whether it was changed this tick (for future highlighting):
 
@@ -168,7 +168,7 @@ oscilla/
 ```python
 from typing import Dict
 from oscilla.engine.registry import ContentRegistry
-from oscilla.engine.loader import load_game  # or equivalent loader entry point
+from oscilla.engine.loader import load_from_disk
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -176,14 +176,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Load all content registries at startup
     registries: Dict[str, ContentRegistry] = {}
-    games_path = settings.games_path
-    if games_path.exists():
-        for game_dir in games_path.iterdir():
+    if settings.games_path.exists():
+        for game_dir in settings.games_path.iterdir():
             if game_dir.is_dir() and (game_dir / "game.yaml").exists():
                 try:
-                    registry = load_game(game_dir)
-                    registries[registry.game.name] = registry
-                    logger.info("Loaded game registry: %s", registry.game.name)
+                    registry, warnings = load_from_disk(content_path=game_dir)
+                    for warning in warnings:
+                        logger.warning("Load warning in %s: %s", game_dir, warning)
+                    assert registry.game is not None
+                    registries[registry.game.metadata.name] = registry
+                    logger.info("Loaded game registry: %s", registry.game.metadata.name)
                 except Exception:
                     logger.exception("Failed to load game from %s — skipping.", game_dir)
     app.state.registries = registries
