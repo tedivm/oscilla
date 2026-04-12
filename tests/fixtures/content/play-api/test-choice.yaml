@@ -1,0 +1,31 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: test-choice
+spec:
+  displayName: "Test Choice"
+  description: "A two-step adventure: narrative then choice. Used for crash recovery tests."
+  steps:
+    - type: narrative
+      text: "You stand at a fork in the road."
+    - type: choice
+      prompt: "Which path do you take?"
+      options:
+        - label: path_left
+          text: "Go left (gain 5 xp)"
+          steps:
+            - type: narrative
+              text: "You chose the left path."
+              effects:
+                - type: stat_change
+                  stat: xp
+                  amount: 5
+        - label: path_right
+          text: "Go right (gain 10 gold)"
+          steps:
+            - type: narrative
+              text: "You chose the right path."
+              effects:
+                - type: stat_change
+                  stat: gold
+                  amount: 10

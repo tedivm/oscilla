@@ -1,0 +1,14 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: test-narrative
+spec:
+  displayName: "Test Narrative"
+  description: "A simple narrative adventure for play API tests."
+  steps:
+    - type: narrative
+      text: "You begin your journey. The path ahead is clear."
+      effects:
+        - type: stat_change
+          stat: xp
+          amount: 1

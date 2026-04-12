@@ -1,0 +1,39 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: api-sse-events
+spec:
+  displayName: "SSE Events Showcase"
+  description: "Exercises narrative, combat_state, and choice SSE event types in sequence. Use POST /play/begin and read the stream to verify all three event types appear in order."
+  steps:
+    - type: narrative
+      text: "You enter the API test chamber. The room hums with diagnostic energy."
+
+    - type: combat
+      enemy: glass-dummy
+      on_win:
+        steps:
+          - type: narrative
+            text: "The dummy collapses. Combat events confirmed."
+      on_defeat:
+        steps:
+          - type: narrative
+            text: "Unexpected defeat in the easy fight."
+      on_flee:
+        steps:
+          - type: narrative
+            text: "You fled the dummy."
+
+    - type: choice
+      prompt: "Which exit do you take?"
+      options:
+        - label: exit_north
+          text: "North door"
+          steps:
+            - type: narrative
+              text: "You leave through the north door."
+        - label: exit_south
+          text: "South door"
+          steps:
+            - type: narrative
+              text: "You leave through the south door."

@@ -80,6 +80,7 @@ class CharacterIterationRecord(Base):
     # cleared on clean exit. If a new session finds this non-NULL it concludes
     # the previous process died, steals the lock, and clears any orphaned adventure state.
     session_token: Mapped[str | None] = mapped_column(String, nullable=True)
+    session_token_acquired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Child table relationships — cascade keeps orphans from accumulating on delete
     stat_values: Mapped[List["CharacterIterationStatValue"]] = relationship(

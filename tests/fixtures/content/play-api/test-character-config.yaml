@@ -1,0 +1,19 @@
+apiVersion: oscilla/v1
+kind: CharacterConfig
+metadata:
+  name: test-character-config
+spec:
+  public_stats:
+    - name: xp
+      type: int
+      default: 0
+      bounds:
+        min: 0
+      description: "Experience points"
+    - name: gold
+      type: int
+      default: 0
+      bounds:
+        min: 0
+      description: "Currency"
+  hidden_stats: []

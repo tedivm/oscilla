@@ -3,7 +3,7 @@
 Provides a full-screen persistent layout with a scrollable narrative log,
 arrow-key choice menu, player status sidebar, and region context panel.
 
-The TextualTUI class satisfies the async TUICallbacks protocol defined in
+The TextualTUI class satisfies the async UICallbacks protocol defined in
 pipeline.py — step handlers call await tui.show_text() / show_menu() etc.
 and this module handles all Textual widget interaction behind the scenes.
 """
@@ -992,7 +992,7 @@ class OscillaApp(App[None]):
 
 
 class TextualTUI:
-    """Implements the async TUICallbacks protocol using the OscillaApp widgets.
+    """Implements the async UICallbacks protocol using the OscillaApp widgets.
 
     Each method updates the appropriate widget in the Textual tree and, where
     player input is required, suspends the caller via asyncio.Event until the

@@ -1,0 +1,7 @@
+apiVersion: oscilla/v1
+kind: Game
+metadata:
+  name: test-play-game
+spec:
+  displayName: "Test Play Game"
+  description: "Minimal game for play router integration tests."

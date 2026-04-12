@@ -895,8 +895,18 @@ erDiagram
     INTEGER iteration
     VARCHAR pronoun_set
     VARCHAR session_token "nullable"
+    DATETIME session_token_acquired_at "nullable"
     DATETIME started_at
     INTEGER version
+  }
+
+  character_session_output {
+    CHAR(32) id PK
+    CHAR(32) iteration_id FK "indexed"
+    JSON content_json
+    DATETIME created_at
+    VARCHAR event_type
+    INTEGER position
   }
 
   characters {
@@ -937,6 +947,7 @@ erDiagram
   character_iterations ||--o| character_iteration_stat_values : iteration_id
   character_iterations ||--o| character_iteration_statistics : iteration_id
   characters ||--o{ character_iterations : character_id
+  character_iterations ||--o{ character_session_output : iteration_id
   users ||--o{ characters : user_id
 
 ```

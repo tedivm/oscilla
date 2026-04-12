@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Awaitable, Callable
 
 from oscilla.engine.conditions import evaluate
 from oscilla.engine.models.adventure import ChoiceStep, OutcomeBranch
-from oscilla.engine.pipeline import AdventureOutcome, TUICallbacks
+from oscilla.engine.pipeline import AdventureOutcome, UICallbacks
 
 if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 async def run_choice(
     step: ChoiceStep,
     player: "CharacterState",
-    tui: TUICallbacks,
+    tui: UICallbacks,
     run_outcome_branch: Callable[[OutcomeBranch], Awaitable[AdventureOutcome]],
     registry: "ContentRegistry | None" = None,
 ) -> AdventureOutcome:

@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Dict, List
 if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
     from oscilla.engine.models.adventure import Cooldown
-    from oscilla.engine.pipeline import TUICallbacks
+    from oscilla.engine.pipeline import UICallbacks
     from oscilla.engine.registry import ContentRegistry
     from oscilla.engine.templates import GameTemplateEngine
 
@@ -82,7 +82,7 @@ def _set_skill_cooldown(
 async def open_actions_screen(
     player: "CharacterState",
     registry: "ContentRegistry",
-    tui: "TUICallbacks",
+    tui: "UICallbacks",
 ) -> None:
     """Present the overworld Actions screen and dispatch the selected skill.
 

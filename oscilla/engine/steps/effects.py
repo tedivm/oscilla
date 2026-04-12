@@ -37,7 +37,7 @@ from oscilla.engine.signals import _EndSignal
 if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
     from oscilla.engine.models.loot_table import LootGroup
-    from oscilla.engine.pipeline import TUICallbacks
+    from oscilla.engine.pipeline import UICallbacks
     from oscilla.engine.registry import ContentRegistry
     from oscilla.engine.templates import ExpressionContext
 
@@ -104,7 +104,7 @@ async def _recompute_derived_stats(
     player: "CharacterState",
     registry: "ContentRegistry",
     engine: "Any",
-    tui: "TUICallbacks",
+    tui: "UICallbacks",
 ) -> None:
     """Re-evaluate all derived stats and fire on_stat_threshold triggers for any that changed.
 
@@ -284,7 +284,7 @@ async def run_effect(
     effect: Effect,
     player: "CharacterState",
     registry: "ContentRegistry",
-    tui: "TUICallbacks",
+    tui: "UICallbacks",
     combat: "CombatContext | None" = None,
     ctx: "ExpressionContext | None" = None,
 ) -> None:

@@ -1,10 +1,10 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, Dict, List, Literal
 from uuid import UUID
 
-from sqlalchemy import and_, func, select, update
+from sqlalchemy import and_, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -25,6 +25,7 @@ from oscilla.models.character_iteration import (
     CharacterIterationStatistic,
     CharacterIterationStatValue,
 )
+from oscilla.models.character_session_output import CharacterSessionOutputRecord
 
 if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
@@ -622,9 +623,23 @@ async def get_active_iteration_id(
     return row if row is None else UUID(str(row))
 
 
-# ---------------------------------------------------------------------------
-# Session soft-lock functions (see design D11)
-# ---------------------------------------------------------------------------
+async def get_active_iteration_record(
+    session: AsyncSession,
+    character_id: UUID,
+) -> "CharacterIterationRecord | None":
+    """Return the active CharacterIterationRecord for a character, or None.
+
+    Used by web route handlers that need the full record (e.g. adventure_ref,
+    adventure_step_index, session_token) in a single query.
+    """
+    stmt = select(CharacterIterationRecord).where(
+        and_(
+            CharacterIterationRecord.character_id == character_id,
+            CharacterIterationRecord.is_active == True,  # noqa: E712
+        )
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
 
 
 async def acquire_session_lock(
@@ -684,6 +699,146 @@ async def release_session_lock(
         .values(session_token=None)
         .execution_options(synchronize_session="fetch")
     )
+    await session.execute(stmt)
+    await session.commit()
+
+
+async def acquire_web_session_lock(
+    session: AsyncSession,
+    iteration_id: UUID,
+    token: str,
+    stale_threshold_minutes: int,
+) -> datetime | None:
+    """Attempt to acquire a web session lock on an iteration.
+
+    Returns ``None`` on success (lock acquired or stale lock taken over).
+    Returns the ``acquired_at`` datetime if a live session already holds the lock
+    (caller should respond with 409 Conflict).
+
+    A lock is considered stale when ``session_token_acquired_at`` is more than
+    ``stale_threshold_minutes`` in the past. Stale locks are automatically
+    replaced without returning a conflict.
+    """
+    stmt = select(CharacterIterationRecord).where(and_(CharacterIterationRecord.id == iteration_id))
+    result = await session.execute(stmt)
+    iteration = result.scalar_one()
+
+    if iteration.session_token is not None:
+        acquired_at = iteration.session_token_acquired_at
+        now = datetime.now(tz=timezone.utc)
+        if acquired_at is None or (
+            now - acquired_at.replace(tzinfo=timezone.utc) if acquired_at.tzinfo is None else now - acquired_at
+        ) < timedelta(minutes=stale_threshold_minutes):
+            # Lock is actively held — return acquired_at so the caller can return 409.
+            return acquired_at if acquired_at is not None else now
+
+    iteration.session_token = token
+    iteration.session_token_acquired_at = datetime.now(tz=timezone.utc)
+    await session.commit()
+    return None
+
+
+async def release_web_session_lock(
+    session: AsyncSession,
+    iteration_id: UUID,
+    token: str,
+) -> None:
+    """Clear the web session lock if the token matches.
+
+    No-op if the token does not match — prevents a zombie process from
+    releasing a lock that another session has already taken over.
+    """
+    stmt = (
+        update(CharacterIterationRecord)
+        .where(
+            and_(
+                CharacterIterationRecord.id == iteration_id,
+                CharacterIterationRecord.session_token == token,
+            )
+        )
+        .values(session_token=None, session_token_acquired_at=None)
+        .execution_options(synchronize_session="fetch")
+    )
+    await session.execute(stmt)
+    await session.commit()
+
+
+async def force_acquire_web_session_lock(
+    session: AsyncSession,
+    iteration_id: UUID,
+    token: str,
+) -> None:
+    """Unconditionally acquire the web session lock (takeover endpoint).
+
+    Logs a WARNING if a prior token is displaced. Clears orphaned adventure
+    state to prevent double-applying outcome effects from the displaced session.
+    """
+    stmt = select(CharacterIterationRecord).where(and_(CharacterIterationRecord.id == iteration_id))
+    result = await session.execute(stmt)
+    iteration = result.scalar_one()
+
+    if iteration.session_token is not None:
+        logger.warning(
+            "Force-acquiring web session lock from prior token %r on iteration %s.",
+            iteration.session_token,
+            iteration_id,
+        )
+
+    # Clear orphaned adventure state from the displaced session.
+    iteration.adventure_ref = None
+    iteration.adventure_step_index = None
+    iteration.adventure_step_state = None
+    iteration.session_token = token
+    iteration.session_token_acquired_at = datetime.now(tz=timezone.utc)
+    await session.commit()
+
+
+async def save_session_output(
+    session: AsyncSession,
+    iteration_id: UUID,
+    events: List[Dict[str, Any]],
+) -> None:
+    """Replace all session output rows for an iteration with the given events.
+
+    Performs a full DELETE + INSERT to keep the stored log exactly in sync with
+    the events emitted during the most recent adventure session.
+    """
+    del_stmt = delete(CharacterSessionOutputRecord).where(
+        and_(CharacterSessionOutputRecord.iteration_id == iteration_id)
+    )
+    await session.execute(del_stmt)
+    for position, event in enumerate(events):
+        row = CharacterSessionOutputRecord(
+            iteration_id=iteration_id,
+            position=position,
+            event_type=event["type"],
+            content_json=event,
+        )
+        session.add(row)
+    await session.commit()
+
+
+async def get_session_output(
+    session: AsyncSession,
+    iteration_id: UUID,
+) -> List[Dict[str, Any]]:
+    """Return all session output events for an iteration, ordered by position."""
+    stmt = (
+        select(CharacterSessionOutputRecord)
+        .where(and_(CharacterSessionOutputRecord.iteration_id == iteration_id))
+        .order_by(CharacterSessionOutputRecord.position)
+    )
+    result = await session.execute(stmt)
+    rows = result.scalars().all()
+    return [row.content_json for row in rows]
+
+
+async def clear_session_output(
+    session: AsyncSession,
+    iteration_id: UUID,
+) -> None:
+    """Delete all session output rows for an iteration."""
+    stmt = delete(CharacterSessionOutputRecord).where(and_(CharacterSessionOutputRecord.iteration_id == iteration_id))
     await session.execute(stmt)
     await session.commit()
 

@@ -9,7 +9,7 @@ from oscilla.engine.conditions import evaluate
 
 if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
-    from oscilla.engine.pipeline import TUICallbacks
+    from oscilla.engine.pipeline import UICallbacks
     from oscilla.engine.registry import ContentRegistry
 
 logger = getLogger(__name__)
@@ -102,7 +102,7 @@ def _fail_quests_silent(player: "CharacterState", registry: "ContentRegistry") -
 async def evaluate_quest_advancements(
     player: "CharacterState",
     registry: "ContentRegistry",
-    tui: "TUICallbacks",
+    tui: "UICallbacks",
 ) -> None:
     """Async, full-effect advancement used after milestone_grant at runtime.
 
@@ -172,7 +172,7 @@ async def evaluate_quest_advancements(
 async def _evaluate_quest_failures(
     player: "CharacterState",
     registry: "ContentRegistry",
-    tui: "TUICallbacks",
+    tui: "UICallbacks",
 ) -> None:
     """Move any active quests whose fail_condition is met to failed_quests.
 

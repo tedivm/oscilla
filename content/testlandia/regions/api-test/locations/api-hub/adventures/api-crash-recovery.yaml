@@ -1,0 +1,24 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: api-crash-recovery
+spec:
+  displayName: "Crash Recovery Demo"
+  description: "Two-step adventure for validating the crash-recovery loop: (1) POST /play/begin — sees narrative ack_required then choice events; (2) GET /play/current — confirms session_output matches; (3) POST /play/advance with choice=1 or choice=2 — completes the adventure."
+  steps:
+    - type: narrative
+      text: "You stand at the crash recovery checkpoint. The system logs your position."
+
+    - type: choice
+      prompt: "Which path do you take?"
+      options:
+        - label: continue
+          text: "Continue forward"
+          steps:
+            - type: narrative
+              text: "You step forward. The adventure ends successfully. Crash recovery validated."
+        - label: retreat
+          text: "Retreat"
+          steps:
+            - type: narrative
+              text: "You retreat safely. Crash recovery validated."

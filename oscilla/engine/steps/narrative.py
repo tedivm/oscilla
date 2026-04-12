@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Awaitable, Callable, List
 
 from oscilla.engine.models.adventure import Effect, NarrativeStep
-from oscilla.engine.pipeline import AdventureOutcome, TUICallbacks
+from oscilla.engine.pipeline import AdventureOutcome, UICallbacks
 from oscilla.engine.templates import ExpressionContext
 
 if TYPE_CHECKING:
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 async def run_narrative(
     step: NarrativeStep,
     player: "CharacterState",
-    tui: TUICallbacks,
+    tui: UICallbacks,
     run_effects: Callable[[List[Effect]], Awaitable[None]],
     registry: "ContentRegistry",
     ctx: ExpressionContext,

@@ -12,6 +12,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING, Dict, List, Literal
 from uuid import UUID, uuid4
 
+from sqlalchemy import delete
 from sqlalchemy.orm.exc import StaleDataError
 
 from oscilla.engine.templates import PRONOUN_SETS
@@ -50,7 +51,8 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from oscilla.engine.character import CharacterState
-    from oscilla.engine.pipeline import AdventureOutcome, TUICallbacks
+    from oscilla.engine.models.character_config import CharacterConfigManifest
+    from oscilla.engine.pipeline import AdventureOutcome, UICallbacks
     from oscilla.engine.registry import ContentRegistry
     from oscilla.models.character import CharacterRecord
 
@@ -93,7 +95,7 @@ class GameSession:
     def __init__(
         self,
         registry: "ContentRegistry",
-        tui: "TUICallbacks",
+        tui: "UICallbacks",
         db_session: "AsyncSession",
         game_name: str,
         character_name: str | None = None,
@@ -675,8 +677,6 @@ class GameSession:
             # Replace the pending trigger queue atomically.
             last_pending = last.pending_triggers if last is not None else []
             if state.pending_triggers != last_pending:
-                from sqlalchemy import delete
-
                 await self.db_session.execute(
                     delete(CharacterIterationPendingTrigger).where(
                         CharacterIterationPendingTrigger.iteration_id == iteration_id
@@ -795,3 +795,347 @@ class GameSession:
 
         _advance_quests_silent(player=state, registry=self.registry)
         return state
+
+
+class WebPersistCallback:
+    """Callable persist callback for the web execution path.
+
+    Mirrors GameSession._on_state_change and _persist_diff but is designed for
+    use in FastAPI route handlers that manage their own SQLAlchemy sessions.
+    Instantiate once per SSE request; call as a coroutine to persist changes.
+
+    Usage::
+
+        persist_cb = WebPersistCallback(
+            db_session=db,
+            iteration_id=iteration_id,
+            initial_state=loaded_state,
+            character_config=registry.character_config,
+            registry=registry,
+        )
+        pipeline = AdventurePipeline(
+            registry=registry,
+            player=state,
+            tui=web_cb,
+            on_state_change=persist_cb,
+        )
+    """
+
+    def __init__(
+        self,
+        db_session: "AsyncSession",
+        iteration_id: UUID,
+        initial_state: "CharacterState",
+        character_config: "CharacterConfigManifest | None",
+        registry: "ContentRegistry",
+    ) -> None:
+        self._db_session = db_session
+        self._iteration_id = iteration_id
+        self._last_saved_state: "CharacterState | None" = copy.deepcopy(initial_state)
+        self._character_config = character_config
+        self._registry = registry
+        self._db_character_name: str = initial_state.name
+
+    async def __call__(
+        self,
+        state: "CharacterState",
+        event: Literal["step_start", "combat_round", "adventure_end"],
+    ) -> None:
+        """Diff current state against last saved snapshot and write changed domains."""
+        try:
+            await self._persist_diff(state=state, event=event)
+            self._last_saved_state = copy.deepcopy(state)
+        except StaleDataError:
+            logger.warning(
+                "StaleDataError during web persist (event=%r); reloading snapshot and retrying once.",
+                event,
+            )
+            if self._character_config is not None:
+                reloaded = await load_character(
+                    session=self._db_session,
+                    character_id=state.character_id,
+                    character_config=self._character_config,
+                    registry=self._registry,
+                )
+                if reloaded is not None:
+                    self._last_saved_state = reloaded
+            try:
+                await self._persist_diff(state=state, event=event)
+                self._last_saved_state = copy.deepcopy(state)
+            except StaleDataError:
+                logger.exception(
+                    "Second StaleDataError during web persist (event=%r); giving up.",
+                    event,
+                )
+                raise
+
+    async def _persist_diff(
+        self,
+        state: "CharacterState",
+        event: Literal["step_start", "combat_round", "adventure_end"],
+    ) -> None:
+        """Write only the domains that changed since _last_saved_state."""
+        if state.prestige_pending is not None and event != "adventure_end":
+            return
+
+        iteration_id = self._iteration_id
+        last = self._last_saved_state
+
+        # --- Scalar fields ---
+        scalar_fields: Dict[str, int | float | str | None] = {}
+        if last is None or state.character_class != last.character_class:
+            scalar_fields["character_class"] = state.character_class
+        if last is None or state.current_location != last.current_location:
+            scalar_fields["current_location"] = state.current_location
+        state_pronoun_key = next((k for k, v in PRONOUN_SETS.items() if v == state.pronouns), "they_them")
+        last_pronoun_key = (
+            next((k for k, v in PRONOUN_SETS.items() if v == last.pronouns), "they_them") if last is not None else None
+        )
+        if last is None or state_pronoun_key != last_pronoun_key:
+            scalar_fields["pronoun_set"] = state_pronoun_key
+        if scalar_fields:
+            await update_scalar_fields(session=self._db_session, iteration_id=iteration_id, fields=scalar_fields)
+
+        # --- Stats ---
+        last_stats = last.stats if last is not None else {}
+        for stat_name, value in state.stats.items():
+            if value != last_stats.get(stat_name):
+                await set_stat(session=self._db_session, iteration_id=iteration_id, stat_name=stat_name, value=value)
+
+        # --- Stacks (stackable inventory) ---
+        last_stacks = last.stacks if last is not None else {}
+        for item_ref, qty in state.stacks.items():
+            if qty != last_stacks.get(item_ref):
+                await set_inventory_item(
+                    session=self._db_session, iteration_id=iteration_id, item_ref=item_ref, quantity=qty
+                )
+        for item_ref in last_stacks:
+            if item_ref not in state.stacks:
+                await set_inventory_item(
+                    session=self._db_session, iteration_id=iteration_id, item_ref=item_ref, quantity=0
+                )
+
+        # --- Item instances ---
+        last_instance_ids: set[str] = {str(i.instance_id) for i in last.instances} if last is not None else set()
+        current_instance_ids: set[str] = {str(i.instance_id) for i in state.instances}
+        for inst in state.instances:
+            if str(inst.instance_id) not in last_instance_ids:
+                await add_item_instance(
+                    session=self._db_session,
+                    iteration_id=iteration_id,
+                    instance_id=str(inst.instance_id),
+                    item_ref=inst.item_ref,
+                    modifiers=inst.modifiers,
+                )
+        for inst_id_str in last_instance_ids:
+            if inst_id_str not in current_instance_ids:
+                await remove_item_instance(session=self._db_session, iteration_id=iteration_id, instance_id=inst_id_str)
+
+        # --- Equipment ---
+        last_equip = last.equipment if last is not None else {}
+        for slot, instance_id in state.equipment.items():
+            if instance_id != last_equip.get(slot):
+                await equip_item(
+                    session=self._db_session,
+                    iteration_id=iteration_id,
+                    slot=slot,
+                    instance_id=str(instance_id),
+                )
+        for slot in last_equip:
+            if slot not in state.equipment:
+                await unequip_item(session=self._db_session, iteration_id=iteration_id, slot=slot)
+
+        # --- Milestones ---
+        last_milestones = last.milestones if last is not None else {}
+        for milestone_ref, record in state.milestones.items():
+            if milestone_ref not in last_milestones:
+                await add_milestone(
+                    session=self._db_session,
+                    iteration_id=iteration_id,
+                    milestone_ref=milestone_ref,
+                    grant_tick=record.tick,
+                    grant_timestamp=record.timestamp,
+                )
+
+        # --- Quests ---
+        last_active = last.active_quests if last is not None else {}
+        last_completed = last.completed_quests if last is not None else set()
+        last_failed = last.failed_quests if last is not None else set()
+        for quest_ref, stage in state.active_quests.items():
+            if quest_ref not in last_active or stage != last_active.get(quest_ref):
+                await set_quest(
+                    session=self._db_session,
+                    iteration_id=iteration_id,
+                    quest_ref=quest_ref,
+                    status="active",
+                    stage=stage,
+                )
+        for quest_ref in state.completed_quests - last_completed:
+            await set_quest(
+                session=self._db_session, iteration_id=iteration_id, quest_ref=quest_ref, status="completed", stage=None
+            )
+        for quest_ref in state.failed_quests - last_failed:
+            await set_quest(
+                session=self._db_session, iteration_id=iteration_id, quest_ref=quest_ref, status="failed", stage=None
+            )
+
+        # --- Statistics ---
+        last_stats_obj = last.statistics if last is not None else None
+        last_enemies = last_stats_obj.enemies_defeated if last_stats_obj else {}
+        last_locations = last_stats_obj.locations_visited if last_stats_obj else {}
+        last_adventures = last_stats_obj.adventures_completed if last_stats_obj else {}
+        last_outcome_counts = last_stats_obj.adventure_outcome_counts if last_stats_obj else {}
+        for entity_ref, count in state.statistics.enemies_defeated.items():
+            delta = count - last_enemies.get(entity_ref, 0)
+            if delta > 0:
+                await increment_statistic(
+                    session=self._db_session,
+                    iteration_id=iteration_id,
+                    stat_type="enemies_defeated",
+                    entity_ref=entity_ref,
+                    delta=delta,
+                )
+        for entity_ref, count in state.statistics.locations_visited.items():
+            delta = count - last_locations.get(entity_ref, 0)
+            if delta > 0:
+                await increment_statistic(
+                    session=self._db_session,
+                    iteration_id=iteration_id,
+                    stat_type="locations_visited",
+                    entity_ref=entity_ref,
+                    delta=delta,
+                )
+        for entity_ref, count in state.statistics.adventures_completed.items():
+            delta = count - last_adventures.get(entity_ref, 0)
+            if delta > 0:
+                await increment_statistic(
+                    session=self._db_session,
+                    iteration_id=iteration_id,
+                    stat_type="adventures_completed",
+                    entity_ref=entity_ref,
+                    delta=delta,
+                )
+        for adventure_ref, outcome_map in state.statistics.adventure_outcome_counts.items():
+            last_outcomes_for_adv = last_outcome_counts.get(adventure_ref, {})
+            for outcome_name, count in outcome_map.items():
+                delta = count - last_outcomes_for_adv.get(outcome_name, 0)
+                if delta > 0:
+                    await increment_statistic(
+                        session=self._db_session,
+                        iteration_id=iteration_id,
+                        stat_type=f"adventure_outcome:{outcome_name}",
+                        entity_ref=adventure_ref,
+                        delta=delta,
+                    )
+
+        # --- Known skills ---
+        last_skills = last.known_skills if last is not None else set()
+        for skill_ref in state.known_skills - last_skills:
+            await add_known_skill(session=self._db_session, iteration_id=iteration_id, skill_ref=skill_ref)
+
+        # --- Skill cooldowns ---
+        last_tick_expiry = last.skill_tick_expiry if last is not None else {}
+        last_real_expiry = last.skill_real_expiry if last is not None else {}
+        all_skill_refs = set(state.skill_tick_expiry) | set(state.skill_real_expiry)
+        for skill_ref in all_skill_refs:
+            new_tick = state.skill_tick_expiry.get(skill_ref, 0)
+            new_real = state.skill_real_expiry.get(skill_ref, 0)
+            if new_tick != last_tick_expiry.get(skill_ref, 0) or new_real != last_real_expiry.get(skill_ref, 0):
+                await set_skill_cooldown(
+                    session=self._db_session,
+                    iteration_id=iteration_id,
+                    skill_ref=skill_ref,
+                    tick_expiry=new_tick,
+                    real_expiry=new_real,
+                )
+        last_all_skills = set(last_tick_expiry) | set(last_real_expiry)
+        for skill_ref in last_all_skills - all_skill_refs:
+            await set_skill_cooldown(
+                session=self._db_session, iteration_id=iteration_id, skill_ref=skill_ref, tick_expiry=0, real_expiry=0
+            )
+
+        # --- Name change ---
+        if state.name != self._db_character_name:
+            await rename_character(session=self._db_session, character_id=state.character_id, new_name=state.name)
+            self._db_character_name = state.name
+
+        # --- Adventure progress ---
+        if event == "adventure_end":
+            if state.prestige_pending is not None and self._character_config is not None:
+                new_iteration = await prestige_character(
+                    session=self._db_session,
+                    character_id=state.character_id,
+                    character_config=self._character_config,
+                )
+                self._iteration_id = new_iteration.id
+                iteration_id = new_iteration.id
+                self._last_saved_state = None
+                last = None
+                state.prestige_pending = None
+
+            await save_adventure_progress(
+                session=self._db_session,
+                iteration_id=iteration_id,
+                adventure_ref=None,
+                step_index=None,
+                step_state=None,
+            )
+            last_completed_real_ts = last.adventure_last_completed_real_ts if last is not None else {}
+            last_completed_game_ticks_map = last.adventure_last_completed_game_ticks if last is not None else {}
+            last_completed_at_ticks = last.adventure_last_completed_at_ticks if last is not None else {}
+            all_adventures_refs = (
+                set(state.adventure_last_completed_real_ts)
+                | set(state.adventure_last_completed_game_ticks)
+                | set(state.adventure_last_completed_at_ticks)
+            )
+            for adventure_ref in all_adventures_refs:
+                new_real_ts = state.adventure_last_completed_real_ts.get(adventure_ref)
+                new_game_ticks = state.adventure_last_completed_game_ticks.get(adventure_ref)
+                new_at_ticks = state.adventure_last_completed_at_ticks.get(adventure_ref)
+                if (
+                    new_real_ts != last_completed_real_ts.get(adventure_ref)
+                    or new_game_ticks != last_completed_game_ticks_map.get(adventure_ref)
+                    or new_at_ticks != last_completed_at_ticks.get(adventure_ref)
+                ):
+                    await upsert_adventure_state(
+                        session=self._db_session,
+                        iteration_id=iteration_id,
+                        adventure_ref=adventure_ref,
+                        last_completed_real_ts=new_real_ts,
+                        last_completed_game_ticks=new_game_ticks,
+                        last_completed_at_ticks=new_at_ticks,
+                    )
+            await update_character_tick_state(
+                session=self._db_session,
+                iteration_id=iteration_id,
+                internal_ticks=state.internal_ticks,
+                game_ticks=state.game_ticks,
+                adventure_last_completed_at_ticks=dict(state.adventure_last_completed_at_ticks),
+                era_started_at_ticks=state.era_started_at_ticks,
+                era_ended_at_ticks=state.era_ended_at_ticks,
+            )
+            await touch_character_updated_at(session=self._db_session, character_id=state.character_id)
+            last_pending = last.pending_triggers if last is not None else []
+            if state.pending_triggers != last_pending:
+                await self._db_session.execute(
+                    delete(CharacterIterationPendingTrigger).where(
+                        CharacterIterationPendingTrigger.iteration_id == iteration_id
+                    )
+                )
+                for position, trigger_name in enumerate(state.pending_triggers):
+                    self._db_session.add(
+                        CharacterIterationPendingTrigger(
+                            iteration_id=iteration_id,
+                            position=position,
+                            trigger_name=trigger_name,
+                        )
+                    )
+                await self._db_session.commit()
+        elif state.active_adventure is not None:
+            await save_adventure_progress(
+                session=self._db_session,
+                iteration_id=iteration_id,
+                adventure_ref=state.active_adventure.adventure_ref,
+                step_index=state.active_adventure.step_index,
+                step_state=dict(state.active_adventure.step_state),
+            )

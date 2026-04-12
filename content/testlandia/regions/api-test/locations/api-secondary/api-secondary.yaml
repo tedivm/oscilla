@@ -1,0 +1,9 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: api-secondary
+spec:
+  displayName: "API Secondary Location"
+  description: "Second location in the API Test Area for testing overworld navigation between two locations in the same region."
+  region: api-test
+  adventures: []

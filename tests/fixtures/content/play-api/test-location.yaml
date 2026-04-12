@@ -1,0 +1,13 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: test-location
+spec:
+  displayName: "Test Location"
+  description: "Play API test location."
+  region: test-region-root
+  adventures:
+    - ref: test-narrative
+      weight: 1
+    - ref: test-choice
+      weight: 1

@@ -13,6 +13,8 @@ from oscilla.engine.registry import ContentRegistry
 from oscilla.routers.auth import router as auth_router
 from oscilla.routers.characters import router as characters_router
 from oscilla.routers.games import router as games_router
+from oscilla.routers.overworld import router as overworld_router
+from oscilla.routers.play import router as play_router
 from oscilla.services.cache import configure_caches
 from oscilla.settings import settings
 
@@ -52,6 +54,9 @@ app.mount("/static", StaticFiles(directory=static_file_path), name="static")
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(games_router, prefix="/games", tags=["games"])
 app.include_router(characters_router, prefix="/characters", tags=["characters"])
+# Play and overworld routers use full paths including /characters/{id}/
+app.include_router(play_router, tags=["play"])
+app.include_router(overworld_router, tags=["overworld"])
 
 
 @app.get("/", include_in_schema=False)

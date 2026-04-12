@@ -12,7 +12,7 @@ from oscilla.engine.steps.effects import run_effect
 
 if TYPE_CHECKING:
     from oscilla.engine.character import CharacterState
-    from oscilla.engine.pipeline import TUICallbacks
+    from oscilla.engine.pipeline import UICallbacks
     from oscilla.engine.registry import ContentRegistry
 
 logger = getLogger(__name__)
@@ -22,7 +22,7 @@ async def run_passive(
     step: PassiveStep,
     player: "CharacterState",
     registry: "ContentRegistry",
-    tui: "TUICallbacks",
+    tui: "UICallbacks",
 ) -> AdventureOutcome:
     """Execute a passive step.
 

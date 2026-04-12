@@ -46,6 +46,10 @@ class Settings(DatabaseSettings, CacheSettings):
     graph_color_passive: str = Field(default="#d0f8d8", description="Graph node color for passive step nodes.")
 
     # Auth
+    stale_session_threshold_minutes: int = Field(
+        default=10,
+        description="Minutes after which a web session lock is considered stale and eligible for takeover.",
+    )
     jwt_secret: SecretStr = Field(
         description="Secret key for JWT signing and itsdangerous HMAC tokens. Must be a long random string.",
     )

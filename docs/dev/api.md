@@ -454,3 +454,132 @@ keyed by game name.
 The `get_registry(game_name, request)` dependency in
 `oscilla/dependencies/games.py` resolves a registry from
 `request.app.state.registries` and raises HTTP 404 when missing.
+
+## Adventure Execution Endpoints
+
+The `/play/` family of endpoints streams adventure execution to the browser
+using [Server-Sent Events (SSE)](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events)
+and integrates session locking and crash recovery.
+
+### Endpoint Reference
+
+| Method | Path                             | Auth       | Description                                           |
+| ------ | -------------------------------- | ---------- | ----------------------------------------------------- |
+| GET    | `/characters/{id}/play/current`  | Bearer JWT | Return persisted session output for crash recovery    |
+| POST   | `/characters/{id}/play/begin`    | Bearer JWT | Begin an adventure and stream SSE events (200 or 409) |
+| POST   | `/characters/{id}/play/advance`  | Bearer JWT | Submit a player decision and continue streaming       |
+| POST   | `/characters/{id}/play/abandon`  | Bearer JWT | Exit the current adventure (204)                      |
+| POST   | `/characters/{id}/play/takeover` | Bearer JWT | Force-acquire a stale session lock (returns state)    |
+
+### SSE Event Type Contract
+
+All streaming responses (`begin`, `advance`) emit newline-delimited SSE
+blocks with an `event:` line and a `data:` JSON payload:
+
+```
+event: narrative
+data: {"text": "...", "context": {"location_ref": "...", ...}}
+
+event: choice
+data: {"prompt": "...", "options": ["...", "..."], "context": {...}}
+```
+
+| Event type     | Emitted when                                             | Decision event? |
+| -------------- | -------------------------------------------------------- | --------------- |
+| `narrative`    | A narrative step displays text                           | No              |
+| `choice`       | A menu step awaits player selection                      | Yes — pauses    |
+| `ack_required` | A narrative step awaits acknowledgement before advancing | Yes — pauses    |
+| `text_input`   | A step requires freeform text from the player            | Yes — pauses    |
+| `skill_menu`   | A step awaits a skill selection                          | Yes — pauses    |
+| `combat_state` | A combat round reports current HP values                 | No              |
+| `complete`     | The adventure finished successfully                      | No              |
+
+The stream terminates after the first **decision event** (pipeline pauses for
+input) or after `complete`. The client should read all events before sending
+the follow-up `advance` request.
+
+### Session Locking
+
+`begin` and `advance` each acquire a short-lived session lock to prevent
+concurrent execution on the same character. The lock is stored in
+`session_token` + `session_token_acquired_at` on the
+`character_iterations` row and is released automatically when the SSE
+stream closes.
+
+If a non-stale lock exists, the endpoint returns **409 Conflict** with a
+`SessionConflictRead` body:
+
+```json
+{
+  "detail": "A live session is already in progress.",
+  "acquired_at": "2024-01-01T00:00:00Z",
+  "character_id": "..."
+}
+```
+
+The stale-lock threshold defaults to **10 minutes** and is configurable via
+`STALE_SESSION_THRESHOLD_MINUTES` in settings.
+
+### Crash Recovery
+
+Every SSE event emitted during a session is appended to the
+`character_session_output` table, keyed by `iteration_id`. If the client
+loses the connection mid-stream, it can call `GET /play/current` to replay
+all received events and determine the pending decision event without
+re-running the adventure.
+
+`GET /play/current` returns a `PendingStateRead`:
+
+```json
+{
+  "character_id": "...",
+  "pending_event": {"type": "choice", "data": {...}},
+  "session_output": [...]
+}
+```
+
+`pending_event` is `null` for a fresh character or after an adventure
+completes. `session_output` is cleared when `begin` starts a new adventure
+and when `abandon` resets state.
+
+### Takeover Flow
+
+`POST /play/takeover` force-acquires the session lock regardless of whether
+it is stale. It returns the same `PendingStateRead` as `GET /play/current`.
+The client should call `advance` (or `abandon`) after takeover.
+
+## Overworld Endpoints
+
+The overworld endpoints expose the character's current world position,
+available adventures, reachable locations, and a region sub-graph for map
+rendering.
+
+### Endpoint Reference
+
+| Method | Path                         | Auth       | Description                                              |
+| ------ | ---------------------------- | ---------- | -------------------------------------------------------- |
+| GET    | `/characters/{id}/overworld` | Bearer JWT | Return full `OverworldStateRead` for the character       |
+| POST   | `/characters/{id}/navigate`  | Bearer JWT | Teleport character to a new location (returns new state) |
+
+### OverworldStateRead Schema
+
+| Field                   | Type                    | Description                                      |
+| ----------------------- | ----------------------- | ------------------------------------------------ |
+| `character_id`          | `UUID`                  | Character identifier                             |
+| `current_location`      | `str \| null`           | Machine ref of current location                  |
+| `current_location_name` | `str \| null`           | Display name of current location                 |
+| `current_region_name`   | `str \| null`           | Display name of current region                   |
+| `available_adventures`  | `AdventureOptionRead[]` | Adventures in the location's pool                |
+| `navigation_options`    | `LocationOptionRead[]`  | All locations in the same region (incl. current) |
+| `region_graph`          | `RegionGraphRead`       | Node/edge neighborhood of the current region     |
+
+`navigate` validates the destination exists and that all `effective_unlock`
+conditions pass; returns **422** otherwise.
+
+### Region Graph
+
+`region_graph` contains the region sub-graph neighborhood scoped to the
+character's current region, produced by `build_world_graph()` +
+`_filter_to_neighborhood()`. Nodes carry an `id` (prefixed `region:` or
+`location:`), a human-readable `label`, and a `kind` property. Edges have
+`source`, `target`, and `label` fields.

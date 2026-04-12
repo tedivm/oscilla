@@ -1,0 +1,9 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: test-location-secondary
+spec:
+  displayName: "Test Secondary Location"
+  description: "Second location for navigation tests."
+  region: test-region-root
+  adventures: []

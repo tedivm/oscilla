@@ -1,0 +1,16 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: api-skill-menu
+spec:
+  displayName: "Skill Menu Demo"
+  description: "Grants test-dispel (an overworld-context skill) to the character, then explains how to trigger the skill_menu SSE event. After running this adventure, navigate to the overworld and use the skill action to see the skill_menu event type emitted via POST /play/advance with skill_choice."
+  steps:
+    - type: narrative
+      text: "You learn the Dispel technique. The knowledge flows into you."
+      effects:
+        - type: skill_grant
+          skill: test-dispel
+
+    - type: narrative
+      text: "Skill acquired. To test the skill_menu SSE event, use the /play/advance endpoint with a skill_choice payload while an overworld skill step is pending."

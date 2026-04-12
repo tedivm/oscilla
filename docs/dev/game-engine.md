@@ -23,35 +23,36 @@ oscilla/engine/
 
 1. **Content Loading**: `ContentLoader` scans YAML manifests → validates schemas → builds cross-references → creates `ContentRegistry`
 2. **Adventure Execution**: `AdventurePipeline` receives player state and content registry → executes adventure steps → updates player state
-3. **Step Processing**: Each step type has a dedicated handler that interacts with the player through the `TUICallbacks` interface
+3. **Step Processing**: Each step type has a dedicated handler that interacts with the player through the `UICallbacks` interface
 
 ## Core Interfaces
 
-### TUICallbacks Protocol
+### UICallbacks Protocol
 
-The `TUICallbacks` protocol defines the interface between engine logic and user interaction. All player-facing output goes through this interface:
+The `UICallbacks` protocol defines the interface between engine logic and user interaction. All player-facing output goes through this interface:
 
 ```python
-class TUICallbacks(Protocol):
-    def show_text(self, text: str) -> None:
+class UICallbacks(Protocol):
+    async def show_text(self, text: str) -> None:
         """Display narrative or informational text."""
 
-    def show_menu(self, prompt: str, options: List[str]) -> int:
+    async def show_menu(self, prompt: str, options: List[str]) -> int:
         """Present numbered choices, return selected index."""
 
-    def show_combat_round(self, player_hp: int, max_hp: int,
+    async def show_combat_round(self, player_hp: int, max_hp: int,
                          enemy_name: str, enemy_hp: int, enemy_max_hp: int) -> None:
         """Display combat status during fights."""
 
-    def wait_for_ack(self) -> None:
+    async def wait_for_ack(self) -> None:
         """Pause for player acknowledgment."""
 ```
 
 **Implementation Notes:**
 
-- Production code uses `RichTUI` (in `oscilla/engine/tui.py`)
+- Terminal play uses `RichTUI` (in `oscilla/engine/tui.py`)
+- Web play uses `WebCallbacks` (in `oscilla/engine/web_callbacks.py`)
 - Tests use `MockTUI` (in `tests/engine/conftest.py`)
-- Step handlers never import `RichTUI` directly — they receive `TUICallbacks`
+- Step handlers never import concrete implementations — they receive the `UICallbacks` protocol
 
 ### Signal Protocol
 
@@ -1043,3 +1044,79 @@ FIFO ordering means: triggers enqueued by an adventure during drain are appended
 ### Interaction with Repeat Controls
 
 Triggered adventures are subject to identical repeat-control checks as pool adventures. `is_adventure_eligible()` is called inside `drain_trigger_queue()` before running each adventure. Authors use `repeatable: false` or `max_completions: N` to prevent re-firing after the first time.
+
+## Web Execution Path
+
+The web execution path enables adventure play through SSE-streaming HTTP endpoints
+(see `oscilla/routers/play.py` and `oscilla/routers/overworld.py`).
+
+### WebCallbacks
+
+`WebCallbacks` (in `oscilla/engine/web_callbacks.py`) implements `UICallbacks`
+for the HTTP/SSE context. Instead of writing to a terminal, it:
+
+1. **Builds SSE event dicts** with a `type` and `data` payload.
+2. **Puts events on an `asyncio.Queue`** so the HTTP response generator can drain
+   them incrementally.
+3. **Appends events to `session_output`** for crash-recovery persistence.
+4. For _decision events_ (`choice`, `ack_required`, `text_input`, `skill_menu`):
+   - Puts a `None` sentinel on the queue to signal end-of-stream.
+   - Raises `DecisionPauseException` to stop the pipeline task cleanly.
+
+`WebCallbacks` also operates in **resume mode**: when a player choice/ack is
+pre-loaded (set via `player_choice`, `player_ack`, etc.), decision methods
+return the pre-loaded value immediately instead of pausing, enabling `advance`
+to replay the adventure from the persisted step.
+
+### DecisionPauseException
+
+`DecisionPauseException` is a sentinel exception raised by `WebCallbacks`
+decision methods to stop the async pipeline task after emitting the pause event.
+The SSE generator catches it (via `asyncio.CancelledError | DecisionPauseException`)
+and suppresses it — it is not an error condition.
+
+This mechanism keeps `UICallbacks` implementations simple: the engine simply
+calls `await tui.show_menu(...)` and the exception propagates out of
+`AdventurePipeline.run()` naturally, without any special pipeline branching.
+
+### Pipeline Task Lifecycle (web)
+
+The `_run_pipeline_and_stream()` async generator in `play.py` orchestrates
+the pipeline execution:
+
+```
+client                  HTTP handler                pipeline task
+  |  POST /begin          |                              |
+  |---------------------->|  create_task(pipeline.run()) |
+  |                       |----------------------------->|
+  |  SSE event stream     |  queue.put(event_dict)       |
+  |<----------------------|<-----------------------------|
+  |                       |  queue.put(None)  ← sentinel |
+  |<-- stream ends -------|<-----------------------------|
+  |                       |  release lock                |
+  |                       |  persist session_output      |
+```
+
+Key steps:
+
+1. **Lock acquisition** — `acquire_web_session_lock()` is called before constructing the pipeline. A 409 is returned if a live lock exists.
+2. **Task creation** — `asyncio.create_task(pipeline.run(...))` runs the pipeline concurrently while the generator yields SSE events from the queue.
+3. **Stream drain** — the generator loops `await queue.get()` until it receives a `None` sentinel.
+4. **Cleanup** — in the `finally` block, any still-running pipeline task is cancelled and awaited. `DecisionPauseException` and `CancelledError` are suppressed.
+5. **Lock release + output persistence** — after `finally`, `release_web_session_lock()` and `save_session_output()` are called so the next `advance` can proceed.
+
+### Crash Recovery
+
+Every event put on the queue is also appended to `WebCallbacks.session_output`.
+When the stream closes, `save_session_output()` persists this list to
+`character_session_output` keyed by `iteration_id`.
+
+On reconnect the client calls `GET /play/current`, which loads the persisted
+events and identifies the last decision event as `pending_event`. The client
+replays events to restore UI state, then calls `advance` with the appropriate
+payload (`choice`, `ack`, `text_input`, or `skill_choice`).
+
+Crash recovery is transparent to the engine: `advance` simply constructs a
+new `WebCallbacks` with the pre-loaded player response and re-runs the
+pipeline from `adventure_step_index`, which fast-forwards through prior
+decisions until it reaches the decision that was pending.

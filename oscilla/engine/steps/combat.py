@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Literal, Set
 from oscilla.engine.combat_context import ActiveCombatEffect, CombatContext
 from oscilla.engine.models.adventure import ApplyBuffEffect, CombatStep, ItemDropEffect, OutcomeBranch
 from oscilla.engine.models.buff import StoredBuff
-from oscilla.engine.pipeline import AdventureOutcome, TUICallbacks
+from oscilla.engine.pipeline import AdventureOutcome, UICallbacks
 from oscilla.engine.steps.effects import run_effect
 
 if TYPE_CHECKING:
@@ -23,7 +23,7 @@ async def _tick_active_effects(
     ctx: CombatContext,
     player: "CharacterState",
     registry: "ContentRegistry",
-    tui: TUICallbacks,
+    tui: UICallbacks,
 ) -> None:
     """Fire per-turn effects for all active periodic effects, then expire finished ones.
 
@@ -93,7 +93,7 @@ async def _apply_reflect(
     target: Literal["player", "enemy"],
     ctx: CombatContext,
     player: "CharacterState",
-    tui: TUICallbacks,
+    tui: UICallbacks,
 ) -> None:
     """Reflect a portion of damage taken back to the attacker.
 
@@ -125,7 +125,7 @@ async def _use_skill_in_combat(
     ctx: CombatContext,
     player: "CharacterState",
     registry: "ContentRegistry",
-    tui: TUICallbacks,
+    tui: UICallbacks,
 ) -> bool:
     """Attempt to activate a skill during combat. Returns True if the skill fired.
 
@@ -208,7 +208,7 @@ async def _enemy_skill_phase(
     ctx: CombatContext,
     player: "CharacterState",
     registry: "ContentRegistry",
-    tui: TUICallbacks,
+    tui: UICallbacks,
 ) -> None:
     """Check and fire any enemy skills whose use_every_n_turns threshold is met.
 
@@ -243,7 +243,7 @@ async def run_combat(
     step: CombatStep,
     player: "CharacterState",
     registry: "ContentRegistry",
-    tui: TUICallbacks,
+    tui: UICallbacks,
     run_outcome_branch: Callable[[OutcomeBranch], Awaitable[AdventureOutcome]],
     on_round_complete: Callable[[], Awaitable[None]] | None = None,
 ) -> AdventureOutcome:

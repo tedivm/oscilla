@@ -18,7 +18,7 @@ This is the most technically complex phase. It requires implementing the `WebCal
 - **New**: `POST /characters/{id}/play/takeover` — force-releases a stale session lock and acquires it for the requesting session; returns current pending state. Restricted to the character's authenticated owner.
 - **New**: `POST /characters/{id}/navigate` — moves the character to a new location within the current region.
 - **New**: `GET /characters/{id}/overworld` — returns complete overworld state: current location, available adventures, navigation options, and region hierarchy (including node/edge graph for future map rendering).
-- **New**: Web session lock: `session_token` column on `CharacterIterationRecord` reused to prevent two concurrent sessions on the same character. A `409 Conflict` response includes `acquired_at` timestamp so the frontend can display lock age and offer force-takeover.
+- **New**: Web session lock: `session_token` column on `CharacterIterationRecord` (already exists for TUI crash recovery) is repurposed for web session locking; a new `session_token_acquired_at` nullable `DateTime` column is added to the same table. Unlike the TUI's always-succeeds `acquire_session_lock`, a new `acquire_web_session_lock` service function returns a `409 Conflict` when a live session exists, with `acquired_at` timestamp so the frontend can display lock age and offer force-takeover.
 - **New**: SSE event type contract locked: `narrative`, `ack_required`, `choice`, `combat_state`, `text_input`, `skill_menu`, `adventure_complete`, `error`. All events carry a `context` object with at minimum `{location_ref, location_name, region_name}`.
 - **New**: Alembic migration for `character_session_output` table.
 
@@ -41,7 +41,7 @@ This is the most technically complex phase. It requires implementing the `WebCal
 - `oscilla/engine/web_callbacks.py` — new file: `WebCallbacks` implementation
 - `oscilla/routers/play.py` — new file: adventure execution endpoints
 - `oscilla/models/character_session_output.py` — new SQLAlchemy model
-- `oscilla/services/character.py` — session lock acquisition/release for web; session output persistence
+- `oscilla/services/character.py` — new `acquire_web_session_lock`, `release_web_session_lock`, `force_acquire_web_session_lock`, `save_session_output`, `get_session_output`, `clear_session_output` functions; existing TUI `acquire_session_lock`/`release_session_lock` unchanged
 - `db/versions/` — new Alembic migration for `character_session_output`
 - `docs/dev/api.md` — adventure execution endpoint and SSE event documentation
 

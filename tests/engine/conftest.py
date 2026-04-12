@@ -20,7 +20,7 @@ FIXTURES = Path(__file__).parent.parent / "fixtures" / "content"
 
 
 class MockTUI:
-    """Implements TUICallbacks for testing. Records all calls and replays
+    """Implements UICallbacks for testing. Records all calls and replays
     pre-configured menu responses in order. Returns choice 1 when the queue
     is exhausted.
     """

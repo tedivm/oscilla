@@ -123,6 +123,14 @@ class WebCallbacks:
         location_ref: str | None,
         location_name: str | None,
         region_name: str | None,
+        # Pre-loaded player decisions for resume requests. On an advance request the
+        # pipeline re-runs from adventure_step_index, reaching the same decision point
+        # that paused the previous run. Providing the input here causes the callback to
+        # return the value immediately rather than pausing again.
+        player_choice: int | None = None,
+        player_ack: bool | None = None,
+        player_text_input: str | None = None,
+        player_skill_choice: int | None = None,
     ) -> None:
         self._queue: Queue[Dict[str, Any] | None] = Queue()
         self._session_output: List[Dict[str, Any]] = []
@@ -131,6 +139,10 @@ class WebCallbacks:
             "location_name": location_name,
             "region_name": region_name,
         }
+        self._player_choice = player_choice
+        self._player_ack = player_ack
+        self._player_text_input = player_text_input
+        self._player_skill_choice = player_skill_choice
 
     async def show_text(self, text: str) -> None:
         event = {"type": "narrative", "data": {"text": text, "context": self._context}}
@@ -139,6 +151,11 @@ class WebCallbacks:
         await sleep(0)  # yield to SSE consumer
 
     async def show_menu(self, prompt: str, options: List[str]) -> int:
+        if self._player_choice is not None:
+            # Resume request — return the pre-loaded choice and do not pause.
+            choice = self._player_choice
+            self._player_choice = None
+            return choice
         event = {"type": "choice", "data": {"prompt": prompt, "options": options, "context": self._context}}
         await self._queue.put(event)
         self._session_output.append(event)
@@ -167,6 +184,10 @@ class WebCallbacks:
         await sleep(0)
 
     async def wait_for_ack(self) -> None:
+        if self._player_ack is not None:
+            # Resume request — consume the ack and do not pause.
+            self._player_ack = None
+            return
         event = {"type": "ack_required", "data": {"context": self._context}}
         await self._queue.put(event)
         self._session_output.append(event)
@@ -174,6 +195,11 @@ class WebCallbacks:
         raise DecisionPauseException
 
     async def input_text(self, prompt: str) -> str:
+        if self._player_text_input is not None:
+            # Resume request — return the pre-loaded text and do not pause.
+            value = self._player_text_input
+            self._player_text_input = None
+            return value
         event = {"type": "text_input", "data": {"prompt": prompt, "context": self._context}}
         await self._queue.put(event)
         self._session_output.append(event)
@@ -181,6 +207,11 @@ class WebCallbacks:
         raise DecisionPauseException
 
     async def show_skill_menu(self, skills: List[Dict[str, Any]]) -> int | None:
+        if self._player_skill_choice is not None:
+            # Resume request — return the pre-loaded skill choice and do not pause.
+            choice = self._player_skill_choice
+            self._player_skill_choice = None
+            return choice
         event = {"type": "skill_menu", "data": {"skills": skills, "context": self._context}}
         await self._queue.put(event)
         self._session_output.append(event)
@@ -253,7 +284,13 @@ async def begin_adventure(
 
 ### D5: Session lock reuses `session_token` column
 
-**Decision:** `CharacterIterationRecord.session_token` (already exists) is reused for web session locking. When a web session acquires the lock, it writes a new `UUID` to `session_token`. When checking for an existing lock, the endpoint reads `session_token` and `session_token_acquired_at` (a new nullable `DateTime` column added by migration).
+**Decision:** `CharacterIterationRecord.session_token` (already exists, used by the TUI crash-recovery path) is repurposed for web session locking. When a web session acquires the lock, it writes a new `UUID` to `session_token` and the current UTC timestamp to `session_token_acquired_at` (a new nullable `DateTime` column added by migration).
+
+The existing TUI `acquire_session_lock` and `release_session_lock` functions in `oscilla/services/character.py` are **unchanged** — they continue to use the always-succeeds steal behavior for offline TUI sessions. Three new web-specific service functions are added:
+
+- `acquire_web_session_lock(session, iteration_id, token, stale_threshold_minutes) -> datetime | None` — returns `None` on success, or `acquired_at` datetime if a live session exists (caller returns 409).
+- `release_web_session_lock(session, iteration_id, token) -> None` — clears `session_token` and `session_token_acquired_at`; no-op if token does not match.
+- `force_acquire_web_session_lock(session, iteration_id, token) -> None` — always acquires, logging the takeover; clears orphaned adventure state.
 
 A stale lock is defined as: `session_token` is not null, `session_token_acquired_at` is more than `stale_session_threshold_minutes` (default 10, configurable) in the past. The `409 Conflict` response includes:
 
@@ -269,9 +306,8 @@ This allows the frontend to display "Session active since X — take over?" with
 `POST /characters/{id}/play/takeover`:
 
 1. Verifies the requesting user owns the character.
-2. Clears the existing `session_token` and `session_token_acquired_at`.
-3. Acquires a new lock immediately.
-4. Returns `PendingStateRead` (same shape as `GET /characters/{id}/play/current`) so the frontend can resume without a second round-trip.
+2. Calls `force_acquire_web_session_lock(...)`, which logs the takeover, clears orphaned adventure state, writes the new token and timestamp.
+3. Returns `PendingStateRead` (same shape as `GET /characters/{id}/play/current`) so the frontend can resume without a second round-trip.
 
 **Note:** `session_token_acquired_at` is a new column. The migration adds it as nullable; existing rows with non-null `session_token` will have `null` for `acquired_at`, which means any existing lock is invisible to the stale-lock check — a conservative and safe failure mode (the lock appears perpetual until the takeover endpoint is used).
 
@@ -400,8 +436,8 @@ event: choice
 data: {"prompt": "What do you do?", "options": ["Fight", "Flee"], "context": {...}}
 
 event: combat_state
-data: {"player_hp": 42, "player_max_hp": 60, "enemy_hp": 18, "enemy_max_hp": 40,
-       "player_name": "Aldric", "enemy_name": "Goblin Chieftain", "round": 3, "context": {...}}
+data: {"player_hp": 42, "enemy_hp": 18,
+       "player_name": "Aldric", "enemy_name": "Goblin Chieftain", "context": {...}}
 
 event: text_input
 data: {"prompt": "What is your name?", "context": {...}}

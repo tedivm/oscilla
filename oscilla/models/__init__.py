@@ -19,3 +19,4 @@ from oscilla.models.character_iteration import (  # noqa: E402, F401
     CharacterIterationStatValue,
 )
 from oscilla.models.user import UserRecord  # noqa: E402, F401
+from oscilla.models.character_session_output import CharacterSessionOutputRecord  # noqa: E402, F401

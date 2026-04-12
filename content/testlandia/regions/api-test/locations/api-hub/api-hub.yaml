@@ -1,0 +1,15 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: api-hub
+spec:
+  displayName: "API Hub"
+  description: "Primary location for testing the web adventure execution API."
+  region: api-test
+  adventures:
+    - ref: api-sse-events
+      weight: 1
+    - ref: api-crash-recovery
+      weight: 1
+    - ref: api-skill-menu
+      weight: 1

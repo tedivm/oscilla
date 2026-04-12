@@ -1,6 +1,6 @@
 """Adventure pipeline — executes an ordered list of adventure steps.
 
-The pipeline is the only engine component that calls TUICallbacks — it
+The pipeline is the only engine component that calls UICallbacks — it
 orchestrates navigation between steps and delegates to per-type handler
 functions in oscilla/engine/steps/.
 """
@@ -21,12 +21,12 @@ if TYPE_CHECKING:
     from oscilla.engine.templates import CombatContextView
 
 
-class TUICallbacks(Protocol):
+class UICallbacks(Protocol):
     """Interface that step handlers use to produce player-facing output.
 
     The concrete implementation is TextualTUI (oscilla/engine/tui.py).
     Tests inject MockTUI (tests/engine/conftest.py).
-    Step handlers never import TextualTUI directly — they receive TUICallbacks.
+    Step handlers never import TextualTUI directly — they receive UICallbacks.
     """
 
     async def show_text(self, text: str) -> None:
@@ -110,7 +110,7 @@ class AdventurePipeline:
         self,
         registry: ContentRegistry,
         player: CharacterState,
-        tui: TUICallbacks,
+        tui: UICallbacks,
         on_state_change: PersistCallback | None = None,
     ) -> None:
         self._registry = registry
@@ -147,8 +147,12 @@ class AdventurePipeline:
             ingame_time=ingame_time,
         )
 
-    async def run(self, adventure_ref: str) -> AdventureOutcome:
-        """Execute the adventure from step 0.
+    async def run(self, adventure_ref: str, start_step: int = 0) -> AdventureOutcome:
+        """Execute the adventure, optionally starting from a given step index.
+
+        On a fresh begin request pass the default ``start_step=0``.
+        On a web advance request pass the persisted ``adventure_step_index`` so
+        the pipeline re-runs from the decision point that was paused last time.
 
         Handles _GotoSignal by restarting _run_from() at the target step.
         Handles _EndSignal by returning the requested outcome immediately.
@@ -168,12 +172,12 @@ class AdventurePipeline:
         }
         self._player.active_adventure = AdventurePosition(
             adventure_ref=adventure_ref,
-            step_index=0,
+            step_index=start_step,
         )
         # Store run_effect locally so _run_effects doesn't re-import each call
         self._run_effect = run_effect
 
-        start = 0
+        start = start_step
         outcome: AdventureOutcome = AdventureOutcome.COMPLETED
         while True:
             try:

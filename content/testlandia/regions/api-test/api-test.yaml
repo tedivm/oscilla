@@ -1,0 +1,7 @@
+apiVersion: oscilla/v1
+kind: Region
+metadata:
+  name: api-test
+spec:
+  displayName: "API Test Area"
+  description: "Minimal region for testing the web adventure execution API."
