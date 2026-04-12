@@ -13,3 +13,7 @@ spec:
       weight: 1
     - ref: api-skill-menu
       weight: 1
+    - ref: web-overworld-nav
+      weight: 1
+    - ref: text-input-adventure
+      weight: 1

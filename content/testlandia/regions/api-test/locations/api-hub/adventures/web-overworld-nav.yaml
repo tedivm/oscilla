@@ -1,0 +1,16 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: web-overworld-nav
+spec:
+  displayName: "Overworld Nav Test"
+  description: "Completes immediately to return you to the overworld, testing the adventure_complete → overworld transition."
+  steps:
+    - type: narrative
+      text: "You step into the nav test chamber. A sign reads: 'This adventure ends quickly.'"
+
+    - type: narrative
+      text: "The diagnostics confirm the overworld transition path is functional."
+
+    - type: narrative
+      text: "Adventure complete. Returning to the overworld."

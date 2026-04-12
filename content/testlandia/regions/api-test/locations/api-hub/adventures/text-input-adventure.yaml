@@ -1,0 +1,18 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: text-input-adventure
+spec:
+  displayName: "Text Input Test"
+  description: "Tests the text_input SSE event by prompting the player via a set_name effect."
+  steps:
+    - type: narrative
+      text: "You approach the naming terminal. A prompt blinks on the screen."
+
+    - type: passive
+      effects:
+        - type: set_name
+          prompt: "Enter any text to continue:"
+
+    - type: narrative
+      text: "Input recorded. The text_input event pipeline is functional."

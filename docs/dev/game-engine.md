@@ -1120,3 +1120,13 @@ Crash recovery is transparent to the engine: `advance` simply constructs a
 new `WebCallbacks` with the pre-loaded player response and re-runs the
 pipeline from `adventure_step_index`, which fast-forwards through prior
 decisions until it reaches the decision that was pending.
+
+### Stream-End Contract
+
+The frontend relies on the following invariant: **every SSE stream ends with either a decision event or an `adventure_complete` event before the `None` sentinel is placed on the queue.**
+
+- A _decision event_ (`choice`, `ack_required`, `text_input`, `skill_menu`) means the pipeline paused for player input. The stream closes and the client waits for an `advance` call.
+- An `adventure_complete` event means the adventure finished normally. The stream closes and the client shows the completion screen.
+- An `error` event may precede the `None` sentinel for unrecoverable engine errors. The client treats this as a return to overworld.
+
+The client's `gameSession` store uses the event type to drive its state machine. Adding new event types that do not fall into one of these three categories (decision / complete / error) requires updating both `WebCallbacks` and the `applyEvent` reducer in `gameSession.ts`.

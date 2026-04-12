@@ -93,7 +93,7 @@ The log is bounded to the **current session** (since the last overworld entry or
 **Decision:** The input area below the narrative log is a single `<div>` that renders a different component based on `$gameSession.pendingEvent.type`:
 
 ```svelte
-<!-- frontend/src/routes/app/characters/[id]/play/+page.svelte -->
+<!-- frontend/src/routes/characters/[id]/play/+page.svelte -->
 {#if pending?.type === 'choice'}
   <ChoiceMenu event={pending} onSelect={handleChoice} />
 {:else if pending?.type === 'ack_required'}
@@ -188,30 +188,25 @@ The play screen UI must therefore provide an explicit abandonment path (e.g., a 
 
 **Decision:** An active adventure takes over the frontend regardless of how the player arrived at their current screen. Two mechanisms enforce this:
 
-**Mechanism 1 — Character-scoped layout load function.** A `+layout.ts` at `routes/app/characters/[id]/` runs before any character-scoped page renders. It calls `GET /characters/{id}/play/current`. If the response contains a non-null `pending_event`, it throws a SvelteKit `redirect(307, ...)` to `/app/characters/[id]/play`. This catches:
+**Mechanism 1 — Character-scoped layout load function.** A `+layout.ts` at `routes/characters/[id]/` runs before any character-scoped page renders. It calls `GET /characters/{id}/play/current`. If the response contains a non-null `pending_event`, it throws a SvelteKit `redirect(307, ...)` to `/characters/[id]/play`. This catches:
 
 - A player navigating directly to the character sheet URL while an adventure is in progress.
 - A player returning to the app after a session gap, when the character already has an active adventure (e.g., triggered by character creation).
 - A triggered adventure racing with a navigation: if the player clicks the character name link at the same time the engine auto-starts a tutorial adventure, the layout load resolves the adventure first.
 
 ```typescript
-// routes/app/characters/[id]/+layout.ts
+// routes/characters/[id]/+layout.ts
 import { redirect } from "@sveltejs/kit";
-import { get } from "svelte/store";
-import { authStore } from "$lib/stores/auth";
-import { request } from "$lib/api/client";
-import type { PlayCurrentRead } from "$lib/types";
+import { apiFetch } from "$lib/api/client.js";
+import type { PendingStateRead } from "$lib/api/types.js";
 
 export async function load({ params }) {
-  const token = get(authStore).token;
-  if (!token) return {}; // auth guard in root layout handles unauthenticated case
-
-  const current = await request<PlayCurrentRead>(
+  // apiFetch injects the access token automatically; root layout guard handles unauthenticated.
+  const current = await apiFetch<PendingStateRead>(
     `/characters/${params.id}/play/current`,
-    token,
   );
   if (current.pending_event !== null) {
-    throw redirect(307, `/app/characters/${params.id}/play`);
+    throw redirect(307, `/characters/${params.id}/play`);
   }
   return {};
 }
@@ -241,7 +236,7 @@ export async function load({ params }) {
 
 ## Component Inventory
 
-### Adventure Screen (`/app/characters/[id]/play`)
+### Adventure Screen (`/characters/[id]/play`)
 
 | Component                 | File                                             | Responsibility                                                          |
 | ------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------- |
@@ -254,7 +249,7 @@ export async function load({ params }) {
 | `AdventureCompleteScreen` | `components/Game/AdventureCompleteScreen.svelte` | Outcome banner, summary, "Return to overworld" button                   |
 | `SessionConflictModal`    | `components/Game/SessionConflictModal.svelte`    | Lock conflict display with takeover and cancel actions                  |
 
-### Overworld Screen (`/app/characters/[id]/play` when `mode === "overworld"`)
+### Overworld Screen (`/characters/[id]/play` when `mode === "overworld"`)
 
 | Component               | File                                                | Responsibility                                                          |
 | ----------------------- | --------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -271,10 +266,10 @@ export async function load({ params }) {
 
 ### Component Hierarchy
 
-The play route delivers both the adventure screen and the overworld screen from the same URL (`/app/characters/[id]/play`). Mode switching is driven entirely by the `gameSession` store's `mode` field — no routing occurs between adventure and overworld.
+The play route delivers both the adventure screen and the overworld screen from the same URL (`/characters/[id]/play`). Mode switching is driven entirely by the `gameSession` store's `mode` field — no routing occurs between adventure and overworld.
 
 ```
-PlayPage (/app/characters/[id]/play)
+PlayPage (/characters/[id]/play)
 ├── (when mode === 'adventure' | 'loading' | 'complete')
 │   ├── NarrativeLog
 │   │   └── NarrativeEntry (×N, fade-in animated)
@@ -306,10 +301,10 @@ User action (begin | advance)
   │
   ▼
 PlayPage handler  (handleChoice / handleAck / handleTextInput / handleSkillChoice)
-  │  calls gameSession.begin(adventureId) or gameSession.advance(decision)
+  │  calls gameSession.begin(characterId, adventureRef) or gameSession.advance(characterId, decision)
   ▼
 gameSession store
-  │  sets mode: 'loading', clears pendingEvent, closes any open SSESession
+  │  sets mode: 'loading', clears pendingEvent, cancels any active stream generator
   │  calls play.ts fetchSSE(POST /play/begin or /play/advance)
   ▼
 fetchSSE async generator  (api/play.ts)
@@ -341,7 +336,7 @@ The `gameSession` store is a plain `.ts` module (not a `.svelte.ts` file), so it
 
 ### `frontend/src/lib/stores/gameSession.ts`
 
-> **Why `writable` store and not Svelte 5 runes?** Same reason as `auth.ts` in MU4: `gameSession` must be readable from `+layout.svelte` (for D7 navigation hard-block) and from `api/play.ts` (for closing an open SSESession before beginning a new one). It also must be readable from `routes/app/characters/[id]/+layout.ts` (for the D8 triggered-adventure detection that calls `gameSession.begin()` from the overworld). Cross-boundary state shared between `.ts` modules and `.svelte` components requires the `writable` store API — runes are only available in `.svelte`/`.svelte.ts` contexts.
+> **Why `writable` store and not Svelte 5 runes?** Same reason as `auth.ts` in MU4: `gameSession` must be readable from `+layout.svelte` (for D7 navigation hard-block) and from `api/play.ts` (for cancelling the active stream generator before beginning a new one). It also must be readable from `routes/characters/[id]/+layout.ts` (for the D8 triggered-adventure detection that calls `gameSession.begin()` from the overworld). Cross-boundary state shared between `.ts` modules and `.svelte` components requires the `writable` store API — runes are only available in `.svelte`/`.svelte.ts` contexts.
 
 ```typescript
 import { writable, get } from "svelte/store";
@@ -366,6 +361,18 @@ export interface NarrativeEntry {
 export interface SSEEvent {
   type: SSEEventType;
   data: unknown; // narrowed per-type in each component's $props
+}
+
+/**
+ * Decision payload sent to POST /play/advance.
+ * Mirrors the backend AdvanceRequest Pydantic model.
+ * Exactly one field should be populated per advance call.
+ */
+export interface AdvanceDecision {
+  choice?: number; // 1-based choice index for 'choice' events
+  ack?: boolean; // true for 'ack_required' events
+  text_input?: string; // player response for 'text_input' events
+  skill_choice?: number; // 1-based skill index for 'skill_menu' events
 }
 
 export interface GameSessionState {
@@ -427,18 +434,20 @@ function createGameSession() {
       });
     },
 
-    async begin(characterId: string, adventureId: string): Promise<void> {
+    async begin(characterId: string, adventureRef: string): Promise<void> {
       const gen = fetchSSE(`/characters/${characterId}/play/begin`, {
-        adventure_id: adventureId,
+        adventure_ref: adventureRef,
       });
       activeGenerator = gen;
       await runStream(gen);
     },
 
-    async advance(characterId: string, decision: unknown): Promise<void> {
-      const gen = fetchSSE(`/characters/${characterId}/play/advance`, {
-        decision,
-      });
+    async advance(
+      characterId: string,
+      decision: AdvanceDecision,
+    ): Promise<void> {
+      // Spread the decision fields directly to match the backend AdvanceRequest model.
+      const gen = fetchSSE(`/characters/${characterId}/play/advance`, decision);
       activeGenerator = gen;
       await runStream(gen);
     },
@@ -486,9 +495,13 @@ export const gameSession = createGameSession();
 ```typescript
 import { get } from "svelte/store";
 import { authStore } from "$lib/stores/auth";
-import { ApiError } from "$lib/api/client";
-import type { SSEEvent, NarrativeEntry } from "$lib/stores/gameSession";
-import type { OverworldStateRead, CharacterStateRead } from "$lib/api/types";
+import { apiFetch, ApiError } from "$lib/api/client.js";
+import type {
+  SSEEvent,
+  NarrativeEntry,
+  AdvanceDecision,
+} from "$lib/stores/gameSession";
+import type { OverworldStateRead, PendingStateRead } from "$lib/api/types.js";
 
 export interface CurrentPlayState {
   narrativeLog: NarrativeEntry[];
@@ -496,16 +509,40 @@ export interface CurrentPlayState {
   overworldState: OverworldStateRead | null;
 }
 
-/** Called from +page.ts load function; returns current session state for crash recovery. */
+/**
+ * Called from +page.ts load function; returns current session state for crash recovery.
+ *
+ * Fetches GET /play/current (returns PendingStateRead) and transforms the persisted
+ * session_output into a client-side NarrativeEntry[]. When no adventure is in progress,
+ * also fetches GET /overworld to populate overworldState for the initial render.
+ */
 export async function getCurrentPlayState(
   characterId: string,
 ): Promise<CurrentPlayState> {
-  const { accessToken } = get(authStore);
-  const res = await fetch(`/characters/${characterId}/play/current`, {
-    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-  });
-  if (!res.ok) throw new ApiError(res.status, await res.text());
-  return res.json();
+  const pending = await apiFetch<PendingStateRead>(
+    `/characters/${characterId}/play/current`,
+  );
+
+  // Reconstruct the narrative log from the persisted session output.
+  const narrativeLog: NarrativeEntry[] = (pending.session_output ?? [])
+    .filter((e: Record<string, unknown>) => e["type"] === "narrative")
+    .map((e: Record<string, unknown>) => ({
+      id: crypto.randomUUID(),
+      text: (e["data"] as { text: string }).text,
+    }));
+
+  const pendingEvent = pending.pending_event
+    ? (pending.pending_event as SSEEvent)
+    : null;
+
+  // Fetch overworld state separately when no active adventure is in progress.
+  const overworldState = pendingEvent
+    ? null
+    : await apiFetch<OverworldStateRead>(
+        `/characters/${characterId}/overworld`,
+      );
+
+  return { narrativeLog, pendingEvent, overworldState };
 }
 
 /**
@@ -529,10 +566,11 @@ export async function* fetchSSE(
     body: JSON.stringify(body),
   });
   if (response.status === 409) {
-    throw new ApiError(409, "session_conflict");
+    throw new ApiError("Session conflict", 409, "session_conflict");
   }
   if (!response.ok) {
-    throw new ApiError(response.status, await response.text());
+    const body = await response.text();
+    throw new ApiError(`HTTP ${response.status}`, response.status, body);
   }
 
   const reader = response.body!.getReader();
@@ -578,7 +616,7 @@ function parseSSEBuffer(buffer: string): {
 }
 ```
 
-### `frontend/src/routes/app/characters/[id]/play/+page.ts`
+### `frontend/src/routes/characters/[id]/play/+page.ts`
 
 ```typescript
 import type { PageLoad } from "./$types";
@@ -595,9 +633,9 @@ export const load: PageLoad = async ({ params }) => {
 };
 ```
 
-Note: `getCharacter` and `getCurrentPlayState` both call `get(authStore)` directly (not via the SvelteKit `fetch` param). This is correct for a CSR-only app — the auth store is initialized by `onMount` in `+layout.svelte` before any page load function executes (SvelteKit runs load functions from the root layout downward; `+layout.svelte`'s `onMount` fires after that, but since `ssr: false` means the load runs lazily on navigation, the store is already populated by the time a user navigates to this page from the character sheet).
+Note: `getCharacter` uses `apiFetch`, and `getCurrentPlayState` also uses `apiFetch` (plus a second `apiFetch` call to `/overworld` when there is no active adventure). Neither accepts a SvelteKit `fetch` param — they call `apiFetch` directly, which reads `get(authStore)` at call time. This is correct for a CSR-only app — the auth store is populated before any page load function executes (SvelteKit runs load functions lazily on navigation, after `+layout.svelte`'s `onMount` has fired and initialized the store).
 
-### `frontend/src/routes/app/characters/[id]/play/+page.svelte` (skeleton)
+### `frontend/src/routes/characters/[id]/play/+page.svelte` (skeleton)
 
 ```svelte
 <script lang="ts">
@@ -628,9 +666,9 @@ Note: `getCharacter` and `getCurrentPlayState` both call `get(authStore)` direct
   async function handleChoice(choice: number): Promise<void> { /* ... */ }
   async function handleAck(): Promise<void> { /* ... */ }
   async function handleTextInput(text: string): Promise<void> { /* ... */ }
-  async function handleSkillChoice(skillId: string): Promise<void> { /* ... */ }
+  async function handleSkillChoice(skillIndex: number): Promise<void> { /* ... */ }
   async function handleAdventureComplete(): Promise<void> {
-    await goto(`/app/characters/${characterId}`);
+    await goto(`/characters/${characterId}`);
   }
 
   onDestroy(() => { gameSession.close(); });
@@ -677,20 +715,24 @@ Note: `getCharacter` and `getCurrentPlayState` both call `get(authStore)` direct
 
 The following interfaces are added to `types.ts` in MU5 (in addition to all MU4 types):
 
-| Interface                    | Fields                                                                                                                                             |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `OverworldStateRead`         | `character_id`, `location_id`, `location_name`, `region_name`, `available_adventures: AdventureSummary[]`, `adjacent_locations: LocationSummary[]` |
-| `AdventureSummary`           | `id`, `name`, `description`                                                                                                                        |
-| `LocationSummary`            | `id`, `name`                                                                                                                                       |
-| `PlaySessionCurrentRead`     | `narrative_log: NarrativeEntry[]`, `pending_event: SSEEvent \| null`, `overworld_state: OverworldStateRead \| null`                                |
-| `NarrativeEventData`         | `text: string`                                                                                                                                     |
-| `ChoiceEventData`            | `prompt: string`, `options: string[]`                                                                                                              |
-| `CombatStateEventData`       | `round: number`, `combatants: CombatantState[]`                                                                                                    |
-| `CombatantState`             | `name: string`, `hp: number`, `max_hp: number`, `is_player: boolean`                                                                               |
-| `TextInputEventData`         | `prompt: string`                                                                                                                                   |
-| `SkillMenuEventData`         | `skills: SkillMenuEntry[]`                                                                                                                         |
-| `SkillMenuEntry`             | `id: string`, `name: string`, `description: string`, `on_cooldown: boolean`                                                                        |
-| `AdventureCompleteEventData` | `outcome: string`, `narrative: string`                                                                                                             |
+| Interface                    | Fields                                                                                                                                                                                                         |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OverworldStateRead`         | `character_id`, `current_location`, `current_location_name`, `current_region_name`, `available_adventures: AdventureOptionRead[]`, `navigation_options: LocationOptionRead[]`, `region_graph: RegionGraphRead` |
+| `AdventureOptionRead`        | `ref`, `display_name`, `description`                                                                                                                                                                           |
+| `LocationOptionRead`         | `ref`, `display_name`, `is_current`                                                                                                                                                                            |
+| `RegionGraphRead`            | `nodes: RegionGraphNode[]`, `edges: RegionGraphEdge[]`                                                                                                                                                         |
+| `RegionGraphNode`            | `id`, `label`, `kind`                                                                                                                                                                                          |
+| `RegionGraphEdge`            | `source`, `target`, `label`                                                                                                                                                                                    |
+| `PendingStateRead`           | `character_id`, `pending_event: Record<string, unknown> \| null`, `session_output: Record<string, unknown>[]` (raw backend; client transforms to `CurrentPlayState`)                                           |
+| `AdvanceDecision`            | `choice?: number` (1-based), `ack?: boolean`, `text_input?: string`, `skill_choice?: number` (1-based) — mirrors backend `AdvanceRequest`                                                                      |
+| `NarrativeEventData`         | `text: string`                                                                                                                                                                                                 |
+| `ChoiceEventData`            | `prompt: string`, `options: string[]`                                                                                                                                                                          |
+| `CombatStateEventData`       | `round: number`, `combatants: CombatantState[]`                                                                                                                                                                |
+| `CombatantState`             | `name: string`, `hp: number`, `max_hp: number`, `is_player: boolean`                                                                                                                                           |
+| `TextInputEventData`         | `prompt: string`                                                                                                                                                                                               |
+| `SkillMenuEventData`         | `skills: SkillMenuEntry[]`                                                                                                                                                                                     |
+| `SkillMenuEntry`             | `id: string`, `name: string`, `description: string`, `on_cooldown: boolean`                                                                                                                                    |
+| `AdventureCompleteEventData` | `outcome: string`, `narrative: string`                                                                                                                                                                         |
 
 ---
 
@@ -733,106 +775,11 @@ frontend/src/
 
 ```
 
-The root `+layout.svelte` is modified to add the D7 hard-block navigation guard checking `$gameSession.mode`. The character-scoped layout `routes/app/characters/[id]/+layout.ts` is added to implement D8 forced redirect when an adventure is active.
+The root `+layout.svelte` is modified to add the D7 hard-block navigation guard checking `$gameSession.mode`. The character-scoped layout `routes/characters/[id]/+layout.ts` is added to implement D8 forced redirect when an adventure is active.
 
 `frontend/src/lib/api/types.ts` is extended with the interfaces listed above.
 
 `frontend/src/lib/api/characters.ts` is extended with `navigateLocation(characterId, locationId)`.
-
----
-
-## Play Page Load Function
-
-`EventSource` does not emit a `close` event when the server closes the connection — it silently reconnects. The wrapper detects the server-sent `stream-end` event and closes cleanly:
-
-```typescript
-// frontend/src/lib/api/sseClient.ts
-
-export class SSESession {
-  private source: EventSource;
-  private closed = false;
-
-  constructor(
-    url: string,
-    private handlers: Record<string, (data: unknown) => void>,
-    private onClose: () => void,
-  ) {
-    this.source = new EventSource(url);
-    for (const [type, handler] of Object.entries(handlers)) {
-      this.source.addEventListener(type, (e: MessageEvent) => {
-        if (!this.closed) handler(JSON.parse(e.data));
-      });
-    }
-    this.source.addEventListener("stream-end", () => {
-      this.close();
-      this.onClose();
-    });
-    this.source.addEventListener("error", () => {
-      if (!this.closed) {
-        this.close();
-        this.handlers["error"]?.({ message: "Connection lost." });
-        this.onClose();
-      }
-    });
-  }
-
-  close(): void {
-    this.closed = true;
-    this.source.close();
-  }
-}
-```
-
-For `POST` endpoints that return SSE streams (begin, advance), the `EventSource` API cannot be used (it only supports GET). Instead, these use `fetch` with `ReadableStream` parsing. The `client.ts` API wrapper handles this:
-
-```typescript
-async function* fetchSSE(url: string, body: object): AsyncGenerator<SSEEvent> {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${getToken()}`,
-    },
-    body: JSON.stringify(body),
-  });
-  const reader = response.body!.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    // Parse SSE lines from buffer
-    for (const event of parseSSEBuffer(buffer)) {
-      yield event;
-      buffer = buffer.slice(event.rawLength);
-    }
-  }
-}
-```
-
-The `gameSession` store drives this generator and dispatches events to the appropriate state updates.
-
----
-
-## Play Page Load Function
-
-```typescript
-// frontend/src/routes/app/characters/[id]/play/+page.ts
-import type { PageLoad } from "./$types";
-import { getCharacter } from "$lib/api/characters";
-import { getCurrentPlayState } from "$lib/api/play";
-
-export const load: PageLoad = async ({ params, fetch }) => {
-  const [character, playState] = await Promise.all([
-    getCharacter(fetch, params.id),
-    getCurrentPlayState(fetch, params.id),
-  ]);
-  return { character, playState };
-};
-```
-
-Both requests are parallelized. The page component initializes `gameSession` from `playState` before rendering.
 
 ---
 
@@ -861,22 +808,22 @@ These tests require a live stack (DB + FastAPI + built frontend) and belong in a
 
 ## Documentation Plan
 
-| Document                              | Audience        | Topics                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/dev/frontend.md` (update)       | Developers      | `gameSession` store lifecycle: `begin`, `advance`, `close`; `fetchSSE` generator and `parseSSEBuffer`; why `writable` not runes; SSESession wrapper for GET streams vs POST streams; crash recovery via `+page.ts` load function; D7 navigation hard-block and D8 forced redirect (including triggered-adventure detection from overworld polling); decision component callback prop pattern; keyboard shortcut registration with `<svelte:window onkeydown>` |
-| `docs/dev/game-engine.md` (update)    | Developers      | Note that `stream-end` SSE event must be emitted by the server after each decision event; document the expected SSE event types and their JSON shapes (already defined in MU3, but now has a TypeScript consumer to stay in sync with)                                                                                                                                                                                                                        |
-| `docs/authors/adventures.md` (update) | Content Authors | No content-author-facing changes; add a brief note that the browser interface now renders all adventure decision types including combat, skill menus, and text inputs                                                                                                                                                                                                                                                                                         |
+| Document                              | Audience        | Topics                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `docs/dev/frontend.md` (update)       | Developers      | `gameSession` store lifecycle: `begin`, `advance`, `close`; `fetchSSE` async generator and `parseSSEBuffer` in `api/play.ts`; why all adventure SSE uses `fetch` + `ReadableStream` instead of `EventSource` (POST-only requirement); why `writable` not runes; `getCurrentPlayState` dual-fetch design (play/current + overworld); crash recovery via `+page.ts` load function; D7 navigation hard-block and D8 forced redirect (including triggered-adventure detection from overworld polling); decision component callback prop pattern; keyboard shortcut registration with `<svelte:window onkeydown>` |
+| `docs/dev/game-engine.md` (update)    | Developers      | Note that `stream-end` SSE event must be emitted by the server after each decision event; document the expected SSE event types and their JSON shapes (already defined in MU3, but now has a TypeScript consumer to stay in sync with)                                                                                                                                                                                                                                                                                                                                                                       |
+| `docs/authors/adventures.md` (update) | Content Authors | No content-author-facing changes; add a brief note that the browser interface now renders all adventure decision types including combat, skill menus, and text inputs                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 ---
 
 ## Risks / Trade-offs
 
-| Risk                                                                                                                                                                             | Mitigation                                                                                                                                                                                                                                                                   |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fetch` + `ReadableStream` SSE parsing is more complex than `EventSource`                                                                                                        | `fetchSSE` generator and `parseSSEBuffer` are isolated in `api/play.ts`; all other code reads from the `gameSession` store; complexity is contained and fully typed                                                                                                          |
-| `EventSource` reconnect logic fires on network glitches during a GET SSE session                                                                                                 | SSE streams (begin/advance) use `fetch` + `ReadableStream`, not `EventSource`, so there is no auto-reconnect. A glitch surfaces as a `done=true` read, which the store treats as stream end. Crash recovery via `GET /play/current` handles any resulting inconsistency      |
-| Scroll anchor fights with typewriter fade — new content pushes earlier content up before it fades out                                                                            | Fade-in animates only `opacity` (no height or margin animation); scroll container height is stable; no layout shift                                                                                                                                                          |
-| `gameSession.init()` is called synchronously at module load from `+page.svelte` — if the store was already in `adventure` mode (user navigates away and back) the init resets it | `onDestroy` in the play page calls `gameSession.close()`, ensuring the store is reset to `idle` before the user leaves; a fresh `init()` on next mount always has a clean state                                                                                              |
-| Inventory quick-actions on overworld require new API endpoints not defined in MU2/MU3                                                                                            | MU5 renders inventory as read-only on the overworld; `InventoryQuickActions` is a stubbed placeholder; equip/use endpoints are defined in a future change                                                                                                                    |
-| 409 Conflict during `begin` bubbles as an `ApiError` into `fetchSSE` before the generator starts yielding                                                                        | The generator catches `response.status === 409` before entering the read loop and throws a typed `ApiError(409, 'session_conflict')`; `gameSession.begin` catches this, sets `showConflictModal = true` via a writable sub-store, and does not enter loading mode            |
-| `get(authStore)` at stream-open time — token may expire during a long stream                                                                                                     | Adventures are short by design (seconds to minutes); token expiry (typically 15–60 min) is not expected mid-stream. If it occurs, the server returns a 401 which appears as a non-OK response before the stream begins, triggering auth refresh via `client.ts` before retry |
+| Risk                                                                                                                                                                             | Mitigation                                                                                                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fetch` + `ReadableStream` SSE parsing is more complex than `EventSource`                                                                                                        | `fetchSSE` generator and `parseSSEBuffer` are isolated in `api/play.ts`; all other code reads from the `gameSession` store; complexity is contained and fully typed                                                                                                               |
+| `EventSource` reconnect logic fires on network glitches during a GET SSE session                                                                                                 | SSE streams (begin/advance) use `fetch` + `ReadableStream`, not `EventSource`, so there is no auto-reconnect. A glitch surfaces as a `done=true` read, which the store treats as stream end. Crash recovery via `GET /play/current` handles any resulting inconsistency           |
+| Scroll anchor fights with typewriter fade — new content pushes earlier content up before it fades out                                                                            | Fade-in animates only `opacity` (no height or margin animation); scroll container height is stable; no layout shift                                                                                                                                                               |
+| `gameSession.init()` is called synchronously at module load from `+page.svelte` — if the store was already in `adventure` mode (user navigates away and back) the init resets it | `onDestroy` in the play page calls `gameSession.close()`, ensuring the store is reset to `idle` before the user leaves; a fresh `init()` on next mount always has a clean state                                                                                                   |
+| Inventory quick-actions on overworld require new API endpoints not defined in MU2/MU3                                                                                            | MU5 renders inventory as read-only on the overworld; `InventoryQuickActions` is a stubbed placeholder; equip/use endpoints are defined in a future change                                                                                                                         |
+| 409 Conflict during `begin` bubbles as an `ApiError` into `fetchSSE` before the generator starts yielding                                                                        | The generator catches `response.status === 409` before entering the read loop and throws `new ApiError("Session conflict", 409, "session_conflict")`; `gameSession.begin` catches this, sets `showConflictModal = true` via a writable sub-store, and does not enter loading mode |
+| `get(authStore)` at stream-open time — token may expire during a long stream                                                                                                     | Adventures are short by design (seconds to minutes); token expiry (typically 15–60 min) is not expected mid-stream. If it occurs, the server returns a 401 which appears as a non-OK response before the stream begins, triggering auth refresh via `client.ts` before retry      |

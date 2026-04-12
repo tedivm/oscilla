@@ -218,12 +218,11 @@ class PrestigeEffect(BaseModel):
 
 
 class SetNameEffect(BaseModel):
-    """Prompt the player for their character's name if the current name looks like a placeholder.
+    """Prompt the player to enter a name and assign it to the character.
 
-    When the character name matches the auto-generated UUID placeholder pattern
-    (``new-<uuid4>``), prompts the player using ``tui.input_text(prompt)``.
-    If the character already has a real name (from ``--character-name`` CLI flag or
-    ``game.yaml character_creation.default_name``), this effect is a no-op.
+    Always prompts regardless of the character's current name. Use a ``requires``
+    condition on the enclosing step when the prompt should be skipped under
+    certain circumstances.
     """
 
     type: Literal["set_name"]

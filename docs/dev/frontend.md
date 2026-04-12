@@ -56,6 +56,34 @@ The Vite dev proxy forwards `/auth`, `/games`, `/characters`, and `/overworld` t
 - `authStore` owns token lifecycle (login/register/logout/refresh/init).
 - Access token is in-memory only; refresh token is persisted in `sessionStorage`.
 
+## Game Loop (Play Screen)
+
+The play screen (`routes/characters/[id]/play/`) drives the SSE-based game loop from the browser.
+
+### Architecture
+
+- **`src/lib/api/play.ts`** — Low-level primitives: `fetchSSE` (POST + `ReadableStream` streaming, not `EventSource`), `getCurrentPlayState` (crash-recovery snapshot), `parseSSEBuffer` (chunked SSE buffer parser).
+- **`src/lib/stores/gameSession.ts`** — Central writable store. Manages stream lifecycle, applies incoming `SSEEvent` objects to `GameSessionState` via the pure `applyEvent` reducer, and exposes `init`, `begin`, `advance`, `setOverworld`, and `close` methods.
+- **`src/lib/components/Game/`** — Per-event-type decision components (`ChoiceMenu`, `AckPrompt`, `CombatHUD`, `TextInputForm`, `SkillMenu`), `NarrativeLog` with auto-scroll, `AdventureCompleteScreen`, and `SessionConflictModal`.
+- **`src/lib/components/Overworld/`** — Overworld screen shown when no adventure is active (`OverworldView`, `LocationInfo`, `AdventureList`, `NavigationPanel`, `CharacterSidebar`, `InventoryQuickActions`).
+
+### SSE Streaming
+
+`fetchSSE` uses `fetch` + `ReadableStream` rather than `EventSource` because the backend endpoints require POST (to send the decision body). Auth tokens are attached once at stream open. The `parseSSEBuffer` function splits on `\n\n` block boundaries and handles incomplete trailing chunks by returning them as `remaining` for the next read iteration.
+
+### Crash Recovery (D6)
+
+When the user reloads mid-adventure, `+page.ts` calls `getCurrentPlayState` in its load function. This fetches `GET /play/current`, reconstructs the narrative log from `session_output`, and (if a `pending_event` is present) restores the decision prompt. The `+page.svelte` calls `gameSession.init(playState)` synchronously before render.
+
+### Navigation Guards
+
+- **D7 (root layout)** — `beforeNavigate` in `src/routes/+layout.svelte` hard-cancels navigation away from the play page while `gameSession.mode` is `"adventure"` or `"loading"`. The user must complete or close the adventure before navigating elsewhere.
+- **D8 (character layout)** — `src/routes/characters/[id]/+layout.ts` calls `GET /play/current`; if a `pending_event` exists, it issues a `307` redirect to the play page. This catches direct links to the character sheet when an adventure is already in progress. The guard skips itself when already on `/play` to prevent redirect loops.
+
+### Session Conflict (409)
+
+When `gameSession.advance` or `gameSession.begin` receives a 409 response, `fetchSSE` throws `ApiError(message, 409, body)`. The play page catches this, extracts `acquired_at` from the error body, and shows `SessionConflictModal`. The "Take Over" action POSTs to `/play/takeover`, then re-initializes the store from the recovered state.
+
 ## Testing Conventions
 
 - Unit tests: `vitest` for store and API-client behavior (`src/**/*.test.ts`).

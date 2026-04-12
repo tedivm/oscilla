@@ -93,9 +93,8 @@ class CharacterCreationDefaults(BaseModel):
     identity — no player selection steps are needed.
 
     - ``default_name``: Used instead of the UUID placeholder in _create_new_character().
-      Because it is not a UUID placeholder, SetNameEffect detects it as a real name and
-      skips the prompt. Authors simply omit the type: set_name step from their creation
-      adventure.
+      Authors who set this should omit the ``type: set_name`` step (or guard it with a
+      ``requires`` condition) so the player is not re-prompted on every run.
     - ``default_pronouns``: Initial pronoun-set key (e.g. 'she_her'). Overrides the
       system default (they/them). Validated at load time against known pronoun sets.
     """

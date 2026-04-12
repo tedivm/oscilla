@@ -22,6 +22,23 @@ spec:
 
 The `metadata.name` is what you reference in a location's [adventure pool](./world-building.md#adventure-pools) (the `ref` field). `displayName` and `description` appear in loading screens and elsewhere in the UI.
 
+## Browser Interface
+
+Adventures run in the web browser through the **play screen** (`/characters/{id}/play`). The browser connects to the backend via a POST-based SSE stream. Each step type maps to a distinct UI widget:
+
+| Step type    | Browser widget                            |
+| ------------ | ----------------------------------------- |
+| `narrative`  | Text entry appended to the narrative log  |
+| `choice`     | Choice menu with keyboard shortcuts (1–9) |
+| `ack`        | Continue prompt (Enter / Space)           |
+| `combat`     | Combat HUD with HP bars per combatant     |
+| `text_input` | Free-text input form                      |
+| `skill_menu` | Skill card grid with cooldown indicators  |
+
+After an adventure ends, the player is returned to the **overworld view**, which shows their current location, available adventures, and navigation options.
+
+As an author you do not need to configure the browser interface — the engine drives it automatically based on step types. The `displayName` and `description` fields from your adventure manifest are used when the adventure appears in the overworld adventure list.
+
 Adventures live inside their owning location directory:
 
 A common convention is to place adventure manifests alongside their owning location:
