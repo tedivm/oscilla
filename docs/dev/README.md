@@ -11,6 +11,80 @@ New to this project? Start here:
 3. **[Settings](./settings.md)** - Environment configuration and settings management
 4. **[Docker](./docker.md)** - Containerization, deployment, and local development with Docker
 
+## Quick Start (Frontend + Backend)
+
+There are two valid full-stack workflows. Use the one that matches what you are changing.
+
+### Option A: Full Docker Stack (backend container + built frontend)
+
+Best when you want everything containerized exactly as Compose defines it.
+
+1. Clone the repository and move into the project root.
+2. Copy environment defaults:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Start all services, including MailHog (dev profile):
+
+   ```bash
+   docker compose --profile dev up -d --build
+   ```
+
+4. Open the app and verify health:
+
+- Frontend (served by backend container): <http://127.0.0.1/app>
+- API docs (backend container): <http://127.0.0.1/docs>
+- Health check: <http://127.0.0.1/health>
+- MailHog: <http://127.0.0.1:8025>
+
+### Option B: Frontend Hot Reload (Vite) + Live backend API
+
+Best when actively developing the Svelte app with instant reload.
+
+1. Install dependencies:
+
+   ```bash
+   make install
+   ```
+
+2. Start dependency services:
+
+   ```bash
+   docker compose --profile dev up -d db redis mailhog
+   ```
+
+3. In Terminal 1, start backend API on port 8000:
+
+   ```bash
+   uv run uvicorn oscilla.www:app --reload --host 127.0.0.1 --port 8000
+   ```
+
+4. In Terminal 2, start the frontend dev server:
+
+   ```bash
+   make frontend_dev
+   ```
+
+5. Open these URLs:
+
+- Frontend dev app: <http://127.0.0.1:5173/app>
+- Backend API docs: <http://127.0.0.1:8000/docs>
+- Backend health check: <http://127.0.0.1:8000/health>
+- MailHog: <http://127.0.0.1:8025>
+
+The Vite server proxies `/auth`, `/games`, `/characters`, and `/overworld` to `http://localhost:8000`.
+
+### Stop Everything
+
+- Stop local frontend/backend processes with Ctrl+C in their terminals.
+- Stop containers:
+
+  ```bash
+  docker compose down
+  ```
+
 ## Core Features
 
 ### [Design Philosophy](./design-philosophy.md)

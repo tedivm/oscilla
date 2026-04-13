@@ -25,7 +25,7 @@ git mv old_path new_path # ALWAYS use git mv for moving or renaming files, never
 ### Testing and Validation
 
 ```bash
-make tests # Run all tests and checks (pytest, ruff, black, mypy, dapperdata, tomlsort)
+make tests # Run all tests and checks (pytest, ruff, format checks, mypy, prettier, TOML lint, schema checks, frontend checks)
 make pytest # Run pytest with coverage report
 make pytest_loud # Run pytest with debug logging enabled
 uv run pytest # Run pytest directly with uv, adding any arguments and options needed
@@ -37,18 +37,35 @@ uv run pytest # Run pytest directly with uv, adding any arguments and options ne
 make ruff_check # Check code with ruff linter
 make black_check # Check code formatting with ruff format using the black format
 make mypy_check # Run type checking with mypy
-make dapperdata_check # Check data file formatting
+make prettier_check # Check markdown/json/yaml/etc formatting with prettier
 make tomlsort_check # Check TOML file linting and formatting
+make paracelsus_check # Check generated database docs are up to date
+make check_ungenerated_migrations # Ensure no missing Alembic migration changes
+make validate # Validate content packages
 ```
 
 ### Code Formatting (Auto-fix)
 
 ```bash
-make chores # Run all formatting fixes (ruff, black, dapperdata, tomlsort)
+make chores # Run all formatting fixes (ruff, format, prettier, TOML, frontend formatting, schema docs)
 make ruff_fixes # Auto-fix ruff issues
 make black_fixes # Auto-format code with ruff using the black format
-make dapperdata_fixes # Auto-format data files
+make prettier_fixes # Auto-format markdown/json/yaml/etc
 make tomlsort_fixes # Auto-format TOML files
+make frontend_format_fix # Auto-format frontend source files
+```
+
+### Frontend Development and Testing
+
+```bash
+make frontend_install # Install frontend npm dependencies
+make frontend_dev # Start Vite dev server
+make frontend_build # Build frontend assets
+make frontend_check # Run svelte-check
+make frontend_test # Run vitest suite
+make frontend_e2e # Run Playwright E2E via managed stack
+make frontend_a11y # Run Playwright accessibility tests
+make frontend_playwright_all # Run accessibility + E2E across chromium/firefox/webkit
 ```
 
 ### Dependency Management
@@ -78,7 +95,8 @@ make build # Build package distribution
 ### Docker
 
 ```bash
-docker compose up -d # Start development environment and detach session
+docker compose up -d # Start default services (db, redis, www)
+docker compose --profile dev up -d # Start default services plus MailHog
 docker compose down # Stop development environment (preserves volumes)
 docker compose down -v # Stop and remove development environment (including volumes)
 docker compose restart # Restart all services without destroying containers or volumes
