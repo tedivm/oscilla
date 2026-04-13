@@ -31,6 +31,7 @@ dependencies = [
   "textual>=0.80.0",
   "typer",
   "uvicorn[standard]",
+  "zxcvbn>=4.5.0",
 ]
 
 [project.scripts]

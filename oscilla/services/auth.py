@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 import jwt
+from aiocache import caches  # type: ignore[import-untyped]
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import HTTPException
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_401_UNAUTHORIZED
 
 from oscilla.models.auth import AuthRefreshTokenRecord
+from oscilla.models.auth_audit_log import AuthAuditLogRecord
 from oscilla.services.email import send_email
 from oscilla.services.jinja import env
 from oscilla.settings import settings
@@ -190,3 +192,83 @@ async def send_reset_email(email: str, user_id: UUID, display_name: str | None) 
         body_html=body_html,
         body_text=body_text,
     )
+
+
+# ---------------------------------------------------------------------------
+# Account lockout
+# ---------------------------------------------------------------------------
+
+
+async def record_failed_login(email: str) -> bool:
+    """Record a failed login attempt and lock the account if the threshold is reached.
+
+    Increments the consecutive failure counter for the email. Sets a TTL on
+    the first increment so the counter auto-expires after the lockout window.
+    If the count reaches ``settings.max_login_attempts_before_lockout``, a
+    separate lockout key is set to prevent further logins.
+
+    Returns:
+        ``True`` if the account is now locked, ``False`` otherwise.
+    """
+    cache = caches.get("persistent")
+    count_key = f"lockout_count:{email}"
+    count: int = await cache.increment(count_key, delta=1)
+
+    if count == 1:
+        await cache.expire(count_key, ttl=settings.lockout_window_seconds)
+
+    if count >= settings.max_login_attempts_before_lockout:
+        lockout_key = f"lockout:{email}"
+        lockout_ttl = settings.lockout_duration_minutes * 60
+        await cache.set(lockout_key, True, ttl=lockout_ttl)
+        return True
+
+    return False
+
+
+async def is_account_locked(email: str) -> bool:
+    """Return ``True`` if the account is currently locked out."""
+    cache = caches.get("persistent")
+    result: bool = await cache.exists(f"lockout:{email}")
+    return result
+
+
+async def clear_lockout(email: str) -> None:
+    """Clear lockout and failure counter keys for the given email (call on successful login)."""
+    cache = caches.get("persistent")
+    await cache.delete(f"lockout:{email}")
+    await cache.delete(f"lockout_count:{email}")
+
+
+# ---------------------------------------------------------------------------
+# Auth audit log
+# ---------------------------------------------------------------------------
+
+
+async def record_auth_event(
+    session: AsyncSession,
+    event_type: str,
+    user_id: UUID | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> None:
+    """Append an audit log record for an authentication event.
+
+    Does NOT commit the session — the caller controls transaction boundaries.
+
+    Args:
+        session: Active SQLAlchemy async session.
+        event_type: One of ``login_success``, ``login_failure``, ``logout``,
+            ``password_reset``, or ``email_verify``.
+        user_id: UUID of the user associated with the event, or ``None`` for
+            failed attempts where the user was not found.
+        ip_address: Remote IP extracted from the HTTP request, or ``None``.
+        user_agent: ``User-Agent`` header value, or ``None``.
+    """
+    record = AuthAuditLogRecord(
+        user_id=user_id,
+        event_type=event_type,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    session.add(record)

@@ -8,7 +8,7 @@ export type E2ECredentials = {
 export function makeCredentials(): E2ECredentials {
   return {
     email: `e2e-${crypto.randomUUID()}@example.com`,
-    password: "password123",
+    password: "securepass123",
   };
 }
 

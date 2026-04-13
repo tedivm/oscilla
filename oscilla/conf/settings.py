@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import List
 
 from pydantic import Field, SecretStr
 from pydantic_settings import SettingsConfigDict
@@ -109,4 +110,42 @@ class Settings(DatabaseSettings, CacheSettings):
     base_url: str = Field(
         default="http://localhost:8000",
         description="Base URL of the application, used to build absolute links in emails.",
+    )
+
+    # Production Security
+    max_login_attempts_per_hour: int = Field(
+        default=10,
+        description="Login attempts per email per hour before rate limiting.",
+    )
+    max_registrations_per_hour_per_ip: int = Field(
+        default=5,
+        description="Registration attempts per IP per hour.",
+    )
+    max_login_attempts_before_lockout: int = Field(
+        default=5,
+        description="Consecutive failed logins before lockout.",
+    )
+    lockout_duration_minutes: int = Field(
+        default=15,
+        description="Duration of account lockout in minutes.",
+    )
+    lockout_window_seconds: int = Field(
+        default=300,
+        description="Window for counting consecutive failures in seconds.",
+    )
+    cors_origins: List[str] = Field(
+        default=["http://localhost:5173"],
+        description="Allowed CORS origins. Include the frontend domain in production. Never use ['*'] with allow_credentials=True.",
+    )
+    log_level: str = Field(
+        default="INFO",
+        description="Logging level: DEBUG, INFO, WARNING, ERROR.",
+    )
+    uvicorn_workers: int = Field(
+        default=1,
+        description="Number of Uvicorn worker processes.",
+    )
+    min_password_strength: int = Field(
+        default=2,
+        description="Minimum zxcvbn password score (0-4) required for registration and password reset.",
     )

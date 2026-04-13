@@ -29,8 +29,12 @@ services:
       POSTGRES_USER: main
       POSTGRES_DB: main
 
+  # MailHog is only started when the dev profile is active.
+  # Use `docker compose --profile dev up` to start MailHog alongside all services.
+  # `docker compose up` (no profile) starts only db, redis, and www.
   mailhog:
     image: mailhog/mailhog
+    profiles: [dev]
     ports:
       - "8025:8025"
       - "1025:1025"

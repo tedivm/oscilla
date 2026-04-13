@@ -5,14 +5,18 @@ from logging import getLogger
 from typing import Dict
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from oscilla.engine.loader import load_from_disk
 from oscilla.engine.registry import ContentRegistry
+from oscilla.middleware.request_logging import RequestLoggingMiddleware
+from oscilla.middleware.security_headers import SecurityHeadersMiddleware
 from oscilla.routers.auth import router as auth_router
 from oscilla.routers.characters import router as characters_router
 from oscilla.routers.games import router as games_router
+from oscilla.routers.health import router as health_router
 from oscilla.routers.overworld import router as overworld_router
 from oscilla.routers.play import router as play_router
 from oscilla.services.cache import configure_caches
@@ -49,8 +53,31 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(lifespan=lifespan)
 
+# Middleware is applied in reverse registration order:
+#   RequestLoggingMiddleware (outermost — handles every inbound request first)
+#   → SecurityHeadersMiddleware
+#   → CORSMiddleware (innermost — runs last, closest to the route handlers)
+#
+# Registered last = outermost execution, so we register in the order:
+#   CORSMiddleware first, SecurityHeaders second, RequestLogging third.
+
+# CORSMiddleware: allow browser requests from configured frontend origins.
+# Never set allow_origins=["*"] together with allow_credentials=True — that
+# violates the CORS spec and is rejected by browsers.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
+
 static_file_path = os.path.dirname(os.path.realpath(__file__)) + "/static"
 app.mount("/static", StaticFiles(directory=static_file_path), name="static")
+app.include_router(health_router, tags=["health"])
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(games_router, prefix="/games", tags=["games"])
 app.include_router(characters_router, prefix="/characters", tags=["characters"])

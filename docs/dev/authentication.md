@@ -158,3 +158,82 @@ rotation live in `tests/services/test_auth.py`.
 Dependency tests (`tests/dependencies/test_auth.py`) verify that
 `get_current_user` and `get_verified_user` raise the correct HTTP errors for
 missing, invalid, or inactive-account tokens.
+
+---
+
+## Security Controls
+
+### Rate Limiting
+
+Login and registration attempts are rate-limited using the persistent cache
+(Redis in production, `NoOpCache` in development).
+
+| Endpoint         | Cache key pattern  | Setting                             | Window |
+| ---------------- | ------------------ | ----------------------------------- | ------ |
+| `POST /login`    | `rl:login:{email}` | `MAX_LOGIN_ATTEMPTS_PER_HOUR`       | 1 hour |
+| `POST /register` | `rl:register:{ip}` | `MAX_REGISTRATIONS_PER_HOUR_PER_IP` | 1 hour |
+
+When the count exceeds the limit, the endpoint returns `HTTP 429 Too Many Requests`.
+
+**Development behavior**: When `CACHE_ENABLED=False` (the default in development),
+`NoOpCache._increment` returns `delta=1` on every call regardless of how many
+times it is called — the counter never accumulates. Rate limiting is therefore
+transparently disabled in development without any configuration change.
+
+### Account Lockout
+
+After too many consecutive failed login attempts, the account is locked for a
+configurable duration.
+
+| Cache key               | Purpose                                                               |
+| ----------------------- | --------------------------------------------------------------------- |
+| `lockout_count:{email}` | Consecutive failure counter (expires after `LOCKOUT_WINDOW_SECONDS`)  |
+| `lockout:{email}`       | Lock sentinel (expires after `LOCKOUT_DURATION_MINUTES × 60` seconds) |
+
+- `MAX_LOGIN_ATTEMPTS_BEFORE_LOCKOUT` (default: 5) — failures before lockout.
+- `LOCKOUT_DURATION_MINUTES` (default: 15) — duration of lockout.
+- `LOCKOUT_WINDOW_SECONDS` (default: 300) — sliding window for failure counting.
+
+A successful login automatically clears both cache keys via `clear_lockout()`.
+Locked accounts receive `HTTP 423 Locked`.
+
+Like rate limiting, lockout is transparently disabled when `CACHE_ENABLED=False`.
+
+### Auth Audit Log
+
+Every significant auth event is written to the `auth_audit_log` table with IP
+address, user agent, and timestamp.
+
+| Event type       | Trigger                                          |
+| ---------------- | ------------------------------------------------ |
+| `login_success`  | Successful password verification and token issue |
+| `login_failure`  | Failed password verification                     |
+| `logout`         | Refresh token revoked                            |
+| `password_reset` | Password successfully changed via reset token    |
+| `email_verify`   | Email address verified via verify token          |
+
+**Table structure** (`auth_audit_log`):
+
+| Column       | Type                            | Notes                                                                             |
+| ------------ | ------------------------------- | --------------------------------------------------------------------------------- |
+| `id`         | UUID (PK)                       | Random UUID, generated at insert.                                                 |
+| `user_id`    | UUID (nullable FK → `users.id`) | `SET NULL` on user deletion — audit records are preserved when a user is deleted. |
+| `event_type` | str                             | One of the event types above.                                                     |
+| `ip_address` | str (nullable)                  | Client IP from the request.                                                       |
+| `user_agent` | str (nullable)                  | `User-Agent` header from the request.                                             |
+| `created_at` | datetime                        | UTC timestamp; indexed for efficient time-range queries.                          |
+
+Reading audit logs requires direct database access (e.g., `make db` or `psql`).
+No read API is exposed in MU6.
+
+### Password Strength
+
+All new passwords are evaluated with [zxcvbn](https://github.com/dwolfhub/zxcvbn-python)
+before being accepted. The score ranges from 0 (very weak) to 4 (very strong).
+Passwords scoring below `MIN_PASSWORD_STRENGTH` (default: 2) are rejected with
+`HTTP 422 Unprocessable Content` and the zxcvbn suggestion string is surfaced in
+the error detail.
+
+Score 2 is the minimum because it is OWASP-aligned and avoids over-rejecting
+reasonable passwords — short random strings or memorable passphrases score 2
+while common dictionary words score 0 or 1.

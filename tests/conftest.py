@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List
 
+import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -8,8 +9,20 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 # Import all ORM models so that Base.metadata.create_all() sees every table.
 import oscilla.models  # noqa: F401
 from oscilla.models.base import Base
+from oscilla.services.cache import configure_caches
 from oscilla.services.db import get_session_depends, test_data
 from oscilla.www import app
+
+
+@pytest.fixture(autouse=True)
+def _configure_caches() -> None:
+    """Ensure aiocache is configured before every test.
+
+    TestClient does not automatically trigger the FastAPI lifespan, so caches
+    must be configured explicitly.  Individual test modules may override this
+    behavior with their own autouse fixtures (e.g. to force NoOpCache).
+    """
+    configure_caches()
 
 
 @pytest_asyncio.fixture

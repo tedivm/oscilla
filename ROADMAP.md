@@ -49,8 +49,6 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [Faction and Reputation System](#faction-and-reputation-system)                                 | M      | Quest Depth & Factions  |
 | [Content Inheritance / Prototypes](#content-inheritance--prototypes)                            | M      | Content Reuse           |
 | [Plugin and Extension System](#plugin-and-extension-system)                                     | L      | Engine Architecture     |
-| [HTTP API for Multi-User Support](#http-api-for-multi-user-support)                             | XL     | Multi-User Platform     |
-| [Front End Website](#front-end-website)                                                         | XL     | Multi-User Platform     |
 | [API-Level Active Adventure Enforcement](#api-level-active-adventure-enforcement)               | S      | Multi-User Platform     |
 | [Skill Cooldown State in API](#skill-cooldown-state-in-api)                                     | S      | Multi-User Platform     |
 | [Display Metadata in CharacterState Sub-models](#display-metadata-in-characterstate-sub-models) | S      | Multi-User Platform     |
@@ -413,22 +411,6 @@ Prerequisite: MU3 must be complete and stable before this refactor begins, as MU
 
 ## Multi-User Platform
 
-### HTTP API for Multi-User Support
-
-**Effort: XL** · **Group: Multi-User Platform**
-
-Extend the existing FastAPI layer into a full multi-user API so that many players can each run their own independent single-player game sessions on a shared server instance. This is explicitly not multiplayer — players do not interact with each other — but they share the same deployed server and game content library.
-
-Goals:
-
-- Authenticated user accounts with persistent character state stored in the database (player persistence already partially exists)
-- Session management: a player can close the browser, return later, and resume exactly where they left off
-- Per-user game selection: each user can be playing a different game from the content library
-- REST endpoints for all game actions currently driven by the TUI (begin adventure, make choice, view inventory, etc.)
-- The TUI remains a valid client; the API is an additional interface layer, not a replacement
-
-This is the prerequisite for a web front end and mobile clients.
-
 ### API-Level Active Adventure Enforcement
 
 **Effort: S** · **Group: Multi-User Platform**
@@ -523,19 +505,6 @@ Goals:
 - Once shipped, update the Skills panel in the web frontend to display cooldown state
 
 This is a prerequisite for the Skills panel showing meaningful cooldown information in the web UI.
-
-### Front End Website
-
-**Effort: XL** · **Group: Multi-User Platform**
-
-A browser-based client for the HTTP API. Players interact with the game through a web interface instead of (or in addition to) the terminal TUI.
-
-Considerations:
-
-- The API design should be driven by front-end needs first; avoid building an API that only the TUI could consume
-- Rich text rendering: narrative text supports Jinja2 templates and pronoun placeholders; the front end should render formatted output rather than raw template strings
-- Accessibility: keyboard navigation, screen reader support, sufficient color contrast
-- The existing static file serving in `oscilla/static/` and template system in `oscilla/templates/` are starting points but likely need significant expansion
 
 ## Media and Presentation
 

@@ -8,7 +8,7 @@ Rate limiting uses the existing `aiocache` Redis backend (`get_cache("persistent
 
 ## What Changes
 
-- **New**: Rate limiting on auth endpoints — failed login lockout and registration throttle implemented via atomic increments on the `"persistent"` aiocache alias (`RedisCache.increment()` + TTL). Falls back gracefully to no-op when `cache_enabled=False` (the `NoOpCache` increment always returns 0, so rate limiting is effectively disabled in development without code changes).
+- **New**: Rate limiting on auth endpoints — failed login lockout and registration throttle implemented via atomic increments on the `"persistent"` aiocache alias (`RedisCache.increment()` + TTL). Falls back gracefully to no-op when `cache_enabled=False` (the `NoOpCache._increment` returns `delta`, which is `1` by default; since every `max_attempts` threshold is at least `1`, the check `count <= max_attempts` always passes, so rate limiting is effectively disabled in development without code changes).
 - **New**: Account lockout after N failed login attempts (configurable via settings); lockout duration configurable.
 - **New**: CORS middleware with allowlist origins (configured via settings).
 - **New**: Security headers middleware: HSTS, `X-Content-Type-Options`, `X-Frame-Options`, Content Security Policy.

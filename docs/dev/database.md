@@ -776,6 +776,15 @@ make document_schema
 <!-- BEGIN_SQLALCHEMY_DOCS -->
 ```mermaid
 erDiagram
+  auth_audit_log {
+    CHAR(32) id PK
+    CHAR(32) user_id FK "nullable"
+    DATETIME created_at
+    VARCHAR event_type
+    VARCHAR ip_address "nullable"
+    VARCHAR user_agent "nullable"
+  }
+
   auth_refresh_tokens {
     CHAR(32) id PK
     CHAR(32) user_id FK
@@ -930,6 +939,7 @@ erDiagram
     VARCHAR user_key UK "nullable"
   }
 
+  users ||--o{ auth_audit_log : user_id
   users ||--o{ auth_refresh_tokens : user_id
   character_iterations ||--o| character_iteration_active_buffs : iteration_id
   character_iterations ||--o| character_iteration_adventure_state : iteration_id

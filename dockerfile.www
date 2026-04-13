@@ -42,4 +42,15 @@ COPY . /app/
 COPY --from=frontend-build /app/frontend/build /app/frontend/build
 
 # Install project
-RUN uv sync --frozen --python /usr/local/bin/python
+RUN uv sync --frozen --no-dev --python /usr/local/bin/python
+
+# Create a non-root user with a fixed UID/GID so file permissions are
+# predictable across restarts and host mounts (UID 999 is below the
+# normal user range and avoids conflicts with default system accounts).
+RUN groupadd -g 999 oscilla && useradd -u 999 -g 999 -s /bin/bash oscilla
+USER oscilla
+
+# The python-uvicorn base image reads WEB_CONCURRENCY for worker count.
+# UVICORN_WORKERS from .env is forwarded to WEB_CONCURRENCY at runtime.
+# Default is 1 worker; set UVICORN_WORKERS in .env to scale up.
+CMD ["/bin/bash", "-c", "WEB_CONCURRENCY=${UVICORN_WORKERS:-1} exec /start.sh"]

@@ -3,7 +3,7 @@ from logging import getLogger
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,14 +15,21 @@ from starlette.status import (
     HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
     HTTP_409_CONFLICT,
+    HTTP_422_UNPROCESSABLE_CONTENT,
+    HTTP_423_LOCKED,
+    HTTP_429_TOO_MANY_REQUESTS,
 )
 
 from oscilla.dependencies.auth import get_current_user
 from oscilla.models.user import UserRecord
 from oscilla.services.auth import (
+    clear_lockout,
     create_access_token,
     create_refresh_token,
     hash_password,
+    is_account_locked,
+    record_auth_event,
+    record_failed_login,
     revoke_refresh_token,
     rotate_refresh_token,
     send_reset_email,
@@ -32,6 +39,9 @@ from oscilla.services.auth import (
     verify_reset_token,
 )
 from oscilla.services.db import get_session_depends
+from oscilla.services.password_strength import validate_password_strength
+from oscilla.services.rate_limit import check_rate_limit
+from oscilla.settings import settings
 
 router = APIRouter()
 logger = getLogger(__name__)
@@ -109,10 +119,23 @@ def _user_read(user: UserRecord) -> UserRead:
 @router.post("/register", response_model=UserRead, status_code=HTTP_201_CREATED)
 async def register(
     request: RegisterRequest,
+    request_obj: Request,
     background_tasks: BackgroundTasks,
     db: Annotated[AsyncSession, Depends(get_session_depends)],
 ) -> UserRead:
     """Register a new user account."""
+    ip = request_obj.client.host if request_obj.client else "unknown"
+    if not await check_rate_limit(f"rl:register:{ip}", settings.max_registrations_per_hour_per_ip, 3600):
+        raise HTTPException(
+            status_code=HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many registration attempts from this address.",
+        )
+
+    try:
+        validate_password_strength(request.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
     stmt = select(UserRecord).where(UserRecord.email == request.email)
     result = await db.execute(stmt)
     if result.scalar_one_or_none() is not None:
@@ -136,9 +159,22 @@ async def register(
 @router.post("/login", response_model=TokenPairRead)
 async def login(
     request: LoginRequest,
+    request_obj: Request,
     db: Annotated[AsyncSession, Depends(get_session_depends)],
 ) -> TokenPairRead:
     """Authenticate with email and password; returns an access + refresh token pair."""
+    if not await check_rate_limit(f"rl:login:{request.email}", settings.max_login_attempts_per_hour, 3600):
+        raise HTTPException(
+            status_code=HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Try again later.",
+        )
+
+    if await is_account_locked(request.email):
+        raise HTTPException(
+            status_code=HTTP_423_LOCKED,
+            detail="Account is temporarily locked due to too many failed login attempts.",
+        )
+
     stmt = select(UserRecord).where(UserRecord.email == request.email)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
@@ -149,10 +185,30 @@ async def login(
         or user.hashed_password is None
         or not verify_password(hashed=user.hashed_password, plaintext=request.password)
     ):
+        if user is not None:
+            await record_failed_login(request.email)
+        await record_auth_event(
+            db,
+            "login_failure",
+            user_id=user.id if user is not None else None,
+            ip_address=request_obj.client.host if request_obj.client else None,
+            user_agent=request_obj.headers.get("user-agent"),
+        )
+        await db.commit()
         raise HTTPException(status_code=HTTP_401_UNAUTHORIZED, detail="Invalid credentials.")
 
     if not user.is_active:
         raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Account is inactive.")
+
+    await clear_lockout(request.email)
+
+    await record_auth_event(
+        db,
+        "login_success",
+        user_id=user.id,
+        ip_address=request_obj.client.host if request_obj.client else None,
+        user_agent=request_obj.headers.get("user-agent"),
+    )
 
     access_token = create_access_token(user_id=user.id)
     refresh_token = await create_refresh_token(session=db, user_id=user.id)
@@ -176,10 +232,17 @@ async def refresh(
 @router.post("/logout", status_code=HTTP_204_NO_CONTENT)
 async def logout(
     request: RefreshRequest,
+    request_obj: Request,
     db: Annotated[AsyncSession, Depends(get_session_depends)],
 ) -> None:
     """Revoke the refresh token (logout)."""
     await revoke_refresh_token(session=db, token=request.refresh_token)
+    await record_auth_event(
+        db,
+        "logout",
+        ip_address=request_obj.client.host if request_obj.client else None,
+        user_agent=request_obj.headers.get("user-agent"),
+    )
     await db.commit()
 
 
@@ -197,6 +260,7 @@ async def request_verify(
 @router.get("/verify/{token}", status_code=HTTP_204_NO_CONTENT)
 async def verify_email(
     token: str,
+    request_obj: Request,
     db: Annotated[AsyncSession, Depends(get_session_depends)],
 ) -> None:
     """Verify a user's email address using the token from the verification email."""
@@ -211,6 +275,13 @@ async def verify_email(
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="User not found.")
 
     user.is_email_verified = True
+    await record_auth_event(
+        db,
+        "email_verify",
+        user_id=user.id,
+        ip_address=request_obj.client.host if request_obj.client else None,
+        user_agent=request_obj.headers.get("user-agent"),
+    )
     await db.commit()
 
 
@@ -232,6 +303,7 @@ async def request_password_reset(
 async def password_reset(
     token: str,
     request: NewPasswordRequest,
+    request_obj: Request,
     db: Annotated[AsyncSession, Depends(get_session_depends)],
 ) -> None:
     """Reset a user's password using a valid reset token."""
@@ -246,6 +318,13 @@ async def password_reset(
         raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail="User not found.")
 
     user.hashed_password = hash_password(request.new_password)
+    await record_auth_event(
+        db,
+        "password_reset",
+        user_id=user.id,
+        ip_address=request_obj.client.host if request_obj.client else None,
+        user_agent=request_obj.headers.get("user-agent"),
+    )
     await db.commit()
 
 

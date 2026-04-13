@@ -583,3 +583,62 @@ character's current region, produced by `build_world_graph()` +
 `_filter_to_neighborhood()`. Nodes carry an `id` (prefixed `region:` or
 `location:`), a human-readable `label`, and a `kind` property. Edges have
 `source`, `target`, and `label` fields.
+
+---
+
+## Health Probes
+
+Two lightweight endpoints support infrastructure health checking with no
+authentication required.
+
+### `GET /health` — Liveness
+
+Process liveness probe. Returns `200 OK` as long as the Python process is
+running. Has no external dependencies — it does not touch the database or cache.
+
+Use this for orchestrator process liveness checks (e.g., Docker `HEALTHCHECK`,
+Kubernetes `livenessProbe`).
+
+**Response 200**:
+
+```json
+{ "status": "ok" }
+```
+
+### `GET /ready` — Readiness
+
+Readiness probe. Verifies that the database (`SELECT 1`) and the persistent
+cache are both reachable. Returns `200 OK` when both pass, or `503 Service
+Unavailable` when either is degraded.
+
+Use this for orchestrator readiness/traffic gating (e.g., Kubernetes
+`readinessProbe`). Traffic should not be routed to instances that return `503`.
+
+**Response 200**:
+
+```json
+{ "status": "ok", "db": true, "cache": true }
+```
+
+**Response 503**:
+
+```json
+{ "status": "degraded", "db": false, "cache": true }
+```
+
+### Recommended Docker Compose `healthcheck`
+
+```yaml
+services:
+  www:
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+```
+
+When the readiness probe fails, Kubernetes stops routing traffic to the pod
+until the pod recovers and the probe succeeds again. Use `/ready` for the
+`readinessProbe` and `/health` for the `livenessProbe`.

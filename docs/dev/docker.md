@@ -58,7 +58,7 @@ The web image uses a two-stage build in `dockerfile.www`:
 - Build steps: `npm ci` then `npm run build`.
 - Output: static assets in `/app/frontend/build`.
 
-2. Python runtime stage (`ghcr.io/multi-py/python-uvicorn`):
+1. Python runtime stage (`ghcr.io/multi-py/python-uvicorn`):
 
 - Copies backend code and dependencies.
 - Copies frontend artifact with:
@@ -731,3 +731,80 @@ docker system prune -a --volumes
 - [Multi-Py Uvicorn Images](https://github.com/multi-py/python-uvicorn)
 - [Multi-Py Celery Images](https://github.com/multi-py/python-celery)
 - [Best Practices for Writing Dockerfiles](https://docs.docker.com/develop/develop-images/dockerfile_best-practices/)
+
+---
+
+## Production Hardening
+
+### Non-Root User
+
+The production image runs as a dedicated `oscilla` user with UID/GID 999.
+Fixed UIDs are used so file ownership is consistent across container restarts
+and host-volume mounts (e.g., database migration output).
+
+```
+RUN groupadd -g 999 oscilla && useradd -u 999 -g 999 -s /bin/bash oscilla
+USER oscilla
+```
+
+UID 999 is below the normal Linux user range (1000+) and does not conflict with
+default system accounts, making it safe across most Linux distributions.
+
+### Worker Configuration
+
+The number of Uvicorn worker processes is controlled by the `UVICORN_WORKERS`
+environment variable. The CMD passes it to the base image via `WEB_CONCURRENCY`:
+
+```bash
+WEB_CONCURRENCY=${UVICORN_WORKERS:-1}
+```
+
+Set `UVICORN_WORKERS` in your `.env` or deployment config:
+
+```dotenv
+UVICORN_WORKERS=4  # recommended: (2 × CPU count) + 1
+```
+
+The default is `1` — appropriate for low-traffic or single-CPU deployments.
+
+### Dev vs Production Profiles
+
+MailHog is only started when the `dev` Docker Compose profile is active:
+
+```bash
+# Production: starts db, redis, www only
+docker compose up -d
+
+# Development: also starts MailHog (port 8025 + 1025)
+docker compose --profile dev up -d
+```
+
+If you run `docker compose up` without `--profile dev`, MailHog is not started
+and the SMTP settings in `.env` should point to a real SMTP relay (or be left
+unset to skip email sending).
+
+### Production SMTP
+
+To send real emails in production, set the following `.env` variables:
+
+```dotenv
+SMTP_HOST=smtp.yourprovider.com
+SMTP_PORT=587
+SMTP_USE_TLS=True
+SMTP_USER=your-smtp-username
+SMTP_PASSWORD=your-smtp-password
+SMTP_FROM_ADDRESS=noreply@yourdomain.com
+```
+
+`SMTP_HOST` is required to enable email sending. If unset, all emails are
+silently skipped (a DEBUG log message is emitted).
+
+### No-Dev Dependency Sync
+
+The production image uses `uv sync --no-dev` to exclude development
+dependencies (pytest, black, mypy, etc.) from the final image layer. This keeps
+the image smaller and reduces the attack surface.
+
+The `UV_NO_DEV=1` environment variable achieves the same result implicitly, but
+`--no-dev` is explicitly passed to the final `uv sync` call to make the intent
+unambiguous.

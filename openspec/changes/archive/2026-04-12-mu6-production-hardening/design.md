@@ -185,7 +185,7 @@ The `422 Unprocessable Entity` response from the registration endpoint includes 
 3. Logs at the start: `{request_id, method, path, user_agent}`.
 4. After response: `{request_id, method, path, status_code, duration_ms, user_id}`.
 
-`user_id` is read from `request.state.user_id`, which `get_current_user` sets on the request state whenever it successfully authenticates a token. This means unauthenticated requests log `user_id: null`.
+`user_id` is read from `request.state.user_id`. As part of MU6, `oscilla/dependencies/auth.py:get_current_user` must be updated to set `request.state.user_id = user.id` after successful token validation — it currently only returns the `UserRecord` without writing to request state. Unauthenticated requests (where `get_current_user` is not invoked) will log `user_id: null` because the attribute is absent from `request.state`.
 
 ```python
 class RequestLoggingMiddleware(BaseHTTPMiddleware):

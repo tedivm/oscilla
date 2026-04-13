@@ -69,11 +69,11 @@ async def play_client(
 # ---------------------------------------------------------------------------
 
 
-def _register(client: TestClient, email: str, password: str = "testpass123") -> None:
+def _register(client: TestClient, email: str, password: str = "securepass123") -> None:
     client.post("/auth/register", json={"email": email, "password": password})
 
 
-def _login(client: TestClient, email: str, password: str = "testpass123") -> Dict[str, str]:
+def _login(client: TestClient, email: str, password: str = "securepass123") -> Dict[str, str]:
     resp = client.post("/auth/login", json={"email": email, "password": password})
     assert resp.status_code == 200, resp.text
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
