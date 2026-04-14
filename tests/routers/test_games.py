@@ -79,7 +79,7 @@ def _build_registry(name: str, display_name: str, with_skills: bool, with_time: 
 
 
 def test_get_games_returns_all_loaded_games(games_client: TestClient) -> None:
-    response = games_client.get("/games")
+    response = games_client.get("/api/games")
     assert response.status_code == 200
 
     body = response.json()
@@ -90,13 +90,13 @@ def test_get_games_returns_all_loaded_games(games_client: TestClient) -> None:
 
 def test_get_games_returns_empty_when_no_games_loaded(games_client: TestClient) -> None:
     app.state.registries = {}
-    response = games_client.get("/games")
+    response = games_client.get("/api/games")
     assert response.status_code == 200
     assert response.json() == []
 
 
 def test_get_game_returns_single_game(games_client: TestClient) -> None:
-    response = games_client.get("/games/test-alpha")
+    response = games_client.get("/api/games/test-alpha")
     assert response.status_code == 200
 
     body = response.json()
@@ -105,12 +105,12 @@ def test_get_game_returns_single_game(games_client: TestClient) -> None:
 
 
 def test_get_game_returns_404_for_unknown_game(games_client: TestClient) -> None:
-    response = games_client.get("/games/does-not-exist")
+    response = games_client.get("/api/games/does-not-exist")
     assert response.status_code == 404
 
 
 def test_feature_flags_reflect_registry_state(games_client: TestClient) -> None:
-    response = games_client.get("/games")
+    response = games_client.get("/api/games")
     assert response.status_code == 200
 
     by_name = {row["name"]: row for row in response.json()}
@@ -122,7 +122,7 @@ def test_feature_flags_reflect_registry_state(games_client: TestClient) -> None:
 
 
 def test_ingame_time_flag_uses_time_spec_presence(games_client: TestClient) -> None:
-    response = games_client.get("/games")
+    response = games_client.get("/api/games")
     assert response.status_code == 200
 
     by_name = {row["name"]: row for row in response.json()}

@@ -68,23 +68,23 @@ async def ow_client(
 
 
 def _register(client: TestClient, email: str, password: str = "securepass123") -> None:
-    client.post("/auth/register", json={"email": email, "password": password})
+    client.post("/api/auth/register", json={"email": email, "password": password})
 
 
 def _login(client: TestClient, email: str, password: str = "securepass123") -> Dict[str, str]:
-    resp = client.post("/auth/login", json={"email": email, "password": password})
+    resp = client.post("/api/auth/login", json={"email": email, "password": password})
     assert resp.status_code == 200, resp.text
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
 def _create_character(client: TestClient, headers: Dict[str, str], game: str = "test-play-game") -> Dict[str, Any]:
-    resp = client.post("/characters", json={"game_name": game}, headers=headers)
+    resp = client.post("/api/characters", json={"game_name": game}, headers=headers)
     assert resp.status_code == 201, resp.text
     return resp.json()
 
 
 def _navigate(client: TestClient, char_id: str, location_ref: str, headers: Dict[str, str]) -> Dict[str, Any]:
-    resp = client.post(f"/characters/{char_id}/navigate", json={"location_ref": location_ref}, headers=headers)
+    resp = client.post(f"/api/characters/{char_id}/navigate", json={"location_ref": location_ref}, headers=headers)
     assert resp.status_code == 200, resp.text
     return resp.json()
 
@@ -100,7 +100,7 @@ def test_get_overworld_fresh_character_has_null_location(ow_client: TestClient) 
     h = _login(ow_client, "ow-get-fresh@x.com")
     char = _create_character(ow_client, h)
 
-    resp = ow_client.get(f"/characters/{char['id']}/overworld", headers=h)
+    resp = ow_client.get(f"/api/characters/{char['id']}/overworld", headers=h)
     assert resp.status_code == 200
     body = resp.json()
     assert body["character_id"] == char["id"]
@@ -119,7 +119,7 @@ def test_get_overworld_returns_location_after_navigate(ow_client: TestClient) ->
 
     _navigate(ow_client, char["id"], "test-location", h)
 
-    resp = ow_client.get(f"/characters/{char['id']}/overworld", headers=h)
+    resp = ow_client.get(f"/api/characters/{char['id']}/overworld", headers=h)
     assert resp.status_code == 200
     body = resp.json()
     assert body["current_location"] == "test-location"
@@ -143,7 +143,7 @@ def test_get_overworld_marks_current_location_is_current(ow_client: TestClient) 
 
     _navigate(ow_client, char["id"], "test-location", h)
 
-    resp = ow_client.get(f"/characters/{char['id']}/overworld", headers=h)
+    resp = ow_client.get(f"/api/characters/{char['id']}/overworld", headers=h)
     assert resp.status_code == 200
     nav_opts = resp.json()["navigation_options"]
     current_opts = [n for n in nav_opts if n["ref"] == "test-location"]
@@ -158,7 +158,7 @@ def test_get_overworld_returns_404_for_other_users_character(ow_client: TestClie
     other_h = _login(ow_client, "ow-get-other@x.com")
     char = _create_character(ow_client, owner_h)
 
-    resp = ow_client.get(f"/characters/{char['id']}/overworld", headers=other_h)
+    resp = ow_client.get(f"/api/characters/{char['id']}/overworld", headers=other_h)
     assert resp.status_code == 404
 
 
@@ -167,7 +167,7 @@ def test_get_overworld_returns_401_when_unauthenticated(ow_client: TestClient) -
     h = _login(ow_client, "ow-get-noauth@x.com")
     char = _create_character(ow_client, h)
 
-    resp = ow_client.get(f"/characters/{char['id']}/overworld")
+    resp = ow_client.get(f"/api/characters/{char['id']}/overworld")
     assert resp.status_code == 401
 
 
@@ -182,7 +182,7 @@ def test_navigate_updates_location_and_returns_overworld_state(ow_client: TestCl
     h = _login(ow_client, "ow-nav-ok@x.com")
     char = _create_character(ow_client, h)
 
-    resp = ow_client.post(f"/characters/{char['id']}/navigate", json={"location_ref": "test-location"}, headers=h)
+    resp = ow_client.post(f"/api/characters/{char['id']}/navigate", json={"location_ref": "test-location"}, headers=h)
     assert resp.status_code == 200
     body = resp.json()
     assert body["current_location"] == "test-location"
@@ -196,7 +196,7 @@ def test_navigate_to_secondary_location(ow_client: TestClient) -> None:
     char = _create_character(ow_client, h)
 
     resp = ow_client.post(
-        f"/characters/{char['id']}/navigate",
+        f"/api/characters/{char['id']}/navigate",
         json={"location_ref": "test-location-secondary"},
         headers=h,
     )
@@ -212,9 +212,9 @@ def test_navigate_persists_location(ow_client: TestClient) -> None:
     h = _login(ow_client, "ow-nav-persist@x.com")
     char = _create_character(ow_client, h)
 
-    ow_client.post(f"/characters/{char['id']}/navigate", json={"location_ref": "test-location"}, headers=h)
+    ow_client.post(f"/api/characters/{char['id']}/navigate", json={"location_ref": "test-location"}, headers=h)
 
-    resp = ow_client.get(f"/characters/{char['id']}/overworld", headers=h)
+    resp = ow_client.get(f"/api/characters/{char['id']}/overworld", headers=h)
     assert resp.status_code == 200
     assert resp.json()["current_location"] == "test-location"
 
@@ -225,7 +225,7 @@ def test_navigate_with_unknown_location_returns_422(ow_client: TestClient) -> No
     char = _create_character(ow_client, h)
 
     resp = ow_client.post(
-        f"/characters/{char['id']}/navigate",
+        f"/api/characters/{char['id']}/navigate",
         json={"location_ref": "nonexistent-location"},
         headers=h,
     )
@@ -240,7 +240,7 @@ def test_navigate_returns_404_for_other_users_character(ow_client: TestClient) -
     char = _create_character(ow_client, owner_h)
 
     resp = ow_client.post(
-        f"/characters/{char['id']}/navigate",
+        f"/api/characters/{char['id']}/navigate",
         json={"location_ref": "test-location"},
         headers=other_h,
     )
@@ -253,7 +253,7 @@ def test_navigate_returns_401_when_unauthenticated(ow_client: TestClient) -> Non
     char = _create_character(ow_client, h)
 
     resp = ow_client.post(
-        f"/characters/{char['id']}/navigate",
+        f"/api/characters/{char['id']}/navigate",
         json={"location_ref": "test-location"},
     )
     assert resp.status_code == 401

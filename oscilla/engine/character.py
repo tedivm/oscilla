@@ -267,13 +267,17 @@ class CharacterState:
                     creation_cfg.default_pronouns,
                 )
 
+        starting_location: str | None = None
+        if creation_cfg is not None:
+            starting_location = creation_cfg.starting_location
+
         return cls(
             character_id=uuid4(),
             name=name,
             character_class=None,
             prestige_count=0,
             pronouns=initial_pronouns,
-            current_location=None,
+            current_location=starting_location,
             stats=initial_stats,
         )
 

@@ -5,7 +5,7 @@ export async function login(
   email: string,
   password: string,
 ): Promise<TokenPairRead> {
-  return apiFetch<TokenPairRead>("/auth/login", {
+  return apiFetch<TokenPairRead>("/api/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
@@ -15,32 +15,32 @@ export async function register(
   email: string,
   password: string,
 ): Promise<UserRead> {
-  return apiFetch<UserRead>("/auth/register", {
+  return apiFetch<UserRead>("/api/auth/register", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
 }
 
 export async function logout(refreshToken: string): Promise<void> {
-  return apiFetch<void>("/auth/logout", {
+  return apiFetch<void>("/api/auth/logout", {
     method: "POST",
     body: JSON.stringify({ refresh_token: refreshToken }),
   });
 }
 
 export async function me(): Promise<UserRead> {
-  return apiFetch<UserRead>("/auth/me");
+  return apiFetch<UserRead>("/api/auth/me");
 }
 
 export async function refresh(refreshToken: string): Promise<TokenPairRead> {
-  return apiFetch<TokenPairRead>("/auth/refresh", {
+  return apiFetch<TokenPairRead>("/api/auth/refresh", {
     method: "POST",
     body: JSON.stringify({ refresh_token: refreshToken }),
   });
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
-  return apiFetch<void>("/auth/request-password-reset", {
+  return apiFetch<void>("/api/auth/request-password-reset", {
     method: "POST",
     body: JSON.stringify({ email }),
   });

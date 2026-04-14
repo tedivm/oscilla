@@ -42,10 +42,10 @@ describe("authStore", () => {
 
     expect(mockApiFetch).toHaveBeenNthCalledWith(
       1,
-      "/auth/login",
+      "/api/auth/login",
       expect.objectContaining({ method: "POST" }),
     );
-    expect(mockApiFetch).toHaveBeenNthCalledWith(2, "/auth/me");
+    expect(mockApiFetch).toHaveBeenNthCalledWith(2, "/api/auth/me");
 
     const state = get(authStore);
     expect(state.user?.id).toBe("user-1");
@@ -79,7 +79,7 @@ describe("authStore", () => {
     expect(state.accessToken).toBeNull();
     expect(sessionStorage.getItem("oscilla:refresh_token")).toBeNull();
     expect(mockApiFetch).toHaveBeenCalledWith(
-      "/auth/logout",
+      "/api/auth/logout",
       expect.objectContaining({ method: "POST" }),
     );
   });

@@ -107,6 +107,10 @@ class CharacterCreationDefaults(BaseModel):
         default=None,
         description="Initial pronoun-set key (e.g. 'she_her'). Overrides the system default (they/them).",
     )
+    starting_location: str | None = Field(
+        default=None,
+        description="Location ref where newly created characters begin. Leaves current_location null when unset.",
+    )
 
 
 class PrestigeConfig(BaseModel):

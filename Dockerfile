@@ -10,9 +10,11 @@ RUN npm ci
 COPY frontend/ /app/frontend/
 RUN npm run build
 
-FROM ghcr.io/multi-py/python-uvicorn:py${PYTHON_VERSION}-slim-LATEST
+FROM ghcr.io/multi-py/python-uvicorn:py${PYTHON_VERSION}-slim-LATEST AS backend
 
 ENV APP_MODULE=oscilla.www:app
+# Bind to port 8000 (overrides the base image default of 80).
+ENV PORT=8000
 
 # Install uv for fast package installation
 RUN pip install --no-cache-dir uv
@@ -39,7 +41,6 @@ RUN uv sync --frozen --no-install-project --python /usr/local/bin/python
 # Copy application code
 COPY ./docker/www/prestart.sh /app/prestart.sh
 COPY . /app/
-COPY --from=frontend-build /app/frontend/build /app/frontend/build
 
 # Install project
 RUN uv sync --frozen --no-dev --python /usr/local/bin/python
@@ -54,3 +55,9 @@ USER oscilla
 # UVICORN_WORKERS from .env is forwarded to WEB_CONCURRENCY at runtime.
 # Default is 1 worker; set UVICORN_WORKERS in .env to scale up.
 CMD ["/bin/bash", "-c", "WEB_CONCURRENCY=${UVICORN_WORKERS:-1} exec /start.sh"]
+
+# Production stage: extends backend with the pre-built frontend assets.
+# `docker build .` targets this by default.
+# `docker build --target backend .` skips the frontend copy (used by compose.yaml).
+FROM backend AS production
+COPY --from=frontend-build /app/frontend/build /app/frontend/build

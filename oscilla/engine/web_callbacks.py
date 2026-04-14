@@ -78,6 +78,16 @@ class WebCallbacks:
         self._player_ack = player_ack
         self._player_text_input = player_text_input
         self._player_skill_choice = player_skill_choice
+        # Count how many pre-loaded decisions remain. When this is non-zero the
+        # pipeline is replaying already-seen steps to reach the decision point;
+        # show_text and show_combat_round are suppressed during replay so the
+        # client does not receive duplicate narrative events.
+        self._decisions_remaining: int = sum(
+            1 for v in [player_choice, player_ack, player_text_input, player_skill_choice] if v is not None
+        )
+        # Tracks the choice index consumed from player_choice during this request
+        # so the router can persist it in step_state after a pause.
+        self._last_consumed_choice: int | None = None
 
     @property
     def queue(self) -> Queue[Dict[str, Any] | None]:
@@ -89,8 +99,18 @@ class WebCallbacks:
         """All non-sentinel events accumulated during this session."""
         return self._session_output
 
+    @property
+    def last_consumed_choice(self) -> int | None:
+        """The choice index consumed from player_choice during this request, or None."""
+        return self._last_consumed_choice
+
     async def show_text(self, text: str) -> None:
         """Emit a narrative SSE event and yield to the SSE consumer."""
+        if self._decisions_remaining > 0:
+            # Suppress replay emissions — the client has already seen this event
+            # from a prior advance response and will see fresh events once past
+            # the pre-loaded decision point.
+            return
         event: Dict[str, Any] = {"type": "narrative", "data": {"text": text, "context": self._context}}
         await self._queue.put(event)
         self._session_output.append(event)
@@ -106,6 +126,8 @@ class WebCallbacks:
             # Resume request — return the pre-loaded choice and do not pause.
             choice = self._player_choice
             self._player_choice = None
+            self._last_consumed_choice = choice
+            self._decisions_remaining -= 1
             return choice
         event: Dict[str, Any] = {
             "type": "choice",
@@ -124,6 +146,8 @@ class WebCallbacks:
         enemy_name: str,
     ) -> None:
         """Emit a combat_state SSE event and yield to the SSE consumer."""
+        if self._decisions_remaining > 0:
+            return  # suppress replay emission
         event: Dict[str, Any] = {
             "type": "combat_state",
             "data": {
@@ -146,6 +170,7 @@ class WebCallbacks:
         if self._player_ack is not None:
             # Resume request — consume the ack and do not pause.
             self._player_ack = None
+            self._decisions_remaining -= 1
             return
         event: Dict[str, Any] = {"type": "ack_required", "data": {"context": self._context}}
         await self._queue.put(event)
@@ -163,6 +188,7 @@ class WebCallbacks:
             # Resume request — return the pre-loaded text and do not pause.
             value = self._player_text_input
             self._player_text_input = None
+            self._decisions_remaining -= 1
             return value
         event: Dict[str, Any] = {"type": "text_input", "data": {"prompt": prompt, "context": self._context}}
         await self._queue.put(event)
@@ -180,6 +206,7 @@ class WebCallbacks:
             # Resume request — return the pre-loaded skill choice and do not pause.
             choice = self._player_skill_choice
             self._player_skill_choice = None
+            self._decisions_remaining -= 1
             return choice
         event: Dict[str, Any] = {"type": "skill_menu", "data": {"skills": skills, "context": self._context}}
         await self._queue.put(event)

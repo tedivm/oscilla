@@ -6,10 +6,11 @@ This project uses [FastAPI](https://fastapi.tiangolo.com/), a modern, fast web f
 
 The FastAPI application is defined in `oscilla/www.py` and includes:
 
-- **Automatic API documentation** at `/docs` (Swagger UI) and `/redoc` (ReDoc)
-- **Static file serving** from `oscilla/static/` via the `/static/` endpoint
-- **OpenAPI schema** available at `/openapi.json`
-- **Root redirect** from `/` to `/docs` for convenient access to documentation
+- **Automatic API documentation** at `/api/docs` (Swagger UI) and `/api/redoc` (ReDoc)
+- **Static file serving** from `oscilla/static/` via the `/static/` path
+- **OpenAPI schema** available at `/api/openapi.json`
+- **API root redirect** from `/api` to `/api/docs` for convenient access to documentation
+- **Health probes** at `/health` and `/ready` (no `/api` prefix — intentional for orchestrators)
 
 ## Configuration
 
@@ -30,11 +31,43 @@ The application automatically initializes required services on startup:
 
 Note: Database connections are NOT initialized at startup. Instead, they are established lazily when first accessed via dependency injection (see Database Integration section below).
 
+## Route Conventions
+
+### API Prefix
+
+All application routes must live under the `/api` prefix. Routers are registered in `oscilla/www.py` with `prefix="/api/..."`. The only exceptions are:
+
+- `/health` — liveness probe (no prefix, for container orchestrators)
+- `/ready` — readiness probe (no prefix, for container orchestrators)
+- `/static` — static file serving (separate from the API)
+
+### Registered Routers
+
+| Router                   | Prefix                                                            |
+| ------------------------ | ----------------------------------------------------------------- |
+| Auth                     | `/api/auth`                                                       |
+| Games                    | `/api/games`                                                      |
+| Characters               | `/api/characters`                                                 |
+| Play (adventure actions) | `/api` (individual routes under `/api/characters/{id}/play/...`)  |
+| Overworld                | `/api` (individual routes under `/api/characters/{id}/overworld`) |
+
+### Frontend API Calls
+
+All `apiFetch` calls in `frontend/src/lib/api/` must use the `/api/` prefix:
+
+```typescript
+// Good
+const data = await apiFetch("/api/games");
+
+// Bad — missing /api prefix
+const data = await apiFetch("/games");
+```
+
 ## Adding Routes
 
 ### Basic Route
 
-Create a new route in `oscilla/www.py`:
+Create a new router file in `oscilla/routers/` and register it in `oscilla/www.py` with an `/api/...` prefix:
 
 ```python
 @app.get("/hello")
@@ -179,8 +212,8 @@ Static files are served from `oscilla/static/`:
    ```
 
 2. **Access files** via the `/static/` URL path:
-   - `http://localhost:8000/static/css/styles.css`
-   - `http://localhost:8000/static/images/logo.png`
+   - `http://localhost/static/css/styles.css`
+   - `http://localhost/static/images/logo.png`
 
 ## Middleware
 
@@ -245,18 +278,17 @@ Use the `fastapi_client` fixture in your test functions:
 ```python
 # tests/test_www.py
 
-def test_root_redirects_to_docs(fastapi_client):
-    """Test that root path redirects to /docs."""
-    response = fastapi_client.get("/", follow_redirects=False)
+def test_api_root_redirects_to_docs(fastapi_client):
+    """Test that /api redirects to /api/docs."""
+    response = fastapi_client.get("/api", follow_redirects=False)
     assert response.status_code == 307  # Temporary redirect
-    assert response.headers["location"] == "/docs"
+    assert response.headers["location"] == "/api/docs"
 
 
-def test_root_redirect_follows(fastapi_client):
-    """Test that following redirect from root goes to docs."""
-    response = fastapi_client.get("/", follow_redirects=True)
+def test_health_check(fastapi_client):
+    """Test the health probe endpoint."""
+    response = fastapi_client.get("/health")
     assert response.status_code == 200
-    # Should reach the OpenAPI docs page
 
 
 def test_api_endpoint(fastapi_client):

@@ -51,7 +51,7 @@ function createAuthStore(): Writable<AuthState> & {
   async function login(email: string, password: string): Promise<void> {
     update((s) => ({ ...s, loading: true, error: null }));
     try {
-      const pair = await apiFetch<TokenPairRead>("/auth/login", {
+      const pair = await apiFetch<TokenPairRead>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
@@ -59,7 +59,7 @@ function createAuthStore(): Writable<AuthState> & {
       // Access token is kept in memory only — not localStorage — to reduce XSS surface.
       update((s) => ({ ...s, accessToken: pair.access_token }));
 
-      const user = await apiFetch<UserRead>("/auth/me");
+      const user = await apiFetch<UserRead>("/api/auth/me");
       set({
         user,
         accessToken: pair.access_token,
@@ -82,7 +82,7 @@ function createAuthStore(): Writable<AuthState> & {
   async function register(email: string, password: string): Promise<void> {
     update((s) => ({ ...s, loading: true, error: null }));
     try {
-      await apiFetch<UserRead>("/auth/register", {
+      await apiFetch<UserRead>("/api/auth/register", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
@@ -102,7 +102,7 @@ function createAuthStore(): Writable<AuthState> & {
 
     if (refreshToken) {
       try {
-        await apiFetch<void>("/auth/logout", {
+        await apiFetch<void>("/api/auth/logout", {
           method: "POST",
           body: JSON.stringify({ refresh_token: refreshToken }),
         });
@@ -120,7 +120,7 @@ function createAuthStore(): Writable<AuthState> & {
     }
 
     try {
-      const pair = await apiFetch<TokenPairRead>("/auth/refresh", {
+      const pair = await apiFetch<TokenPairRead>("/api/auth/refresh", {
         method: "POST",
         body: JSON.stringify({ refresh_token: refreshToken }),
       });
@@ -139,7 +139,7 @@ function createAuthStore(): Writable<AuthState> & {
 
     try {
       await refresh();
-      const user = await apiFetch<UserRead>("/auth/me");
+      const user = await apiFetch<UserRead>("/api/auth/me");
       update((s) => ({ ...s, user }));
     } catch {
       // Refresh failed — clear stale tokens and return as unauthenticated.

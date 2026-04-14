@@ -210,9 +210,12 @@ describe("gameSession store", () => {
 
     await gameSession.begin("char-1", "adv:tutorial");
 
-    expect(mockFetchSSE).toHaveBeenCalledWith("/characters/char-1/play/begin", {
-      adventure_ref: "adv:tutorial",
-    });
+    expect(mockFetchSSE).toHaveBeenCalledWith(
+      "/api/characters/char-1/play/begin",
+      {
+        adventure_ref: "adv:tutorial",
+      },
+    );
   });
 
   it("begin applies events yielded by the generator", async () => {

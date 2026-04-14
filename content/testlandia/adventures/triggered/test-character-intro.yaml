@@ -21,3 +21,6 @@ spec:
               amount: 1
     - type: narrative
       text: "Your adventure begins."
+      effects:
+        - type: set_location
+          location: bump-strength

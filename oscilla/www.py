@@ -51,7 +51,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Shutdown: cleanup would go here if needed
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
+)
 
 # Middleware is applied in reverse registration order:
 #   RequestLoggingMiddleware (outermost — handles every inbound request first)
@@ -78,12 +83,19 @@ app.add_middleware(RequestLoggingMiddleware)
 static_file_path = os.path.dirname(os.path.realpath(__file__)) + "/static"
 app.mount("/static", StaticFiles(directory=static_file_path), name="static")
 app.include_router(health_router, tags=["health"])
-app.include_router(auth_router, prefix="/auth", tags=["auth"])
-app.include_router(games_router, prefix="/games", tags=["games"])
-app.include_router(characters_router, prefix="/characters", tags=["characters"])
-# Play and overworld routers use full paths including /characters/{id}/
-app.include_router(play_router, tags=["play"])
-app.include_router(overworld_router, tags=["overworld"])
+app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
+app.include_router(games_router, prefix="/api/games", tags=["games"])
+app.include_router(characters_router, prefix="/api/characters", tags=["characters"])
+# Play and overworld routers use full paths including /characters/{id}/;
+# the /api prefix is added here so they become /api/characters/{id}/play/...
+app.include_router(play_router, prefix="/api", tags=["play"])
+app.include_router(overworld_router, prefix="/api", tags=["overworld"])
+
+
+@app.get("/api", include_in_schema=False)
+async def api_root() -> RedirectResponse:
+    return RedirectResponse("/api/docs")
+
 
 # Mount the SvelteKit frontend at /app. This must come after all API routers so that
 # API routes take precedence. If the build directory doesn't exist (local Python-only

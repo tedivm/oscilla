@@ -2,15 +2,68 @@
 
 ## Purpose
 
-Specifies the Docker hardening changes applied to `dockerfile.www` and `compose.yaml`. Goals are: run as a non-root user to reduce the attack surface of a container escape, install only production dependencies to minimize image size and supply-chain risk, support configurable worker counts for production throughput, and isolate the MailHog mail catcher behind a development-only Compose profile so it is never started in production.
+Specifies the Docker hardening changes applied to `Dockerfile` and `compose.yaml`. Goals are: run as a non-root user to reduce the attack surface of a container escape, install only production dependencies to minimize image size and supply-chain risk, support configurable worker counts for production throughput, and use a multi-stage build that separates the backend-only image from the production image that includes the frontend build artifact.
 
 ---
 
 ## Requirements
 
+### Requirement: Dockerfile is named `Dockerfile` (not `dockerfile.www`)
+
+The production Dockerfile SHALL be named `Dockerfile` (standard Docker naming convention). The legacy name `dockerfile.www` SHALL be removed via `git mv`.
+
+All references in `compose.yaml`, `.github/workflows/docker.yaml`, and documentation SHALL be updated to reference `Dockerfile`.
+
+#### Scenario: Standard docker build command works
+
+- **GIVEN** the repository with `Dockerfile` at the root
+- **WHEN** `docker build .` is run (no `-f` flag)
+- **THEN** the production image is built successfully using the default `Dockerfile` name
+
+---
+
+### Requirement: Dockerfile declares named build stages
+
+`Dockerfile` SHALL declare three named stages:
+
+1. `FROM node:22-alpine AS frontend-build` — builds the SvelteKit static assets
+2. `FROM ghcr.io/multi-py/python-uvicorn:... AS backend` — Python runtime without the frontend artifact; used by `docker compose` dev stack via `target: backend`
+3. `FROM backend AS production` — extends `backend` with `COPY --from=frontend-build`; this is the default (last) stage built by `docker build .`
+
+The `backend` stage SHALL include all Python dependencies, application code, non-root user setup, and the `CMD`. The `production` stage SHALL only add the frontend build artifact.
+
+#### Scenario: Default build produces production image with frontend
+
+- **GIVEN** `Dockerfile` with three named stages
+- **WHEN** `docker build .` is run (targets the default final stage `production`)
+- **THEN** the image contains `frontend/build/` with the compiled SvelteKit assets
+- **AND** `GET /app` in a running container serves the SPA
+
+#### Scenario: `target: backend` image omits frontend build
+
+- **GIVEN** `Dockerfile` with three named stages
+- **WHEN** `docker build --target backend .` is run
+- **THEN** the image does NOT contain `frontend/build/`
+- **AND** the image starts and serves the API correctly
+
+---
+
+### Requirement: Published container image is tagged without `.www` suffix
+
+The GitHub Actions `docker.yaml` workflow SHALL publish the image to `ghcr.io/tedivm/oscilla` (no `.www` suffix). The strategy matrix (which previously allowed multiple images) SHALL be removed; the workflow SHALL have a single build step.
+
+#### Scenario: Workflow publishes to correct image name
+
+- **GIVEN** a push to the `main` branch or a version tag
+- **WHEN** the `Publish Docker Images` workflow runs
+- **THEN** the image is pushed to `ghcr.io/tedivm/oscilla` with the appropriate tags
+- **AND** no image is pushed to `ghcr.io/tedivm/oscilla.www`
+
+---
+
 ### Requirement: Application container runs as non-root user
 
-`dockerfile.www` SHALL create a system user and group with UID/GID `999` named `oscilla` and switch to that user before the `CMD` instruction. All files in the working directory SHALL be `chown`-ed to `oscilla:oscilla` before the user switch.
+`Dockerfile` SHALL create a system user and group with UID/GID `999` named `oscilla` and switch to that user before the `CMD` instruction. All files in the working directory SHALL be `chown`-ed to `oscilla:oscilla` before the user switch.
 
 ```dockerfile
 RUN groupadd --gid 999 oscilla && \
@@ -30,7 +83,7 @@ USER oscilla
 
 ### Requirement: Only production dependencies are installed in the image
 
-`dockerfile.www` SHALL invoke `uv sync` with the `--no-dev` flag so development dependencies (pytest, ruff, mypy, etc.) are not present in the production image. This reduces image size and removes tools that could be misused in a compromised container.
+`Dockerfile` SHALL invoke `uv sync` with the `--no-dev` flag so development dependencies (pytest, ruff, mypy, etc.) are not present in the production image. This reduces image size and removes tools that could be misused in a compromised container.
 
 ```dockerfile
 RUN uv sync --no-dev --frozen
@@ -48,7 +101,7 @@ The `--frozen` flag ensures the lock file is respected and no unexpected version
 
 ### Requirement: Uvicorn worker count is configurable via environment variable
 
-The `CMD` in `dockerfile.www` SHALL read the `UVICORN_WORKERS` environment variable and default to `1` if it is not set. This allows operators to tune concurrency by setting the variable in their deployment environment without rebuilding the image.
+The `CMD` in `Dockerfile` SHALL read the `UVICORN_WORKERS` environment variable and default to `1` if it is not set. This allows operators to tune concurrency by setting the variable in their deployment environment without rebuilding the image.
 
 ```dockerfile
 CMD ["sh", "-c", "uvicorn oscilla.www:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-1}"]
@@ -66,28 +119,6 @@ The `prestart.sh` script (if present) SHALL be called before the uvicorn command
 
 - **GIVEN** a container started with `UVICORN_WORKERS=4`
 - **THEN** 4 uvicorn worker processes are running
-
----
-
-### Requirement: MailHog is isolated behind a dev Compose profile
-
-`compose.yaml` SHALL add `profiles: ["dev"]` to the `mailhog` service definition. Services without a profile are started by default; services with a profile are only started when the profile is explicitly activated.
-
-Developers run `docker compose --profile dev up` to include MailHog. The production deployment omits the `--profile` flag and MailHog is never started.
-
-`compose.yaml` SHALL include a comment on the `mailhog` service explaining its profile restriction.
-
-#### Scenario: mailhog not started without dev profile
-
-- **GIVEN** `compose.yaml` with MailHog in the `dev` profile
-- **WHEN** `docker compose up` is run without `--profile dev`
-- **THEN** the `mailhog` service is not started
-
-#### Scenario: mailhog started with dev profile
-
-- **GIVEN** `compose.yaml` with MailHog in the `dev` profile
-- **WHEN** `docker compose --profile dev up` is run
-- **THEN** the `mailhog` service starts and is reachable
 
 ---
 

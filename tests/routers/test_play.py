@@ -70,17 +70,17 @@ async def play_client(
 
 
 def _register(client: TestClient, email: str, password: str = "securepass123") -> None:
-    client.post("/auth/register", json={"email": email, "password": password})
+    client.post("/api/auth/register", json={"email": email, "password": password})
 
 
 def _login(client: TestClient, email: str, password: str = "securepass123") -> Dict[str, str]:
-    resp = client.post("/auth/login", json={"email": email, "password": password})
+    resp = client.post("/api/auth/login", json={"email": email, "password": password})
     assert resp.status_code == 200, resp.text
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
 def _create_character(client: TestClient, headers: Dict[str, str], game: str = "test-play-game") -> Dict[str, Any]:
-    resp = client.post("/characters", json={"game_name": game}, headers=headers)
+    resp = client.post("/api/characters", json={"game_name": game}, headers=headers)
     assert resp.status_code == 201, resp.text
     return resp.json()
 
@@ -112,7 +112,7 @@ def test_get_play_current_returns_empty_for_fresh_character(play_client: TestCli
     h = _login(play_client, "play-current-fresh@x.com")
     char = _create_character(play_client, h)
 
-    resp = play_client.get(f"/characters/{char['id']}/play/current", headers=h)
+    resp = play_client.get(f"/api/characters/{char['id']}/play/current", headers=h)
     assert resp.status_code == 200
     body = resp.json()
     assert body["character_id"] == char["id"]
@@ -127,7 +127,7 @@ def test_get_play_current_returns_404_for_other_users_character(play_client: Tes
     other_h = _login(play_client, "play-current-other@x.com")
     char = _create_character(play_client, owner_h)
 
-    resp = play_client.get(f"/characters/{char['id']}/play/current", headers=other_h)
+    resp = play_client.get(f"/api/characters/{char['id']}/play/current", headers=other_h)
     assert resp.status_code == 404
 
 
@@ -136,7 +136,7 @@ def test_get_play_current_returns_401_when_unauthenticated(play_client: TestClie
     h = _login(play_client, "play-current-noauth@x.com")
     char = _create_character(play_client, h)
 
-    resp = play_client.get(f"/characters/{char['id']}/play/current")
+    resp = play_client.get(f"/api/characters/{char['id']}/play/current")
     assert resp.status_code == 401
 
 
@@ -152,7 +152,7 @@ def test_begin_narrative_adventure_emits_sse_events(play_client: TestClient) -> 
     char = _create_character(play_client, h)
 
     with play_client.stream(
-        "POST", f"/characters/{char['id']}/play/begin", json={"adventure_ref": "test-narrative"}, headers=h
+        "POST", f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "test-narrative"}, headers=h
     ) as resp:
         assert resp.status_code == 200
         resp.read()
@@ -169,7 +169,7 @@ def test_begin_choice_adventure_emits_choice_event(play_client: TestClient) -> N
     char = _create_character(play_client, h)
 
     with play_client.stream(
-        "POST", f"/characters/{char['id']}/play/begin", json={"adventure_ref": "test-choice"}, headers=h
+        "POST", f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "test-choice"}, headers=h
     ) as resp:
         assert resp.status_code == 200
         resp.read()
@@ -186,7 +186,7 @@ def test_begin_with_unknown_adventure_ref_returns_422(play_client: TestClient) -
     char = _create_character(play_client, h)
 
     resp = play_client.post(
-        f"/characters/{char['id']}/play/begin", json={"adventure_ref": "nonexistent-adventure"}, headers=h
+        f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "nonexistent-adventure"}, headers=h
     )
     assert resp.status_code == 422
 
@@ -199,7 +199,7 @@ def test_begin_returns_404_for_other_users_character(play_client: TestClient) ->
     char = _create_character(play_client, owner_h)
 
     resp = play_client.post(
-        f"/characters/{char['id']}/play/begin", json={"adventure_ref": "test-narrative"}, headers=other_h
+        f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "test-narrative"}, headers=other_h
     )
     assert resp.status_code == 404
 
@@ -209,7 +209,7 @@ def test_begin_returns_401_when_unauthenticated(play_client: TestClient) -> None
     h = _login(play_client, "play-begin-noauth@x.com")
     char = _create_character(play_client, h)
 
-    resp = play_client.post(f"/characters/{char['id']}/play/begin", json={"adventure_ref": "test-narrative"})
+    resp = play_client.post(f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "test-narrative"})
     assert resp.status_code == 401
 
 
@@ -259,7 +259,9 @@ def test_begin_returns_409_when_session_locked(play_client: TestClient) -> None:
 
     asyncio.get_event_loop().run_until_complete(_inject_lock())
 
-    resp = play_client.post(f"/characters/{char['id']}/play/begin", json={"adventure_ref": "test-narrative"}, headers=h)
+    resp = play_client.post(
+        f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "test-narrative"}, headers=h
+    )
     assert resp.status_code == 409
     body = resp.json()
     # FastAPI wraps non-dict detail in {detail: ...}; our detail is already a dict
@@ -276,7 +278,7 @@ def test_advance_returns_422_with_no_active_adventure(play_client: TestClient) -
     h = _login(play_client, "play-advance-none@x.com")
     char = _create_character(play_client, h)
 
-    resp = play_client.post(f"/characters/{char['id']}/play/advance", json={"choice": 1}, headers=h)
+    resp = play_client.post(f"/api/characters/{char['id']}/play/advance", json={"choice": 1}, headers=h)
     assert resp.status_code == 422
 
 
@@ -288,13 +290,15 @@ def test_advance_resumes_choice_adventure(play_client: TestClient) -> None:
 
     # begin — pauses at ack_required after the narrative step
     with play_client.stream(
-        "POST", f"/characters/{char['id']}/play/begin", json={"adventure_ref": "test-choice"}, headers=h
+        "POST", f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "test-choice"}, headers=h
     ) as resp:
         assert resp.status_code == 200
         resp.read()
 
     # advance — acknowledge the narrative to continue to the choice step
-    with play_client.stream("POST", f"/characters/{char['id']}/play/advance", json={"ack": True}, headers=h) as resp:
+    with play_client.stream(
+        "POST", f"/api/characters/{char['id']}/play/advance", json={"ack": True}, headers=h
+    ) as resp:
         assert resp.status_code == 200
         resp.read()
         body = resp.text
@@ -312,7 +316,7 @@ def test_advance_returns_404_for_other_users_character(play_client: TestClient) 
     other_h = _login(play_client, "play-advance-other@x.com")
     char = _create_character(play_client, owner_h)
 
-    resp = play_client.post(f"/characters/{char['id']}/play/advance", json={"choice": 1}, headers=other_h)
+    resp = play_client.post(f"/api/characters/{char['id']}/play/advance", json={"choice": 1}, headers=other_h)
     assert resp.status_code == 404
 
 
@@ -321,7 +325,7 @@ def test_advance_returns_401_when_unauthenticated(play_client: TestClient) -> No
     h = _login(play_client, "play-adv-noauth@x.com")
     char = _create_character(play_client, h)
 
-    resp = play_client.post(f"/characters/{char['id']}/play/advance", json={"choice": 1})
+    resp = play_client.post(f"/api/characters/{char['id']}/play/advance", json={"choice": 1})
     assert resp.status_code == 401
 
 
@@ -337,17 +341,17 @@ def test_abandon_clears_adventure_and_returns_204(play_client: TestClient) -> No
 
     # begin a choice adventure — pauses at choice step
     with play_client.stream(
-        "POST", f"/characters/{char['id']}/play/begin", json={"adventure_ref": "test-choice"}, headers=h
+        "POST", f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "test-choice"}, headers=h
     ) as resp:
         assert resp.status_code == 200
         resp.read()
 
     # abandon
-    resp = play_client.post(f"/characters/{char['id']}/play/abandon", headers=h)
+    resp = play_client.post(f"/api/characters/{char['id']}/play/abandon", headers=h)
     assert resp.status_code == 204
 
     # current should now show empty session output
-    resp = play_client.get(f"/characters/{char['id']}/play/current", headers=h)
+    resp = play_client.get(f"/api/characters/{char['id']}/play/current", headers=h)
     assert resp.status_code == 200
     body = resp.json()
     assert body["session_output"] == []
@@ -360,7 +364,7 @@ def test_abandon_returns_404_for_other_users_character(play_client: TestClient) 
     other_h = _login(play_client, "play-abandon-other@x.com")
     char = _create_character(play_client, owner_h)
 
-    resp = play_client.post(f"/characters/{char['id']}/play/abandon", headers=other_h)
+    resp = play_client.post(f"/api/characters/{char['id']}/play/abandon", headers=other_h)
     assert resp.status_code == 404
 
 
@@ -369,7 +373,7 @@ def test_abandon_returns_401_when_unauthenticated(play_client: TestClient) -> No
     h = _login(play_client, "play-abandon-noauth@x.com")
     char = _create_character(play_client, h)
 
-    resp = play_client.post(f"/characters/{char['id']}/play/abandon")
+    resp = play_client.post(f"/api/characters/{char['id']}/play/abandon")
     assert resp.status_code == 401
 
 
@@ -383,7 +387,7 @@ def test_takeover_returns_pending_state(play_client: TestClient) -> None:
     h = _login(play_client, "play-takeover@x.com")
     char = _create_character(play_client, h)
 
-    resp = play_client.post(f"/characters/{char['id']}/play/takeover", headers=h)
+    resp = play_client.post(f"/api/characters/{char['id']}/play/takeover", headers=h)
     assert resp.status_code == 200
     body = resp.json()
     assert body["character_id"] == char["id"]
@@ -397,7 +401,7 @@ def test_takeover_returns_404_for_other_users_character(play_client: TestClient)
     other_h = _login(play_client, "play-takeover-other@x.com")
     char = _create_character(play_client, owner_h)
 
-    resp = play_client.post(f"/characters/{char['id']}/play/takeover", headers=other_h)
+    resp = play_client.post(f"/api/characters/{char['id']}/play/takeover", headers=other_h)
     assert resp.status_code == 404
 
 
@@ -406,7 +410,7 @@ def test_takeover_returns_401_when_unauthenticated(play_client: TestClient) -> N
     h = _login(play_client, "play-takeover-noauth@x.com")
     char = _create_character(play_client, h)
 
-    resp = play_client.post(f"/characters/{char['id']}/play/takeover")
+    resp = play_client.post(f"/api/characters/{char['id']}/play/takeover")
     assert resp.status_code == 401
 
 
@@ -423,7 +427,7 @@ def test_crash_recovery_begin_current_advance(play_client: TestClient) -> None:
 
     # Step 1: begin — adventure pauses at choice step
     with play_client.stream(
-        "POST", f"/characters/{char['id']}/play/begin", json={"adventure_ref": "test-choice"}, headers=h
+        "POST", f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "test-choice"}, headers=h
     ) as resp:
         assert resp.status_code == 200
         resp.read()
@@ -434,7 +438,7 @@ def test_crash_recovery_begin_current_advance(play_client: TestClient) -> None:
     assert begin_events[-1]["type"] == "ack_required"
 
     # Step 2: crash recovery — GET /current reflects the streamed events
-    resp = play_client.get(f"/characters/{char['id']}/play/current", headers=h)
+    resp = play_client.get(f"/api/characters/{char['id']}/play/current", headers=h)
     assert resp.status_code == 200
     current = resp.json()
     assert current["pending_event"] is not None
@@ -442,7 +446,9 @@ def test_crash_recovery_begin_current_advance(play_client: TestClient) -> None:
     assert len(current["session_output"]) == len(begin_events)
 
     # Step 3: advance — acknowledge the narrative to reach the choice step
-    with play_client.stream("POST", f"/characters/{char['id']}/play/advance", json={"ack": True}, headers=h) as resp:
+    with play_client.stream(
+        "POST", f"/api/characters/{char['id']}/play/advance", json={"ack": True}, headers=h
+    ) as resp:
         assert resp.status_code == 200
         resp.read()
         advance_body = resp.text
@@ -450,3 +456,59 @@ def test_crash_recovery_begin_current_advance(play_client: TestClient) -> None:
     advance_events = _parse_sse(advance_body)
     assert len(advance_events) >= 1
     assert advance_events[-1]["type"] == "choice"
+
+
+# ---------------------------------------------------------------------------
+# Choice branch effect application (BUG-1 regression)
+# ---------------------------------------------------------------------------
+
+
+def test_choice_branch_effects_applied_after_ack(play_client: TestClient) -> None:
+    """Effects inside a choice branch sub-step are applied after the player acks.
+
+    Flow: begin → advance/choice (pause at ack_required inside branch) →
+    advance/ack → adventure completes → stat updated in DB.
+
+    Reproduces the BUG-1 regression where adventure_step_index pointed at the
+    root choice step and the ack advance re-presented the choice instead of
+    continuing into the branch.
+    """
+    _register(play_client, "play-choice-effects@x.com")
+    h = _login(play_client, "play-choice-effects@x.com")
+    char = _create_character(play_client, h)
+
+    char_id = char["id"]
+
+    # 1. begin — navigate past the root narrative, pause at ack_required
+    with play_client.stream(
+        "POST", f"/api/characters/{char_id}/play/begin", json={"adventure_ref": "test-choice"}, headers=h
+    ) as resp:
+        assert resp.status_code == 200
+        resp.read()
+
+    # 2. advance/ack — consume narrative ack, pipeline runs to the choice step
+    with play_client.stream("POST", f"/api/characters/{char_id}/play/advance", json={"ack": True}, headers=h) as resp:
+        assert resp.status_code == 200
+        resp.read()
+        body = resp.text
+    events = _parse_sse(body)
+    assert events[-1]["type"] == "choice"
+
+    # 3. advance/choice=2 — choose path_right (gold +10), pause at ack_required
+    with play_client.stream("POST", f"/api/characters/{char_id}/play/advance", json={"choice": 2}, headers=h) as resp:
+        assert resp.status_code == 200
+        resp.read()
+        body = resp.text
+    events = _parse_sse(body)
+    assert events[-1]["type"] == "ack_required"
+
+    # 4. advance/ack — consume the branch narrative ack; effects should be applied
+    with play_client.stream("POST", f"/api/characters/{char_id}/play/advance", json={"ack": True}, headers=h) as resp:
+        assert resp.status_code == 200
+        resp.read()
+
+    # 5. Verify gold was updated to 10 (path_right: +10)
+    resp = play_client.get(f"/api/characters/{char_id}", headers=h)
+    assert resp.status_code == 200
+    state = resp.json()
+    assert state["stats"]["gold"]["value"] == 10

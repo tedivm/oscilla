@@ -30,7 +30,7 @@ def test_login_rate_limit_disabled_with_noop_cache(auth_client: TestClient) -> N
     """
     for _ in range(20):
         response = auth_client.post(
-            "/auth/login",
+            "/api/auth/login",
             json={"email": "ratelimit@example.com", "password": "wrongpassword"},
         )
         assert response.status_code != 429, f"Unexpected 429 on attempt {_ + 1}"
@@ -42,10 +42,10 @@ def test_login_lockout_disabled_with_noop_cache(auth_client: TestClient) -> None
     NoOpCache.exists always returns False, so is_account_locked is always False
     and no 423 is raised.
     """
-    auth_client.post("/auth/register", json={"email": "lockout@example.com", "password": "securepass123"})
+    auth_client.post("/api/auth/register", json={"email": "lockout@example.com", "password": "securepass123"})
     for _ in range(10):
         response = auth_client.post(
-            "/auth/login",
+            "/api/auth/login",
             json={"email": "lockout@example.com", "password": "wrongpassword"},
         )
         assert response.status_code != 423, f"Unexpected 423 on attempt {_ + 1}"
@@ -59,7 +59,7 @@ def test_register_rate_limit_disabled_with_noop_cache(auth_client: TestClient) -
     """
     for i in range(10):
         response = auth_client.post(
-            "/auth/register",
+            "/api/auth/register",
             json={"email": f"newuser{i}@example.com", "password": "securepass123"},
         )
         assert response.status_code != 429, f"Unexpected 429 on attempt {i + 1}"

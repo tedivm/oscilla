@@ -5,11 +5,12 @@ from typing import Annotated, Dict, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_201_CREATED, HTTP_204_NO_CONTENT
 
 from oscilla.dependencies.auth import get_current_user
-from oscilla.engine.character import CharacterState
+from oscilla.engine.character import DEFAULT_CHARACTER_NAME, CharacterState
 from oscilla.engine.registry import ContentRegistry
 from oscilla.models.api.characters import (
     CharacterCreate,
@@ -74,16 +75,33 @@ async def create_character(
     assert registry.game is not None
     assert registry.character_config is not None
 
-    # Choose a stable initial name from available user identity fields.
-    # Fall back to the user UUID string when profile fields are absent.
-    character_name = user.display_name or user.email or user.user_key or str(user.id)
+    # Resolve the character name: game-level default_name, then engine fallback.
+    # User identity fields are never used as character names to avoid leaking PII.
+    creation_cfg = registry.game.spec.character_creation
+    if creation_cfg is not None and creation_cfg.default_name is not None:
+        character_name = creation_cfg.default_name
+    else:
+        character_name = DEFAULT_CHARACTER_NAME
 
     state = CharacterState.new_character(
         name=character_name,
         game_manifest=registry.game,
         character_config=registry.character_config,
     )
-    await save_character(session=db, state=state, user_id=user.id, game_name=body.game_name)
+    # Enqueue the on_character_create trigger before persisting — mirrors the
+    # same logic in session.py._create_new_character() for the TUI flow.
+    if "on_character_create" in registry.trigger_index:
+        state.enqueue_trigger(
+            "on_character_create",
+            max_depth=registry.game.spec.triggers.max_trigger_queue_depth,
+        )
+    try:
+        await save_character(session=db, state=state, user_id=user.id, game_name=body.game_name)
+    except IntegrityError:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A character named '{character_name}' already exists for this game.",
+        )
 
     record = await get_character_record(session=db, character_id=state.character_id)
     assert record is not None

@@ -200,6 +200,9 @@ async def login(
     if not user.is_active:
         raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Account is inactive.")
 
+    if settings.require_email_verification and not user.is_email_verified:
+        raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Email address has not been verified.")
+
     await clear_lockout(request.email)
 
     await record_auth_event(

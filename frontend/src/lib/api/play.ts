@@ -38,7 +38,7 @@ export async function getCurrentPlayState(
   characterId: string,
 ): Promise<CurrentPlayState> {
   const pending = await apiFetch<PendingStateRead>(
-    `/characters/${encodeURIComponent(characterId)}/play/current`,
+    `/api/characters/${encodeURIComponent(characterId)}/play/current`,
   );
 
   // Reconstruct the narrative log from the persisted session output.

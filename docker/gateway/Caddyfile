@@ -1,0 +1,20 @@
+:80 {
+	# API and static assets are served by the FastAPI backend.
+	handle /api* {
+		reverse_proxy backend:8000
+	}
+	handle /static* {
+		reverse_proxy backend:8000
+	}
+	# Health probes stay at the root — container orchestrators probe /health and /ready.
+	handle /health* {
+		reverse_proxy backend:8000
+	}
+	handle /ready* {
+		reverse_proxy backend:8000
+	}
+	# Everything else is the SvelteKit frontend (client-side routing handled by Vite).
+	handle {
+		reverse_proxy frontend:5173
+	}
+}

@@ -1,22 +1,57 @@
 services:
-  www:
+  gateway:
+    image: caddy:2-alpine
+    volumes:
+      - "./docker/gateway/Caddyfile:/etc/caddy/Caddyfile"
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+
+  backend:
     build:
-      dockerfile: ./dockerfile.www
+      dockerfile: ./Dockerfile
+      target: backend
     volumes:
       - "./oscilla:/app/oscilla"
       - "./db:/app/db"
+      - "./content:/app/content"
       - "./docker/www/prestart.sh:/app/prestart.sh"
-    ports:
-      - "80:80"
+    env_file:
+      - .env
     environment:
       IS_DEV: true
       RELOAD: true
+      PORT: 8000
       DATABASE_URL: postgresql://main:main12345@db/main
       CACHE_REDIS_HOST: redis
       CACHE_REDIS_PORT: 6379
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_USE_TLS: false
+      SMTP_FROM_ADDRESS: oscilla@localhost
+      BASE_URL: http://localhost
     depends_on:
       - db
       - redis
+      - mailhog
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ./docker/frontend/Dockerfile
+    volumes:
+      - "./frontend:/app"
+      # Named volume shadows the host node_modules so that Alpine-native
+      # binaries (esbuild, rollup) are used instead of macOS binaries.
+      - "frontend_node_modules:/app/node_modules"
+    environment:
+      # Tells the Vite HMR WebSocket client in the browser to connect on
+      # port 80 (through Caddy) rather than the container-internal port 5173.
+      HMR_CLIENT_PORT: 80
+    depends_on:
+      - backend
 
   redis:
     image: redis
@@ -29,12 +64,11 @@ services:
       POSTGRES_USER: main
       POSTGRES_DB: main
 
-  # MailHog is only started when the dev profile is active.
-  # Use `docker compose --profile dev up` to start MailHog alongside all services.
-  # `docker compose up` (no profile) starts only db, redis, and www.
   mailhog:
     image: mailhog/mailhog
-    profiles: [dev]
     ports:
       - "8025:8025"
       - "1025:1025"
+
+volumes:
+  frontend_node_modules:

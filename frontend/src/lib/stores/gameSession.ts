@@ -135,7 +135,7 @@ function createGameSession() {
 
     async begin(characterId: string, adventureRef: string): Promise<void> {
       const gen = fetchSSE(
-        `/characters/${encodeURIComponent(characterId)}/play/begin`,
+        `/api/characters/${encodeURIComponent(characterId)}/play/begin`,
         {
           adventure_ref: adventureRef,
         },
@@ -150,7 +150,7 @@ function createGameSession() {
       decision: import("$lib/api/play.js").AdvanceDecision,
     ): Promise<void> {
       const gen = fetchSSE(
-        `/characters/${encodeURIComponent(characterId)}/play/advance`,
+        `/api/characters/${encodeURIComponent(characterId)}/play/advance`,
         decision,
       );
       activeGenerator = gen;

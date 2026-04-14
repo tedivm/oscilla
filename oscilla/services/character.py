@@ -18,6 +18,7 @@ from oscilla.models.character_iteration import (
     CharacterIterationItemInstance,
     CharacterIterationItemInstanceModifier,
     CharacterIterationMilestone,
+    CharacterIterationPendingTrigger,
     CharacterIterationQuest,
     CharacterIterationRecord,
     CharacterIterationSkill,
@@ -223,6 +224,14 @@ async def save_character(session: AsyncSession, state: "CharacterState", user_id
                 tick_expiry=sb.tick_expiry,
                 game_tick_expiry=sb.game_tick_expiry,
                 real_ts_expiry=sb.real_ts_expiry,
+            )
+        )
+    for position, trigger_name in enumerate(state.pending_triggers):
+        session.add(
+            CharacterIterationPendingTrigger(
+                iteration_id=iteration.id,
+                position=position,
+                trigger_name=trigger_name,
             )
         )
 

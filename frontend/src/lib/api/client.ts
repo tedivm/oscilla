@@ -76,7 +76,7 @@ export async function apiFetch<T>(
 
   if (response.status === 401) {
     // Avoid recursive refresh attempts for the refresh endpoint itself.
-    if (path === "/auth/refresh") {
+    if (path === "/api/auth/refresh") {
       await authStore.logout();
       throw new ApiError("Unauthorized — session expired", 401, null);
     }

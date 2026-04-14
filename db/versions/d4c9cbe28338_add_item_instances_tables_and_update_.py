@@ -6,9 +6,8 @@ Create Date: 2026-03-29 18:34:01.680780
 
 """
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "d4c9cbe28338"
@@ -32,7 +31,7 @@ def upgrade() -> None:
     )
     op.create_table(
         "character_iteration_item_instance_modifiers",
-        sa.Column("iteration_id", sa.String(), nullable=False),
+        sa.Column("iteration_id", sa.Uuid(), nullable=False),
         sa.Column("instance_id", sa.String(), nullable=False),
         sa.Column("stat", sa.String(), nullable=False),
         sa.Column("amount", sa.REAL(), nullable=False),

@@ -46,15 +46,15 @@ def test_root_redirect_follows(fastapi_client: TestClient) -> None:
 
 
 def test_docs_accessible(fastapi_client: TestClient) -> None:
-    """Test that /docs endpoint is accessible."""
-    response = fastapi_client.get("/docs")
+    """Test that /api/docs endpoint is accessible."""
+    response = fastapi_client.get("/api/docs")
     assert response.status_code == 200
     assert "text/html" in response.headers.get("content-type", "")
 
 
 def test_openapi_schema(fastapi_client: TestClient) -> None:
     """Test that OpenAPI schema is accessible."""
-    response = fastapi_client.get("/openapi.json")
+    response = fastapi_client.get("/api/openapi.json")
     assert response.status_code == 200
     schema = response.json()
     assert "openapi" in schema
@@ -84,7 +84,7 @@ def test_lifespan_configured() -> None:
 def test_app_can_start(fastapi_client: TestClient) -> None:
     """Test that the app can start successfully."""
     # Making any request will trigger startup event
-    response = fastapi_client.get("/docs")
+    response = fastapi_client.get("/api/docs")
     assert response.status_code == 200
 
 

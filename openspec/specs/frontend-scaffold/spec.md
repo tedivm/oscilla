@@ -74,41 +74,68 @@ This is a graceful degradation: Python-only development without running the fron
 
 ---
 
-### Requirement: Vite dev proxy for API routes
+### Requirement: Vite dev proxy covers `/api` and `/static` — not individual path prefixes
 
-`vite.config.ts` SHALL configure a `server.proxy` that forwards all requests whose paths begin with `/auth`, `/games`, and `/characters` to `http://localhost:8000` when running `npm run dev`. This eliminates any CORS configuration in both development and production: from the browser's perspective, the Vite dev server (`localhost:5173`) and the API share a single origin.
+`vite.config.ts` SHALL configure a `server.proxy` that forwards exactly two path patterns to `http://localhost:8000` when running `npm run dev`:
+
+- `/api` → `http://localhost:8000`
+- `/static` → `http://localhost:8000`
+
+The four-entry proxy (`/auth`, `/games`, `/characters`, `/overworld`) previously used SHALL be removed. This eliminates any CORS configuration in both development and production: from the browser's perspective, the Vite dev server (`localhost:5173`) and the API share a single origin.
 
 #### Scenario: API call from Vite dev server reaches FastAPI
 
 - **GIVEN** `npm run dev` is running and FastAPI is running on port 8000
-- **WHEN** the browser POSTs to `/auth/login` via `localhost:5173`
-- **THEN** Vite proxies the request to `http://localhost:8000/auth/login` transparently
+- **WHEN** the browser POSTs to `/api/auth/login` via `localhost:5173`
+- **THEN** Vite proxies the request to `http://localhost:8000/api/auth/login` transparently
 - **AND** the browser never makes a cross-origin request.
+
+---
+
+### Requirement: Vite dev server supports `HMR_CLIENT_PORT` environment variable override
+
+`frontend/vite.config.ts` SHALL read the `HMR_CLIENT_PORT` environment variable and pass it to `server.hmr.clientPort`. When unset, the value SHALL be `undefined`, which causes Vite to use its default HMR port behavior (connecting on the same port as the dev server).
+
+This allows the Vite dev server to operate correctly behind a reverse proxy on a different port (e.g. Caddy on port 80) without any change to developer workflow when running Vite directly outside Docker.
+
+#### Scenario: HMR connects via proxy port when `HMR_CLIENT_PORT` is set
+
+- **GIVEN** the `frontend` container has `HMR_CLIENT_PORT=80` in its environment
+- **WHEN** a browser loads the app through the gateway on port 80
+- **THEN** the Vite HMR WebSocket client connects to `ws://localhost:80` (not port 5173)
+- **AND** hot module replacement works through the gateway
+
+#### Scenario: HMR uses Vite default when `HMR_CLIENT_PORT` is unset
+
+- **GIVEN** `HMR_CLIENT_PORT` is not set in the environment (local non-Docker dev)
+- **WHEN** `vite dev` starts
+- **THEN** `server.hmr.clientPort` is `undefined` and Vite's default HMR behavior is used
+- **AND** HMR connects on the same port as the dev server (5173)
 
 ---
 
 ### Requirement: Docker multi-stage build prepends a Node build stage
 
-`dockerfile.www` SHALL be updated with a `FROM node:22-alpine AS frontend-build` stage that:
+`Dockerfile` SHALL include a `FROM node:22-alpine AS frontend-build` stage that:
 
 1. Copies `frontend/package.json` and `frontend/package-lock.json`.
 2. Runs `npm ci`.
 3. Copies `frontend/` and runs `npm run build`.
 
-The existing Python runtime stage SHALL receive one new line:
+The `production` final stage SHALL copy the frontend build artifact:
 
 ```dockerfile
 COPY --from=frontend-build /frontend/build /app/frontend/build
 ```
 
-All other lines in the Python stage remain unchanged.
+The `backend` intermediate stage SHALL NOT include the frontend build artifact.
 
 #### Scenario: Docker image contains frontend build
 
-- **GIVEN** a Docker image built with `docker build -f dockerfile.www .`
+- **GIVEN** a Docker image built with `docker build .` (default `production` target)
 - **WHEN** the container starts
 - **THEN** `GET /app` serves the SvelteKit landing page
-- **AND** `GET /auth/me` (unauthenticated) returns `401`, confirming the API is also live.
+- **AND** `GET /api/auth/me` (unauthenticated) returns `401`, confirming the API is also live.
 
 ---
 

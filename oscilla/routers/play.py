@@ -90,6 +90,31 @@ async def _persist_session_output(
         logger.exception("Failed to persist session output for iteration %s.", iteration_id)
 
 
+async def _run_pipeline(
+    pipeline: AdventurePipeline,
+    web_cb: WebCallbacks,
+    adventure_ref: str,
+    start_step: int,
+) -> None:
+    """Run the adventure pipeline and always put a None sentinel when done.
+
+    DecisionPauseException and CancelledError both put their own sentinel before
+    raising so we must not add a second one. All other termination paths
+    (normal completion or unexpected exception) need to add the sentinel so the
+    SSE consumer can exit its receive loop.
+    """
+    sentinel_needed = True
+    try:
+        await pipeline.run(adventure_ref=adventure_ref, start_step=start_step)
+    except (DecisionPauseException, asyncio.CancelledError):
+        # Sentinel was already placed on the queue before the exception was raised.
+        sentinel_needed = False
+        raise
+    finally:
+        if sentinel_needed:
+            await web_cb.queue.put(None)
+
+
 async def _run_pipeline_and_stream(
     pipeline: AdventurePipeline,
     web_cb: WebCallbacks,
@@ -106,7 +131,10 @@ async def _run_pipeline_and_stream(
     closes (normally or on client disconnect), session output is persisted and
     the session lock is released so the next advance can acquire it.
     """
-    pipeline_task = asyncio.create_task(pipeline.run(adventure_ref=adventure_ref, start_step=start_step))
+    pipeline_task = asyncio.create_task(
+        _run_pipeline(pipeline=pipeline, web_cb=web_cb, adventure_ref=adventure_ref, start_step=start_step)
+    )
+    pipeline_decision_paused = False
     try:
         while True:
             event = await web_cb.queue.get()
@@ -118,13 +146,27 @@ async def _run_pipeline_and_stream(
             pipeline_task.cancel()
         try:
             await pipeline_task
-        except (asyncio.CancelledError, DecisionPauseException):
+        except DecisionPauseException:
+            # Normal pause at a player decision point.
+            pipeline_decision_paused = True
+        except asyncio.CancelledError:
             pass
         except Exception:
             logger.exception("Pipeline task raised an unexpected exception.")
 
     # Persist session output after the stream closes so frontend can replay events.
     await _persist_session_output(db=db, iteration_id=iteration_id, events=web_cb.session_output)
+    # When a choice was consumed in replay mode and the pipeline paused again,
+    # persist the choice index in step_state so the next advance can re-enter
+    # the same branch without re-presenting the choice to the player.
+    if pipeline_decision_paused and web_cb.last_consumed_choice is not None:
+        await save_adventure_progress(
+            session=db,
+            iteration_id=iteration_id,
+            adventure_ref=adventure_ref,
+            step_index=start_step,
+            step_state={"pending_choice": web_cb.last_consumed_choice},
+        )
     # Release the session lock so the next advance/begin request can proceed.
     await release_web_session_lock(session=db, iteration_id=iteration_id, token=session_token)
 
@@ -348,11 +390,22 @@ async def advance_adventure(
             region = registry.regions.get(loc.spec.region)
             region_name = region.spec.displayName if region is not None else None
 
+    # When the request is not a fresh choice submission, restore any pending
+    # choice index previously stored in step_state. This allows the pipeline
+    # to replay the choice step silently and re-enter the correct option branch
+    # so subsequent decisions (ack/text/skill) are consumed in the right context.
+    step_state = iteration.adventure_step_state or {}
+    pending_choice: int | None = None
+    if body.choice is None:
+        raw = step_state.get("pending_choice")
+        if isinstance(raw, int):
+            pending_choice = raw
+
     web_cb = WebCallbacks(
         location_ref=location_ref,
         location_name=location_name,
         region_name=region_name,
-        player_choice=body.choice,
+        player_choice=body.choice if body.choice is not None else pending_choice,
         player_ack=body.ack,
         player_text_input=body.text_input,
         player_skill_choice=body.skill_choice,

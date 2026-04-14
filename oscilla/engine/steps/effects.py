@@ -28,6 +28,7 @@ from oscilla.engine.models.adventure import (
     SetPronounsEffect,
     SkillGrantEffect,
     SkillRevokeEffect,
+    SetLocationEffect,
     StatChangeEffect,
     StatSetEffect,
     UseItemEffect,
@@ -853,3 +854,25 @@ async def run_effect(
 
         case SkillRevokeEffect(skill=skill_ref):
             player.known_skills.discard(skill_ref)
+
+        case SetLocationEffect(location=location_ref):
+            if location_ref is None:
+                player.current_location = None
+            elif registry.locations.get(location_ref) is None:
+                logger.warning(
+                    "set_location effect: location ref %r not found in registry; ignoring.",
+                    location_ref,
+                )
+            else:
+                player.current_location = location_ref
+
+        case SetLocationEffect(location=location_ref):
+            if location_ref is None:
+                player.current_location = None
+            elif registry.locations.get(location_ref) is None:
+                logger.warning(
+                    "set_location effect: location ref %r not found in registry; ignoring.",
+                    location_ref,
+                )
+            else:
+                player.current_location = location_ref

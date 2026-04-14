@@ -22,6 +22,8 @@ git mv old_path new_path # ALWAYS use git mv for moving or renaming files, never
 
 **CRITICAL**: When moving or renaming files in a git repository, you MUST use `git mv` instead of regular `mv` or file manipulation tools. This ensures git properly tracks the file history and prevents issues with version control. The only exception to this is if you are moving files which are not tracked in git, as in that case `git mv` will have no effect.
 
+**CRITICAL**: Always use `./tmp` instead of `/tmp` when creating files. The local temporary directory (`./tmp`) has isolation in place that allows it to be used securely. Never attempt to write to `/tmp`.
+
 ### Testing and Validation
 
 ```bash
@@ -95,8 +97,7 @@ make build # Build package distribution
 ### Docker
 
 ```bash
-docker compose up -d # Start default services (db, redis, www)
-docker compose --profile dev up -d # Start default services plus MailHog
+docker compose up -d # Start all services (gateway, backend, frontend, db, redis, mailhog)
 docker compose down # Stop development environment (preserves volumes)
 docker compose down -v # Stop and remove development environment (including volumes)
 docker compose restart # Restart all services without destroying containers or volumes
@@ -284,6 +285,8 @@ class Settings(BaseSettings):
 - All routes must use Pydantic models for input and output.
 - Use different Pydantic models for inputs and outputs (i.e., creating a `Post` must require a `PostCreate` and return a `PostRead` model, not reuse the same model).
 - Parameters in Pydantic models for user input must use the Field function with validation and descriptions.
+- All application routes must be registered under the `/api` prefix in `oscilla/www.py`. The only exceptions are `/health`, `/ready` (liveness/readiness probes — no `/api` prefix by convention), and `/static` (static file serving).
+- The OpenAPI docs are served at `/api/docs` (Swagger UI), `/api/redoc` (ReDoc), and `/api/openapi.json`. Do not move them away from the `/api` scope.
 
 ```python
 from uuid import UUID

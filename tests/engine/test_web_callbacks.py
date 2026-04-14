@@ -196,6 +196,81 @@ async def test_show_combat_round_puts_combat_state_event() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Replay suppression (decisions_remaining > 0 gate)
+# ---------------------------------------------------------------------------
+
+
+async def test_show_text_suppressed_while_decisions_pending() -> None:
+    """show_text emits nothing when a pre-loaded decision has not yet been consumed."""
+    cb = _make_cb(player_choice=1)
+    await cb.show_text("You open the door.")
+
+    assert cb.queue.empty()
+    assert len(cb.session_output) == 0
+
+
+async def test_show_text_emits_after_single_decision_consumed() -> None:
+    """show_text emits normally once the only pre-loaded decision is consumed."""
+    cb = _make_cb(player_choice=1)
+    await cb.show_menu(prompt="Choose:", options=["Option A"])  # consumes choice
+
+    # Now show_text should emit normally
+    await cb.show_text("You chose wisely.")
+    items = await _drain_queue(cb)
+    # Queue has: choice-event, sentinel (from a fresh show_menu below) -- no,
+    # show_menu was in resume mode (choice pre-loaded) so it returned without
+    # queuing anything. Only show_text queued an event.
+    assert len(items) == 1
+    assert items[0] is not None
+    assert items[0]["type"] == "narrative"
+
+
+async def test_show_text_still_suppressed_between_two_decisions() -> None:
+    """show_text stays suppressed after the first of two pre-loaded decisions."""
+    cb = _make_cb(player_choice=1, player_ack=True)
+    await cb.show_menu(prompt="Choose:", options=["Option A"])  # consumes choice; one decision left
+
+    # show_text here is between choice and ack — still replaying, must be suppressed
+    await cb.show_text("You see a narrow path.")
+    assert cb.queue.empty()
+    assert len(cb.session_output) == 0
+
+
+async def test_show_text_emits_after_both_decisions_consumed() -> None:
+    """show_text emits after both pre-loaded decisions are consumed."""
+    cb = _make_cb(player_choice=1, player_ack=True)
+    await cb.show_menu(prompt="Choose:", options=["Option A"])  # consume choice
+    await cb.wait_for_ack()  # consume ack
+
+    await cb.show_text("Effects applied.")
+    items = await _drain_queue(cb)
+    assert len(items) == 1
+    assert items[0] is not None
+    assert items[0]["type"] == "narrative"
+
+
+async def test_show_combat_round_suppressed_while_decisions_pending() -> None:
+    """show_combat_round is suppressed while pre-loaded decisions remain unconsumed."""
+    cb = _make_cb(player_ack=True)
+    await cb.show_combat_round(player_hp=10, enemy_hp=5, player_name="Hero", enemy_name="Rat")
+    assert cb.queue.empty()
+    assert len(cb.session_output) == 0
+
+
+async def test_last_consumed_choice_is_none_when_choice_not_set() -> None:
+    """last_consumed_choice is None when no player_choice was pre-loaded."""
+    cb = _make_cb()
+    assert cb.last_consumed_choice is None
+
+
+async def test_last_consumed_choice_tracks_consumed_choice() -> None:
+    """last_consumed_choice returns the index of the consumed player_choice."""
+    cb = _make_cb(player_choice=3)
+    await cb.show_menu(prompt="Choose:", options=["A", "B", "C"])
+    assert cb.last_consumed_choice == 3
+
+
+# ---------------------------------------------------------------------------
 # session_output accumulation
 # ---------------------------------------------------------------------------
 

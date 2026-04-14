@@ -265,6 +265,20 @@ class SkillRevokeEffect(BaseModel):
     skill: str
 
 
+class SetLocationEffect(BaseModel):
+    """Teleport the character to the named location ref.
+
+    The location must exist in the content registry; an invalid ref is logged
+    as a warning and silently ignored so it does not crash the adventure.
+    Used primarily in on_character_create triggered adventures to establish
+    the character's starting position.
+    """
+
+    type: Literal["set_location"]
+    # Location manifest name to move the character to, or null to clear it.
+    location: str | None
+
+
 Effect = Annotated[
     Union[
         ItemDropEffect,
@@ -287,6 +301,7 @@ Effect = Annotated[
         ArchetypeAddEffect,
         ArchetypeRemoveEffect,
         SkillRevokeEffect,
+        SetLocationEffect,
     ],
     Field(discriminator="type"),
 ]

@@ -13,12 +13,6 @@ New to this project? Start here:
 
 ## Quick Start (Frontend + Backend)
 
-There are two valid full-stack workflows. Use the one that matches what you are changing.
-
-### Option A: Full Docker Stack (backend container + built frontend)
-
-Best when you want everything containerized exactly as Compose defines it.
-
 1. Clone the repository and move into the project root.
 2. Copy environment defaults:
 
@@ -26,64 +20,53 @@ Best when you want everything containerized exactly as Compose defines it.
    cp .env.example .env
    ```
 
-3. Start all services, including MailHog (dev profile):
+3. Start everything:
 
    ```bash
-   docker compose --profile dev up -d --build
+   docker compose up --build
    ```
 
-4. Open the app and verify health:
+4. Open the app and verify:
+   - App: <http://localhost/app>
+   - API docs (Swagger): <http://localhost/api/docs>
+   - Health check: <http://localhost/health>
+   - MailHog (email testing): <http://localhost:8025>
 
-- Frontend (served by backend container): <http://127.0.0.1/app>
-- API docs (backend container): <http://127.0.0.1/docs>
-- Health check: <http://127.0.0.1/health>
-- MailHog: <http://127.0.0.1:8025>
+This starts a Caddy gateway, a Python backend, and a Vite frontend dev server with hot module replacement (HMR). Changes to frontend source files reload instantly in the browser. See [Docker](./docker.md) for architecture details.
 
-### Option B: Frontend Hot Reload (Vite) + Live backend API
+### Stop Everything
 
-Best when actively developing the Svelte app with instant reload.
+```bash
+docker compose down
+```
 
-1. Install dependencies:
+### Running Without Docker
+
+If you prefer to run the backend locally (e.g. for debugging):
+
+1. Start only the infrastructure services:
 
    ```bash
-   make install
+   docker compose up -d db redis mailhog
    ```
 
-2. Start dependency services:
-
-   ```bash
-   docker compose --profile dev up -d db redis mailhog
-   ```
-
-3. In Terminal 1, start backend API on port 8000:
+2. In Terminal 1, start the backend:
 
    ```bash
    uv run uvicorn oscilla.www:app --reload --host 127.0.0.1 --port 8000
    ```
 
-4. In Terminal 2, start the frontend dev server:
+3. In Terminal 2, start the Vite dev server:
 
    ```bash
    make frontend_dev
    ```
 
-5. Open these URLs:
+   The Vite server proxies `/api` and `/static` to the backend at `http://localhost:8000`.
 
-- Frontend dev app: <http://127.0.0.1:5173/app>
-- Backend API docs: <http://127.0.0.1:8000/docs>
-- Backend health check: <http://127.0.0.1:8000/health>
-- MailHog: <http://127.0.0.1:8025>
-
-The Vite server proxies `/auth`, `/games`, `/characters`, and `/overworld` to `http://localhost:8000`.
-
-### Stop Everything
-
-- Stop local frontend/backend processes with Ctrl+C in their terminals.
-- Stop containers:
-
-  ```bash
-  docker compose down
-  ```
+- Frontend: <http://localhost:5173/app>
+- API docs: <http://localhost:8000/api/docs>
+- MailHog: <http://localhost:8025>
 
 ## Core Features
 
