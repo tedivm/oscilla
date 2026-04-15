@@ -21,7 +21,6 @@ def _make_state(level: int = 1) -> CharacterState:
         name="Tester",
         character_class=None,
         prestige_count=0,
-        current_location=None,
         stats={"level": level, "xp": 0},
     )
 

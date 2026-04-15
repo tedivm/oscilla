@@ -92,7 +92,7 @@ async def test_stale_version_raises_stale_data_error(
 ) -> None:
     """StaleDataError is raised when the version column differs between memory and DB.
 
-    Uses no_autoflush so that `iteration.current_location = "somewhere"` is not
+    Uses no_autoflush so that `iteration.pronoun_set = "they_them"` is not
     automatically flushed before the bulk version bump. After the bump, the identity
     map still holds version = 0 while the DB (in the same transaction) has version = 1.
     An explicit flush() then generates ``WHERE version = 0``, matches 0 rows, and
@@ -117,7 +117,7 @@ async def test_stale_version_raises_stale_data_error(
     # `iteration.current_location = "somewhere"` BEFORE the version bump, allowing it to succeed
     # (defeating the point of the test).
     with async_session.no_autoflush:
-        iteration.current_location = "somewhere"  # mark dirty (not yet flushed)
+        iteration.pronoun_set = "he_him"  # mark dirty (not yet flushed)
 
         # Bump version in the DB via a bulk UPDATE with synchronize_session=False
         # so the identity map is NOT updated.  version in memory = 0; DB = 1.

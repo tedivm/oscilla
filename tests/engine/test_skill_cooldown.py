@@ -25,7 +25,6 @@ def _bare_player() -> CharacterState:
         name="CooldownTester",
         character_class=None,
         prestige_count=0,
-        current_location=None,
         stats={},
     )
 

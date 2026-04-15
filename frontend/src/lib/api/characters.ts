@@ -53,16 +53,3 @@ export async function getOverworld(
     `/api/characters/${encodeURIComponent(characterId)}/overworld`,
   );
 }
-
-export async function navigateLocation(
-  characterId: string,
-  locationRef: string,
-): Promise<OverworldStateRead> {
-  return apiFetch<OverworldStateRead>(
-    `/api/characters/${encodeURIComponent(characterId)}/navigate`,
-    {
-      method: "POST",
-      body: JSON.stringify({ location_ref: locationRef }),
-    },
-  );
-}

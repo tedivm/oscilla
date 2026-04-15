@@ -174,3 +174,4 @@ saves.bak.*
 NOTES.md
 
 /tmp
+.playwright-cli/

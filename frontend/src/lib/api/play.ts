@@ -25,6 +25,22 @@ export interface CurrentPlayState {
   overworldState: OverworldStateRead | null;
 }
 
+// ── beginAdventureGo ──────────────────────────────────────────────────────────
+
+/**
+ * Opens a POST SSE stream on `/play/go` with a location ref.
+ * The server selects an adventure via weighted random — the client never learns which one.
+ */
+export function beginAdventureGo(
+  characterId: string,
+  locationRef: string,
+): AsyncGenerator<SSEEvent> {
+  return fetchSSE(
+    `/api/characters/${encodeURIComponent(characterId)}/play/go`,
+    { location_ref: locationRef },
+  );
+}
+
 // ── getCurrentPlayState ────────────────────────────────────────────────────────
 
 /**

@@ -4,9 +4,11 @@ import { get } from "svelte/store";
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
 const mockFetchSSE = vi.fn();
+const mockBeginAdventureGo = vi.fn();
 
 vi.mock("$lib/api/play.js", () => ({
   fetchSSE: mockFetchSSE,
+  beginAdventureGo: mockBeginAdventureGo,
 }));
 
 vi.mock("$app/paths", () => ({
@@ -21,7 +23,7 @@ describe("gameSession module exports", () => {
     expect(typeof mod.gameSession).toBe("object");
     expect(typeof mod.gameSession.subscribe).toBe("function");
     expect(typeof mod.gameSession.init).toBe("function");
-    expect(typeof mod.gameSession.begin).toBe("function");
+    expect(typeof mod.gameSession.go).toBe("function");
     expect(typeof mod.gameSession.advance).toBe("function");
     expect(typeof mod.gameSession.close).toBe("function");
   });
@@ -179,9 +181,9 @@ describe("gameSession store", () => {
   it("setOverworld sets mode:'overworld' and overworldState", async () => {
     const { gameSession } = await import("./gameSession.js");
     const owState = {
-      current_location: { ref: "loc:hub", name: "Hub" },
-      adjacent_locations: [],
-      available_adventures: [],
+      character_id: "char-1",
+      accessible_locations: [],
+      region_graph: { nodes: [], edges: [] },
     } as never;
     gameSession.setOverworld(owState);
     const s = get(gameSession);
@@ -192,33 +194,28 @@ describe("gameSession store", () => {
   it("close sets mode:'idle' and clears activeGenerator reference", async () => {
     const { gameSession } = await import("./gameSession.js");
     gameSession.setOverworld({
-      current_location: { ref: "r", name: "R" },
-      adjacent_locations: [],
-      available_adventures: [],
+      character_id: "char-1",
+      accessible_locations: [],
+      region_graph: { nodes: [], edges: [] },
     } as never);
     expect(get(gameSession).mode).toBe("overworld");
     gameSession.close();
     expect(get(gameSession).mode).toBe("idle");
   });
 
-  it("begin calls fetchSSE with correct URL and body", async () => {
+  it("go calls beginAdventureGo with correct characterId and locationRef", async () => {
     const { gameSession } = await import("./gameSession.js");
 
-    // Make fetchSSE return an empty async generator so runStream completes immediately.
+    // Make beginAdventureGo return an empty async generator so runStream completes immediately.
     async function* emptyGen() {}
-    mockFetchSSE.mockReturnValueOnce(emptyGen());
+    mockBeginAdventureGo.mockReturnValueOnce(emptyGen());
 
-    await gameSession.begin("char-1", "adv:tutorial");
+    await gameSession.go("char-1", "loc:hub");
 
-    expect(mockFetchSSE).toHaveBeenCalledWith(
-      "/api/characters/char-1/play/begin",
-      {
-        adventure_ref: "adv:tutorial",
-      },
-    );
+    expect(mockBeginAdventureGo).toHaveBeenCalledWith("char-1", "loc:hub");
   });
 
-  it("begin applies events yielded by the generator", async () => {
+  it("go applies events yielded by the generator", async () => {
     const { gameSession } = await import("./gameSession.js");
 
     async function* gen() {
@@ -228,9 +225,9 @@ describe("gameSession store", () => {
         data: { prompt: "Choose?", options: [] },
       };
     }
-    mockFetchSSE.mockReturnValueOnce(gen());
+    mockBeginAdventureGo.mockReturnValueOnce(gen());
 
-    await gameSession.begin("char-1", "adv:tutorial");
+    await gameSession.go("char-1", "loc:hub");
 
     const s = get(gameSession);
     expect(s.narrativeLog).toHaveLength(1);
@@ -246,9 +243,9 @@ describe("gameSession store", () => {
       yield { type: "narrative" as const, data: { text: "Start." } };
       throw new Error("Network failed");
     }
-    mockFetchSSE.mockReturnValueOnce(failingGen());
+    mockBeginAdventureGo.mockReturnValueOnce(failingGen());
 
-    await gameSession.begin("char-1", "adv:fail");
+    await gameSession.go("char-1", "loc:fail");
 
     const s = get(gameSession);
     expect(s.mode).toBe("overworld");

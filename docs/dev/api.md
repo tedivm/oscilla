@@ -462,7 +462,6 @@ require a Bearer JWT and enforce ownership using the current user id.
 | Category  | Fields                                                                                                              |
 | --------- | ------------------------------------------------------------------------------------------------------------------- |
 | Identity  | `id`, `name`, `game_name`, `character_class`, `prestige_count`, `pronoun_set`, `created_at`                         |
-| Location  | `current_location`, `current_location_name`, `current_region_name`                                                  |
 | Stats     | `stats: Dict[str, StatValue]`                                                                                       |
 | Inventory | `stacks: Dict[str, StackedItemRead]`, `instances: List[ItemInstanceRead]`, `equipment: Dict[str, ItemInstanceRead]` |
 | Skills    | `skills: List[SkillRead]`                                                                                           |
@@ -495,17 +494,17 @@ and integrates session locking and crash recovery.
 
 ### Endpoint Reference
 
-| Method | Path                             | Auth       | Description                                           |
-| ------ | -------------------------------- | ---------- | ----------------------------------------------------- |
-| GET    | `/characters/{id}/play/current`  | Bearer JWT | Return persisted session output for crash recovery    |
-| POST   | `/characters/{id}/play/begin`    | Bearer JWT | Begin an adventure and stream SSE events (200 or 409) |
-| POST   | `/characters/{id}/play/advance`  | Bearer JWT | Submit a player decision and continue streaming       |
-| POST   | `/characters/{id}/play/abandon`  | Bearer JWT | Exit the current adventure (204)                      |
-| POST   | `/characters/{id}/play/takeover` | Bearer JWT | Force-acquire a stale session lock (returns state)    |
+| Method | Path                             | Auth       | Description                                                       |
+| ------ | -------------------------------- | ---------- | ----------------------------------------------------------------- |
+| GET    | `/characters/{id}/play/current`  | Bearer JWT | Return persisted session output for crash recovery                |
+| POST   | `/characters/{id}/play/go`       | Bearer JWT | Select a location, pick a random adventure, and stream SSE events |
+| POST   | `/characters/{id}/play/advance`  | Bearer JWT | Submit a player decision and continue streaming                   |
+| POST   | `/characters/{id}/play/abandon`  | Bearer JWT | Exit the current adventure (204)                                  |
+| POST   | `/characters/{id}/play/takeover` | Bearer JWT | Force-acquire a stale session lock (returns state)                |
 
 ### SSE Event Type Contract
 
-All streaming responses (`begin`, `advance`) emit newline-delimited SSE
+All streaming responses (`go`, `advance`) emit newline-delimited SSE
 blocks with an `event:` line and a `data:` JSON payload:
 
 ```
@@ -530,9 +529,32 @@ The stream terminates after the first **decision event** (pipeline pauses for
 input) or after `complete`. The client should read all events before sending
 the follow-up `advance` request.
 
+### `POST /play/go` — Begin Adventure
+
+Request body:
+
+```json
+{ "location_ref": "<location-ref>" }
+```
+
+The server validates the location, selects a weighted-random adventure from
+the eligible pool, acquires the session lock, and streams SSE events.
+Adventure selection is entirely server-side — the client never sees adventure
+refs or names, preventing spoilers.
+
+**Error responses:**
+
+| Status | Condition                                                        |
+| ------ | ---------------------------------------------------------------- |
+| 422    | Unknown `location_ref`                                           |
+| 422    | Location's `effective_unlock` conditions fail for this character |
+| 422    | No adventures in the eligible pool (all blocked or on cooldown)  |
+| 409    | A live session lock is already held for this character           |
+| 404    | Character not found or belongs to another user                   |
+
 ### Session Locking
 
-`begin` and `advance` each acquire a short-lived session lock to prevent
+`go` and `advance` each acquire a short-lived session lock to prevent
 concurrent execution on the same character. The lock is stored in
 `session_token` + `session_token_acquired_at` on the
 `character_iterations` row and is released automatically when the SSE
@@ -582,39 +604,49 @@ The client should call `advance` (or `abandon`) after takeover.
 
 ## Overworld Endpoints
 
-The overworld endpoints expose the character's current world position,
-available adventures, reachable locations, and a region sub-graph for map
-rendering.
+The overworld endpoint returns the character's accessible locations and a
+region sub-graph for map rendering. Adventure selection happens server-side
+via `POST /play/go` — the overworld never exposes individual adventure refs
+or names.
 
 ### Endpoint Reference
 
-| Method | Path                         | Auth       | Description                                              |
-| ------ | ---------------------------- | ---------- | -------------------------------------------------------- |
-| GET    | `/characters/{id}/overworld` | Bearer JWT | Return full `OverworldStateRead` for the character       |
-| POST   | `/characters/{id}/navigate`  | Bearer JWT | Teleport character to a new location (returns new state) |
+| Method | Path                         | Auth       | Description                                        |
+| ------ | ---------------------------- | ---------- | -------------------------------------------------- |
+| GET    | `/characters/{id}/overworld` | Bearer JWT | Return full `OverworldStateRead` for the character |
 
 ### OverworldStateRead Schema
 
-| Field                   | Type                    | Description                                      |
-| ----------------------- | ----------------------- | ------------------------------------------------ |
-| `character_id`          | `UUID`                  | Character identifier                             |
-| `current_location`      | `str \| null`           | Machine ref of current location                  |
-| `current_location_name` | `str \| null`           | Display name of current location                 |
-| `current_region_name`   | `str \| null`           | Display name of current region                   |
-| `available_adventures`  | `AdventureOptionRead[]` | Adventures in the location's pool                |
-| `navigation_options`    | `LocationOptionRead[]`  | All locations in the same region (incl. current) |
-| `region_graph`          | `RegionGraphRead`       | Node/edge neighborhood of the current region     |
+| Field                  | Type                   | Description                                        |
+| ---------------------- | ---------------------- | -------------------------------------------------- |
+| `character_id`         | `UUID`                 | Character identifier                               |
+| `accessible_locations` | `LocationOptionRead[]` | All locations the character can currently access   |
+| `region_graph`         | `RegionGraphRead`      | Full region/location graph for world-map rendering |
 
-`navigate` validates the destination exists and that all `effective_unlock`
-conditions pass; returns **422** otherwise.
+### LocationOptionRead Schema
+
+| Field                  | Type   | Description                                                        |
+| ---------------------- | ------ | ------------------------------------------------------------------ |
+| `ref`                  | `str`  | Machine ref of the location                                        |
+| `display_name`         | `str`  | Human-readable location name                                       |
+| `region_ref`           | `str`  | Machine ref of the region this location belongs to                 |
+| `region_name`          | `str`  | Human-readable region name                                         |
+| `adventures_available` | `bool` | `true` if at least one adventure in the pool is currently eligible |
+
+A location appears in `accessible_locations` only if its `effective_unlock`
+conditions pass for the current character state. `adventures_available` is
+`false` when all adventures in the pool are blocked by requires-conditions
+or cooldowns — the frontend should disable the Begin Adventure button in
+this case.
 
 ### Region Graph
 
-`region_graph` contains the region sub-graph neighborhood scoped to the
-character's current region, produced by `build_world_graph()` +
-`_filter_to_neighborhood()`. Nodes carry an `id` (prefixed `region:` or
+`region_graph` contains the full world graph, produced by
+`build_world_graph()`. Nodes carry an `id` (prefixed `region:` or
 `location:`), a human-readable `label`, and a `kind` property. Edges have
-`source`, `target`, and `label` fields.
+`source`, `target`, and `label` fields. The frontend derives region
+hierarchy by traversing edges from root nodes (region nodes with no
+incoming edges).
 
 ---
 

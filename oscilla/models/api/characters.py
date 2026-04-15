@@ -119,11 +119,6 @@ class CharacterStateRead(BaseModel):
     pronoun_set: str = Field(description="Pronoun set key (e.g. 'they_them', 'she_her').")
     created_at: datetime = Field(description="When the character was created.")
 
-    # Location
-    current_location: str | None = Field(default=None, description="Current location ref.")
-    current_location_name: str | None = Field(default=None, description="Display name of the current location.")
-    current_region_name: str | None = Field(default=None, description="Display name of the current region.")
-
     # Stats (all declared stats; value=None for derived or unset stats)
     stats: Dict[str, StatValue] = Field(default_factory=dict, description="All declared stats with current values.")
 
@@ -201,17 +196,6 @@ def build_character_state_read(
     from oscilla.engine.templates import PRONOUN_SETS
 
     pronoun_set_key = next((k for k, v in PRONOUN_SETS.items() if v == state.pronouns), "they_them")
-
-    # Resolve location display names from the registry
-    current_location_name: str | None = None
-    current_region_name: str | None = None
-    if state.current_location is not None:
-        loc = registry.locations.get(state.current_location)
-        if loc is not None:
-            current_location_name = loc.spec.displayName
-            region = registry.regions.get(loc.spec.region)
-            if region is not None:
-                current_region_name = region.spec.displayName
 
     # Build stats dict from all declared stats in character_config (including derived → None)
     all_stat_defs = char_config.spec.public_stats + char_config.spec.hidden_stats
@@ -298,9 +282,6 @@ def build_character_state_read(
         prestige_count=state.prestige_count,
         pronoun_set=pronoun_set_key,
         created_at=record.created_at,
-        current_location=state.current_location,
-        current_location_name=current_location_name,
-        current_region_name=current_region_name,
         stats=stats,
         stacks=stacks,
         instances=instances,

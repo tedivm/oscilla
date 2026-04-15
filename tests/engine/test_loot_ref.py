@@ -82,7 +82,6 @@ def _make_bare_player(item_in_inventory: str | None = None) -> CharacterState:
         name="Tester",
         character_class=None,
         prestige_count=0,
-        current_location=None,
     )
     if item_in_inventory:
         player.stacks[item_in_inventory] = 1

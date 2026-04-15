@@ -6,5 +6,5 @@ export async function listGames(): Promise<GameRead[]> {
 }
 
 export async function getGame(name: string): Promise<GameRead> {
-  return apiFetch<GameRead>(`/games/${encodeURIComponent(name)}`);
+  return apiFetch<GameRead>(`/api/games/${encodeURIComponent(name)}`);
 }

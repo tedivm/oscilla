@@ -134,11 +134,6 @@ export interface CharacterStateRead {
   pronoun_set: string;
   created_at: string;
 
-  // Location
-  current_location: string | null;
-  current_location_name: string | null;
-  current_region_name: string | null;
-
   // Stats
   stats: Record<string, StatValue>;
 
@@ -174,16 +169,12 @@ export interface CharacterStateRead {
 
 // ── Play / SSE ────────────────────────────────────────────────────────────────
 
-export interface AdventureOptionRead {
-  ref: string;
-  display_name: string;
-  description: string;
-}
-
 export interface LocationOptionRead {
   ref: string;
   display_name: string;
-  is_current: boolean;
+  region_ref: string;
+  region_name: string;
+  adventures_available: boolean;
 }
 
 export interface RegionGraphNode {
@@ -205,11 +196,7 @@ export interface RegionGraphRead {
 
 export interface OverworldStateRead {
   character_id: string;
-  current_location: string | null;
-  current_location_name: string | null;
-  current_region_name: string | null;
-  available_adventures: AdventureOptionRead[];
-  navigation_options: LocationOptionRead[];
+  accessible_locations: LocationOptionRead[];
   region_graph: RegionGraphRead;
 }
 

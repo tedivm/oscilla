@@ -897,7 +897,6 @@ erDiagram
     JSON adventure_step_state "nullable"
     VARCHAR character_class "nullable"
     DATETIME completed_at "nullable"
-    VARCHAR current_location "nullable"
     BIGINT game_ticks
     BIGINT internal_ticks
     BOOLEAN is_active

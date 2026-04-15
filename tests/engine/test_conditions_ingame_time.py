@@ -27,7 +27,6 @@ def _player(
         name="Tester",
         character_class=None,
         prestige_count=0,
-        current_location=None,
         stats={"level": level},
     )
     p.game_ticks = game_ticks

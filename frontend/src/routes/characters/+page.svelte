@@ -83,6 +83,12 @@
               >
             </div>
             <Button
+              variant="primary"
+              onclick={() => goto(`${base}/characters/${character.id}/play`)}
+            >
+              Play
+            </Button>
+            <Button
               variant="secondary"
               onclick={() => goto(`${base}/characters/${character.id}`)}
             >

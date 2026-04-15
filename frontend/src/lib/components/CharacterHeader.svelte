@@ -6,19 +6,6 @@
   }
 
   let { character }: Props = $props();
-
-  const locationText = $derived.by(() => {
-    if (character.current_location_name && character.current_region_name) {
-      return `${character.current_location_name}, ${character.current_region_name}`;
-    }
-    if (character.current_location_name) {
-      return character.current_location_name;
-    }
-    if (character.current_region_name) {
-      return character.current_region_name;
-    }
-    return null;
-  });
 </script>
 
 <header class="character-header">
@@ -27,9 +14,6 @@
     <span><strong>Game:</strong> {character.game_name}</span>
     <span><strong>Pronouns:</strong> {character.pronoun_set}</span>
     <span><strong>Prestige:</strong> {character.prestige_count}</span>
-    {#if locationText}
-      <span><strong>Location:</strong> {locationText}</span>
-    {/if}
   </div>
 </header>
 

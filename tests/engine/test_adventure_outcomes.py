@@ -202,7 +202,6 @@ def _make_player() -> CharacterState:
         name="Tester",
         character_class=None,
         prestige_count=0,
-        current_location=None,
         stats={},
     )
 

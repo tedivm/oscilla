@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, untrack } from "svelte";
   import { goto } from "$app/navigation";
   import { base } from "$app/paths";
   import { gameSession } from "$lib/stores/gameSession.js";
@@ -21,10 +21,11 @@
   let { data }: { data: PageData } = $props();
 
   // Initialize store from crash-recovery data before first render (D6).
-  // Destructure first so Svelte 5 doesn't warn about capturing a reactive prop reference.
-  const { character, playState } = data;
-  gameSession.init(playState);
+  // untrack() signals that we intentionally want only the initial value here.
+  untrack(() => gameSession.init(data.playState));
 
+  // Derive character reactively so prop updates propagate through the component.
+  const character = $derived(data.character);
   const characterId = $derived(character.id);
 
   let showConflictModal = $state(false);
@@ -126,7 +127,8 @@
       {characterId}
       overworldState={$gameSession.overworldState}
       {character}
-      onBeginAdventure={(ref) => gameSession.begin(character.id, ref)}
+      onBeginAdventure={(locationRef) =>
+        gameSession.go(character.id, locationRef)}
     />
   {:else}
     <div class="adventure-layout">

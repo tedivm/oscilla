@@ -141,18 +141,18 @@ def test_get_play_current_returns_401_when_unauthenticated(play_client: TestClie
 
 
 # ---------------------------------------------------------------------------
-# POST /play/begin
+# POST /play/go
 # ---------------------------------------------------------------------------
 
 
-def test_begin_narrative_adventure_emits_sse_events(play_client: TestClient) -> None:
-    """begin with test-narrative emits at least one narrative event."""
-    _register(play_client, "play-begin-narrative@x.com")
-    h = _login(play_client, "play-begin-narrative@x.com")
+def test_go_with_valid_location_emits_sse_events(play_client: TestClient) -> None:
+    """go with test-location emits at least one narrative SSE event."""
+    _register(play_client, "play-go-narrative@x.com")
+    h = _login(play_client, "play-go-narrative@x.com")
     char = _create_character(play_client, h)
 
     with play_client.stream(
-        "POST", f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "test-narrative"}, headers=h
+        "POST", f"/api/characters/{char['id']}/play/go", json={"location_ref": "test-location"}, headers=h
     ) as resp:
         assert resp.status_code == 200
         resp.read()
@@ -162,70 +162,83 @@ def test_begin_narrative_adventure_emits_sse_events(play_client: TestClient) -> 
     assert "narrative" in types
 
 
-def test_begin_choice_adventure_emits_choice_event(play_client: TestClient) -> None:
-    """begin with test-choice emits a narrative then pauses at choice."""
-    _register(play_client, "play-begin-choice@x.com")
-    h = _login(play_client, "play-begin-choice@x.com")
+def test_go_with_choice_only_location_emits_choice_flow(play_client: TestClient) -> None:
+    """go with test-location-choice-only always selects test-choice (only adventure in pool).
+
+    test-choice has a narrative step followed by a choice step.
+    The SSE stream pauses at ack_required after the narrative step.
+    """
+    _register(play_client, "play-go-choice@x.com")
+    h = _login(play_client, "play-go-choice@x.com")
     char = _create_character(play_client, h)
 
     with play_client.stream(
-        "POST", f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "test-choice"}, headers=h
+        "POST",
+        f"/api/characters/{char['id']}/play/go",
+        json={"location_ref": "test-location-choice-only"},
+        headers=h,
     ) as resp:
         assert resp.status_code == 200
         resp.read()
         body = resp.text
     events = _parse_sse(body)
     types = [e["type"] for e in events]
-    # narrative step pauses with ack_required before revealing the choice step
+    # Narrative step produces ack_required before continuing to the choice step.
     assert "ack_required" in types
 
 
-def test_begin_with_unknown_adventure_ref_returns_422(play_client: TestClient) -> None:
-    _register(play_client, "play-begin-badref@x.com")
-    h = _login(play_client, "play-begin-badref@x.com")
+def test_go_with_unknown_location_returns_422(play_client: TestClient) -> None:
+    _register(play_client, "play-go-badref@x.com")
+    h = _login(play_client, "play-go-badref@x.com")
     char = _create_character(play_client, h)
 
     resp = play_client.post(
-        f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "nonexistent-adventure"}, headers=h
+        f"/api/characters/{char['id']}/play/go", json={"location_ref": "nonexistent-location"}, headers=h
     )
     assert resp.status_code == 422
 
 
-def test_begin_returns_404_for_other_users_character(play_client: TestClient) -> None:
-    _register(play_client, "play-begin-owner@x.com")
-    _register(play_client, "play-begin-other@x.com")
-    owner_h = _login(play_client, "play-begin-owner@x.com")
-    other_h = _login(play_client, "play-begin-other@x.com")
+def test_go_with_empty_adventure_pool_returns_422(play_client: TestClient) -> None:
+    """test-location-secondary has no adventures so go returns 422."""
+    _register(play_client, "play-go-empty@x.com")
+    h = _login(play_client, "play-go-empty@x.com")
+    char = _create_character(play_client, h)
+
+    resp = play_client.post(
+        f"/api/characters/{char['id']}/play/go", json={"location_ref": "test-location-secondary"}, headers=h
+    )
+    assert resp.status_code == 422
+
+
+def test_go_returns_404_for_other_users_character(play_client: TestClient) -> None:
+    _register(play_client, "play-go-owner@x.com")
+    _register(play_client, "play-go-other@x.com")
+    owner_h = _login(play_client, "play-go-owner@x.com")
+    other_h = _login(play_client, "play-go-other@x.com")
     char = _create_character(play_client, owner_h)
 
     resp = play_client.post(
-        f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "test-narrative"}, headers=other_h
+        f"/api/characters/{char['id']}/play/go", json={"location_ref": "test-location"}, headers=other_h
     )
     assert resp.status_code == 404
 
 
-def test_begin_returns_401_when_unauthenticated(play_client: TestClient) -> None:
-    _register(play_client, "play-begin-noauth@x.com")
-    h = _login(play_client, "play-begin-noauth@x.com")
+def test_go_returns_401_when_unauthenticated(play_client: TestClient) -> None:
+    _register(play_client, "play-go-noauth@x.com")
+    h = _login(play_client, "play-go-noauth@x.com")
     char = _create_character(play_client, h)
 
-    resp = play_client.post(f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "test-narrative"})
+    resp = play_client.post(f"/api/characters/{char['id']}/play/go", json={"location_ref": "test-location"})
     assert resp.status_code == 401
 
 
-def test_begin_returns_409_when_session_locked(play_client: TestClient) -> None:
-    """Second begin while lock is held returns 409 with SessionConflictRead body."""
+def test_go_returns_409_when_session_locked(play_client: TestClient) -> None:
+    """Second go while lock is held returns 409 with SessionConflictRead body."""
 
-    _register(play_client, "play-begin-locked@x.com")
-    h = _login(play_client, "play-begin-locked@x.com")
+    _register(play_client, "play-go-locked@x.com")
+    h = _login(play_client, "play-go-locked@x.com")
     char = _create_character(play_client, h)
 
-    # Simulate a live lock by calling begin (which acquires the lock) and then
-    # attempting another begin while the lock is still held.
-    # We inject the lock directly via the DB fixture.
-    # The simplest approach: call begin once; the lock is released when SSE stream ends.
-    # To test 409, we must pre-set the lock to a non-stale timestamp.
-    # We do this by directly calling the service via the DB override.
     import asyncio
     from datetime import datetime, timezone
 
@@ -233,7 +246,6 @@ def test_begin_returns_409_when_session_locked(play_client: TestClient) -> None:
     from oscilla.services.character import get_active_iteration_id
     from oscilla.services.db import get_session_depends
 
-    # Retrieve the DB maker from the override
     override_gen = app.dependency_overrides[get_session_depends]
 
     async def _inject_lock() -> None:
@@ -259,12 +271,9 @@ def test_begin_returns_409_when_session_locked(play_client: TestClient) -> None:
 
     asyncio.get_event_loop().run_until_complete(_inject_lock())
 
-    resp = play_client.post(
-        f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "test-narrative"}, headers=h
-    )
+    resp = play_client.post(f"/api/characters/{char['id']}/play/go", json={"location_ref": "test-location"}, headers=h)
     assert resp.status_code == 409
     body = resp.json()
-    # FastAPI wraps non-dict detail in {detail: ...}; our detail is already a dict
     assert "acquired_at" in str(body)
 
 
@@ -288,9 +297,9 @@ def test_advance_resumes_choice_adventure(play_client: TestClient) -> None:
     h = _login(play_client, "play-advance-choice@x.com")
     char = _create_character(play_client, h)
 
-    # begin — pauses at ack_required after the narrative step
+    # go — pauses at ack_required after the narrative step
     with play_client.stream(
-        "POST", f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "test-choice"}, headers=h
+        "POST", f"/api/characters/{char['id']}/play/go", json={"location_ref": "test-location-choice-only"}, headers=h
     ) as resp:
         assert resp.status_code == 200
         resp.read()
@@ -339,9 +348,9 @@ def test_abandon_clears_adventure_and_returns_204(play_client: TestClient) -> No
     h = _login(play_client, "play-abandon@x.com")
     char = _create_character(play_client, h)
 
-    # begin a choice adventure — pauses at choice step
+    # go — choice adventure pauses at ack_required after the narrative step
     with play_client.stream(
-        "POST", f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "test-choice"}, headers=h
+        "POST", f"/api/characters/{char['id']}/play/go", json={"location_ref": "test-location-choice-only"}, headers=h
     ) as resp:
         assert resp.status_code == 200
         resp.read()
@@ -425,9 +434,9 @@ def test_crash_recovery_begin_current_advance(play_client: TestClient) -> None:
     h = _login(play_client, "play-crash-recovery@x.com")
     char = _create_character(play_client, h)
 
-    # Step 1: begin — adventure pauses at choice step
+    # Step 1: go — adventure pauses at choice step
     with play_client.stream(
-        "POST", f"/api/characters/{char['id']}/play/begin", json={"adventure_ref": "test-choice"}, headers=h
+        "POST", f"/api/characters/{char['id']}/play/go", json={"location_ref": "test-location-choice-only"}, headers=h
     ) as resp:
         assert resp.status_code == 200
         resp.read()
@@ -479,9 +488,9 @@ def test_choice_branch_effects_applied_after_ack(play_client: TestClient) -> Non
 
     char_id = char["id"]
 
-    # 1. begin — navigate past the root narrative, pause at ack_required
+    # 1. go — navigate past the root narrative, pause at ack_required
     with play_client.stream(
-        "POST", f"/api/characters/{char_id}/play/begin", json={"adventure_ref": "test-choice"}, headers=h
+        "POST", f"/api/characters/{char_id}/play/go", json={"location_ref": "test-location-choice-only"}, headers=h
     ) as resp:
         assert resp.status_code == 200
         resp.read()

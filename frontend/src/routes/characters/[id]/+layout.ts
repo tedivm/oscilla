@@ -26,7 +26,7 @@ export const load: LayoutLoad = async ({ params, url }) => {
   }
 
   const current = await apiFetch<PendingStateRead>(
-    `/characters/${encodeURIComponent(params.id)}/play/current`,
+    `/api/characters/${encodeURIComponent(params.id)}/play/current`,
   );
 
   if (current.pending_event !== null) {

@@ -1,6 +1,6 @@
 import { writable, get } from "svelte/store";
 import type { OverworldStateRead } from "$lib/api/types.js";
-import { fetchSSE } from "$lib/api/play.js";
+import { fetchSSE, beginAdventureGo } from "$lib/api/play.js";
 import type { CurrentPlayState } from "$lib/api/play.js";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -103,6 +103,9 @@ function createGameSession() {
         if (gen !== activeGenerator) return;
         update((s) => applyEvent(s, event));
       }
+      // Stream exhausted: if we're still in loading mode (no adventure_complete event
+      // was received), fall back to overworld so the player isn't stuck.
+      update((s) => (s.mode === "loading" ? { ...s, mode: "overworld" } : s));
     } catch (e) {
       update((s) => ({
         ...s,
@@ -133,13 +136,8 @@ function createGameSession() {
       update((s) => ({ ...s, mode: "overworld", overworldState }));
     },
 
-    async begin(characterId: string, adventureRef: string): Promise<void> {
-      const gen = fetchSSE(
-        `/api/characters/${encodeURIComponent(characterId)}/play/begin`,
-        {
-          adventure_ref: adventureRef,
-        },
-      );
+    async go(characterId: string, locationRef: string): Promise<void> {
+      const gen = beginAdventureGo(characterId, locationRef);
       activeGenerator = gen;
       await runStream(gen);
     },

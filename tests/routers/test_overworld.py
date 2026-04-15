@@ -1,4 +1,4 @@
-"""Integration tests for the overworld router (location navigation and state)."""
+"""Integration tests for the overworld router (GET /overworld)."""
 
 from __future__ import annotations
 
@@ -83,72 +83,103 @@ def _create_character(client: TestClient, headers: Dict[str, str], game: str = "
     return resp.json()
 
 
-def _navigate(client: TestClient, char_id: str, location_ref: str, headers: Dict[str, str]) -> Dict[str, Any]:
-    resp = client.post(f"/api/characters/{char_id}/navigate", json={"location_ref": location_ref}, headers=headers)
-    assert resp.status_code == 200, resp.text
-    return resp.json()
-
-
 # ---------------------------------------------------------------------------
-# GET /overworld
+# GET /overworld — shape and content
 # ---------------------------------------------------------------------------
 
 
-def test_get_overworld_fresh_character_has_null_location(ow_client: TestClient) -> None:
-    """A fresh character has no current location."""
-    _register(ow_client, "ow-get-fresh@x.com")
-    h = _login(ow_client, "ow-get-fresh@x.com")
+def test_get_overworld_returns_correct_top_level_shape(ow_client: TestClient) -> None:
+    """GET /overworld returns character_id, accessible_locations, and region_graph."""
+    _register(ow_client, "ow-shape@x.com")
+    h = _login(ow_client, "ow-shape@x.com")
     char = _create_character(ow_client, h)
 
     resp = ow_client.get(f"/api/characters/{char['id']}/overworld", headers=h)
     assert resp.status_code == 200
     body = resp.json()
     assert body["character_id"] == char["id"]
-    assert body["current_location"] is None
-    assert body["current_location_name"] is None
-    assert body["current_region_name"] is None
-    assert body["available_adventures"] == []
-    assert body["navigation_options"] == []
+    assert "accessible_locations" in body
+    assert "region_graph" in body
+    # Old fields must not appear
+    assert "current_location" not in body
+    assert "available_adventures" not in body
+    assert "navigation_options" not in body
 
 
-def test_get_overworld_returns_location_after_navigate(ow_client: TestClient) -> None:
-    """After navigation, GET /overworld reflects the new location."""
-    _register(ow_client, "ow-get-nav@x.com")
-    h = _login(ow_client, "ow-get-nav@x.com")
+def test_get_overworld_accessible_locations_non_empty(ow_client: TestClient) -> None:
+    """accessible_locations includes all locations with no unlock conditions."""
+    _register(ow_client, "ow-locs@x.com")
+    h = _login(ow_client, "ow-locs@x.com")
     char = _create_character(ow_client, h)
-
-    _navigate(ow_client, char["id"], "test-location", h)
 
     resp = ow_client.get(f"/api/characters/{char['id']}/overworld", headers=h)
     assert resp.status_code == 200
-    body = resp.json()
-    assert body["current_location"] == "test-location"
-    assert body["current_location_name"] == "Test Location"
-    assert body["current_region_name"] is not None
-    # Should include both test adventures
-    adventure_refs = [a["ref"] for a in body["available_adventures"]]
-    assert "test-narrative" in adventure_refs
-    assert "test-choice" in adventure_refs
-    # Navigation options must include both locations in the region
-    nav_refs = [n["ref"] for n in body["navigation_options"]]
-    assert "test-location" in nav_refs
-    assert "test-location-secondary" in nav_refs
+    locs = resp.json()["accessible_locations"]
+    assert len(locs) >= 1
+    # All locations in play-api have no unlock conditions, so all should appear
+    refs = [loc["ref"] for loc in locs]
+    assert "test-location" in refs
+    assert "test-location-secondary" in refs
 
 
-def test_get_overworld_marks_current_location_is_current(ow_client: TestClient) -> None:
-    """The current location has is_current=True in navigation_options."""
-    _register(ow_client, "ow-get-iscurrent@x.com")
-    h = _login(ow_client, "ow-get-iscurrent@x.com")
+def test_get_overworld_location_option_shape(ow_client: TestClient) -> None:
+    """Each LocationOptionRead has ref, display_name, region_ref, region_name, adventures_available."""
+    _register(ow_client, "ow-locshape@x.com")
+    h = _login(ow_client, "ow-locshape@x.com")
     char = _create_character(ow_client, h)
-
-    _navigate(ow_client, char["id"], "test-location", h)
 
     resp = ow_client.get(f"/api/characters/{char['id']}/overworld", headers=h)
     assert resp.status_code == 200
-    nav_opts = resp.json()["navigation_options"]
-    current_opts = [n for n in nav_opts if n["ref"] == "test-location"]
-    assert len(current_opts) == 1
-    assert current_opts[0]["is_current"] is True
+    locs = resp.json()["accessible_locations"]
+    for loc in locs:
+        assert "ref" in loc
+        assert "display_name" in loc
+        assert "region_ref" in loc
+        assert "region_name" in loc
+        assert "adventures_available" in loc
+        # Old field must not appear
+        assert "is_current" not in loc
+
+
+def test_get_overworld_adventures_available_is_true_for_location_with_adventures(ow_client: TestClient) -> None:
+    """adventures_available is True for test-location (has 2 adventures) and False for secondary."""
+    _register(ow_client, "ow-advavail@x.com")
+    h = _login(ow_client, "ow-advavail@x.com")
+    char = _create_character(ow_client, h)
+
+    resp = ow_client.get(f"/api/characters/{char['id']}/overworld", headers=h)
+    assert resp.status_code == 200
+    locs = {loc["ref"]: loc for loc in resp.json()["accessible_locations"]}
+
+    # test-location has test-narrative and test-choice — both are eligible for a fresh character
+    assert locs["test-location"]["adventures_available"] is True
+    # test-location-secondary has no adventures
+    assert locs["test-location-secondary"]["adventures_available"] is False
+
+
+def test_get_overworld_region_graph_has_nodes_and_edges(ow_client: TestClient) -> None:
+    """region_graph contains at least one node (the root region) and edges list."""
+    _register(ow_client, "ow-graph@x.com")
+    h = _login(ow_client, "ow-graph@x.com")
+    char = _create_character(ow_client, h)
+
+    resp = ow_client.get(f"/api/characters/{char['id']}/overworld", headers=h)
+    assert resp.status_code == 200
+    graph = resp.json()["region_graph"]
+    assert "nodes" in graph
+    assert "edges" in graph
+    assert isinstance(graph["nodes"], list)
+    assert isinstance(graph["edges"], list)
+    # play-api has one root region and two locations → at least 3 nodes
+    assert len(graph["nodes"]) >= 1
+    # Verify at least one node has the region in its id
+    node_ids = [n["id"] for n in graph["nodes"]]
+    assert any("test-region-root" in nid for nid in node_ids)
+
+
+# ---------------------------------------------------------------------------
+# GET /overworld — auth and ownership
+# ---------------------------------------------------------------------------
 
 
 def test_get_overworld_returns_404_for_other_users_character(ow_client: TestClient) -> None:
@@ -168,92 +199,4 @@ def test_get_overworld_returns_401_when_unauthenticated(ow_client: TestClient) -
     char = _create_character(ow_client, h)
 
     resp = ow_client.get(f"/api/characters/{char['id']}/overworld")
-    assert resp.status_code == 401
-
-
-# ---------------------------------------------------------------------------
-# POST /navigate
-# ---------------------------------------------------------------------------
-
-
-def test_navigate_updates_location_and_returns_overworld_state(ow_client: TestClient) -> None:
-    """Navigate to a valid location and verify the response reflects the new state."""
-    _register(ow_client, "ow-nav-ok@x.com")
-    h = _login(ow_client, "ow-nav-ok@x.com")
-    char = _create_character(ow_client, h)
-
-    resp = ow_client.post(f"/api/characters/{char['id']}/navigate", json={"location_ref": "test-location"}, headers=h)
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["current_location"] == "test-location"
-    assert body["current_location_name"] == "Test Location"
-
-
-def test_navigate_to_secondary_location(ow_client: TestClient) -> None:
-    """Navigate to the secondary location — should have no adventures."""
-    _register(ow_client, "ow-nav-secondary@x.com")
-    h = _login(ow_client, "ow-nav-secondary@x.com")
-    char = _create_character(ow_client, h)
-
-    resp = ow_client.post(
-        f"/api/characters/{char['id']}/navigate",
-        json={"location_ref": "test-location-secondary"},
-        headers=h,
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["current_location"] == "test-location-secondary"
-    assert body["available_adventures"] == []
-
-
-def test_navigate_persists_location(ow_client: TestClient) -> None:
-    """After navigate, GET /overworld shows the updated location."""
-    _register(ow_client, "ow-nav-persist@x.com")
-    h = _login(ow_client, "ow-nav-persist@x.com")
-    char = _create_character(ow_client, h)
-
-    ow_client.post(f"/api/characters/{char['id']}/navigate", json={"location_ref": "test-location"}, headers=h)
-
-    resp = ow_client.get(f"/api/characters/{char['id']}/overworld", headers=h)
-    assert resp.status_code == 200
-    assert resp.json()["current_location"] == "test-location"
-
-
-def test_navigate_with_unknown_location_returns_422(ow_client: TestClient) -> None:
-    _register(ow_client, "ow-nav-bad@x.com")
-    h = _login(ow_client, "ow-nav-bad@x.com")
-    char = _create_character(ow_client, h)
-
-    resp = ow_client.post(
-        f"/api/characters/{char['id']}/navigate",
-        json={"location_ref": "nonexistent-location"},
-        headers=h,
-    )
-    assert resp.status_code == 422
-
-
-def test_navigate_returns_404_for_other_users_character(ow_client: TestClient) -> None:
-    _register(ow_client, "ow-nav-owner@x.com")
-    _register(ow_client, "ow-nav-other@x.com")
-    owner_h = _login(ow_client, "ow-nav-owner@x.com")
-    other_h = _login(ow_client, "ow-nav-other@x.com")
-    char = _create_character(ow_client, owner_h)
-
-    resp = ow_client.post(
-        f"/api/characters/{char['id']}/navigate",
-        json={"location_ref": "test-location"},
-        headers=other_h,
-    )
-    assert resp.status_code == 404
-
-
-def test_navigate_returns_401_when_unauthenticated(ow_client: TestClient) -> None:
-    _register(ow_client, "ow-nav-noauth@x.com")
-    h = _login(ow_client, "ow-nav-noauth@x.com")
-    char = _create_character(ow_client, h)
-
-    resp = ow_client.post(
-        f"/api/characters/{char['id']}/navigate",
-        json={"location_ref": "test-location"},
-    )
     assert resp.status_code == 401

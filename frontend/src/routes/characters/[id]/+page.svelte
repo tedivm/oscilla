@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
   import { onMount } from "svelte";
   import { page } from "$app/stores";
   import { base } from "$app/paths";
@@ -7,6 +8,7 @@
   import { getGame } from "$lib/api/games.js";
   import type { CharacterStateRead, GameRead } from "$lib/api/types.js";
   import {
+    Button,
     CharacterHeader,
     ErrorBanner,
     LoadingSpinner,
@@ -47,7 +49,17 @@
 </script>
 
 <div class="character-sheet">
-  <a class="back-link" href={`${base}/characters`}>Back to characters</a>
+  <div class="sheet-nav">
+    <a class="back-link" href={`${base}/characters`}>Back to characters</a>
+    {#if character}
+      <Button
+        variant="primary"
+        onclick={() => goto(`${base}/characters/${id}/play`)}
+      >
+        Play
+      </Button>
+    {/if}
+  </div>
 
   {#if loading}
     <div class="loading-state"><LoadingSpinner /></div>
@@ -100,6 +112,12 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
+  }
+
+  .sheet-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
 
   .back-link {

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the overworld state and navigation endpoints. The overworld is the "between adventures" layer where a player views their current location, available adventures, and reachable locations.
+Defines the overworld state and hierarchical region navigation. The overworld is the "between adventures" layer where a player browses the world map, navigates through regions, and begins adventures from accessible locations.
 
 ## Requirements
 
@@ -13,76 +13,48 @@ Defines the overworld state and navigation endpoints. The overworld is the "betw
 `OverworldStateRead` SHALL contain:
 
 - `character_id: UUID`
-- `current_location: str | None` — location ref from the iteration row
-- `current_location_name: str | None` — display name resolved from `registry.locations`
-- `current_region_name: str | None` — display name of the location's parent region
-- `available_adventures: List[AdventureOptionRead]` — adventures in the current location's pool, with display name and description resolved from `registry.adventures`; empty list if `current_location` is None
-- `navigation_options: List[LocationOptionRead]` — all locations in `registry.locations` that share the current region, with `is_current` set for the active one; empty list if `current_location` is None
-- `region_graph: RegionGraphRead` — nodes and edges for the current region, derived from `build_world_graph` scoped to the character's region; empty graph if `current_location` is None
+- `accessible_locations: List[LocationOptionRead]` — all locations in the registry whose unlock conditions the character currently meets
+- `region_graph: RegionGraphRead` — nodes and edges for the complete world graph (all regions and locations in the registry, not filtered to accessible locations; the frontend hides inaccessible location rows using `accessible_locations` as the filter)
 
-`AdventureOptionRead` SHALL contain: `ref: str`, `display_name: str`, `description: str`.
+`OverworldStateRead` SHALL NOT contain any field that reveals adventure names, descriptions, refs, or counts. There is no `current_location`, `current_location_name`, `current_region_name`, `available_adventures`, or `navigation_options` field.
 
-`LocationOptionRead` SHALL contain: `ref: str`, `display_name: str`, `is_current: bool`.
+`LocationOptionRead` SHALL contain:
+
+- `ref: str`
+- `display_name: str`
+- `region_ref: str` — the ref of the region this location belongs to
+- `region_name: str` — the display name of that region
+- `adventures_available: bool` — `true` if at least one adventure in the location's pool is currently eligible for this character; `false` otherwise
+
+`adventures_available` SHALL NOT reveal what adventures are available, how many, or by what names. It SHALL only indicate whether a Begin Adventure action is currently possible.
 
 `RegionGraphRead` SHALL contain: `nodes: List[RegionGraphNode]`, `edges: List[RegionGraphEdge]`.
 
-`RegionGraphNode` SHALL contain: `id: str`, `label: str`, `kind: str`.
+`RegionGraphNode` SHALL contain: `id: str`, `label: str`, `kind: str` (either `"region"` or `"location"`).
 
 `RegionGraphEdge` SHALL contain: `source: str`, `target: str`, `label: str`.
 
-#### Scenario: Returns full OverworldStateRead for a character with a current_location
+`AdventureOptionRead` is REMOVED from this endpoint. No adventure names, descriptions, or refs SHALL be exposed in this response.
 
-- **GIVEN** a character at location `"easy-fight"` in region `"combat"`
+#### Scenario: returns accessible_locations with adventures_available
+
+- **GIVEN** a character who meets the unlock conditions for `"test-location"` which has eligible adventures, and `"test-location-empty"` which has no eligible adventures, but NOT `"test-location-locked"`
 - **WHEN** `GET /overworld` is called
-- **THEN** the response contains `current_location = "easy-fight"`, `current_location_name`, `current_region_name`, `available_adventures` matching the location's adventure pool, and `navigation_options` listing all combat-region locations
+- **THEN** the response contains `accessible_locations` with an entry for `"test-location"` where `adventures_available` is `true`
+- **AND** an entry for `"test-location-empty"` where `adventures_available` is `false`
+- **AND** `"test-location-locked"` is NOT in `accessible_locations`
+- **AND** the response does NOT contain any adventure names, descriptions, or refs
 
-#### Scenario: Returns null location fields for a character with no current_location
+#### Scenario: returns empty accessible_locations for a character with no unlocked locations
 
-- **GIVEN** a character with `current_location = null`
+- **GIVEN** a newly created character with no unlocked locations
 - **WHEN** `GET /overworld` is called
-- **THEN** `current_location`, `current_location_name`, `current_region_name` are all `null`; `available_adventures`, `navigation_options`, and `region_graph` are empty collections
+- **THEN** `accessible_locations` is an empty list
 
 #### Scenario: Returns 404 for an unowned character
 
 - **GIVEN** character `{id}` belongs to user B
 - **WHEN** user A calls `GET /overworld`
-- **THEN** the response has HTTP 404
-
----
-
-### Requirement: POST /characters/{id}/navigate moves the character to a new location
-
-`POST /characters/{id}/navigate` SHALL be an authenticated endpoint accepting `NavigateRequest` and returning `OverworldStateRead` (HTTP 200). The endpoint SHALL return HTTP 404 for unowned characters.
-
-`NavigateRequest` SHALL contain:
-
-- `location_ref: str` — the destination location ref
-
-The endpoint SHALL validate that `location_ref` exists in `registry.locations`. If `location_ref` is unknown it SHALL return HTTP 422. If the location's `effective_unlock` condition is not satisfied by the character's current state it SHALL return HTTP 422 with a descriptive detail. On success it SHALL update `current_location` on the iteration row and return the new `OverworldStateRead`.
-
-Navigation is unrestricted between locations within the same region and between regions — region membership is not enforced by this endpoint. Unlock conditions are the sole access control mechanism.
-
-#### Scenario: Successfully navigates to an unlocked location
-
-- **WHEN** the owner calls `POST /navigate` with a valid, unlocked `location_ref`
-- **THEN** the response has HTTP 200 with `OverworldStateRead` reflecting the new location
-- **AND** `GET /characters/{id}` shows `current_location` equals the new ref
-
-#### Scenario: Returns 422 for an unknown location_ref
-
-- **WHEN** `POST /navigate` is called with `{"location_ref": "nonexistent"}`
-- **THEN** the response has HTTP 422
-
-#### Scenario: Returns 422 for a location whose unlock condition is not satisfied
-
-- **GIVEN** location `"locked-area"` requires a stat condition the character does not meet
-- **WHEN** `POST /navigate` is called with `{"location_ref": "locked-area"}`
-- **THEN** the response has HTTP 422 with a descriptive message
-
-#### Scenario: Returns 404 for an unowned character
-
-- **GIVEN** character `{id}` belongs to user B
-- **WHEN** user A calls `POST /navigate`
 - **THEN** the response has HTTP 404
 
 ---
@@ -100,43 +72,60 @@ The overworld and adventure screens share the single route `/characters/[id]/pla
 
 ---
 
-### Requirement: OverworldView fetches and displays location state
+### Requirement: OverworldView implements hierarchical region navigation
 
-`OverworldView.svelte` receives `state: OverworldStateRead | null` and `characterId: string`. When `state` is null it SHALL render a `LoadingSpinner`. When populated it SHALL render `LocationInfo`, `AdventureList`, `NavigationPanel`, and `CharacterSidebar`. The `state` is initialized from `getCurrentPlayState` in the page load function; the component does not fetch it independently on first render.
+`OverworldView.svelte` receives `overworldState: OverworldStateRead | null`, `characterId: string`, and `onBeginAdventure: (locationRef: string) => void`. When `state` is null it SHALL render a `LoadingSpinner`.
 
-#### Scenario: overworld renders available adventures for current location
+The component SHALL store `currentRegion: string | null` in local Svelte `$state`. This value SHALL NOT be sent to the server.
 
-- **GIVEN** `OverworldStateRead.available_adventures` has 2 entries
+When `currentRegion` is `null`, the component SHALL render root-level regions (region nodes in `region_graph` with no incoming edges from other region nodes).
+
+When `currentRegion` is set, the component SHALL render the direct children of that region using `region_graph` edges:
+
+- Region-kind children SHALL be rendered as navigation buttons that update `currentRegion`.
+- Location-kind children that appear in `accessible_locations` SHALL be rendered as location rows with a Begin Adventure button. The button SHALL be **disabled** when `loc.adventures_available === false`.
+
+A back button SHALL be present (and functional) whenever `currentRegion` is not null.
+
+The component SHALL NOT display adventure names, descriptions, counts, or eligibility explanations.
+
+`AdventureList.svelte` is REMOVED.
+
+#### Scenario: shows all root regions on initial render
+
+- **GIVEN** a `region_graph` with two disconnected root regions (no edges between them), each with child locations
+- **WHEN** `OverworldView` renders with `currentRegion` = null (the initial world map state)
+- **THEN** both root regions are shown as navigation buttons simultaneously
+- **AND** no location rows or Begin Adventure buttons are visible
+- **AND** no back button is shown
+
+#### Scenario: back button from root region returns to world map
+
+- **GIVEN** the player has navigated into a root region
+- **WHEN** they click the back button
+- **THEN** `currentRegion` returns to `null`
+- **AND** all root regions are displayed again
+
+#### Scenario: entering a region shows its children
+
+- **GIVEN** the player clicks a root region button
+- **WHEN** `currentRegion` is updated to that region's id
+- **THEN** the children of that region are rendered (sub-regions as buttons, locations as location rows)
+- **AND** a back button is shown
+
+#### Scenario: Begin Adventure button is disabled when adventures_available is false
+
+- **GIVEN** a location row where `loc.adventures_available === false`
 - **WHEN** `OverworldView` renders
-- **THEN** `AdventureList` shows 2 adventure cards, each with `display_name` and `description`
+- **THEN** the Begin Adventure button is in a disabled state
+- **AND** clicking it does NOT call `onBeginAdventure`
 
----
+#### Scenario: clicking Begin Adventure passes the location ref
 
-### Requirement: AdventureList begins an adventure via gameSession
-
-`AdventureList.svelte` SHALL call `onBeginAdventure(adventure.ref)` when a player selects an adventure. The parent `+page.svelte` handler calls `gameSession.begin(characterId, adventureRef)`. `AdventureList` SHALL NOT call `gameSession` directly.
-
-#### Scenario: selecting an adventure transitions the play screen to loading
-
-- **GIVEN** `AdventureList` shows "SSE Events Showcase"
-- **WHEN** the player clicks "Begin" on that adventure
-- **THEN** `onBeginAdventure("api-sse-events")` is called
+- **GIVEN** a location with ref `"test-location"` and `adventures_available === true`
+- **WHEN** the player clicks its Begin Adventure button
+- **THEN** `onBeginAdventure("test-location")` is called
 - **AND** `$gameSession.mode` transitions to `"loading"` before the first SSE event
-- **AND** `OverworldView` is replaced by `NarrativeLog` + `LoadingSpinner`
-
----
-
-### Requirement: NavigationPanel navigates to a new location via the API
-
-`NavigationPanel.svelte` SHALL call `navigateLocation(characterId, location.ref)` from `api/characters.ts` when a non-current location button is clicked. On success it SHALL call `onNavigated(newOverworldState)` so the parent can update `$gameSession.overworldState`. The current location button SHALL be visually highlighted and its button disabled. On `ApiError` the panel SHALL render an `ErrorBanner`.
-
-#### Scenario: navigating updates the overworld state
-
-- **GIVEN** the player is at "API Hub" and "API Secondary Location" is listed
-- **WHEN** the player clicks "API Secondary Location"
-- **THEN** `POST /characters/{id}/navigate` is called with `{ location_ref: "api-secondary" }`
-- **AND** on success `onNavigated` is called with the updated `OverworldStateRead`
-- **AND** "API Secondary Location" is now highlighted as the current location
 
 ---
 

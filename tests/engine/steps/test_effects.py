@@ -256,7 +256,6 @@ def _make_gold_player(gold: int = 100) -> CharacterState:
         name="TestHero",
         character_class=None,
         prestige_count=0,
-        current_location=None,
         stats={"gold": gold},
     )
 

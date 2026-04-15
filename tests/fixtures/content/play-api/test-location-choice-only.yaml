@@ -1,0 +1,11 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: test-location-choice-only
+spec:
+  displayName: "Test Choice Location"
+  description: "Location with only the choice adventure, for deterministic test selection."
+  region: test-region-root
+  adventures:
+    - ref: test-choice
+      weight: 1

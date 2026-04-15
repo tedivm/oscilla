@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import random
+import time as _time
 from collections.abc import AsyncIterator
 from datetime import datetime
 from logging import getLogger
@@ -17,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_204_NO_CONTENT
 
 from oscilla.dependencies.auth import get_current_user
+from oscilla.engine.conditions import evaluate
 from oscilla.engine.pipeline import AdventurePipeline
 from oscilla.engine.session import WebPersistCallback
 from oscilla.engine.web_callbacks import DecisionPauseException, WebCallbacks
@@ -46,8 +49,8 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-class BeginAdventureRequest(BaseModel):
-    adventure_ref: str = Field(description="Adventure manifest ref to begin.")
+class GoAdventureRequest(BaseModel):
+    location_ref: str = Field(description="Location ref to begin an adventure from.")
 
 
 class AdvanceRequest(BaseModel):
@@ -233,23 +236,75 @@ async def get_play_current(
     return PendingStateRead(character_id=character_id, pending_event=pending, session_output=events)
 
 
-@router.post("/characters/{character_id}/play/begin")
-async def begin_adventure(
+@router.post("/characters/{character_id}/play/go")
+async def go_adventure(
     character_id: UUID,
-    body: BeginAdventureRequest,
+    body: GoAdventureRequest,
     user: Annotated[UserRecord, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_session_depends)],
     request: Request,
 ) -> StreamingResponse:
-    """Begin an adventure and stream SSE events until the first decision point.
+    """Select and begin an adventure via weighted random from the location's eligible pool.
 
-    Acquires a session lock; returns 409 if a live session already holds the lock.
-    Clears any existing session output before starting.
+    Steps:
+    1. Validate location exists in the registry (422 if not).
+    2. Load character state (404 if not found).
+    3. Validate location is accessible to this character via unlock conditions (422 if not).
+    4. Build eligible pool: adventures whose `requires` conditions pass and repeat controls allow.
+    5. Return 422 if pool is empty.
+    6. Select one adventure via weighted random — result is never revealed to the client.
+    7. Acquire session lock (409 if already held).
+    8. Stream the adventure as SSE.
     """
     iteration, registry = await _require_character_and_registry(
         character_id=character_id, user=user, db=db, request=request
     )
 
+    # 1. Validate location exists in the registry.
+    loc = registry.locations.get(body.location_ref)
+    if loc is None:
+        raise HTTPException(status_code=422, detail=f"Unknown location '{body.location_ref}'.")
+
+    if registry.character_config is None:
+        raise HTTPException(status_code=500, detail="Game not configured.")
+
+    # 2. Load character state (required to evaluate unlock conditions and adventure eligibility).
+    state = await load_character(
+        session=db,
+        character_id=character_id,
+        character_config=registry.character_config,
+        registry=registry,
+    )
+    if state is None:
+        raise HTTPException(status_code=404, detail="Character not found.")
+
+    # 3. Validate the location is accessible to this character.
+    #    Unlock conditions may reference character stats, so the full state is required.
+    if not evaluate(loc.spec.effective_unlock, state, registry):
+        raise HTTPException(status_code=422, detail=f"Location '{body.location_ref}' is not accessible.")
+
+    # 4. Build the eligible pool: same filter as the TUI (conditions + repeat controls).
+    now_ts = int(_time.time())
+    eligible = [
+        entry
+        for entry in loc.spec.adventures
+        if evaluate(entry.requires, state, registry)
+        and state.is_adventure_eligible(
+            adventure_ref=entry.ref,
+            spec=registry.adventures.require(entry.ref, "Adventure").spec,
+            now_ts=now_ts,
+        )
+    ]
+
+    if not eligible:
+        raise HTTPException(status_code=422, detail="No adventures are available at this location right now.")
+
+    # 5. Weighted random selection — never exposed to the client.
+    weights = [entry.weight for entry in eligible]
+    (chosen_entry,) = random.choices(population=eligible, weights=weights, k=1)
+    adventure_ref = chosen_entry.ref
+
+    # 6. Acquire session lock.
     token = str(uuid4())
     conflict_dt = await acquire_web_session_lock(
         session=db,
@@ -267,41 +322,14 @@ async def begin_adventure(
             ).model_dump(mode="json"),
         )
 
-    # Validate adventure exists in the registry.
-    if registry.adventures.get(body.adventure_ref) is None:
-        await release_web_session_lock(session=db, iteration_id=iteration.id, token=token)
-        raise HTTPException(status_code=422, detail=f"Unknown adventure '{body.adventure_ref}'.")
-
-    assert registry.character_config is not None
-
-    state = await load_character(
-        session=db,
-        character_id=character_id,
-        character_config=registry.character_config,
-        registry=registry,
-    )
-    if state is None:
-        await release_web_session_lock(session=db, iteration_id=iteration.id, token=token)
-        raise HTTPException(status_code=404, detail="Character not found.")
-
-    # Clear stale session output from a previous adventure.
     await clear_session_output(session=db, iteration_id=iteration.id)
 
-    # Resolve location context for SSE event metadata.
-    location_ref = state.current_location
-    location_name: str | None = None
-    region_name: str | None = None
-    if location_ref is not None:
-        loc = registry.locations.get(location_ref)
-        if loc is not None:
-            location_name = loc.spec.displayName
-            region = registry.regions.get(loc.spec.region)
-            region_name = region.spec.displayName if region is not None else None
-
+    # 7. Resolve location context for SSE event metadata.
+    region = registry.regions.get(loc.spec.region)
     web_cb = WebCallbacks(
-        location_ref=location_ref,
-        location_name=location_name,
-        region_name=region_name,
+        location_ref=body.location_ref,
+        location_name=loc.spec.displayName,
+        region_name=region.spec.displayName if region is not None else None,
     )
     persist_cb = WebPersistCallback(
         db_session=db,
@@ -317,13 +345,14 @@ async def begin_adventure(
         on_state_change=persist_cb,
     )
 
+    # 8. Stream the adventure.
     return StreamingResponse(
         _run_pipeline_and_stream(
             pipeline=pipeline,
             web_cb=web_cb,
             db=db,
             iteration_id=iteration.id,
-            adventure_ref=body.adventure_ref,
+            adventure_ref=adventure_ref,
             session_token=token,
         ),
         media_type="text/event-stream",
@@ -380,16 +409,6 @@ async def advance_adventure(
         await release_web_session_lock(session=db, iteration_id=iteration.id, token=token)
         raise HTTPException(status_code=404, detail="Character not found.")
 
-    location_ref = state.current_location
-    location_name: str | None = None
-    region_name: str | None = None
-    if location_ref is not None:
-        loc = registry.locations.get(location_ref)
-        if loc is not None:
-            location_name = loc.spec.displayName
-            region = registry.regions.get(loc.spec.region)
-            region_name = region.spec.displayName if region is not None else None
-
     # When the request is not a fresh choice submission, restore any pending
     # choice index previously stored in step_state. This allows the pipeline
     # to replay the choice step silently and re-enter the correct option branch
@@ -402,9 +421,9 @@ async def advance_adventure(
             pending_choice = raw
 
     web_cb = WebCallbacks(
-        location_ref=location_ref,
-        location_name=location_name,
-        region_name=region_name,
+        location_ref=None,
+        location_name=None,
+        region_name=None,
         player_choice=body.choice if body.choice is not None else pending_choice,
         player_ack=body.ack,
         player_text_input=body.text_input,

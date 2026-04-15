@@ -43,11 +43,12 @@ vi.mock("$app/paths", () => ({
 // ── Source-contract: module exports ───────────────────────────────────────────
 
 describe("play module exports", () => {
-  it("exports getCurrentPlayState, fetchSSE, parseSSEBuffer", async () => {
+  it("exports getCurrentPlayState, fetchSSE, parseSSEBuffer, beginAdventureGo", async () => {
     const mod = await import("./play.js");
     expect(typeof mod.getCurrentPlayState).toBe("function");
     expect(typeof mod.fetchSSE).toBe("function");
     expect(typeof mod.parseSSEBuffer).toBe("function");
+    expect(typeof mod.beginAdventureGo).toBe("function");
   });
 });
 
@@ -132,9 +133,9 @@ describe("getCurrentPlayState", () => {
       ],
     });
     mockGetOverworld.mockResolvedValueOnce({
-      current_location: { ref: "loc:hub", name: "Hub" },
-      adjacent_locations: [],
-      available_adventures: [],
+      character_id: "char-1",
+      accessible_locations: [],
+      region_graph: { nodes: [], edges: [] },
     });
 
     const result = await getCurrentPlayState("char-1");
@@ -148,9 +149,9 @@ describe("getCurrentPlayState", () => {
     const { getCurrentPlayState } = await import("./play.js");
 
     const owState = {
-      current_location: { ref: "loc:hub", name: "Hub" },
-      adjacent_locations: [],
-      available_adventures: [],
+      character_id: "char-1",
+      accessible_locations: [],
+      region_graph: { nodes: [], edges: [] },
     };
     mockApiFetch.mockResolvedValueOnce({
       pending_event: null,

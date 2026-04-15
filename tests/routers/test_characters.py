@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 
 from oscilla.engine.models.character_config import CharacterConfigManifest
 from oscilla.engine.models.game import GameManifest
-from oscilla.engine.models.location import LocationManifest
 from oscilla.engine.models.time import GameTimeSpec
 from oscilla.engine.registry import ContentRegistry
 from oscilla.www import app
@@ -20,16 +19,11 @@ def characters_client(auth_client: TestClient) -> TestClient:
     app.state.registries = {
         "test-alpha": _build_registry(name="test-alpha", display_name="Test Alpha", with_time=False),
         "test-beta": _build_registry(name="test-beta", display_name="Test Beta", with_time=True),
-        "test-gamma": _build_registry(
-            name="test-gamma", display_name="Test Gamma", with_time=False, starting_location="test-loc"
-        ),
     }
     return auth_client
 
 
-def _build_registry(
-    name: str, display_name: str, with_time: bool, starting_location: str | None = None
-) -> ContentRegistry:
+def _build_registry(name: str, display_name: str, with_time: bool) -> ContentRegistry:
     registry = ContentRegistry()
     game_spec: Dict[str, Any] = {
         "displayName": display_name,
@@ -37,8 +31,6 @@ def _build_registry(
     }
     if with_time:
         game_spec["time"] = GameTimeSpec().model_dump()
-    if starting_location is not None:
-        game_spec["character_creation"] = {"starting_location": starting_location}
 
     registry.game = GameManifest.model_validate(
         {
@@ -64,21 +56,6 @@ def _build_registry(
             },
         }
     )
-    if starting_location is not None:
-        registry.locations.register(
-            LocationManifest.model_validate(
-                {
-                    "apiVersion": "oscilla/v1",
-                    "kind": "Location",
-                    "metadata": {"name": starting_location},
-                    "spec": {
-                        "displayName": "Test Location",
-                        "description": "A test location.",
-                        "region": "test-region",
-                    },
-                }
-            )
-        )
     return registry
 
 
@@ -278,23 +255,3 @@ def test_patch_character_returns_404_for_other_users_character(characters_client
         headers=other_headers,
     )
     assert response.status_code == 404
-
-
-def test_post_characters_sets_starting_location(characters_client: TestClient) -> None:
-    """New characters start at the location declared in character_creation.starting_location."""
-    headers = _auth_headers(characters_client, "char-startloc@example.com")
-
-    created = _create_character(characters_client, headers=headers, game_name="test-gamma")
-    response = characters_client.get(f"/api/characters/{created['id']}", headers=headers)
-    assert response.status_code == 200
-    assert response.json()["current_location"] == "test-loc"
-
-
-def test_post_characters_no_starting_location_when_unset(characters_client: TestClient) -> None:
-    """New characters have no current_location when game does not set starting_location."""
-    headers = _auth_headers(characters_client, "char-noloc@example.com")
-
-    created = _create_character(characters_client, headers=headers, game_name="test-alpha")
-    response = characters_client.get(f"/api/characters/{created['id']}", headers=headers)
-    assert response.status_code == 200
-    assert response.json()["current_location"] is None

@@ -141,7 +141,6 @@ class CharacterState:
     # level, xp, hp, max_hp removed — authors declare these in character_config.yaml
     # 0-based prestige run number; maps to character_iterations.iteration
     prestige_count: int
-    current_location: str | None
     # Player's chosen pronoun set. Defaults to they/them until explicitly set.
     pronouns: PronounSet = field(default_factory=lambda: DEFAULT_PRONOUN_SET)
     # Milestones granted this iteration: name → GrantRecord(tick, timestamp).
@@ -267,17 +266,12 @@ class CharacterState:
                     creation_cfg.default_pronouns,
                 )
 
-        starting_location: str | None = None
-        if creation_cfg is not None:
-            starting_location = creation_cfg.starting_location
-
         return cls(
             character_id=uuid4(),
             name=name,
             character_class=None,
             prestige_count=0,
             pronouns=initial_pronouns,
-            current_location=starting_location,
             stats=initial_stats,
         )
 
@@ -685,7 +679,6 @@ class CharacterState:
             "character_class": self.character_class,
             # level, xp, hp, max_hp removed — they live in the stats dict
             # _derived_shadows is ephemeral and intentionally excluded
-            "current_location": self.current_location,
             "pronoun_set": next(
                 (k for k, v in PRONOUN_SETS.items() if v == self.pronouns),
                 "they_them",  # fallback if using a custom set not in the built-in registry
@@ -903,7 +896,6 @@ class CharacterState:
             name=data["name"],
             character_class=data.get("character_class"),
             # level, xp, hp, max_hp no longer top-level; they live in the stats dict
-            current_location=data.get("current_location"),
             pronouns=_deserialize_pronoun_set(data.get("pronoun_set", "they_them")),
             milestones=milestones,
             stacks=dict(data.get("stacks", {})),

@@ -113,7 +113,6 @@ def _make_bare_player() -> CharacterState:
         name="T",
         character_class=None,
         prestige_count=0,
-        current_location=None,
         stats={"gold": 100},
     )
 
@@ -348,7 +347,6 @@ def _make_bare_eligible_player() -> CharacterState:
         name="EligTest",
         character_class=None,
         prestige_count=0,
-        current_location=None,
         stats={},
     )
 
