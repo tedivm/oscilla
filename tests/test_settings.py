@@ -128,7 +128,7 @@ def test_debug_defaults_to_false() -> None:
     Pass _env_file=None so the developer's local .env (which may set DEBUG=True)
     does not interfere with testing the compiled-in default.
     """
-    test_settings = Settings(_env_file=None)
+    test_settings = Settings(_env_file=None, jwt_secret="test-secret-for-settings-default-test")
     assert test_settings.debug is False
 
 

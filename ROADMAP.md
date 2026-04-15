@@ -54,6 +54,7 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [Display Metadata in CharacterState Sub-models](#display-metadata-in-characterstate-sub-models) | S      | Multi-User Platform     |
 | [CharacterSummaryRead Enrichment](#charactersummaryread-enrichment)                             | XS     | Multi-User Platform     |
 | [Remove `character_class` Dead Field](#remove-character_class-dead-field)                       | S      | Multi-User Platform     |
+| [Hidden Stats Excluded from API](#hidden-stats-excluded-from-api)                               | S      | Multi-User Platform     |
 | [Full TUI Upgrade](#full-tui-upgrade)                                                           | L      | Media and Presentation  |
 | [Region Maps](#region-maps)                                                                     | M      | Media and Presentation  |
 | [Picture Selection and ASCII Art](#picture-selection-and-ascii-art)                             | M      | Media and Presentation  |
@@ -506,7 +507,20 @@ Goals:
 
 This is a prerequisite for the Skills panel showing meaningful cooldown information in the web UI.
 
-## Media and Presentation
+### Hidden Stats Excluded from API
+
+**Effort: S** · **Group: Multi-User Platform**
+
+Stats declared with `hidden: true` in a game's `character_config.yaml` are internal engine bookkeeping values — they are not intended to be shown to the player. Currently the character state API returns all stats indiscriminately, which leaks hidden stats to the web frontend.
+
+Goals:
+
+- Filter hidden stats out of the `stats` map in `CharacterStateRead` before the response is serialised
+- Ensure the same filtering applies to any derived or summary read models that expose stat data
+- Hidden stats must remain fully accessible inside the engine (conditions, effects, templates) — only the outbound API response is filtered
+- Add or extend tests to assert that a stat marked `hidden: true` in the manifest does not appear in the API response
+
+This prevents content authors from accidentally exposing internal bookkeeping values (e.g. internal counters, flags, or game-state trackers) that are not meant to be player-visible.
 
 ### Full TUI Upgrade
 

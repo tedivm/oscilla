@@ -281,6 +281,7 @@
     cursor: pointer;
     font-size: 1rem;
     text-align: left;
+    color: var(--color-text);
     transition: border-color 0.15s;
   }
 

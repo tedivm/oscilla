@@ -32,6 +32,13 @@ New to this project? Start here:
    - Health check: <http://localhost/health>
    - MailHog (email testing): <http://localhost:8025>
 
+   A default developer account is created automatically on first startup:
+
+   | Field    | Value             |
+   | -------- | ----------------- |
+   | Email    | <dev@example.com> |
+   | Password | devpassword       |
+
 This starts a Caddy gateway, a Python backend, and a Vite frontend dev server with hot module replacement (HMR). Changes to frontend source files reload instantly in the browser. See [Docker](./docker.md) for architecture details.
 
 ### Stop Everything

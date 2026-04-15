@@ -1,4 +1,3 @@
-import os
 import shutil
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -10,10 +9,11 @@ from alembic import command
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from ..models.user import UserRecord
 from ..settings import settings
 
 logger = getLogger(__name__)
@@ -63,13 +63,44 @@ async def get_session_depends() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def test_data(session: AsyncSession) -> None:
-    """Populate the test database with initial data."""
-    if os.environ.get("IS_DEV", "") != "":
-        raise ValueError("This function should not be called in production. Enable IS_DEV to run it in development.")
+    """Populate the database with development data.
 
-    # Example: Add initial data to the session
-    # await session.add_all([YourModel(name="Test")])
-    # await session.commit()
+    Idempotent — safe to call multiple times. Creates the default developer
+    account (dev@example.com / devpassword) if it does not already exist.
+    Migrates the legacy dev@localhost email to dev@example.com if found.
+    """
+    from ..services.auth import hash_password  # local import to avoid circular dependency at module level
+
+    dev_email = "dev@example.com"
+    legacy_email = "dev@localhost"
+
+    # Migrate legacy dev account email if it still exists.
+    legacy_stmt = select(UserRecord).where(UserRecord.email == legacy_email)
+    legacy_result = await session.execute(legacy_stmt)
+    legacy_user = legacy_result.scalar_one_or_none()
+    if legacy_user is not None:
+        legacy_user.email = dev_email
+        await session.commit()
+        logger.info("Migrated legacy development user email to %s", dev_email)
+        return
+
+    stmt = select(UserRecord).where(UserRecord.email == dev_email)
+    result = await session.execute(stmt)
+    existing = result.scalar_one_or_none()
+
+    if existing is None:
+        dev_user = UserRecord(
+            email=dev_email,
+            hashed_password=hash_password("devpassword"),
+            display_name="Dev User",
+            is_email_verified=True,
+            is_active=True,
+        )
+        session.add(dev_user)
+        await session.commit()
+        logger.info("Development user created: %s", dev_email)
+    else:
+        logger.debug("Development user already exists: %s", dev_email)
 
 
 def migrate_database() -> bool:

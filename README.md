@@ -140,6 +140,9 @@ make install
 
 # Start services with Docker
 docker compose up -d
+# Default developer account is created automatically:
+#   Email:    dev@example.com
+#   Password: devpassword
 
 # Run tests
 make tests

@@ -22,6 +22,14 @@ export default defineConfig({
       // in the container environment to enable this.
       clientPort: Number(process.env.HMR_CLIENT_PORT) || undefined,
     },
+    // macOS Docker volumes don't reliably deliver inotify events into Linux
+    // containers, so Vite's native watcher misses host-side edits. Polling
+    // detects changes regardless of filesystem event support. The interval is
+    // short enough to feel responsive without hammering the CPU.
+    watch: {
+      usePolling: true,
+      interval: 300,
+    },
   },
   // Keep preview behavior aligned with dev so E2E uses the same API routing.
   preview: {
