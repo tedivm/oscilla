@@ -8,6 +8,7 @@ let authState: AuthState = {
   accessToken: null,
   loading: false,
   error: null,
+  initialized: true,
 };
 
 vi.mock("$app/paths", () => ({
@@ -28,7 +29,13 @@ vi.mock("$lib/stores/auth.js", () => ({
 describe("apiFetch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    authState = { user: null, accessToken: null, loading: false, error: null };
+    authState = {
+      user: null,
+      accessToken: null,
+      loading: false,
+      error: null,
+      initialized: true,
+    };
     vi.stubGlobal("fetch", vi.fn());
   });
 

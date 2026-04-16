@@ -4,7 +4,7 @@
   import { base } from "$app/paths";
   import { authStore } from "$lib/stores/auth.js";
   import { gameSession } from "$lib/stores/gameSession.js";
-  import { NavBar } from "$lib/components/index.js";
+  import { NavBar, LoadingSpinner } from "$lib/components/index.js";
   import "$lib/theme/tokens.css";
   import type { Snippet } from "svelte";
 
@@ -18,8 +18,11 @@
   });
 
   // Auth guard: redirect unauthenticated users away from protected routes.
+  // Wait for init() to complete before checking — otherwise a page refresh
+  // redirects to /login before the stored refresh token is validated.
   $effect(() => {
-    const { user } = $authStore;
+    const { user, initialized } = $authStore;
+    if (!initialized) return;
     if (!user) {
       // Check if current path (relative to base) is protected.
       const currentPath =
@@ -62,7 +65,13 @@
 <NavBar />
 
 <main class="main-container">
-  {@render children()}
+  {#if !$authStore.initialized}
+    <div class="auth-loading">
+      <LoadingSpinner />
+    </div>
+  {:else}
+    {@render children()}
+  {/if}
 </main>
 
 <style>
@@ -70,5 +79,11 @@
     max-width: 72rem;
     margin: 0 auto;
     padding: var(--space-6) var(--space-4);
+  }
+
+  .auth-loading {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-8);
   }
 </style>

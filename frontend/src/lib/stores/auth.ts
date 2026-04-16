@@ -13,6 +13,10 @@ export interface AuthState {
   accessToken: string | null;
   loading: boolean;
   error: string | null;
+  // True once init() has completed (success or failure). The route guard
+  // must not redirect until this is set, otherwise a page refresh causes an
+  // immediate redirect to /login before the stored refresh token is checked.
+  initialized: boolean;
 }
 
 const initialState: AuthState = {
@@ -20,6 +24,7 @@ const initialState: AuthState = {
   accessToken: null,
   loading: false,
   error: null,
+  initialized: false,
 };
 
 function createAuthStore(): Writable<AuthState> & {
@@ -65,6 +70,7 @@ function createAuthStore(): Writable<AuthState> & {
         accessToken: pair.access_token,
         loading: false,
         error: null,
+        initialized: true,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Login failed.";
@@ -98,7 +104,7 @@ function createAuthStore(): Writable<AuthState> & {
     const refreshToken = getStoredRefreshToken();
     // Always clear local state regardless of whether the server call succeeds.
     clearRefreshToken();
-    set(initialState);
+    set({ ...initialState, initialized: true });
 
     if (refreshToken) {
       try {
@@ -135,16 +141,19 @@ function createAuthStore(): Writable<AuthState> & {
 
   async function init(): Promise<void> {
     const refreshToken = getStoredRefreshToken();
-    if (!refreshToken) return;
+    if (!refreshToken) {
+      update((s) => ({ ...s, initialized: true }));
+      return;
+    }
 
     try {
       await refresh();
       const user = await apiFetch<UserRead>("/api/auth/me");
-      update((s) => ({ ...s, user }));
+      update((s) => ({ ...s, user, initialized: true }));
     } catch {
       // Refresh failed — clear stale tokens and return as unauthenticated.
       clearRefreshToken();
-      set(initialState);
+      set({ ...initialState, initialized: true });
     }
   }
 

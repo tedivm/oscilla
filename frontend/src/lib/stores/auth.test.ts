@@ -17,6 +17,7 @@ describe("authStore", () => {
       accessToken: null,
       loading: false,
       error: null,
+      initialized: true,
     });
   });
 
@@ -68,6 +69,7 @@ describe("authStore", () => {
       accessToken: "access-1",
       loading: false,
       error: null,
+      initialized: true,
     });
     sessionStorage.setItem("oscilla:refresh_token", "refresh-1");
 
@@ -129,6 +131,7 @@ describe("authStore", () => {
       accessToken: "access-1",
       loading: false,
       error: null,
+      initialized: true,
     });
     sessionStorage.setItem("oscilla:refresh_token", "refresh-1");
 
