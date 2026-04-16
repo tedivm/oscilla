@@ -82,7 +82,7 @@ tomlsort_fixes:
 # Testing
 #
 .PHONY: tests
-tests: install pytest ruff_check black_check mypy_check prettier_check tomlsort_check paracelsus_check check_ungenerated_migrations validate frontend_check frontend_test
+tests: install pytest ruff_check black_check mypy_check prettier_check tomlsort_check paracelsus_check check_ungenerated_migrations validate frontend_check frontend_test frontend_playwright_lint
 
 .PHONY: pytest
 pytest:
@@ -110,6 +110,12 @@ frontend_check:
 .PHONY: frontend_test
 frontend_test:
 	cd frontend && npx vitest run
+
+# Validate Playwright test structure (duplicate titles, config errors) without
+# running tests or requiring a live server. Uses --list to parse all test files.
+.PHONY: frontend_playwright_lint
+frontend_playwright_lint: frontend_playwright_install
+	cd frontend && npx playwright test --config playwright.e2e.config.ts --list > /dev/null
 
 .PHONY: frontend_format_check
 frontend_format_check:
