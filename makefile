@@ -223,14 +223,14 @@ frontend_e2e_stack: frontend_playwright_install frontend_e2e_cleanup
 	trap 'kill $$PREVIEW_PID $$API_PID 2>/dev/null || true; $(MAKE) frontend_e2e_cleanup' EXIT; \
 	BACKEND_READY=0; \
 	for i in $$(seq 1 120); do \
-		if curl --silent --fail http://127.0.0.1:8000/docs >/dev/null; then \
+		if curl --silent --fail http://127.0.0.1:8000/ready >/dev/null; then \
 			BACKEND_READY=1; \
 			break; \
 		fi; \
 		sleep 1; \
 	done; \
 	if [ $$BACKEND_READY -ne 1 ]; then \
-		echo 'Backend did not become ready at http://127.0.0.1:8000/docs within 120s'; \
+		echo 'Backend did not become ready at http://127.0.0.1:8000/ready within 120s'; \
 		docker compose ps; \
 		tail -n 200 ./tmp/e2e-backend.log; \
 		exit 1; \
