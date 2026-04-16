@@ -2,7 +2,9 @@
 
 You must always follow the best practices outlined in this document. If there is a valid reason why you cannot follow one of these practices, you must inform the user and document the reasons.
 
-Before beginning any task, make sure you review the documentation (`docs/dev/` and `README.md`), the existing tests to understand the project, and the task runner (Makefile) to understand what dev tools are available and how to use them. You must review code related to your request to understand preferred style: for example, you must review other tests before writing a new test suite, or review existing routers before creating a new one.
+At the start of any session you MUST review the the [system overview](./docs/system-overview.md). This is vital to give you the appropriate system context to take any action.
+
+You must also review code related to your request to understand preferred style: for example, you must review other tests before writing a new test suite, or review existing routers before creating a new one. This is to ensure you match the style, structure, and feel of the existing codebase.
 
 ## Important Commands
 
@@ -21,6 +23,14 @@ git mv old_path new_path # ALWAYS use git mv for moving or renaming files, never
 ```
 
 **CRITICAL**: When moving or renaming files in a git repository, you MUST use `git mv` instead of regular `mv` or file manipulation tools. This ensures git properly tracks the file history and prevents issues with version control. The only exception to this is if you are moving files which are not tracked in git, as in that case `git mv` will have no effect.
+
+### Temporary Files
+
+```bash
+curl https://example.com > ./tmp/example.html # Use the local project tmp directory when you need to store files on desk that you do not want to save.
+
+curl https://example.com > /tmp/example.html # BAD! Do NOT use the system tmp directory.
+```
 
 **CRITICAL**: Always use `./tmp` instead of `/tmp` when creating files. The local temporary directory (`./tmp`) has isolation in place that allows it to be used securely. Never attempt to write to `/tmp`.
 

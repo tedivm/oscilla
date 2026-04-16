@@ -1,154 +1,145 @@
-# oscilla
+# Oscilla
 
-## Installation
+Oscilla is a platform for building and hosting text-based adventure games. Games are defined entirely as YAML content manifests — regions, locations, adventures, items, enemies, quests, and more — with no code required to create a new game.
+
+The engine ships two interfaces over the same core:
+
+- **Web application** — a SvelteKit frontend backed by a FastAPI REST + SSE API, with user accounts, persistent characters, and a browser-based play experience.
+- **TUI** — a Textual full-screen terminal application that runs entirely locally against a local SQLite database, with no server required.
+
+For a full architectural overview, see [docs/system-overview.md](./docs/system-overview.md).
+
+---
+
+## Playing via the Web
+
+The easiest way to run the web stack is with Docker Compose:
+
+```bash
+git clone https://github.com/tedivm/oscilla.git
+cd oscilla
+docker compose up -d
+```
+
+The application is then available at `http://localhost`. A default developer account is seeded automatically:
+
+- **Email:** `dev@example.com`
+- **Password:** `devpassword`
+
+For production deployment — environment variables, PostgreSQL, Redis, TLS, and migration procedure — see the [Deployment Guide](./docs/hosting/deployment.md).
+
+---
+
+## Playing Locally via the TUI
+
+The TUI runs entirely from the command line with no server or account required. It uses a local SQLite database for character persistence.
+
+**Install from PyPI:**
 
 ```bash
 pip install oscilla
+# or, with uv:
+uv tool install oscilla
 ```
 
-## Playing Locally
-
-Oscilla requires a game library — a directory of game packages, each containing YAML manifests that define the game world. By default it looks for a `content/` directory in the project root. You can point it at any game library with the `GAMES_PATH` environment variable.
+**Install from source:**
 
 ```bash
-# Validate all game packages before playing
-uv run oscilla validate
+git clone https://github.com/tedivm/oscilla.git
+cd oscilla
+make install
+```
 
-# Start an interactive game session (choose a game from the TUI if multiple are present)
-uv run oscilla game
+Oscilla requires a game library — a directory of game packages, each containing YAML manifests. By default it looks for a `content/` directory in the working directory. Point it elsewhere with `GAMES_PATH`.
 
-# Jump straight into a specific game by name
-uv run oscilla game --game the-kingdom
+```bash
+# Validate content before playing
+oscilla validate
+
+# Launch the TUI (choose from available games)
+oscilla game
+
+# Jump directly into a specific game
+oscilla game --game my-game
 
 # Use a custom game library directory
-GAMES_PATH=/path/to/my-library uv run oscilla game
+GAMES_PATH=/path/to/games oscilla game
 ```
+
+The `game` command resolves your identity from `USER@hostname` and stores save data in a platform-appropriate data directory. Run `oscilla data-path` to see where that is on your system.
+
+For the full CLI reference, see [docs/dev/cli.md](./docs/dev/cli.md).
+
+---
 
 ## Game Library Layout
 
-The game library root must contain one or more game package subdirectories. Each game package directory must contain a `game.yaml` to be loaded.
+A game library is a directory of game packages. Each package is a subdirectory containing a `game.yaml`.
 
 ```
-content/             ← GAMES_PATH (game library root)
-  the-kingdom/       ← game package
+content/                   # GAMES_PATH root
+  my-game/                 # one game package
     game.yaml
     character_config.yaml
     regions/
-  testlandia/        ← game package
-    game.yaml
-    character_config.yaml
-    regions/
+      starting-region.yaml
+    adventures/
+      intro.yaml
 ```
 
-## CLI
+Multiple game packages can coexist in the same library. Oscilla loads all of them at startup.
 
-All commands are available via `oscilla`. Run any command with `--help` for full usage.
+---
+
+## Writing Game Content
+
+Games are defined entirely in YAML. No code is required to create a new adventure, enemy, item, quest, or region. The content system supports:
+
+- A hierarchical world of regions and locations with unlock conditions
+- Multi-step adventures with narrative text, choices, combat, stat checks, and skill menus
+- Items, equipment slots, crafting recipes, and loot tables
+- A skill and buff system for both players and enemies
+- Multi-stage quests with milestone-driven progression
+- Archetypes for persistent character states (class, faction, condition)
+- An opt-in in-game calendar with cycles, eras, and time-based conditions
+- Jinja2 templates for dynamic narrative text and numeric formulas
+
+**Getting started with content authoring:** [docs/authors/getting-started.md](./docs/authors/getting-started.md)
+
+**Full authoring reference:** [docs/authors/README.md](./docs/authors/README.md)
+
+**Author CLI tools** (validate, test, scaffold, graph, trace): [docs/authors/cli.md](./docs/authors/cli.md)
 
 ```bash
-uv run oscilla --help
+# Validate all content
+oscilla validate
+
+# List all loaded manifests of a given kind
+oscilla content list Adventure --game my-game
+
+# Run the engine against a specific adventure and print results
+oscilla content test my-adventure --game my-game
+
+# Scaffold a new manifest
+oscilla content create Adventure --game my-game
 ```
 
-### `game` — Play
+---
 
-Launches the interactive terminal UI. The game resolves your user identity from the system environment, then presents a game-selection screen when multiple games are present. After selecting a game, you can select or create a character.
+## Contributing
 
 ```bash
-uv run oscilla game
+git clone https://github.com/tedivm/oscilla.git
+cd oscilla
+make install          # install dependencies and set up .venv
+cp .env.example .env  # configure local settings
+docker compose up -d  # start database, Redis, and other services
+make tests            # run the full test and lint suite
+make chores           # auto-fix formatting
 ```
 
-| Option                  | Short          | Description                                                                                      |
-| ----------------------- | -------------- | ------------------------------------------------------------------------------------------------ |
-| `--game GAME_NAME`      | `-g GAME_NAME` | Load this game directly by its manifest name, skipping the selection screen.                     |
-| `--character-name NAME` | `-c NAME`      | Load or create the character with this name, skipping the selection screen.                      |
-| `--reset-db`            |                | Delete all saved characters for the **selected game** before starting. Prompts for confirmation. |
+**Architecture and codebase reference:** [docs/system-overview.md](./docs/system-overview.md)
 
-**Examples**
+**Developer documentation index:** [docs/dev/README.md](./docs/dev/README.md)
 
-```bash
-# Jump straight into a named character in a specific game
-uv run oscilla game --game the-kingdom --character-name "Aldric"
-
-# Wipe your save data for a game and start fresh
-uv run oscilla game --game the-kingdom --reset-db
-
-# Combine: reset, then immediately start a named character
-uv run oscilla game --game the-kingdom --reset-db --character-name "Aldric"
-```
-
-> **Note:** `--reset-db` permanently deletes all characters associated with your user **for the selected game only**. The CLI will ask for confirmation before proceeding, naming the specific game.
-
-### `validate` — Check Content
-
-Loads and validates all game packages in the library, printing a per-game summary on success or a list of errors on failure. Exits with code 1 if any errors are found.
-
-```bash
-# Validate all game packages
-uv run oscilla validate
-
-# Validate a specific game package
-uv run oscilla validate --game testlandia
-```
-
-### `version` — Show Version
-
-Prints the installed version of Oscilla.
-
-```bash
-uv run oscilla version
-```
-
-### `data-path` — Show Data Directory
-
-Prints the platform data directory where Oscilla stores its database, log file, and crash reports. Useful for backup, reset, or inspection scripts.
-
-```bash
-uv run oscilla data-path
-```
-
-**Example** (macOS):
-
-```
-/Users/alice/Library/Application Support/oscilla
-```
-
-Use it in shell pipelines to work with the files directly:
-
-```bash
-# List all files in the data directory
-ls $(uv run oscilla data-path)
-
-# Back up the database
-cp $(uv run oscilla data-path)/oscilla.db ~/Desktop/oscilla-backup.db
-```
-
-### Environment Variables
-
-| Variable       | Default                                        | Description                                                                                                                              |
-| -------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `GAMES_PATH`   | `content/`                                     | Path to the game library root directory. Each immediate subdirectory with a `game.yaml` is treated as a game package.                    |
-| `DATABASE_URL` | auto-derived: `<platform data dir>/oscilla.db` | SQLAlchemy async database URL for character persistence. See [docs/dev/database.md](./docs/dev/database.md) for the per-OS default path. |
-
-## Developer Documentation
-
-Comprehensive developer documentation is available in [`docs/dev/`](./docs/dev/) covering testing, configuration, deployment, and all project features.
-
-### Quick Start for Developers
-
-```bash
-# Install development environment
-make install
-
-# Start services with Docker
-docker compose up -d
-# Default developer account is created automatically:
-#   Email:    dev@example.com
-#   Password: devpassword
-
-# Run tests
-make tests
-
-# Auto-fix formatting
-make chores
-```
-
-See the [developer documentation](./docs/dev/README.md) for complete guides and reference.
+**All documentation:** [docs/README.md](./docs/README.md)
