@@ -59,6 +59,12 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [Region Maps](#region-maps)                                                                     | M      | Media and Presentation  |
 | [Picture Selection and ASCII Art](#picture-selection-and-ascii-art)                             | M      | Media and Presentation  |
 | [Content Documentation Generator](#content-documentation-generator)                             | M      | Author Tooling          |
+| [Adventure Log in Web Interface](#adventure-log-in-web-interface)                               | M      | Web Adventure Experience |
+| [Combat Skill Usage in Web Interface](#combat-skill-usage-in-web-interface)                     | S      | Web Adventure Experience |
+| [Post-Adventure Return to Location](#post-adventure-return-to-location)                         | XS     | Web Adventure Experience |
+| [UI Color Themes](#ui-color-themes)                                                             | M      | Web Frontend Customization |
+| [In-Game Time Display in Web UI](#in-game-time-display-in-web-ui)                               | S      | Web Frontend Customization |
+| [Character Stat UI Customization](#character-stat-ui-customization)                             | M      | Web Frontend Customization |
 
 ---
 
@@ -583,6 +589,98 @@ Implementation notes:
 - The TUI rendering layer checks terminal width and scales ASCII output accordingly
 - The web front end ignores the ASCII conversion and serves the original image
 - Content authors are not required to provide images; the field is always optional and the engine renders gracefully without one
+
+---
+
+## Web Frontend
+
+### Adventure Log in Web Interface
+
+**Effort: M** · **Group: Web Adventure Experience**
+
+The web frontend already displays the adventure log inline during an active adventure via the SSE stream. However, once an adventure is complete the log is no longer accessible — players cannot review past runs or look up what happened in a previous session.
+
+Goals:
+
+- Add a backend API endpoint (or extend an existing one) to return the output history for completed adventure sessions, sourced from the `CharacterSessionOutput` records already written by the engine
+- Add a dedicated adventure log view or panel in the web frontend that players can access outside of an active adventure — for example, from the character sheet or location screen
+- Support browsing multiple past sessions, not just the most recent
+- Consider pagination or a scrollable view for long sessions; the output records are already stored per-character-session
+
+### Combat Skill Usage in Web Interface
+
+**Effort: S** · **Group: Web Adventure Experience**
+
+The web combat interface currently presents only the standard combat action choices (attack, flee, etc.) and does not expose skills that the character has equipped. Players cannot use skills during combat from the web UI, even when the engine fully supports skill activation during combat steps.
+
+Goals:
+
+- Extend the combat step decision UI in the web frontend to include available skills as selectable actions alongside the standard choices
+- Disabled state (with tooltip) for skills that are on cooldown, using cooldown data from the character state API
+- Skill display names and descriptions pulled from `SkillRead` fields — this item depends on [Skill Cooldown State in API](#skill-cooldown-state-in-api) being complete
+- No engine changes required; this is purely a frontend addition to the decision-point rendering for combat steps
+
+### Post-Adventure Return to Location
+
+**Effort: XS** · **Group: Web Adventure Experience**
+
+After an adventure completes, the web frontend currently navigates to the world map rather than returning the player to the location they were at when the adventure was started. This is disorienting — players must re-navigate to their location after every adventure.
+
+Goals:
+
+- After a successful adventure completion, navigate the player back to their current location view rather than the world map
+- The frontend should track which location the player was at when the adventure was started and use that as the return destination — this is frontend-only state, not something stored in the backend
+- If adventure effects navigated the character to a new location, the frontend should detect this from the SSE stream and navigate to the new location instead
+
+---
+
+## Web Frontend Customization
+
+### UI Color Themes
+
+**Effort: M** · **Group: Web Frontend Customization**
+
+The web interface currently has a single fixed visual theme. A flexible theming system gives players a way to personalize their experience, improves accessibility, and allows content packages to ship game-specific visual identities alongside their manifests.
+
+The theming system has two layers: a set of built-in themes shipped with the frontend, and content-defined themes declared in game manifests that are loaded and applied automatically when that game is active.
+
+Goals:
+
+- Define a `Theme` manifest kind (or a `themes:` block in `game.yaml`) that allows content authors to declare named themes by specifying high-level design tokens — colors, fonts, border radii, spacing, and similar variables — which map to CSS custom properties at runtime
+- As a bonus, allow themes to optionally supply a raw CSS block for authors who need fine-grained control beyond the token system
+- Ship a small set of built-in themes (at minimum dark and light) as frontend defaults; these serve as usable baselines and reference examples for authors writing their own
+- Add a theme selector in a user preferences or settings panel; the active theme persists to local storage per game so players can have different themes for different games
+- When a game declares one or more themes in its manifests, those themes appear in the selector alongside the built-in options; when a game declares a `defaultTheme`, it is applied automatically on first visit
+- The frontend applies themes by injecting the resolved CSS custom properties into the document root — no frontend code changes are required to support new themes added via manifests
+
+### In-Game Time Display in Web UI
+
+**Effort: S** · **Group: Web Frontend Customization**
+
+The engine already tracks in-game time — cycles like day, season, era, and tick counts — when a `time:` block is declared in `game.yaml`. The TUI exposes this in the character sheet. The web frontend does not display any in-game time information.
+
+Goals:
+
+- Display the current in-game time context (cycle positions and current cycle names, e.g., season name, time of day) in the web character sheet or a persistent UI element such as a header or sidebar
+- The data is already available via `CharacterStateRead` — this is a pure frontend addition
+- When a game does not configure in-game time, the element is hidden entirely
+- The display should be readable and evocative (e.g., "Day 12 — Harvest Season") rather than a raw tick count
+
+### Character Stat UI Customization
+
+**Effort: M** · **Group: Web Frontend Customization**
+
+The web character sheet displays stats as a flat list of key-value pairs. Games with rich stat systems — resources like health or mana, progression values like experience and levels, or thematic attributes — benefit from richer presentation options that make the character sheet easier to scan and more visually engaging.
+
+This is a frontend-only feature. The engine and API are unchanged; the display metadata needed to drive it is already available or can be added as display hints.
+
+Goals:
+
+- Allow stat groups to be collapsible and re-orderable in the character sheet so players can focus on the values most relevant to them at a given moment
+- Support optional progress-bar rendering for stats that have a defined maximum (e.g., a current/max pair such as `hp` and `max_hp`), controlled by display metadata in the stat manifest declaration
+- Support optional icon or label theming per stat group to visually differentiate resource pools, progression values, and attribute scores
+- Customization preferences (collapsed groups, ordering) persist to local storage per game and character
+- The system must be generic: it works for whatever stats a content package defines, using only author-declared display metadata, and makes no assumptions about what stats mean
 
 ---
 
