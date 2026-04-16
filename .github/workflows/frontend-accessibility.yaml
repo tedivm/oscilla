@@ -2,6 +2,8 @@ name: Frontend Accessibility
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 jobs:

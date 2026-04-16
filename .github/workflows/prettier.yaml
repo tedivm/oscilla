@@ -2,6 +2,8 @@ name: Configuration File Formatting
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 jobs:
