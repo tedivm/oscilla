@@ -161,18 +161,18 @@ All configuration lives in `oscilla/conf/settings.py` using [pydantic-settings](
 
 Key setting groups:
 
-| Group | Settings |
-| ----- | -------- |
-| Database | `database_url` (auto-derived as local SQLite when unset), `games_path` |
-| Cache | `cache_enabled`, `cache_redis_host/port`, `cache_default_ttl` (300 s), `cache_persistent_ttl` (3600 s) |
-| Auth tokens | `jwt_secret` (SecretStr), `access_token_expire_minutes` (15), `refresh_token_expire_days` (30) |
-| Email tokens | `email_verify_token_expire_hours` (24), `password_reset_token_expire_hours` (1) |
-| SMTP | `smtp_host/port/user/password`, `smtp_from_address`, `smtp_use_tls` |
+| Group         | Settings                                                                                                                                              |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Database      | `database_url` (auto-derived as local SQLite when unset), `games_path`                                                                                |
+| Cache         | `cache_enabled`, `cache_redis_host/port`, `cache_default_ttl` (300 s), `cache_persistent_ttl` (3600 s)                                                |
+| Auth tokens   | `jwt_secret` (SecretStr), `access_token_expire_minutes` (15), `refresh_token_expire_days` (30)                                                        |
+| Email tokens  | `email_verify_token_expire_hours` (24), `password_reset_token_expire_hours` (1)                                                                       |
+| SMTP          | `smtp_host/port/user/password`, `smtp_from_address`, `smtp_use_tls`                                                                                   |
 | Rate limiting | `max_login_attempts_per_hour` (10), `max_login_attempts_before_lockout` (5), `lockout_duration_minutes` (15), `max_registrations_per_hour_per_ip` (5) |
-| Password | `min_password_strength` (zxcvbn score 0–4, default 2) |
-| Session | `stale_session_threshold_minutes` (10) — threshold for force-taking a web session lock |
-| CORS | `cors_origins` |
-| App | `base_url`, `debug`, `require_email_verification`, `uvicorn_workers`, `log_level` |
+| Password      | `min_password_strength` (zxcvbn score 0–4, default 2)                                                                                                 |
+| Session       | `stale_session_threshold_minutes` (10) — threshold for force-taking a web session lock                                                                |
+| CORS          | `cors_origins`                                                                                                                                        |
+| App           | `base_url`, `debug`, `require_email_verification`, `uvicorn_workers`, `log_level`                                                                     |
 
 Settings are loaded once at startup and exposed globally via `from oscilla.settings import settings`.
 
@@ -209,14 +209,14 @@ Three middleware layers wrap every request (outermost first at request time):
 
 3. Routers mounted under `/api`:
 
-| Router | Mount | Requires Auth |
-| ------ | ----- | ------------- |
-| `health` | `/health`, `/ready` | No |
-| `auth` | `/api/auth` | No (most endpoints) |
-| `games` | `/api/games` | No |
-| `characters` | `/api/characters` | Yes |
-| `play` | `/api` | Yes |
-| `overworld` | `/api` | Yes |
+| Router       | Mount               | Requires Auth       |
+| ------------ | ------------------- | ------------------- |
+| `health`     | `/health`, `/ready` | No                  |
+| `auth`       | `/api/auth`         | No (most endpoints) |
+| `games`      | `/api/games`        | No                  |
+| `characters` | `/api/characters`   | Yes                 |
+| `play`       | `/api`              | Yes                 |
+| `overworld`  | `/api`              | Yes                 |
 
 1. Static files mounted at `/static` and `/app` (SvelteKit build). Root `/` redirects to `/app`.
 
@@ -253,21 +253,21 @@ The engine (`oscilla/engine/`) is intentionally **pure**: it has no FastAPI impo
 
 The engine consists of several cooperating subsystems:
 
-| Subsystem | Location | Purpose |
-| --------- | -------- | ------- |
-| Content models | `engine/models/` | Pydantic manifest classes for all YAML kinds |
-| Loader | `engine/loader.py` | Parses YAML files → `ContentRegistry` |
-| Registry | `engine/registry.py` | Typed in-memory index of all loaded manifests |
-| Character state | `engine/character.py` | `CharacterState` dataclass — the mutable game state |
-| Pipeline | `engine/pipeline.py` | Executes adventure steps, dispatches to step handlers |
-| Step handlers | `engine/steps/` | Individual step type logic (combat, choice, narrative, …) |
-| Conditions | `engine/conditions.py` | Pure boolean evaluator against `CharacterState` |
-| Effects | `engine/steps/effects.py` | Mutates `CharacterState` based on effect definitions |
-| Templates | `engine/templates.py` | Sandboxed Jinja2 for narrative text and numeric expressions |
-| In-game time | `engine/ingame_time.py` | Converts `game_ticks` to cycle/era state |
-| Session | `engine/session.py` | TUI game session lifecycle + `WebPersistCallback` |
-| TUI | `engine/tui.py` | Textual terminal application |
-| Web callbacks | `engine/web_callbacks.py` | SSE event queue for the web interface |
+| Subsystem       | Location                  | Purpose                                                     |
+| --------------- | ------------------------- | ----------------------------------------------------------- |
+| Content models  | `engine/models/`          | Pydantic manifest classes for all YAML kinds                |
+| Loader          | `engine/loader.py`        | Parses YAML files → `ContentRegistry`                       |
+| Registry        | `engine/registry.py`      | Typed in-memory index of all loaded manifests               |
+| Character state | `engine/character.py`     | `CharacterState` dataclass — the mutable game state         |
+| Pipeline        | `engine/pipeline.py`      | Executes adventure steps, dispatches to step handlers       |
+| Step handlers   | `engine/steps/`           | Individual step type logic (combat, choice, narrative, …)   |
+| Conditions      | `engine/conditions.py`    | Pure boolean evaluator against `CharacterState`             |
+| Effects         | `engine/steps/effects.py` | Mutates `CharacterState` based on effect definitions        |
+| Templates       | `engine/templates.py`     | Sandboxed Jinja2 for narrative text and numeric expressions |
+| In-game time    | `engine/ingame_time.py`   | Converts `game_ticks` to cycle/era state                    |
+| Session         | `engine/session.py`       | TUI game session lifecycle + `WebPersistCallback`           |
+| TUI             | `engine/tui.py`           | Textual terminal application                                |
+| Web callbacks   | `engine/web_callbacks.py` | SSE event queue for the web interface                       |
 
 See [Game Engine](dev/game-engine.md) for developer documentation.
 
@@ -467,30 +467,30 @@ All game content is described by YAML manifests. Every manifest follows the same
 
 ```yaml
 apiVersion: oscilla/v1
-kind: Adventure          # determines which Pydantic model validates the spec
+kind: Adventure # determines which Pydantic model validates the spec
 metadata:
-  name: my-adventure     # unique slug within the kind, used as a cross-reference key
+  name: my-adventure # unique slug within the kind, used as a cross-reference key
 spec:
   # kind-specific fields
 ```
 
 Supported manifest kinds and their primary spec fields:
 
-| Kind | Purpose | Key Spec Fields |
-| ---- | ------- | --------------- |
-| `Game` | Game-level configuration | `displayName`, `time`, `triggers`, `passives`, `equipment_slots`, `character_creation` |
-| `CharacterConfig` | Starting stat definitions | `stats: List[StatDefinition]`, `equipment_slots`, `skill_category_rules` |
-| `Region` | World hierarchy node | `displayName`, `parent`, `unlock` (Condition) |
-| `Location` | Explorable place | `displayName`, `region`, `unlock`, `adventures` (weighted pool) |
-| `Adventure` | Sequence of steps | `steps`, `ticks`, `trigger_adventures`, `repeat_limit`, `repeat_cooldown` |
-| `Enemy` | Combat opponent | `hp`, `attack`, `defense`, `xp_reward`, `loot`, `skills` |
-| `Item` | Inventory object | `category`, `stackable`, `equip` (slots, stat_modifiers), `use_effects`, `charges` |
-| `Skill` | Activatable ability | `contexts`, `cost`, `cooldown`, `use_effects`, `requires` |
-| `Buff` | Timed combat modifier | `duration`, `modifiers`, `per_turn_effects` |
-| `Quest` | Multi-stage storyline | `entry_stage`, `stages` (DAG with advance_on, terminal) |
-| `Archetype` | Persistent character state | `gain_effects`, `lose_effects`, `passive_effects` |
-| `LootTable` | Reusable drop table | `groups` (weighted/unique sampling) |
-| `Recipe` | Crafting formula | `inputs`, `output` |
+| Kind              | Purpose                    | Key Spec Fields                                                                        |
+| ----------------- | -------------------------- | -------------------------------------------------------------------------------------- |
+| `Game`            | Game-level configuration   | `displayName`, `time`, `triggers`, `passives`, `equipment_slots`, `character_creation` |
+| `CharacterConfig` | Starting stat definitions  | `stats: List[StatDefinition]`, `equipment_slots`, `skill_category_rules`               |
+| `Region`          | World hierarchy node       | `displayName`, `parent`, `unlock` (Condition)                                          |
+| `Location`        | Explorable place           | `displayName`, `region`, `unlock`, `adventures` (weighted pool)                        |
+| `Adventure`       | Sequence of steps          | `steps`, `ticks`, `trigger_adventures`, `repeat_limit`, `repeat_cooldown`              |
+| `Enemy`           | Combat opponent            | `hp`, `attack`, `defense`, `xp_reward`, `loot`, `skills`                               |
+| `Item`            | Inventory object           | `category`, `stackable`, `equip` (slots, stat_modifiers), `use_effects`, `charges`     |
+| `Skill`           | Activatable ability        | `contexts`, `cost`, `cooldown`, `use_effects`, `requires`                              |
+| `Buff`            | Timed combat modifier      | `duration`, `modifiers`, `per_turn_effects`                                            |
+| `Quest`           | Multi-stage storyline      | `entry_stage`, `stages` (DAG with advance_on, terminal)                                |
+| `Archetype`       | Persistent character state | `gain_effects`, `lose_effects`, `passive_effects`                                      |
+| `LootTable`       | Reusable drop table        | `groups` (weighted/unique sampling)                                                    |
+| `Recipe`          | Crafting formula           | `inputs`, `output`                                                                     |
 
 A single YAML file may contain multiple manifests separated by `---` (multi-document YAML).
 
@@ -510,19 +510,19 @@ Conditions are Pydantic union types discriminated by a `type` field. The evaluat
 
 Condition categories:
 
-| Category | Examples |
-| -------- | -------- |
-| Progression | `level`, `prestige_count`, `adventures_completed`, `enemies_defeated` |
-| Milestones | `milestone`, `milestone_ticks_elapsed` |
-| Stats | `character_stat` |
-| Inventory | `item`, `item_equipped`, `any_item_equipped`, `item_held_label` |
-| Quests | `quest_stage` |
-| Skills | `skill` |
-| Archetypes | `has_archetype`, `has_all_archetypes`, `archetype_count`, `archetype_ticks_elapsed` |
-| Identity | `name_equals`, `pronouns` |
+| Category        | Examples                                                                                              |
+| --------------- | ----------------------------------------------------------------------------------------------------- |
+| Progression     | `level`, `prestige_count`, `adventures_completed`, `enemies_defeated`                                 |
+| Milestones      | `milestone`, `milestone_ticks_elapsed`                                                                |
+| Stats           | `character_stat`                                                                                      |
+| Inventory       | `item`, `item_equipped`, `any_item_equipped`, `item_held_label`                                       |
+| Quests          | `quest_stage`                                                                                         |
+| Skills          | `skill`                                                                                               |
+| Archetypes      | `has_archetype`, `has_all_archetypes`, `archetype_count`, `archetype_ticks_elapsed`                   |
+| Identity        | `name_equals`, `pronouns`                                                                             |
 | Real-world time | `date_is`, `date_between`, `day_of_week_is`, `month_is`, `season_is`, `moon_phase_is`, `time_between` |
-| In-game time | `game_calendar_cycle`, `game_calendar_era`, `game_calendar_time` |
-| Logic | `all` (AND), `any` (OR), `not` |
+| In-game time    | `game_calendar_cycle`, `game_calendar_era`, `game_calendar_time`                                      |
+| Logic           | `all` (AND), `any` (OR), `not`                                                                        |
 
 See [Conditions](authors/conditions.md) for the authoring reference.
 
@@ -532,18 +532,18 @@ Effects (`engine/steps/effects.py`) are the only place `CharacterState` is mutat
 
 Effect categories:
 
-| Category | Types |
-| -------- | ----- |
-| Stats | `stat_change`, `stat_set` |
-| Items | `item_drop`, `use_item` |
-| Milestones | `milestone_grant` |
-| Skills | `skill_grant`, `skill_revoke` |
-| Archetypes | `archetype_add`, `archetype_remove` |
-| Quests | `quest_activate`, `quest_fail` |
-| Combat | `heal`, `apply_buff`, `dispel` |
-| Time | `adjust_game_ticks` |
-| Flow | `end_adventure`, `emit_trigger`, `prestige` |
-| Identity | `set_name`, `set_pronouns` |
+| Category   | Types                                       |
+| ---------- | ------------------------------------------- |
+| Stats      | `stat_change`, `stat_set`                   |
+| Items      | `item_drop`, `use_item`                     |
+| Milestones | `milestone_grant`                           |
+| Skills     | `skill_grant`, `skill_revoke`               |
+| Archetypes | `archetype_add`, `archetype_remove`         |
+| Quests     | `quest_activate`, `quest_fail`              |
+| Combat     | `heal`, `apply_buff`, `dispel`              |
+| Time       | `adjust_game_ticks`                         |
+| Flow       | `end_adventure`, `emit_trigger`, `prestige` |
+| Identity   | `set_name`, `set_pronouns`                  |
 
 Side-effect chains triggered by effects:
 
@@ -560,23 +560,23 @@ See [Effects](authors/effects.md) for the authoring reference.
 
 Key fields:
 
-| Field | Type | Description |
-| ----- | ---- | ----------- |
-| `stats` | `Dict[str, int \| bool \| None]` | All stored stat values by name |
-| `inventory` | `Dict[str, int]` | Stackable item counts (ref → count) |
-| `item_instances` | `Dict[str, ItemInstance]` | Non-stackable items keyed by UUID |
-| `equipment` | `Dict[str, str]` | Equipment slot → instance UUID |
-| `milestones` | `Dict[str, GrantRecord]` | Named boolean milestones with tick metadata |
-| `archetypes` | `Dict[str, GrantRecord]` | Active archetypes |
-| `known_skills` | `Set[str]` | Skills the character has learned |
-| `active_buffs` | `List[StoredBuff]` | Persistent cross-combat buff state |
-| `quest_log` | `Dict[str, QuestLogEntry]` | Active/completed/failed quests |
-| `statistics` | `CharacterStatistics` | Event counters (enemies defeated, etc.) |
-| `active_adventure` | `AdventurePosition \| None` | Current adventure position (for resume) |
-| `internal_ticks` | `int` | Engine tick counter (each adventure costs `ticks`) |
-| `game_ticks` | `int` | In-game time ticks (separate from internal) |
-| `pending_triggers` | `List[str]` | Queue of deferred adventure refs to run |
-| `prestige_count` | `int` | Number of prestige cycles completed |
+| Field              | Type                             | Description                                        |
+| ------------------ | -------------------------------- | -------------------------------------------------- |
+| `stats`            | `Dict[str, int \| bool \| None]` | All stored stat values by name                     |
+| `inventory`        | `Dict[str, int]`                 | Stackable item counts (ref → count)                |
+| `item_instances`   | `Dict[str, ItemInstance]`        | Non-stackable items keyed by UUID                  |
+| `equipment`        | `Dict[str, str]`                 | Equipment slot → instance UUID                     |
+| `milestones`       | `Dict[str, GrantRecord]`         | Named boolean milestones with tick metadata        |
+| `archetypes`       | `Dict[str, GrantRecord]`         | Active archetypes                                  |
+| `known_skills`     | `Set[str]`                       | Skills the character has learned                   |
+| `active_buffs`     | `List[StoredBuff]`               | Persistent cross-combat buff state                 |
+| `quest_log`        | `Dict[str, QuestLogEntry]`       | Active/completed/failed quests                     |
+| `statistics`       | `CharacterStatistics`            | Event counters (enemies defeated, etc.)            |
+| `active_adventure` | `AdventurePosition \| None`      | Current adventure position (for resume)            |
+| `internal_ticks`   | `int`                            | Engine tick counter (each adventure costs `ticks`) |
+| `game_ticks`       | `int`                            | In-game time ticks (separate from internal)        |
+| `pending_triggers` | `List[str]`                      | Queue of deferred adventure refs to run            |
+| `prestige_count`   | `int`                            | Number of prestige cycles completed                |
 
 Key methods:
 
@@ -627,11 +627,11 @@ flowchart TD
 
 The pipeline is interface-agnostic. It communicates with the UI through the `UICallbacks` protocol, which has three implementations:
 
-| Implementation | Location | Used by |
-| -------------- | -------- | ------- |
-| `TUICallbacks` | `engine/tui.py` | Textual TUI |
-| `WebCallbacks` | `engine/web_callbacks.py` | FastAPI SSE routes |
-| `MockTUI` | `tests/engine/conftest.py` | Automated tests |
+| Implementation | Location                   | Used by            |
+| -------------- | -------------------------- | ------------------ |
+| `TUICallbacks` | `engine/tui.py`            | Textual TUI        |
+| `WebCallbacks` | `engine/web_callbacks.py`  | FastAPI SSE routes |
+| `MockTUI`      | `tests/engine/conftest.py` | Automated tests    |
 
 The web implementation (`WebCallbacks`) raises a `DecisionPauseException` at each decision point (choice, text input, skill menu) to unwind the call stack and end the SSE stream. The adventure position is persisted to the database, and the next HTTP request resumes execution from that point.
 
@@ -652,12 +652,12 @@ triggers:
 
 Trigger types:
 
-| Type | Fires when |
-| ---- | ---------- |
-| Named trigger (`emit_trigger` effect) | An adventure step fires `emit_trigger: trigger_name` |
-| `on_character_create` | A new character is created |
-| `on_stat_threshold` | A stat crosses a defined threshold (modes: `each` crossing, or `highest` reached) |
-| `on_game_rejoin` | A user resumes playing (web session reconnect) |
+| Type                                  | Fires when                                                                        |
+| ------------------------------------- | --------------------------------------------------------------------------------- |
+| Named trigger (`emit_trigger` effect) | An adventure step fires `emit_trigger: trigger_name`                              |
+| `on_character_create`                 | A new character is created                                                        |
+| `on_stat_threshold`                   | A stat crosses a defined threshold (modes: `each` crossing, or `highest` reached) |
+| `on_game_rejoin`                      | A user resumes playing (web session reconnect)                                    |
 
 Trigger adventures are enqueued in `CharacterState.pending_triggers` and processed immediately after the current adventure completes.
 
@@ -698,16 +698,16 @@ Because both the TUI and web interfaces write to the same database, Oscilla uses
 
 Web adventure execution streams events to the browser as Server-Sent Events. Each event is a JSON payload with a `type` field:
 
-| Event type | Payload |
-| ---------- | ------- |
-| `narrative` | `{ text }` |
-| `choice` | `{ prompt, options }` |
+| Event type     | Payload                                            |
+| -------------- | -------------------------------------------------- |
+| `narrative`    | `{ text }`                                         |
+| `choice`       | `{ prompt, options }`                              |
 | `combat_round` | `{ player_hp, enemy_hp, player_name, enemy_name }` |
-| `ack` | `{}` — wait for user acknowledgment |
-| `text_input` | `{ prompt }` |
-| `skill_menu` | `{ skills }` |
-| `complete` | `{ adventure_ref }` — adventure finished |
-| `error` | `{ message }` |
+| `ack`          | `{}` — wait for user acknowledgment                |
+| `text_input`   | `{ prompt }`                                       |
+| `skill_menu`   | `{ skills }`                                       |
+| `complete`     | `{ adventure_ref }` — adventure finished           |
+| `error`        | `{ message }`                                      |
 
 All events are persisted to `character_session_output` as they fire. `GET /api/characters/{id}/play/current` returns the full event log plus the current pending decision event, enabling the browser to reconstruct the adventure display after a page refresh or crash.
 

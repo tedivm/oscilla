@@ -31,37 +31,37 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 
 ### All Items
 
-| Item                                                                                            | Effort | Group                   |
-| ----------------------------------------------------------------------------------------------- | ------ | ----------------------- |
-| [Decision Tree AI for Enemies](#decision-tree-ai-for-enemies)                                   | L      | Combat Overhaul         |
-| [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems)            | XL     | Combat Overhaul         |
-| [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades)                              | M      | Character Progression   |
-| [Extended Template Primitives](#extended-template-primitives)                                   | S      | Engine Architecture     |
-| [Adventure Pipeline State-Machine Refactor](#adventure-pipeline-state-machine-refactor)         | XL     | Engine Architecture     |
-| [Player-Defined Pronouns](#player-defined-pronouns)                                             | S      | Character Configuration |
-| [Cross-Iteration Conditions/Templates/Effects](#cross-iteration-conditionstemplateseffects)     | M      | Character Progression   |
-| [Adventure-Scoped Variables](#adventure-scoped-variables)                                       | M      | Adventure Authoring     |
-| [Inventory Storage](#inventory-storage)                                                         | L      | Item System             |
-| [Shop and Vendor System](#shop-and-vendor-system)                                               | L      | Economy & NPCs          |
-| [Persistent NPCs and Dialogue](#persistent-npcs-and-dialogue)                                   | L      | Economy & NPCs          |
-| [Quest Branching](#quest-branching)                                                             | M      | Quest Depth & Factions  |
-| [Quest Progress Panel](#quest-progress-panel)                                                   | M      | Quest Depth             |
-| [Faction and Reputation System](#faction-and-reputation-system)                                 | M      | Quest Depth & Factions  |
-| [Content Inheritance / Prototypes](#content-inheritance--prototypes)                            | M      | Content Reuse           |
-| [Plugin and Extension System](#plugin-and-extension-system)                                     | L      | Engine Architecture     |
-| [API-Level Active Adventure Enforcement](#api-level-active-adventure-enforcement)               | S      | Multi-User Platform     |
-| [Skill Cooldown State in API](#skill-cooldown-state-in-api)                                     | S      | Multi-User Platform     |
-| [Display Metadata in CharacterState Sub-models](#display-metadata-in-characterstate-sub-models) | S      | Multi-User Platform     |
-| [CharacterSummaryRead Enrichment](#charactersummaryread-enrichment)                             | XS     | Multi-User Platform     |
-| [Remove `character_class` Dead Field](#remove-character_class-dead-field)                       | S      | Multi-User Platform     |
-| [Hidden Stats Excluded from API](#hidden-stats-excluded-from-api)                               | S      | Multi-User Platform     |
-| [Full TUI Upgrade](#full-tui-upgrade)                                                           | L      | Media and Presentation  |
-| [Region Maps](#region-maps)                                                                     | M      | Media and Presentation  |
-| [Picture Selection and ASCII Art](#picture-selection-and-ascii-art)                             | M      | Media and Presentation  |
-| [Content Documentation Generator](#content-documentation-generator)                             | M      | Author Tooling          |
-| [Adventure Log in Web Interface](#adventure-log-in-web-interface)                               | M      | Web Adventure Experience |
-| [Combat Skill Usage in Web Interface](#combat-skill-usage-in-web-interface)                     | S      | Web Adventure Experience |
-| [Post-Adventure Return to Location](#post-adventure-return-to-location)                         | XS     | Web Adventure Experience |
+| Item                                                                                            | Effort | Group                      |
+| ----------------------------------------------------------------------------------------------- | ------ | -------------------------- |
+| [Decision Tree AI for Enemies](#decision-tree-ai-for-enemies)                                   | L      | Combat Overhaul            |
+| [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems)            | XL     | Combat Overhaul            |
+| [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades)                              | M      | Character Progression      |
+| [Extended Template Primitives](#extended-template-primitives)                                   | S      | Engine Architecture        |
+| [Adventure Pipeline State-Machine Refactor](#adventure-pipeline-state-machine-refactor)         | XL     | Engine Architecture        |
+| [Player-Defined Pronouns](#player-defined-pronouns)                                             | S      | Character Configuration    |
+| [Cross-Iteration Conditions/Templates/Effects](#cross-iteration-conditionstemplateseffects)     | M      | Character Progression      |
+| [Adventure-Scoped Variables](#adventure-scoped-variables)                                       | M      | Adventure Authoring        |
+| [Inventory Storage](#inventory-storage)                                                         | L      | Item System                |
+| [Shop and Vendor System](#shop-and-vendor-system)                                               | L      | Economy & NPCs             |
+| [Persistent NPCs and Dialogue](#persistent-npcs-and-dialogue)                                   | L      | Economy & NPCs             |
+| [Quest Branching](#quest-branching)                                                             | M      | Quest Depth & Factions     |
+| [Quest Progress Panel](#quest-progress-panel)                                                   | M      | Quest Depth                |
+| [Faction and Reputation System](#faction-and-reputation-system)                                 | M      | Quest Depth & Factions     |
+| [Content Inheritance / Prototypes](#content-inheritance--prototypes)                            | M      | Content Reuse              |
+| [Plugin and Extension System](#plugin-and-extension-system)                                     | L      | Engine Architecture        |
+| [API-Level Active Adventure Enforcement](#api-level-active-adventure-enforcement)               | S      | Multi-User Platform        |
+| [Skill Cooldown State in API](#skill-cooldown-state-in-api)                                     | S      | Multi-User Platform        |
+| [Display Metadata in CharacterState Sub-models](#display-metadata-in-characterstate-sub-models) | S      | Multi-User Platform        |
+| [CharacterSummaryRead Enrichment](#charactersummaryread-enrichment)                             | XS     | Multi-User Platform        |
+| [Remove `character_class` Dead Field](#remove-character_class-dead-field)                       | S      | Multi-User Platform        |
+| [Hidden Stats Excluded from API](#hidden-stats-excluded-from-api)                               | S      | Multi-User Platform        |
+| [Full TUI Upgrade](#full-tui-upgrade)                                                           | L      | Media and Presentation     |
+| [Region Maps](#region-maps)                                                                     | M      | Media and Presentation     |
+| [Picture Selection and ASCII Art](#picture-selection-and-ascii-art)                             | M      | Media and Presentation     |
+| [Content Documentation Generator](#content-documentation-generator)                             | M      | Author Tooling             |
+| [Adventure Log in Web Interface](#adventure-log-in-web-interface)                               | M      | Web Adventure Experience   |
+| [Combat Skill Usage in Web Interface](#combat-skill-usage-in-web-interface)                     | S      | Web Adventure Experience   |
+| [Post-Adventure Return to Location](#post-adventure-return-to-location)                         | XS     | Web Adventure Experience   |
 | [UI Color Themes](#ui-color-themes)                                                             | M      | Web Frontend Customization |
 | [In-Game Time Display in Web UI](#in-game-time-display-in-web-ui)                               | S      | Web Frontend Customization |
 | [Character Stat UI Customization](#character-stat-ui-customization)                             | M      | Web Frontend Customization |
