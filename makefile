@@ -308,7 +308,7 @@ lock-check:
 
 .PHONY: build
 build: $(PACKAGE_CHECK)
-	$(UV) run python -m build
+	$(UV) run --no-sync python -m build
 
 #
 # Database
