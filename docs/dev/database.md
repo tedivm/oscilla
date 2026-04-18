@@ -895,7 +895,6 @@ erDiagram
     VARCHAR adventure_ref "nullable"
     INTEGER adventure_step_index "nullable"
     JSON adventure_step_state "nullable"
-    VARCHAR character_class "nullable"
     DATETIME completed_at "nullable"
     BIGINT game_ticks
     BIGINT internal_ticks

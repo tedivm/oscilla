@@ -25,7 +25,6 @@ def _player(
     p = CharacterState(
         character_id=uuid4(),
         name="Tester",
-        character_class=None,
         prestige_count=0,
         stats={"level": level},
     )

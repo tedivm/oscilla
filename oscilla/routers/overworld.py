@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time as _time
 from logging import getLogger
-from typing import TYPE_CHECKING, Annotated, Any, List
+from typing import TYPE_CHECKING, Annotated, Any, Dict, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -37,12 +37,14 @@ class LocationOptionRead(BaseModel):
     region_ref: str
     region_name: str
     adventures_available: bool
+    description: str | None = None
 
 
 class RegionGraphNode(BaseModel):
     id: str
     label: str
     kind: str
+    description: str | None = None
 
 
 class RegionGraphEdge(BaseModel):
@@ -99,6 +101,7 @@ def _build_overworld_state(
                 LocationOptionRead(
                     ref=loc.metadata.name,
                     display_name=loc.spec.displayName,
+                    description=loc.spec.description or None,
                     region_ref=loc.spec.region,
                     region_name=region.spec.displayName if region is not None else loc.spec.region,
                     adventures_available=_is_any_adventure_eligible(
@@ -113,8 +116,21 @@ def _build_overworld_state(
     # Build the full (unfiltered) world graph for region navigation.
     # The frontend filters out inaccessible location rows using accessible_locations.
     world_graph = build_world_graph(registry=registry)
+    # Build a ref→description lookup for regions so graph nodes carry descriptions.
+    region_descriptions: Dict[str, str | None] = {
+        region.metadata.name: region.spec.description or None for region in registry.regions.all()
+    }
     region_graph = RegionGraphRead(
-        nodes=[RegionGraphNode(id=n.id, label=n.label, kind=n.kind) for n in world_graph.nodes],
+        nodes=[
+            RegionGraphNode(
+                id=n.id,
+                label=n.label,
+                kind=n.kind,
+                # Region nodes have id like "region:<ref>"; extract ref for lookup.
+                description=region_descriptions.get(n.id.removeprefix("region:")) if n.kind == "region" else None,
+            )
+            for n in world_graph.nodes
+        ],
         edges=[RegionGraphEdge(source=e.source, target=e.target, label=e.label) for e in world_graph.edges],
     )
 

@@ -137,7 +137,6 @@ class CharacterState:
 
     character_id: UUID
     name: str
-    character_class: str | None
     # level, xp, hp, max_hp removed — authors declare these in character_config.yaml
     # 0-based prestige run number; maps to character_iterations.iteration
     prestige_count: int
@@ -269,7 +268,6 @@ class CharacterState:
         return cls(
             character_id=uuid4(),
             name=name,
-            character_class=None,
             prestige_count=0,
             pronouns=initial_pronouns,
             stats=initial_stats,
@@ -676,7 +674,6 @@ class CharacterState:
             "character_id": str(self.character_id),
             "prestige_count": self.prestige_count,
             "name": self.name,
-            "character_class": self.character_class,
             # level, xp, hp, max_hp removed — they live in the stats dict
             # _derived_shadows is ephemeral and intentionally excluded
             "pronoun_set": next(
@@ -894,7 +891,7 @@ class CharacterState:
             character_id=UUID(data["character_id"]),
             prestige_count=data.get("prestige_count", data.get("iteration", 0)),
             name=data["name"],
-            character_class=data.get("character_class"),
+            # character_class removed — field is ignored from legacy blobs for backward compatibility
             # level, xp, hp, max_hp no longer top-level; they live in the stats dict
             pronouns=_deserialize_pronoun_set(data.get("pronoun_set", "they_them")),
             milestones=milestones,

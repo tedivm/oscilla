@@ -4,6 +4,7 @@ metadata:
   name: test-character-intro
 spec:
   displayName: "Welcome to Testlandia"
+  description: "Triggered introduction scene. Greets new characters on first arrival in Testlandia."
   repeatable: false
   steps:
     - type: choice

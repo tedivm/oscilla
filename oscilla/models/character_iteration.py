@@ -49,7 +49,6 @@ class CharacterIterationRecord(Base):
     # uq_active_iteration_per_character partial unique index.
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    character_class: Mapped[str | None] = mapped_column(String, nullable=True)
     pronoun_set: Mapped[str] = mapped_column(String, nullable=False, default="they_them")
 
     # Active adventure — scalar identifiers live as columns; step_state is the

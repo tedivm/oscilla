@@ -766,7 +766,6 @@ async def run_effect(
                 logger.error("prestige effect: character_config not available in registry — skipping reset.")
                 return
             all_stats = registry.character_config.spec.public_stats + registry.character_config.spec.hidden_stats
-            player.character_class = None
             player.milestones = {}
             player.stacks = {}
             player.instances = []

@@ -4,6 +4,7 @@ metadata:
   name: test-level-up-scene
 spec:
   displayName: "Level Up!"
+  description: "Triggered level-up scene. Fires when the character's level increases."
   steps:
     - type: narrative
       text: "You feel stronger. Your level has increased!"

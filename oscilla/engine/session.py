@@ -381,10 +381,9 @@ class GameSession:
         iteration_id = self._iteration_id
         last = self._last_saved_state
 
-        # --- Scalar fields (character_class, pronoun_set) ---
+        # --- Scalar fields (pronoun_set) ---
         scalar_fields: Dict[str, int | float | str | None] = {}
-        if last is None or state.character_class != last.character_class:
-            scalar_fields["character_class"] = state.character_class
+        # character_class removed — field is not part of CharacterState
         # Normalize pronoun set to its key name for storage.
         state_pronoun_key = next((k for k, v in PRONOUN_SETS.items() if v == state.pronouns), "they_them")
         last_pronoun_key = (
@@ -881,8 +880,7 @@ class WebPersistCallback:
 
         # --- Scalar fields ---
         scalar_fields: Dict[str, int | float | str | None] = {}
-        if last is None or state.character_class != last.character_class:
-            scalar_fields["character_class"] = state.character_class
+        # character_class removed — field is not part of CharacterState
         state_pronoun_key = next((k for k, v in PRONOUN_SETS.items() if v == state.pronouns), "they_them")
         last_pronoun_key = (
             next((k for k, v in PRONOUN_SETS.items() if v == last.pronouns), "they_them") if last is not None else None

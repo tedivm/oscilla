@@ -4,6 +4,7 @@ metadata:
   name: character-creation
 spec:
   displayName: "Who Are You?"
+  description: "Initial character setup adventure. Prompts the player to name their character."
   repeatable: false
   steps:
     # Step 1: Name input — only runs when the character still has the default name

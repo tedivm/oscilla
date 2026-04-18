@@ -9,7 +9,7 @@ unreachable content.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, List, Set
+from typing import TYPE_CHECKING, Dict, List, Set, Tuple
 
 if TYPE_CHECKING:
     from oscilla.engine.registry import ContentRegistry
@@ -41,6 +41,7 @@ def validate_semantic(registry: "ContentRegistry") -> List[SemanticIssue]:
     issues.extend(_check_orphaned_adventures(registry))
     issues.extend(_check_unreachable_adventures(registry))
     issues.extend(_validate_time_spec(registry))
+    issues.extend(_check_missing_descriptions(registry))
     return issues
 
 
@@ -502,4 +503,41 @@ def _validate_time_spec(registry: "ContentRegistry") -> List[SemanticIssue]:
             cal_conds = _collect_calendar_conditions(entry.requires)
             _check_calendar_conditions(cal_conds, source=src)
 
+    return issues
+
+
+# API-exposed manifest kinds whose description field is player-visible.
+# displayName has no default and is already enforced by Pydantic — only description needs a warning.
+_DESCRIPTION_CHECKS: List[Tuple[str, str]] = [
+    ("adventure", "adventures"),
+    ("item", "items"),
+    ("skill", "skills"),
+    ("buff", "buffs"),
+    ("quest", "quests"),
+    ("archetype", "archetypes"),
+    ("location", "locations"),
+    ("region", "regions"),
+]
+
+
+def _check_missing_descriptions(registry: "ContentRegistry") -> List[SemanticIssue]:
+    """Warn when an API-exposed manifest kind has no description set.
+
+    An empty description means the API returns null for that field and the
+    frontend silently omits it. This is usually an authoring oversight because
+    description defaults to an empty string.
+    """
+    issues: List[SemanticIssue] = []
+    for kind_label, registry_attr in _DESCRIPTION_CHECKS:
+        kind_registry = getattr(registry, registry_attr)
+        for manifest in kind_registry.all():
+            if not manifest.spec.description:
+                issues.append(
+                    SemanticIssue(
+                        kind="missing_description",
+                        message=f"{kind_label} {manifest.metadata.name!r} has no description",
+                        manifest=f"{kind_label}:{manifest.metadata.name}",
+                        severity="warning",
+                    )
+                )
     return issues

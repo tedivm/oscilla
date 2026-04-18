@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_201_CREATED, HTTP_204_NO_CONTENT
 
 from oscilla.dependencies.auth import get_current_user
+from oscilla.dependencies.adventure_guard import require_no_active_adventure
 from oscilla.engine.character import DEFAULT_CHARACTER_NAME, CharacterState
 from oscilla.engine.registry import ContentRegistry
 from oscilla.models.api.characters import (
@@ -163,7 +164,9 @@ async def delete_character(
         raise HTTPException(status_code=404, detail="Character not found.")
 
 
-@router.patch("/{character_id}", response_model=CharacterSummaryRead)
+@router.patch(
+    "/{character_id}", response_model=CharacterSummaryRead, dependencies=[Depends(require_no_active_adventure)]
+)
 async def update_character(
     character_id: UUID,
     body: CharacterUpdate,

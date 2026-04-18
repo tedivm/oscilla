@@ -80,7 +80,6 @@ def _make_bare_player(item_in_inventory: str | None = None) -> CharacterState:
     player = CharacterState(
         character_id=uuid4(),
         name="Tester",
-        character_class=None,
         prestige_count=0,
     )
     if item_in_inventory:

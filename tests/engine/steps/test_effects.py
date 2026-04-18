@@ -254,7 +254,6 @@ def _make_gold_player(gold: int = 100) -> CharacterState:
     return CharacterState(
         character_id=uuid4(),
         name="TestHero",
-        character_class=None,
         prestige_count=0,
         stats={"gold": gold},
     )

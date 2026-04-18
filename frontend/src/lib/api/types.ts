@@ -49,6 +49,7 @@ export interface CharacterSummaryRead {
   game_name: string;
   prestige_count: number;
   created_at: string;
+  updated_at: string;
 }
 
 /**
@@ -61,10 +62,12 @@ export interface StatValue {
   value: number | boolean | null;
 }
 
-/** Stackable inventory item. Use `ref` for display — no display_name field. */
+/** Stackable inventory item. */
 export interface StackedItemRead {
   ref: string;
   quantity: number;
+  display_name: string | null;
+  description: string | null;
 }
 
 /** Non-stackable item instance. */
@@ -73,15 +76,17 @@ export interface ItemInstanceRead {
   item_ref: string;
   charges_remaining: number | null;
   modifiers: Record<string, number>;
+  display_name: string | null;
+  description: string | null;
 }
 
-/**
- * A skill known by the character.
- * NOTE: cooldown state is NOT available from this model and must never be shown.
- */
+/** A skill known by the character. */
 export interface SkillRead {
   ref: string;
   display_name: string | null;
+  description: string | null;
+  on_cooldown: boolean;
+  cooldown_remaining_ticks: number | null;
 }
 
 /** An active persistent buff. All expiry fields are optional ticks/epoch. */
@@ -91,12 +96,17 @@ export interface BuffRead {
   tick_expiry: number | null;
   game_tick_expiry: number | null;
   real_ts_expiry: number | null;
+  display_name: string | null;
+  description: string | null;
 }
 
 /** A quest currently tracked by the character. */
 export interface ActiveQuestRead {
   ref: string;
   current_stage: string;
+  quest_display_name: string | null;
+  quest_description: string | null;
+  stage_description: string | null;
 }
 
 /** A milestone held by the character. */
@@ -111,25 +121,24 @@ export interface ArchetypeRead {
   ref: string;
   grant_tick: number;
   grant_timestamp: number;
+  display_name: string | null;
+  description: string | null;
 }
 
 /** The adventure and step the character is currently on. */
 export interface ActiveAdventureRead {
   adventure_ref: string;
   step_index: number;
+  display_name: string | null;
+  description: string | null;
 }
 
-/**
- * Full character state. `character_class` is always null in the current API
- * and is scheduled for removal — do NOT use it.
- */
+/** Full character state. */
 export interface CharacterStateRead {
   // Identity
   id: string;
   name: string;
   game_name: string;
-  /** @deprecated Always null. Will be removed in a future API version. */
-  character_class: string | null;
   prestige_count: number;
   pronoun_set: string;
   created_at: string;
@@ -175,12 +184,14 @@ export interface LocationOptionRead {
   region_ref: string;
   region_name: string;
   adventures_available: boolean;
+  description: string | null;
 }
 
 export interface RegionGraphNode {
   id: string;
   label: string;
   kind: string;
+  description: string | null;
 }
 
 export interface RegionGraphEdge {

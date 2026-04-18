@@ -148,7 +148,9 @@ def test_triggered_adventure_is_not_orphaned() -> None:
     )
     registry = ContentRegistry.build(manifests=[region, location, adventure, game])
     issues = validate_semantic(registry)
-    orphan_warnings = [i for i in issues if i.severity == "warning" and "character-creation" in i.message]
+    orphan_warnings = [
+        i for i in issues if i.severity == "warning" and i.kind == "orphaned" and "character-creation" in i.message
+    ]
     assert orphan_warnings == [], f"Unexpected orphan warning for triggered adventure: {orphan_warnings}"
 
 
@@ -451,3 +453,59 @@ def test_time_condition_era_is_unknown_era_raises_error() -> None:
     registry = ContentRegistry.build(manifests=[game, adventure])
     errors = [i for i in validate_semantic(registry) if i.severity == "error"]
     assert any("ghost-era" in i.message for i in errors)
+
+
+# ---------------------------------------------------------------------------
+# _check_missing_descriptions
+# ---------------------------------------------------------------------------
+
+
+def test_missing_description_warns_for_adventure_without_description() -> None:
+    """An adventure with empty description must generate a missing_description warning."""
+    region = _base_region()
+    location = _base_location()
+    adventure = _base_adventure("no-desc")  # description defaults to ""
+    registry = ContentRegistry.build(manifests=[region, location, adventure])
+    warnings = [i for i in validate_semantic(registry) if i.severity == "warning" and i.kind == "missing_description"]
+    assert any("no-desc" in i.message for i in warnings)
+
+
+def test_missing_description_no_warning_when_description_set() -> None:
+    """An adventure with a non-empty description must not trigger a missing_description warning."""
+    region = _base_region()
+    location = _base_location()
+    adventure = AdventureManifest(
+        apiVersion="oscilla/v1",
+        kind="Adventure",
+        metadata=Metadata(name="has-desc"),
+        spec=AdventureSpec(
+            displayName="Has Description",
+            description="Something interesting happens.",
+            steps=[
+                NarrativeStep(type="narrative", text="You do something."),
+                NarrativeStep(
+                    type="narrative",
+                    text="Done.",
+                    effects=[EndAdventureEffect(type="end_adventure", outcome="completed")],
+                ),
+            ],
+        ),
+    )
+    registry = ContentRegistry.build(manifests=[region, location, adventure])
+    warnings = [
+        i
+        for i in validate_semantic(registry)
+        if i.severity == "warning" and i.kind == "missing_description" and "has-desc" in i.message
+    ]
+    assert warnings == []
+
+
+def test_missing_description_warns_for_location_and_region() -> None:
+    """Locations and regions without descriptions each produce a missing_description warning."""
+    region = _base_region("no-desc-region")  # description defaults to ""
+    location = _base_location("no-desc-loc", region="no-desc-region")
+    registry = ContentRegistry.build(manifests=[region, location])
+    warnings = [i for i in validate_semantic(registry) if i.severity == "warning" and i.kind == "missing_description"]
+    refs = {i.manifest for i in warnings}
+    assert "region:no-desc-region" in refs
+    assert "location:no-desc-loc" in refs

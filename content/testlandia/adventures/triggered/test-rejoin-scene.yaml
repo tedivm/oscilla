@@ -4,6 +4,7 @@ metadata:
   name: test-rejoin-scene
 spec:
   displayName: "Welcome Back"
+  description: "Triggered re-entry scene. Greets returning characters who have previously visited Testlandia."
   steps:
     - type: narrative
       text: "You've been away for a while. The world has continued without you."

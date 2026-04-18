@@ -4,6 +4,7 @@ metadata:
   name: testlandia-character-creation
 spec:
   displayName: "Testlandia Initialization"
+  description: "Testlandia-specific character initialization. Sets starting stats and grants the character intro trigger."
   repeatable: false
   steps:
     # Set base HP and max_hp for the character on creation.

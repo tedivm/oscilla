@@ -23,7 +23,6 @@ def _bare_player() -> CharacterState:
     return CharacterState(
         character_id=uuid4(),
         name="CooldownTester",
-        character_class=None,
         prestige_count=0,
         stats={},
     )

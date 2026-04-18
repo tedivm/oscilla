@@ -4,6 +4,7 @@ metadata:
   name: test-defeat-recovery
 spec:
   displayName: "Recovery"
+  description: "Triggered defeat recovery scene. Restores the player to a safe state after being defeated in combat."
   steps:
     - type: narrative
       text: "You wake up bruised but alive. Someone carried you to safety."

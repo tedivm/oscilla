@@ -111,7 +111,6 @@ def _make_bare_player() -> CharacterState:
     return CharacterState(
         character_id=uuid4(),
         name="T",
-        character_class=None,
         prestige_count=0,
         stats={"gold": 100},
     )
@@ -345,7 +344,6 @@ def _make_bare_eligible_player() -> CharacterState:
     return CharacterState(
         character_id=uuid4(),
         name="EligTest",
-        character_class=None,
         prestige_count=0,
         stats={},
     )

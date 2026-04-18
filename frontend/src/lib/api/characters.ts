@@ -1,9 +1,34 @@
-import { apiFetch } from "./client.js";
+import { ApiError, apiFetch } from "./client.js";
 import type {
   CharacterStateRead,
   CharacterSummaryRead,
   OverworldStateRead,
 } from "./types.js";
+
+/** Structured detail body sent when a character has an active adventure lock. */
+export interface ActiveAdventureConflict {
+  code: "active_adventure";
+  character_id: string;
+}
+
+/**
+ * Returns true when `err` is a 409 ApiError whose detail body indicates
+ * an active adventure lock — use to redirect the user to the play screen.
+ */
+export function isActiveAdventureConflict(
+  err: unknown,
+): err is ApiError & { body: { detail: ActiveAdventureConflict } } {
+  if (!(err instanceof ApiError) || err.status !== 409) return false;
+  const body = err.body as Record<string, unknown> | null;
+  return (
+    body !== null &&
+    typeof body === "object" &&
+    "detail" in body &&
+    typeof (body as Record<string, unknown>)["detail"] === "object" &&
+    (body as Record<string, Record<string, unknown>>)["detail"]?.["code"] ===
+      "active_adventure"
+  );
+}
 
 export async function listCharacters(
   gameName?: string,

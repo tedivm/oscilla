@@ -31,6 +31,8 @@ class StackedItemRead(BaseModel):
 
     ref: str = Field(description="Item manifest reference.")
     quantity: int = Field(description="Number of this item in the stack.")
+    display_name: str | None = Field(default=None, description="Human-readable item name.")
+    description: str | None = Field(default=None, description="Item description.")
 
 
 class ItemInstanceRead(BaseModel):
@@ -40,6 +42,8 @@ class ItemInstanceRead(BaseModel):
     item_ref: str = Field(description="Item manifest reference.")
     charges_remaining: int | None = Field(default=None, description="Remaining charges, if the item has charges.")
     modifiers: Dict[str, int] = Field(default_factory=dict, description="Per-instance stat modifiers.")
+    display_name: str | None = Field(default=None, description="Human-readable item name.")
+    description: str | None = Field(default=None, description="Item description.")
 
 
 class SkillRead(BaseModel):
@@ -47,6 +51,12 @@ class SkillRead(BaseModel):
 
     ref: str = Field(description="Skill manifest reference.")
     display_name: str | None = Field(default=None, description="Human-readable skill name.")
+    description: str | None = Field(default=None, description="Skill description.")
+    on_cooldown: bool = Field(default=False, description="True if the skill is currently on cooldown.")
+    cooldown_remaining_ticks: int | None = Field(
+        default=None,
+        description="Internal ticks remaining on the cooldown, if on cooldown.",
+    )
 
 
 class BuffRead(BaseModel):
@@ -57,6 +67,8 @@ class BuffRead(BaseModel):
     tick_expiry: int | None = Field(default=None, description="Internal tick at which the buff expires.")
     game_tick_expiry: int | None = Field(default=None, description="Game tick at which the buff expires.")
     real_ts_expiry: int | None = Field(default=None, description="Unix timestamp at which the buff expires.")
+    display_name: str | None = Field(default=None, description="Human-readable buff name.")
+    description: str | None = Field(default=None, description="Buff description.")
 
 
 class ActiveQuestRead(BaseModel):
@@ -64,6 +76,9 @@ class ActiveQuestRead(BaseModel):
 
     ref: str = Field(description="Quest manifest reference.")
     current_stage: str = Field(description="Current stage name within the quest.")
+    quest_display_name: str | None = Field(default=None, description="Human-readable quest name.")
+    quest_description: str | None = Field(default=None, description="Quest-level description.")
+    stage_description: str | None = Field(default=None, description="Description of the current stage.")
 
 
 class MilestoneRead(BaseModel):
@@ -80,6 +95,8 @@ class ArchetypeRead(BaseModel):
     ref: str = Field(description="Archetype manifest reference.")
     grant_tick: int = Field(description="Internal tick when the archetype was granted.")
     grant_timestamp: int = Field(description="Unix timestamp when the archetype was granted.")
+    display_name: str | None = Field(default=None, description="Human-readable archetype name.")
+    description: str | None = Field(default=None, description="Archetype description.")
 
 
 class ActiveAdventureRead(BaseModel):
@@ -87,6 +104,8 @@ class ActiveAdventureRead(BaseModel):
 
     adventure_ref: str = Field(description="Adventure manifest reference.")
     step_index: int = Field(description="Current step index within the adventure.")
+    display_name: str | None = Field(default=None, description="Human-readable adventure name.")
+    description: str | None = Field(default=None, description="Adventure description.")
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +121,7 @@ class CharacterSummaryRead(BaseModel):
     game_name: str = Field(description="Game this character belongs to.")
     prestige_count: int = Field(description="Number of completed prestige cycles.")
     created_at: datetime = Field(description="When the character was created.")
+    updated_at: datetime = Field(description="When the character was last modified.")
 
 
 class CharacterStateRead(BaseModel):
@@ -114,7 +134,6 @@ class CharacterStateRead(BaseModel):
     id: UUID = Field(description="Character identifier.")
     name: str = Field(description="Character display name.")
     game_name: str = Field(description="Game this character belongs to.")
-    character_class: str | None = Field(default=None, description="Character class, if assigned.")
     prestige_count: int = Field(description="Number of completed prestige cycles.")
     pronoun_set: str = Field(description="Pronoun set key (e.g. 'they_them', 'she_her').")
     created_at: datetime = Field(description="When the character was created.")
@@ -183,6 +202,7 @@ def build_character_summary(record: "CharacterRecord", prestige_count: int) -> C
         game_name=record.game_name,
         prestige_count=prestige_count,
         created_at=record.created_at,
+        updated_at=record.updated_at,
     )
 
 
@@ -197,10 +217,9 @@ def build_character_state_read(
 
     pronoun_set_key = next((k for k, v in PRONOUN_SETS.items() if v == state.pronouns), "they_them")
 
-    # Build stats dict from all declared stats in character_config (including derived → None)
-    all_stat_defs = char_config.spec.public_stats + char_config.spec.hidden_stats
+    # Build stats dict from only public stats in character_config (hidden stats excluded)
     stats: Dict[str, StatValue] = {}
-    for stat_def in all_stat_defs:
+    for stat_def in char_config.spec.public_stats:
         value = state.stats.get(stat_def.name)  # None for derived stats (never stored)
         stats[stat_def.name] = StatValue(
             ref=stat_def.name,
@@ -209,18 +228,27 @@ def build_character_state_read(
         )
 
     # Stacks
-    stacks: Dict[str, StackedItemRead] = {
-        ref: StackedItemRead(ref=ref, quantity=qty) for ref, qty in state.stacks.items()
-    }
+    stacks: Dict[str, StackedItemRead] = {}
+    for ref, qty in state.stacks.items():
+        item_manifest = registry.items.get(ref)
+        stacks[ref] = StackedItemRead(
+            ref=ref,
+            quantity=qty,
+            display_name=item_manifest.spec.displayName if item_manifest is not None else None,
+            description=item_manifest.spec.description or None if item_manifest is not None else None,
+        )
 
     # Item instances indexed by instance_id for equipment lookup
     instance_map: Dict[UUID, ItemInstanceRead] = {}
     for inst in state.instances:
+        item_manifest = registry.items.get(inst.item_ref)
         instance_map[inst.instance_id] = ItemInstanceRead(
             instance_id=inst.instance_id,
             item_ref=inst.item_ref,
             charges_remaining=inst.charges_remaining,
             modifiers=dict(inst.modifiers),
+            display_name=item_manifest.spec.displayName if item_manifest is not None else None,
+            description=item_manifest.spec.description or None if item_manifest is not None else None,
         )
     instances: List[ItemInstanceRead] = list(instance_map.values())
 
@@ -231,29 +259,57 @@ def build_character_state_read(
         if inst_read is not None:
             equipment[slot] = inst_read
 
-    # Skills — include ref and display name from registry
+    # Skills — include ref, display name, description, and cooldown state from registry
     skills: List[SkillRead] = []
     for skill_ref in sorted(state.known_skills):
         skill_manifest = registry.skills.get(skill_ref)
-        display_name = skill_manifest.spec.displayName if skill_manifest is not None else None
-        skills.append(SkillRead(ref=skill_ref, display_name=display_name))
+        tick_expiry = state.skill_tick_expiry.get(skill_ref)
+        on_cooldown = tick_expiry is not None and tick_expiry > state.internal_ticks
+        skills.append(
+            SkillRead(
+                ref=skill_ref,
+                display_name=skill_manifest.spec.displayName if skill_manifest is not None else None,
+                description=skill_manifest.spec.description or None if skill_manifest is not None else None,
+                on_cooldown=on_cooldown,
+                cooldown_remaining_ticks=(tick_expiry - state.internal_ticks)
+                if (on_cooldown and tick_expiry is not None)
+                else None,
+            )
+        )
 
     # Active buffs
-    active_buffs: List[BuffRead] = [
-        BuffRead(
-            ref=sb.buff_ref,
-            remaining_turns=sb.remaining_turns,
-            tick_expiry=sb.tick_expiry,
-            game_tick_expiry=sb.game_tick_expiry,
-            real_ts_expiry=sb.real_ts_expiry,
+    active_buffs: List[BuffRead] = []
+    for sb in state.active_buffs:
+        buff_manifest = registry.buffs.get(sb.buff_ref)
+        active_buffs.append(
+            BuffRead(
+                ref=sb.buff_ref,
+                remaining_turns=sb.remaining_turns,
+                tick_expiry=sb.tick_expiry,
+                game_tick_expiry=sb.game_tick_expiry,
+                real_ts_expiry=sb.real_ts_expiry,
+                display_name=buff_manifest.spec.displayName if buff_manifest is not None else None,
+                description=buff_manifest.spec.description or None if buff_manifest is not None else None,
+            )
         )
-        for sb in state.active_buffs
-    ]
 
     # Active quests
-    active_quests: List[ActiveQuestRead] = [
-        ActiveQuestRead(ref=ref, current_stage=stage) for ref, stage in state.active_quests.items()
-    ]
+    active_quests: List[ActiveQuestRead] = []
+    for ref, stage_name in state.active_quests.items():
+        quest_manifest = registry.quests.get(ref)
+        stage_description: str | None = None
+        if quest_manifest is not None:
+            matching_stage = next((s for s in quest_manifest.spec.stages if s.name == stage_name), None)
+            stage_description = matching_stage.description or None if matching_stage is not None else None
+        active_quests.append(
+            ActiveQuestRead(
+                ref=ref,
+                current_stage=stage_name,
+                quest_display_name=quest_manifest.spec.displayName if quest_manifest is not None else None,
+                quest_description=quest_manifest.spec.description or None if quest_manifest is not None else None,
+                stage_description=stage_description,
+            )
+        )
 
     # Milestones
     milestones: Dict[str, MilestoneRead] = {
@@ -262,23 +318,34 @@ def build_character_state_read(
     }
 
     # Archetypes
-    archetypes: List[ArchetypeRead] = [
-        ArchetypeRead(ref=ref, grant_tick=gr.tick, grant_timestamp=gr.timestamp) for ref, gr in state.archetypes.items()
-    ]
+    archetypes: List[ArchetypeRead] = []
+    for ref, gr in state.archetypes.items():
+        archetype_manifest = registry.archetypes.get(ref)
+        archetypes.append(
+            ArchetypeRead(
+                ref=ref,
+                grant_tick=gr.tick,
+                grant_timestamp=gr.timestamp,
+                display_name=archetype_manifest.spec.displayName if archetype_manifest is not None else None,
+                description=archetype_manifest.spec.description or None if archetype_manifest is not None else None,
+            )
+        )
 
     # Active adventure
     active_adventure: ActiveAdventureRead | None = None
     if state.active_adventure is not None:
+        adv_manifest = registry.adventures.get(state.active_adventure.adventure_ref)
         active_adventure = ActiveAdventureRead(
             adventure_ref=state.active_adventure.adventure_ref,
             step_index=state.active_adventure.step_index,
+            display_name=adv_manifest.spec.displayName if adv_manifest is not None else None,
+            description=adv_manifest.spec.description or None if adv_manifest is not None else None,
         )
 
     return CharacterStateRead(
         id=state.character_id,
         name=record.name,
         game_name=record.game_name,
-        character_class=state.character_class,
         prestige_count=state.prestige_count,
         pronoun_set=pronoun_set_key,
         created_at=record.created_at,

@@ -4,6 +4,7 @@ metadata:
   name: test-custom-trigger-scene
 spec:
   displayName: "Custom Trigger Fired"
+  description: "Triggered scene for custom trigger validation. Fires when a test-custom trigger is emitted."
   steps:
     - type: narrative
       text: "A custom emit_trigger event was received and routed correctly."

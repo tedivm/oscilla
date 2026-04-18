@@ -4,6 +4,7 @@ metadata:
   name: testlandia-level-up
 spec:
   displayName: "Level Up!"
+  description: "Triggered level-up adventure. Grants HP on level increase and awards the level-up milestone."
   repeatable: true
   steps:
     - type: narrative

@@ -204,7 +204,6 @@ def test_from_dict_succeeds_without_level_xp_hp_keys() -> None:
         "character_id": str(uuid4()),
         "prestige_count": 0,
         "name": "Tester",
-        "character_class": None,
         "current_location": None,
         "pronoun_set": "they_them",
         "milestones": {},

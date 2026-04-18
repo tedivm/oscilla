@@ -53,7 +53,6 @@ def _player() -> CharacterState:
     return CharacterState(
         character_id=uuid4(),
         name="Tester",
-        character_class=None,
         prestige_count=0,
         stats={},
     )

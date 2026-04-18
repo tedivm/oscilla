@@ -170,11 +170,11 @@ def test_character_state_stats_include_declared_and_unset(characters_client: Tes
 
     assert "health" in stats
     assert "is_blessed" in stats
-    assert "power" in stats
+    # Hidden stats (power) must not be exposed via the API
+    assert "power" not in stats
 
     assert stats["health"]["value"] == 10
     assert stats["is_blessed"]["value"] is False
-    assert stats["power"]["value"] is None
 
 
 def test_get_character_by_id_returns_404_for_other_users_character(characters_client: TestClient) -> None:

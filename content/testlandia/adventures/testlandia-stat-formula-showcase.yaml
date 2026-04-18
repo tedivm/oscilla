@@ -4,6 +4,7 @@ metadata:
   name: testlandia-stat-formula-showcase
 spec:
   displayName: "Stat Formula Showcase"
+  description: "Demonstrates derived stat formulas and display. A developer tool for verifying stat calculations."
   repeatable: true
   steps:
     - type: narrative
