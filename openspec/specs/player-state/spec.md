@@ -8,9 +8,13 @@ The player state system manages all persistent player data including stats, inve
 
 ### Requirement: Player state fields
 
-The player state model SHALL include the following fixed fields: `player_id` (UUID), `name` (string), `character_class` (string, nullable), `prestige_count` (int, default 0), `current_location` (string reference, nullable), `milestones` (dict mapping milestone name to the `internal_ticks` value at grant time — see milestone-timestamps spec), `statistics` (PlayerStatistics dataclass with enemy/location/adventure counters), `stacks` (mapping of item ref to quantity for stackable items), `instances` (list of `ItemInstance` objects for non-stackable items, each with `instance_id: UUID`, `item_ref: str`, and `modifiers: Dict`), `equipment` (mapping of slot name to `instance_id: UUID`), `active_quests` (mapping of quest ref to stage name), `completed_quests` (set of quest refs), `active_adventure` (nullable adventure position struct), `pending_triggers` (FIFO list of trigger names awaiting drain, default empty list), and `prestige_pending` (nullable `PrestigeCarryForward` dataclass, default `None` — see prestige-system spec).
+The player state model SHALL include the following fixed fields: `player_id` (UUID), `name` (string), `prestige_count` (int, default 0), `current_location` (string reference, nullable), `milestones` (dict mapping milestone name to the `internal_ticks` value at grant time — see milestone-timestamps spec), `statistics` (PlayerStatistics dataclass with enemy/location/adventure counters), `stacks` (mapping of item ref to quantity for stackable items), `instances` (list of `ItemInstance` objects for non-stackable items, each with `instance_id: UUID`, `item_ref: str`, and `modifiers: Dict`), `equipment` (mapping of slot name to `instance_id: UUID`), `active_quests` (mapping of quest ref to stage name), `completed_quests` (set of quest refs), `active_adventure` (nullable adventure position struct), `pending_triggers` (FIFO list of trigger names awaiting drain, default empty list), and `prestige_pending` (nullable `PrestigeCarryForward` dataclass, default `None` — see prestige-system spec).
 
 The `prestige_pending` field is ephemeral: it is never serialized to the database or restored from it.
+
+`CharacterState` SHALL NOT contain a `character_class` field. The field was always `None` and has no engine semantics; archetypes serve the role it was intended for.
+
+`CharacterState.to_dict()` SHALL NOT include a `character_class` key. `CharacterState.from_dict()` SHALL silently ignore a `"character_class"` key if present in the input data, to support backward-compatible deserialization of legacy serialized blobs. The `character_iterations` database table SHALL NOT have a `character_class` column.
 
 `CharacterState` SHALL also include `_derived_shadows: Dict[str, int | None]` (ephemeral, default empty dict). This field is never serialized to the database; it holds the most recently computed value for each derived stat and is always recomputed after load.
 
@@ -30,6 +34,18 @@ Skill cooldown state SHALL be stored as absolute expiry timestamps:
 - `skill_real_expiry: Dict[str, int]` — Unix timestamp (integer seconds) at which the adventure-scope cooldown expires.
 
 The deprecated `skill_cooldowns: Dict[str, int]` (adventure-count countdown) field SHALL be removed.
+
+#### Scenario: to_dict does not include character_class
+
+- **GIVEN** a `CharacterState` instance
+- **WHEN** `to_dict()` is called
+- **THEN** the returned dict does not contain the key `"character_class"`
+
+#### Scenario: from_dict accepts legacy blobs with character_class without error
+
+- **GIVEN** a saved dict that contains `"character_class": null` (legacy format)
+- **WHEN** `CharacterState.from_dict()` is called with this dict
+- **THEN** no exception is raised and the resulting `CharacterState` is valid
 
 #### Scenario: New player starts with default values
 

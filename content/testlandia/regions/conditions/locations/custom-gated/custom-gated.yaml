@@ -1,0 +1,16 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: custom-gated
+spec:
+  displayName: "Custom Condition Gate"
+  description: "Requires level >= 10 via the test-high-level custom condition. Use
+    the character controls to adjust level below and above 10 to verify the
+    gate."
+  region: conditions
+  unlock:
+    type: custom
+    name: test-high-level
+  adventures:
+    - ref: custom-gated
+      weight: 100

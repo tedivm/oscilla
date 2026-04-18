@@ -1,0 +1,11 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: custom-gated
+spec:
+  displayName: "Custom Condition Gate Test"
+  description: "Confirms the type: custom condition worked."
+  steps:
+    - type: narrative
+      text: "**CUSTOM CONDITION GATE TEST SUCCESSFUL** — Your level is >= 10 and the
+        test-high-level custom condition evaluated True."

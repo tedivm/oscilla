@@ -1,0 +1,13 @@
+apiVersion: oscilla/v1
+kind: CustomCondition
+metadata:
+  name: test-high-level-warrior
+spec:
+  displayName: "High Level Warrior"
+  condition:
+    type: all
+    conditions:
+      - type: custom
+        name: test-high-level
+      - type: has_archetype
+        name: warrior

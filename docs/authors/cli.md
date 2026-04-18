@@ -41,9 +41,9 @@ oscilla content list <kind> [--game NAME] [--format text|json|yaml]
 
 **Arguments**
 
-| Argument | Description                                                                                                                                                                    |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `kind`   | Plural manifest kind: `regions`, `locations`, `adventures`, `enemies`, `items`, `skills`, `quests`, `recipes`, `loot-tables`, `buffs`, `classes`, `games`, `character-configs` |
+| Argument | Description                                                                                                                                                                                         |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kind`   | Plural manifest kind: `regions`, `locations`, `adventures`, `enemies`, `items`, `skills`, `quests`, `recipes`, `loot-tables`, `buffs`, `classes`, `games`, `character-configs`, `custom-conditions` |
 
 **Options**
 

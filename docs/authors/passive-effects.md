@@ -41,25 +41,14 @@ Each entry has three optional fields:
 
 ## Condition Restrictions
 
-Passive effects are evaluated without a content registry (since they run inside
-`effective_stats()` and `available_skills()` which can be called in limited contexts).
-This means two condition types **cannot** be used reliably in passive effects and will
-trigger a `LoadWarning` at validation time:
+Passive effects now receive the content registry at evaluation time, so most condition types work correctly. However, two condition types are **hard errors** (`LoadError`) at validation time because using them in a passive effect would cause infinite recursion:
 
-- `item_held_label` — requires registry to look up item labels
-- `any_item_equipped` — requires registry to look up item labels
+- `character_stat` with `stat_source: effective` — computing effective stats requires effective stats
+- `skill` — computing available skills depends on passive effect results
 
-> **Workaround:** Most use cases for these conditions can be handled in one of two ways:
->
-> - **Place grants directly on the item** using [`grants_skills_equipped`/`grants_skills_held`](./items.md#skills-granted-by-equipment) and [`grants_buffs_equipped`/`grants_buffs_held`](./items.md#buffs-granted-by-equipment), paired with an [`equip.requires` condition](./items.md#equip-requirements) if you need to gate the grant.
-> - **Use `item_equipped` in a passive effect** to check for a specific item being equipped — this condition type is safe and does not require a registry lookup (see the safe example below).
+These restrictions also apply **transitively** through `type: custom` references: if a `CustomCondition`'s body (or any custom condition it references) contains a banned type, the loader rejects the passive effect with a hard error.
 
-Also avoid:
-
-- `character_stat` with `stat_source: effective` — the stat source cannot be honored
-  when the registry is unavailable, producing a warning
-
-All other condition types work fully:
+All other condition types work fully, including `item_held_label` and `any_item_equipped`:
 
 ```yaml
 # ✓ Safe: milestone check
@@ -90,17 +79,28 @@ All other condition types work fully:
     gte: 20
     stat_source: base
 
-# ⚠ Not safe: item_held_label
+# ✓ Safe: item_held_label
 - condition:
-    type: item_held_label # triggers LoadWarning
+    type: item_held_label
     label: legendary
 
-# ⚠ Not safe: stat_source: effective
+# ✓ Safe: custom condition (provided its body contains no banned types)
+- condition:
+    type: custom
+    name: milestone-gate
+
+# ✗ Hard error: stat_source: effective
 - condition:
     type: character_stat
     stat: strength
     gte: 15
-    stat_source: effective # triggers LoadWarning
+    stat_source: effective # triggers LoadError
+
+# ✗ Hard error: skill condition
+- condition:
+    type: skill
+    skill_ref: arcane-shield
+    mode: available # triggers LoadError
 ```
 
 ---

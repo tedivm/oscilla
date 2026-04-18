@@ -523,8 +523,9 @@ Condition categories:
 | Real-world time | `date_is`, `date_between`, `day_of_week_is`, `month_is`, `season_is`, `moon_phase_is`, `time_between` |
 | In-game time    | `game_calendar_cycle`, `game_calendar_era`, `game_calendar_time`                                      |
 | Logic           | `all` (AND), `any` (OR), `not`                                                                        |
+| Reuse           | `custom` — references a named `CustomCondition` manifest resolved via the registry                    |
 
-See [Conditions](authors/conditions.md) for the authoring reference.
+See [Conditions](authors/conditions.md) for the authoring reference, including [Custom Conditions](authors/conditions.md#custom-conditions).
 
 ### Effect System
 

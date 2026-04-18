@@ -27,7 +27,7 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | Item | Effort | Group |
 | ---- | ------ | ----- |
 
-> All pre-v1 items have been implemented.
+> There are currently no high-priority pre-v1 items pending.
 
 ### All Items
 
@@ -53,6 +53,7 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [Region Maps](#region-maps)                                                                 | M      | Media and Presentation     |
 | [Picture Selection and ASCII Art](#picture-selection-and-ascii-art)                         | M      | Media and Presentation     |
 | [Content Documentation Generator](#content-documentation-generator)                         | M      | Author Tooling             |
+| [Website Authoring Mode](#website-authoring-mode)                                           | XL     | Author Tooling             |
 | [Adventure Log in Web Interface](#adventure-log-in-web-interface)                           | M      | Web Adventure Experience   |
 | [Combat Skill Usage in Web Interface](#combat-skill-usage-in-web-interface)                 | S      | Web Adventure Experience   |
 | [Post-Adventure Return to Location](#post-adventure-return-to-location)                     | XS     | Web Adventure Experience   |
@@ -596,3 +597,23 @@ oscilla content docs --game testlandia --output ./docs/game/
 ```
 
 This pairs naturally with the `oscilla content graph` command (which already generates region graphs) and would reuse the same content-loading pipeline.
+
+### Website Authoring Mode
+
+**Effort: XL** · **Group: Author Tooling**
+
+An opt-in mode, enabled via a settings flag, that unlocks a set of backend APIs and frontend controls for live content authoring directly inside the game. When active, authors can create, edit, and delete manifest files without leaving the browser, and can manipulate character state — stats, milestones, inventory, game clocks — for rapid iteration and debugging.
+
+Key design points:
+
+- Controlled by a single `authoring_mode` boolean in `Settings` — off by default; must be explicitly enabled in `.env`. All authoring endpoints unconditionally return `404` when the flag is off, preventing accidental exposure in production.
+- **Manifest CRUD APIs** — new endpoints under `/api/authoring/` for reading, creating, updating, and deleting manifest files for all supported kinds (adventures, items, enemies, regions, locations, skills, archetypes, quests, etc.). Writes go directly to the active content package directory on disk.
+- **Content hot-reload** — after a write the content loader reprocesses the affected package so changes are reflected in the running game immediately without a server restart.
+- **Character debug APIs** — endpoints for direct character state manipulation outside the normal adventure flow: grant or revoke milestones, set or delta stat values, add or remove inventory items, advance or reset game clocks. Intended for testing content in-context without running through prerequisite adventure chains.
+- **Frontend authoring overlay** — when authoring mode is detected from the API, the frontend renders an optional authoring sidebar. The sidebar provides:
+  - A manifest browser and editor (structured form or raw YAML) for the full content library
+  - Inline edit/create buttons on entities the player is currently viewing (the current location, active adventure, enemy in combat, etc.)
+  - A character debug panel for direct stat, milestone, and inventory manipulation
+- **Validation on save** — manifest writes are validated against the same schema the loader uses before being written to disk; invalid manifests return a structured error response rather than corrupting the content package.
+- Authoring mode is scoped to local development and private hosted dev environments. It is a single-author tool, not a multi-user collaboration system — concurrent edits from multiple browsers are not coordinated.
+- The `oscilla content` CLI commands (validate, test, graph, trace) remain the canonical authoring tools; this mode adds a browser-based layer on top of the same underlying content pipeline.

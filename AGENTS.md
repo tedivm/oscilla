@@ -118,6 +118,10 @@ docker compose ps # List running services and their status
 docker compose exec service_name bash # Open a bash shell in a running service container
 ```
 
+### JSON Parsing
+
+Always use the `jq` utility to parse json output from commands. Do _not_ create bespoke python scripts, even inline ones, simply to parse json.
+
 ## Best Practices
 
 ### General

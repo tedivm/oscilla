@@ -22,6 +22,7 @@ Defines the overworld state and hierarchical region navigation. The overworld is
 
 - `ref: str`
 - `display_name: str`
+- `description: str | None` — location description; `None` when the manifest has an empty description
 - `region_ref: str` — the ref of the region this location belongs to
 - `region_name: str` — the display name of that region
 - `adventures_available: bool` — `true` if at least one adventure in the location's pool is currently eligible for this character; `false` otherwise
@@ -30,11 +31,40 @@ Defines the overworld state and hierarchical region navigation. The overworld is
 
 `RegionGraphRead` SHALL contain: `nodes: List[RegionGraphNode]`, `edges: List[RegionGraphEdge]`.
 
-`RegionGraphNode` SHALL contain: `id: str`, `label: str`, `kind: str` (either `"region"` or `"location"`).
+`RegionGraphNode` SHALL contain:
+
+- `id: str`
+- `label: str`
+- `kind: str` (either `"region"` or `"location"`)
+- `description: str | None` — region description for `kind="region"` nodes; `None` for location nodes and for regions with an empty description
 
 `RegionGraphEdge` SHALL contain: `source: str`, `target: str`, `label: str`.
 
 `AdventureOptionRead` is REMOVED from this endpoint. No adventure names, descriptions, or refs SHALL be exposed in this response.
+
+#### Scenario: LocationOptionRead carries description when manifest has one
+
+- **GIVEN** a location manifest with `description: "A dark forest clearing"`
+- **WHEN** `GET /overworld` is called for a character who can access that location
+- **THEN** the corresponding `LocationOptionRead` has `description: "A dark forest clearing"`
+
+#### Scenario: LocationOptionRead description is null for empty manifest description
+
+- **GIVEN** a location manifest with `description: ""`
+- **WHEN** `GET /overworld` is called
+- **THEN** the corresponding `LocationOptionRead` has `description: null`
+
+#### Scenario: RegionGraphNode carries description for region nodes
+
+- **GIVEN** a region manifest with `description: "The Northern Reaches"`
+- **WHEN** `GET /overworld` is called
+- **THEN** the `RegionGraphNode` for that region has `description: "The Northern Reaches"`
+
+#### Scenario: RegionGraphNode description is null for location nodes
+
+- **GIVEN** a location node in the region graph
+- **WHEN** `GET /overworld` is called
+- **THEN** the location `RegionGraphNode` has `description: null`
 
 #### Scenario: returns accessible_locations with adventures_available
 

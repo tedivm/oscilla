@@ -33,7 +33,7 @@ A mechanism for declaring stat modifiers and skill grants that are active only w
 
 ### Requirement: passive_effects contribute to effective_stats()
 
-`CharacterState.effective_stats(registry)` SHALL loop through `registry.game.spec.passive_effects` after accumulating equipped item modifiers. For each passive effect whose `condition` evaluates true (using `evaluate(condition, player, registry=None)`), the `stat_modifiers` SHALL be added to the result using the same accumulation logic as equipped item modifiers.
+`CharacterState.effective_stats(registry)` SHALL loop through `registry.game.spec.passive_effects` after accumulating equipped item modifiers. For each passive effect whose `condition` evaluates true (using `evaluate(condition, player, registry=registry)`), the `stat_modifiers` SHALL be added to the result using the same accumulation logic as equipped item modifiers.
 
 If `registry` is `None` or `registry.game` is `None`, the passive effects loop is skipped.
 
@@ -61,7 +61,7 @@ If `registry` is `None` or `registry.game` is `None`, the passive effects loop i
 
 ### Requirement: passive_effects contribute to available_skills()
 
-`CharacterState.available_skills(registry)` SHALL loop through `registry.game.spec.passive_effects` after accumulating item-granted skills. For each passive effect whose condition evaluates true (using `evaluate(condition, player, registry=None)`), the `skill_grants` list SHALL be added to the result.
+`CharacterState.available_skills(registry)` SHALL loop through `registry.game.spec.passive_effects` after accumulating item-granted skills. For each passive effect whose condition evaluates true (using `evaluate(condition, player, registry=registry)`), the `skill_grants` list SHALL be added to the result.
 
 #### Scenario: Passive effect condition true — skill included
 
@@ -75,24 +75,21 @@ If `registry` is `None` or `registry.game` is `None`, the passive effects loop i
 
 ---
 
-### Requirement: Passive effect conditions are evaluated against base stats only
+### Requirement: Passive effect conditions are evaluated with the full registry
 
-Inside `effective_stats()` and `available_skills()`, passive effect conditions SHALL be evaluated by calling `evaluate(condition, player, registry=None)`. This ensures:
+Inside `effective_stats()` and `available_skills()`, passive effect conditions SHALL be evaluated by calling `evaluate(condition, player, registry=registry)`. This allows all registry-dependent condition types — including `item_held_label`, `any_item_equipped`, `game_calendar_*`, and `type: custom` — to evaluate correctly inside passive effects.
 
-- `CharacterStatCondition` evaluates against base stats (not effective stats), preventing infinite recursion.
-- `item_held_label` and `any_item_equipped` conditions inside passive effects always return false (they require a registry); authors using label-based passive conditions SHALL be warned at load time.
+`CharacterStatCondition` with `stat_source: effective` and `SkillCondition` are forbidden in passive effects and are rejected at load time as `ContentLoadError` (see requirements below), preventing infinite recursion via `effective_stats()` and `available_skills()`.
 
-A `LoadWarning` SHALL be emitted at content load time if a passive effect's condition tree contains an `item_held_label` or `any_item_equipped` node, because these conditions can never evaluate to true when used inside passive effects.
+#### Scenario: Passive condition with item_held_label evaluates correctly
 
-#### Scenario: Passive condition with item_held_label emits a load warning
-
-- **WHEN** a passive effect's condition is `item_held_label: cursed`
-- **THEN** the content loader emits a `LoadWarning` indicating the condition will never activate inside a passive effect, and suggesting `item_equipped` as an alternative
+- **WHEN** a passive effect's condition is `item_held_label: sword` and the player holds an item with that label
+- **THEN** the condition evaluates to `True` inside `effective_stats()` and `available_skills()`
 
 #### Scenario: Passive condition with item_equipped works correctly
 
 - **WHEN** a passive effect's condition is `item_equipped: rangers-cloak`
-- **THEN** the condition evaluates correctly inside `effective_stats()` and `available_skills()` because `item_equipped` does not require a registry
+- **THEN** the condition evaluates correctly inside `effective_stats()` and `available_skills()`
 
 ---
 
@@ -109,6 +106,84 @@ All `stat` names in `stat_modifiers` and all `skill_grants` strings SHALL be val
 
 - **WHEN** a passive effect declares `skill_grants: [nonexistent-skill]`
 - **THEN** the content loader raises a `LoadError`
+
+---
+
+### Requirement: `character_stat (stat_source: effective)` in a passive effect is a load-time `ContentLoadError`
+
+A `LoadError` SHALL be raised for any passive effect whose condition tree contains — directly or transitively through `CustomConditionRef` chains — a `CharacterStatCondition` with `stat_source == "effective"`.
+
+The error message SHALL be:
+`"passive_effects[<idx>] condition uses character_stat with stat_source: effective (causes infinite recursion via effective_stats()); this type cannot be used in passive effects"`
+
+#### Scenario: character_stat stat_source: effective in passive effect raises LoadError
+
+- **GIVEN** a `Game` manifest with a passive effect whose condition is `CharacterStatCondition(stat="level", stat_source="effective", gte=5)`
+- **WHEN** content validation runs
+- **THEN** a `LoadError` is raised
+- **AND** its message contains `"passive_effects[0]"` and `"character_stat"` and `"effective"`
+
+#### Scenario: character_stat stat_source: base in passive effect is valid
+
+- **GIVEN** a `Game` manifest with a passive effect whose condition is `CharacterStatCondition(stat="level", stat_source="base", gte=5)`
+- **WHEN** content validation runs
+- **THEN** no `LoadError` is raised for this passive effect
+
+---
+
+### Requirement: `skill` condition in a passive effect is a load-time `ContentLoadError`
+
+A `LoadError` SHALL be raised for any passive effect whose condition tree contains — directly or transitively — a `SkillCondition`.
+
+The error message SHALL be:
+`"passive_effects[<idx>] condition uses skill (causes infinite recursion via available_skills()); this type cannot be used in passive effects"`
+
+#### Scenario: skill condition in passive effect raises LoadError
+
+- **GIVEN** a `Game` manifest with a passive effect whose condition is `SkillCondition(name="fireball")`
+- **WHEN** content validation runs
+- **THEN** a `LoadError` is raised
+- **AND** its message contains `"passive_effects[0]"` and `"skill"`
+
+---
+
+### Requirement: Banned types transitively inside a `type: custom` passive condition also raise `ContentLoadError`
+
+If a passive effect condition tree contains a `CustomConditionRef`, the validator SHALL resolve the body of that `CustomConditionRef` and recursively check it for banned types (`character_stat` with `stat_source: effective` and `skill`).
+
+If a banned type is found anywhere in the resolved chain, a `LoadError` SHALL be raised on the passive effect (not on the `CustomCondition` manifest itself). Previously-seen `CustomConditionRef` names during transitive resolution SHALL be tracked in a `seen` set to prevent infinite loops on cyclic chains.
+
+#### Scenario: type: custom in passive effect whose body contains a banned type raises LoadError
+
+- **GIVEN** a `CustomCondition "has-skill"` whose body is `SkillCondition(name="fireball")`
+- **AND** a `Game` manifest with a passive effect whose condition is `CustomConditionRef(name="has-skill")`
+- **WHEN** content validation runs
+- **THEN** a `LoadError` is raised for the passive effect
+- **AND** its message mentions `"passive_effects[0]"` and `"skill"`
+
+#### Scenario: type: custom in passive effect with a safe body does not raise LoadError
+
+- **GIVEN** a `CustomCondition "gate"` whose body is `LevelCondition(value=5)`
+- **AND** a `Game` manifest with a passive effect whose condition is `CustomConditionRef(name="gate")`
+- **WHEN** content validation runs
+- **THEN** no `LoadError` is raised for this passive effect
+
+---
+
+### Requirement: `_validate_passive_effects()` no longer warns about `item_held_label` or `any_item_equipped`
+
+`_validate_passive_effects()` in `oscilla/engine/loader.py` SHALL NOT emit `LoadWarning` entries for `ItemHeldLabelCondition`, `AnyItemEquippedCondition`, or `CharacterStatCondition(stat_source="effective")`, because:
+
+- `item_held_label` and `any_item_equipped` now evaluate correctly in passive effects (registry is passed).
+- `character_stat (stat_source: effective)` and `skill` are now hard `LoadError` in validation.
+
+The function SHALL remain as the extension point for future passive effect warnings.
+
+#### Scenario: item_held_label in passive effect produces no LoadWarning
+
+- **GIVEN** a `Game` manifest with a passive effect using `ItemHeldLabelCondition`
+- **WHEN** `_validate_passive_effects()` is called
+- **THEN** the returned list is empty
 
 ---
 

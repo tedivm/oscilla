@@ -1,0 +1,13 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: test-location
+spec:
+  displayName: "Test Location"
+  region: test-region-root
+  unlock:
+    type: custom
+    name: test-nonexistent-custom-condition
+  adventures:
+    - ref: test-narrative
+      weight: 100

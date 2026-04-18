@@ -1,0 +1,10 @@
+apiVersion: oscilla/v1
+kind: CustomCondition
+metadata:
+  name: test-high-level
+spec:
+  displayName: "High Level (10+)"
+  condition:
+    type: character_stat
+    name: level
+    gte: 10

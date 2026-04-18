@@ -1,0 +1,10 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: test-narrative
+spec:
+  displayName: "Test Narrative"
+  description: "A simple narrative adventure for testing."
+  steps:
+    - type: narrative
+      text: "You are in a test. Everything is fine."

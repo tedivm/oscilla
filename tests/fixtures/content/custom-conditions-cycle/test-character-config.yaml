@@ -1,0 +1,10 @@
+apiVersion: oscilla/v1
+kind: CharacterConfig
+metadata:
+  name: test-character-config
+spec:
+  public_stats:
+    - name: level
+      type: int
+      default: 1
+      description: "Character level"

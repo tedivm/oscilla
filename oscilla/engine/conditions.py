@@ -17,6 +17,7 @@ from oscilla.engine.models.base import (
     CharacterStatCondition,
     ChineseZodiacIsCondition,
     Condition,
+    CustomConditionRef,
     DateBetweenCondition,
     DateIsCondition,
     DayOfWeekIsCondition,
@@ -299,6 +300,22 @@ def evaluate(
             else:
                 # Midnight-wrapping window: true when >= start OR <= end.
                 return now_time >= t_start or now_time <= t_end
+
+        # --- Custom condition resolution ---
+
+        case CustomConditionRef(name=n):
+            if registry is None:
+                # Registry is required to resolve custom condition names.
+                # This should not occur in production paths; all callers supply the registry.
+                logger.warning("type: custom condition %r requires registry — evaluating False.", n)
+                return False
+            defn = registry.custom_conditions.get(n)
+            if defn is None:
+                # Dangling reference that slipped past load-time validation, or the
+                # registry was built from a subset of manifests. Fail safe.
+                logger.warning("type: custom condition %r not found in registry — evaluating False.", n)
+                return False
+            return evaluate(defn.spec.condition, player, registry, exclude_item)
 
         # --- In-game calendar predicates ---
 

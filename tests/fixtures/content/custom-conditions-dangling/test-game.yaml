@@ -1,0 +1,6 @@
+apiVersion: oscilla/v1
+kind: Game
+metadata:
+  name: test-game
+spec:
+  displayName: "Test Game"

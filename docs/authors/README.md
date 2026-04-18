@@ -40,12 +40,12 @@ Everything is data. Your entire game is written in YAML manifest files that decl
 
 These documents explain the three cross-cutting systems you'll use in almost everything you write.
 
-| Guide                         | What it covers                                                                                                                                                                                       |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Conditions](./conditions.md) | All condition types — level, milestone, item, stat, skill, calendar/time predicates, and logical operators. Used in unlock gates, adventure requirements, stat checks, and choice option visibility. |
-| [Effects](./effects.md)       | All effect types — XP, item drops, stat changes, milestones, skills, flow control, and combat buffs. Used anywhere something happens: adventure outcomes, skill use, item use.                       |
-| [Templates](./templates.md)   | Jinja2 templates in narrative text — player context, mathematical functions, calendar functions, filters, pronoun placeholders, and built-in constants.                                              |
-| [Cooldowns](./cooldowns.md)   | The unified `cooldown:` block used on adventures and skills — tick, game-tick, real-time, and turn scopes, template expressions, and the `SECONDS_PER_*` constants.                                  |
+| Guide                         | What it covers                                                                                                                                                                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [Conditions](./conditions.md) | All condition types — level, milestone, item, stat, skill, calendar/time predicates, logical operators, and reusable named conditions (`type: custom`). Used in unlock gates, adventure requirements, stat checks, and choice option visibility. |
+| [Effects](./effects.md)       | All effect types — XP, item drops, stat changes, milestones, skills, flow control, and combat buffs. Used anywhere something happens: adventure outcomes, skill use, item use.                                                                   |
+| [Templates](./templates.md)   | Jinja2 templates in narrative text — player context, mathematical functions, calendar functions, filters, pronoun placeholders, and built-in constants.                                                                                          |
+| [Cooldowns](./cooldowns.md)   | The unified `cooldown:` block used on adventures and skills — tick, game-tick, real-time, and turn scopes, template expressions, and the `SECONDS_PER_*` constants.                                                                              |
 
 ---
 

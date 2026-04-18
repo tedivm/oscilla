@@ -1166,6 +1166,8 @@ def validate_references(manifests: List[ManifestEnvelope]) -> List[LoadError]:
     errors.extend(_validate_quest_stage_condition_refs(manifests))
     errors.extend(_validate_archetype_refs(manifests))
     errors.extend(_validate_loot_condition_refs(manifests))
+    errors.extend(_validate_custom_condition_refs(manifests))
+    errors.extend(_validate_passive_effect_conditions(manifests))
 
     return errors
 
@@ -1388,67 +1390,239 @@ def _validate_labels(manifests: List[ManifestEnvelope]) -> List[LoadWarning]:
     return warnings
 
 
-def _validate_passive_effects(manifests: List[ManifestEnvelope]) -> List[LoadWarning]:
-    """Emit warnings for passive effects that use unsupported condition types.
+# ---------------------------------------------------------------------------
+# Custom condition cross-reference validation
+# ---------------------------------------------------------------------------
 
-    Passive effects are evaluated without a registry (to avoid recursion), so:
-    - item_held_label and any_item_equipped conditions will always evaluate False.
-    - character_stat conditions with stat_source: effective cannot access gear bonuses.
+
+def _collect_custom_condition_refs_in_condition(condition: Condition) -> Set[str]:
+    """Recursively collect all CustomConditionRef name strings from a condition tree."""
+    from oscilla.engine.models.base import CustomConditionRef
+
+    refs: Set[str] = set()
+    match condition:
+        case CustomConditionRef(name=n):
+            refs.add(n)
+        case AllCondition(conditions=children):
+            for child in children:
+                refs.update(_collect_custom_condition_refs_in_condition(child))
+        case AnyCondition(conditions=children):
+            for child in children:
+                refs.update(_collect_custom_condition_refs_in_condition(child))
+        case NotCondition(condition=child):
+            refs.update(_collect_custom_condition_refs_in_condition(child))
+        case _:
+            pass
+    return refs
+
+
+def _collect_custom_condition_refs_from_manifest(m: ManifestEnvelope) -> Set[str]:
+    """Collect all CustomConditionRef names referenced in a manifest's condition fields."""
+    from oscilla.engine.models.custom_condition import CustomConditionManifest
+
+    refs: Set[str] = set()
+
+    def _add(cond: Condition | None) -> None:
+        if cond is not None:
+            refs.update(_collect_custom_condition_refs_in_condition(cond))
+
+    match m.kind:
+        case "CustomCondition":
+            cc = cast(CustomConditionManifest, m)
+            _add(cc.spec.condition)
+        case "Location":
+            loc = cast(LocationManifest, m)
+            _add(loc.spec.unlock)
+            _add(loc.spec.effective_unlock)
+            for adv_entry in loc.spec.adventures:
+                _add(adv_entry.requires)
+        case "Region":
+            region = cast(RegionManifest, m)
+            _add(region.spec.unlock)
+            _add(region.spec.effective_unlock)
+        case "Adventure":
+            adv = cast(AdventureManifest, m)
+            _add(adv.spec.requires)
+            for step in adv.spec.steps:
+                match step:
+                    case ChoiceStep():
+                        _add(step.requires)
+                        for opt in step.options:
+                            _add(opt.requires)
+                    case PassiveStep():
+                        _add(step.requires)
+                        _add(step.bypass)
+                    case StatCheckStep():
+                        _add(step.requires)
+                        _add(step.condition)
+                    case _:
+                        _add(getattr(step, "requires", None))
+        case "Item":
+            item = cast(ItemManifest, m)
+            if item.spec.equip is not None:
+                _add(item.spec.equip.requires)
+        case "Skill":
+            skill = cast(SkillManifest, m)
+            _add(skill.spec.requires)
+        case "Game":
+            game = cast(GameManifest, m)
+            for pe in game.spec.passive_effects:
+                _add(pe.condition)
+
+    return refs
+
+
+def _validate_custom_condition_refs(manifests: List[ManifestEnvelope]) -> List[LoadError]:
+    """Validate all CustomConditionRef usages across manifests.
+
+    Two checks:
+    1. Every referenced name must exist as a declared CustomCondition manifest.
+    2. No CustomCondition body may form a circular dependency chain (direct or indirect).
     """
-    from oscilla.engine.models.base import AnyItemEquippedCondition, CharacterStatCondition, ItemHeldLabelCondition
+    errors: List[LoadError] = []
+    known_names: Set[str] = {m.metadata.name for m in manifests if m.kind == "CustomCondition"}
 
-    warnings: List[LoadWarning] = []
+    # --- Pass 1: dangling reference check ---
+    for m in manifests:
+        refs = _collect_custom_condition_refs_from_manifest(m)
+        for ref in sorted(refs):
+            if ref not in known_names:
+                errors.append(
+                    LoadError(
+                        file=Path(f"<{m.metadata.name}>"),
+                        message=f"type: custom condition references unknown CustomCondition: {ref!r}",
+                    )
+                )
+
+    # --- Pass 2: circular reference detection (DFS over CustomCondition bodies only) ---
+    # Build adjacency: name → set of CustomConditionRef names in its body.
+    # Only names that are themselves declared CustomConditions form edges; dangling
+    # refs are already reported in pass 1 and excluded here to avoid false cycles.
+    adjacency: Dict[str, Set[str]] = {}
+    for m in manifests:
+        if m.kind == "CustomCondition":
+            from oscilla.engine.models.custom_condition import CustomConditionManifest
+
+            cc = cast(CustomConditionManifest, m)
+            body_refs = _collect_custom_condition_refs_in_condition(cc.spec.condition)
+            adjacency[m.metadata.name] = body_refs & known_names
+
+    # Standard iterative DFS cycle detection.
+    # visited: nodes whose full subtree has been explored (no cycle found below them).
+    # in_stack: nodes currently on the active DFS path (cycle if we see one again).
+    visited: Set[str] = set()
+    in_stack: Set[str] = set()
+
+    def _dfs(node: str, path: List[str]) -> None:
+        in_stack.add(node)
+        for neighbour in sorted(adjacency.get(node, set())):
+            if neighbour in in_stack:
+                # Cycle found — build the human-readable path.
+                cycle_start = path.index(neighbour)
+                cycle_path = " \u2192 ".join(path[cycle_start:] + [neighbour])
+                errors.append(
+                    LoadError(
+                        file=Path(f"<{node}>"),
+                        message=f"circular reference in CustomCondition {node!r}: {cycle_path}",
+                    )
+                )
+            elif neighbour not in visited:
+                _dfs(neighbour, path + [neighbour])
+        in_stack.discard(node)
+        visited.add(node)
+
+    for name in sorted(adjacency):
+        if name not in visited:
+            _dfs(name, [name])
+
+    return errors
+
+
+def _validate_passive_effect_conditions(manifests: List[ManifestEnvelope]) -> List[LoadError]:
+    """Hard-error on passive effect conditions that cause infinite recursion.
+
+    Passive effects are evaluated inside effective_stats() and available_skills(),
+    which are themselves called during condition evaluation. Two condition types
+    re-enter those methods and will cause infinite recursion:
+
+    - character_stat with stat_source: effective  →  calls effective_stats()
+    - skill                                        →  calls available_skills()
+
+    type: custom conditions are checked transitively: if the resolved body (or any
+    body it references) contains a banned type, the error is reported on the
+    passive effect that holds the CustomConditionRef.
+    """
+    from oscilla.engine.models.base import CharacterStatCondition, CustomConditionRef, SkillCondition
+    from oscilla.engine.models.custom_condition import CustomConditionManifest
+
+    errors: List[LoadError] = []
 
     game_manifest = next((m for m in manifests if m.kind == "Game"), None)
     if game_manifest is None:
-        return warnings
-
+        return errors
     game = cast(GameManifest, game_manifest)
 
-    def _check_condition(condition: object, passive_index: int) -> List[LoadWarning]:
-        """Recursively check a condition tree for unsupported passive condition types."""
-        from oscilla.engine.models.base import AllCondition, AnyCondition, NotCondition
+    # Pre-build a name→body map for CustomCondition resolution.
+    custom_condition_bodies: Dict[str, Condition] = {
+        m.metadata.name: cast(CustomConditionManifest, m).spec.condition
+        for m in manifests
+        if m.kind == "CustomCondition"
+    }
 
-        found: List[LoadWarning] = []
-        if condition is None:
-            return found
-        if isinstance(condition, ItemHeldLabelCondition):
-            found.append(
-                LoadWarning(
-                    file=Path("<game>"),
-                    message=f"passive_effects[{passive_index}] uses item_held_label condition which requires a registry and will always evaluate False in passive context",
-                    suggestion="Use a stat or milestone condition instead, or accept that this passive effect will never activate.",
-                )
-            )
-        elif isinstance(condition, AnyItemEquippedCondition):
-            found.append(
-                LoadWarning(
-                    file=Path("<game>"),
-                    message=f"passive_effects[{passive_index}] uses any_item_equipped condition which requires a registry and will always evaluate False in passive context",
-                    suggestion="Use a stat or milestone condition instead, or accept that this passive effect will never activate.",
-                )
-            )
-        elif isinstance(condition, CharacterStatCondition) and condition.stat_source == "effective":
-            found.append(
-                LoadWarning(
-                    file=Path("<game>"),
-                    message=f"passive_effects[{passive_index}] uses character_stat with stat_source: effective which cannot access gear bonuses in passive context",
-                    suggestion="Set stat_source: base to compare against raw stats, which is always available.",
-                )
-            )
-        elif isinstance(condition, AllCondition):
+    def _contains_banned_type(condition: Condition, seen_custom: Set[str]) -> str | None:
+        """Return an error description string if a banned type is found, else None.
+
+        seen_custom guards against cycles (already caught by _validate_custom_condition_refs)
+        so we do not recurse infinitely here.
+        """
+        if isinstance(condition, CharacterStatCondition) and condition.stat_source == "effective":
+            return "character_stat with stat_source: effective (causes infinite recursion via effective_stats())"
+        if isinstance(condition, SkillCondition):
+            return "skill (causes infinite recursion via available_skills())"
+        if isinstance(condition, CustomConditionRef):
+            if condition.name in seen_custom:
+                return None  # cycle already reported elsewhere
+            body = custom_condition_bodies.get(condition.name)
+            if body is None:
+                return None  # dangling ref already reported elsewhere
+            return _contains_banned_type(body, seen_custom | {condition.name})
+        if isinstance(condition, AllCondition):
             for sub in condition.conditions:
-                found.extend(_check_condition(sub, passive_index))
-        elif isinstance(condition, AnyCondition):
+                result = _contains_banned_type(sub, seen_custom)
+                if result:
+                    return result
+        if isinstance(condition, AnyCondition):
             for sub in condition.conditions:
-                found.extend(_check_condition(sub, passive_index))
-        elif isinstance(condition, NotCondition):
-            found.extend(_check_condition(condition.condition, passive_index))
-        return found
+                result = _contains_banned_type(sub, seen_custom)
+                if result:
+                    return result
+        if isinstance(condition, NotCondition):
+            return _contains_banned_type(condition.condition, seen_custom)
+        return None
 
     for idx, passive in enumerate(game.spec.passive_effects):
-        warnings.extend(_check_condition(passive.condition, idx))
+        if passive.condition is not None:
+            banned = _contains_banned_type(passive.condition, set())
+            if banned:
+                errors.append(
+                    LoadError(
+                        file=Path("<game>"),
+                        message=f"passive_effects[{idx}] condition uses {banned}; this type cannot be used in passive effects",
+                    )
+                )
 
+    return errors
+
+
+def _validate_passive_effects(manifests: List[ManifestEnvelope]) -> List[LoadWarning]:
+    """Emit warnings for passive effects that use condition types with limited passive support.
+
+    Hard errors for re-entrant types (character_stat stat_source: effective, skill) are
+    handled by _validate_passive_effect_conditions() in validate_references() instead.
+    """
+    warnings: List[LoadWarning] = []
+    # All previously-warned condition types are now either fully supported
+    # (item_held_label, any_item_equipped) or hard-errored at reference validation time.
     return warnings
 
 

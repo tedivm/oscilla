@@ -436,8 +436,10 @@ class CharacterState:
             from oscilla.engine.conditions import evaluate
 
             for passive in registry.game.spec.passive_effects:
-                # Passive effects are evaluated without registry to avoid recursion.
-                if evaluate(condition=passive.condition, player=self, registry=None):
+                # Registry is now passed through. Re-entrant types (character_stat with
+                # stat_source: effective, skill) are blocked at load time by
+                # _validate_passive_effect_conditions() rather than at runtime here.
+                if evaluate(condition=passive.condition, player=self, registry=registry):
                     for modifier in passive.stat_modifiers:
                         current = result.get(modifier.stat, 0)
                         if isinstance(current, int) and not isinstance(current, bool):
@@ -451,7 +453,7 @@ class CharacterState:
             if archetype_manifest is None:
                 continue
             for passive in archetype_manifest.spec.passive_effects:
-                if evaluate(condition=passive.condition, player=self, registry=None):
+                if evaluate(condition=passive.condition, player=self, registry=registry):
                     for modifier in passive.stat_modifiers:
                         current = result.get(modifier.stat, 0)
                         if isinstance(current, int) and not isinstance(current, bool):
@@ -516,8 +518,10 @@ class CharacterState:
             from oscilla.engine.conditions import evaluate
 
             for passive in registry.game.spec.passive_effects:
-                # Passive conditions evaluated without registry to avoid recursion.
-                if evaluate(condition=passive.condition, player=self, registry=None):
+                # Registry is now passed through. Re-entrant types (character_stat with
+                # stat_source: effective, skill) are blocked at load time by
+                # _validate_passive_effect_conditions() rather than at runtime here.
+                if evaluate(condition=passive.condition, player=self, registry=registry):
                     result.update(passive.skill_grants)
 
         # Passive effect skill grants from held archetypes.
@@ -528,7 +532,7 @@ class CharacterState:
             if archetype_manifest is None:
                 continue
             for passive in archetype_manifest.spec.passive_effects:
-                if evaluate(condition=passive.condition, player=self, registry=None):
+                if evaluate(condition=passive.condition, player=self, registry=registry):
                     result.update(passive.skill_grants)
 
         return result

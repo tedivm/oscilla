@@ -547,6 +547,18 @@ class GameCalendarEraCondition(BaseModel):
     state: Literal["active", "inactive"] = "active"
 
 
+class CustomConditionRef(BaseModel):
+    """Reference to a named CustomCondition manifest declared in the same content package.
+
+    Resolved at evaluation time against registry.custom_conditions.
+    Validated at load time: dangling references and circular dependency chains
+    both raise ContentLoadError.
+    """
+
+    type: Literal["custom"]
+    name: str
+
+
 Condition = Annotated[
     Union[
         AllCondition,
@@ -586,6 +598,7 @@ Condition = Annotated[
         DateIsCondition,
         DateBetweenCondition,
         TimeBetweenCondition,
+        CustomConditionRef,
     ],
     Field(discriminator="type"),
 ]

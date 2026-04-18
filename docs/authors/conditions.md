@@ -447,6 +447,83 @@ requires:
 
 ---
 
+## Custom Conditions
+
+Custom conditions let you define a named, reusable condition in a `CustomCondition` manifest, then reference it anywhere a condition is expected using `type: custom`. This keeps complex or frequently repeated logic in one place and lets you compose conditions by name rather than by nesting.
+
+### Defining a Custom Condition
+
+Create a YAML file in your content package (the recommended location is a `conditions/` subdirectory):
+
+```yaml
+apiVersion: oscilla/v1
+kind: CustomCondition
+metadata:
+  name: high-level
+spec:
+  displayName: "High Level" # optional; used in UI or tooling
+  condition:
+    type: level
+    value: 10
+```
+
+| Field              | Type      | Required | Description                                          |
+| ------------------ | --------- | -------- | ---------------------------------------------------- |
+| `metadata.name`    | `str`     | yes      | Unique identifier used in `type: custom` references  |
+| `spec.condition`   | Condition | yes      | The full condition body — any valid condition type   |
+| `spec.displayName` | `str`     | no       | Human-readable name for tooling and display purposes |
+
+### Using a Custom Condition
+
+Reference a defined `CustomCondition` by name anywhere a condition is accepted:
+
+```yaml
+requires:
+  type: custom
+  name: high-level
+```
+
+| Field  | Type  | Description                                |
+| ------ | ----- | ------------------------------------------ |
+| `name` | `str` | The `metadata.name` of the CustomCondition |
+
+### Composition
+
+Custom conditions can reference other custom conditions, allowing layered, named logic:
+
+```yaml
+# conditions/high-level-warrior.yaml
+apiVersion: oscilla/v1
+kind: CustomCondition
+metadata:
+  name: high-level-warrior
+spec:
+  condition:
+    type: all
+    conditions:
+      - type: custom
+        name: high-level
+      - type: has_archetype
+        name: warrior
+```
+
+An adventure or location can then use `type: custom` / `name: high-level-warrior` and the engine resolves the entire tree at evaluation time.
+
+### Validation Errors
+
+The loader validates all `CustomCondition` references and rejects the content package if:
+
+- A `type: custom` reference names a `CustomCondition` that does not exist in the package. Error message: `unknown CustomCondition "<name>"`.
+- Two or more `CustomCondition` manifests form a reference cycle (A → B → A, etc.). Error message: `circular reference detected in CustomCondition chain`.
+
+These are hard errors — the content package will not load.
+
+### Restriction in Passive Effects
+
+`type: custom` references are allowed in `passive_effects`, but the loader checks their bodies transitively. If a custom condition's body (or any condition it references) contains a banned type — `character_stat` with `stat_source: effective` or `skill` — the loader produces a hard error. See [Passive Effects](./passive-effects.md#condition-restrictions) for the full list of restrictions.
+
+---
+
 ## Archetype Conditions
 
 [Archetypes](./archetypes.md) are persistent states held by a character — roles, ranks, or earned identities granted and revoked by effects. These conditions let you gate content on which archetypes a character holds, how many they hold, or how long ago one was granted.
@@ -660,6 +737,7 @@ requires:
 | `all`                     | `conditions`               | —                          | All child conditions must pass (AND)                                                            |
 | `any`                     | `conditions`               | —                          | Any child condition must pass (OR)                                                              |
 | `not`                     | `condition`                | —                          | Inverts the single child condition                                                              |
+| `custom`                  | `name`                     | —                          | References a named `CustomCondition` manifest; resolved at evaluation time via the registry     |
 | `season_is`               | `value`                    | —                          | True when meteorological season matches; `spring` \| `summer` \| `autumn` \| `winter`           |
 | `moon_phase_is`           | `value`                    | —                          | True when lunar phase matches (approximate ±1 day)                                              |
 | `zodiac_is`               | `value`                    | —                          | True when Western zodiac sign matches today's date                                              |

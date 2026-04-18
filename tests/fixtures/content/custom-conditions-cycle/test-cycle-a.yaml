@@ -1,0 +1,8 @@
+apiVersion: oscilla/v1
+kind: CustomCondition
+metadata:
+  name: test-cycle-a
+spec:
+  condition:
+    type: custom
+    name: test-cycle-b

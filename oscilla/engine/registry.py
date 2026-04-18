@@ -7,6 +7,7 @@ from oscilla.engine.models.archetype import ArchetypeManifest
 from oscilla.engine.models.base import ManifestEnvelope
 from oscilla.engine.models.buff import BuffManifest
 from oscilla.engine.models.character_config import CharacterConfigManifest
+from oscilla.engine.models.custom_condition import CustomConditionManifest
 from oscilla.engine.models.enemy import EnemyManifest
 from oscilla.engine.models.game import GameManifest
 from oscilla.engine.models.item import ItemManifest
@@ -72,6 +73,7 @@ class ContentRegistry:
         self.quests: KindRegistry[QuestManifest] = KindRegistry()
         self.buffs: KindRegistry[BuffManifest] = KindRegistry()
         self.skills: KindRegistry[SkillManifest] = KindRegistry()
+        self.custom_conditions: KindRegistry[CustomConditionManifest] = KindRegistry()
         self.game: GameManifest | None = None
         self.character_config: CharacterConfigManifest | None = None
         # Holds precompiled templates; populated by loader.py after validation.
@@ -124,6 +126,8 @@ class ContentRegistry:
                     registry.skills.register(cast(SkillManifest, m))
                 case "Buff":
                     registry.buffs.register(cast(BuffManifest, m))
+                case "CustomCondition":
+                    registry.custom_conditions.register(cast(CustomConditionManifest, m))
                 case "Game":
                     registry.game = cast(GameManifest, m)
                     # Build the in-game time resolver once the game manifest is available.

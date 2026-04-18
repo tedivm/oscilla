@@ -246,6 +246,7 @@ Conditions are tree structures that evaluate player state:
 - `item_held_label`: True when any item in inventory (stacks or instances) carries the given label
 - `any_item_equipped`: True when any equipped item carries the given label
 - `quest_stage`: True when a quest is active and at a specific named stage
+- `custom`: References a named `CustomCondition` manifest; resolved at evaluation time via the registry
 
 **Calendar Conditions (evaluate real-world date/time):**
 
@@ -288,6 +289,10 @@ its own requirement (self-justification guard).
 - `all`: Requires all child conditions to pass
 - `any`: Requires at least one child condition to pass
 - `not`: Logical negation of child condition
+
+**Custom Conditions:**
+
+A `CustomConditionRef` (`type: custom`, `name: <manifest-name>`) looks up the named `CustomCondition` manifest from the registry and evaluates its body condition recursively. If the registry is `None` or the name is not found, the result is `False` and a warning is emitted. This allows complex or frequently repeated condition logic to be centralized as a named `CustomCondition` manifest and referenced by name throughout the content package.
 
 Conditions are evaluated recursively by `evaluate(condition, player_state)` in `oscilla/engine/conditions.py`.
 
@@ -810,10 +815,16 @@ class PassiveEffect:
 ```
 
 `effective_stats()` and `available_skills()` in `character.py` loop `registry.game.passive_effects`
-and apply matching effects. Because passive effects are evaluated with `registry=None`,
-conditions that require a registry — `item_held_label`, `any_item_equipped` — cannot be honored
-and trigger a `LoadWarning` at load time. Similarly, `character_stat` conditions with
-`stat_source: effective` also emit a warning since the registry is unavailable.
+and apply matching effects. The passive effect evaluator now passes the content registry, so most
+condition types work correctly. However, certain conditions are banned in passive effects and produce
+a hard `LoadError` at load time:
+
+- `character_stat` with `stat_source: effective` — would cause infinite recursion (computing effective stats requires effective stats)
+- `skill` (`mode: learned` or `mode: available`) — would cause infinite recursion (available skills depends on passive effects)
+
+These restrictions apply transitively through `CustomConditionRef` chains: if a custom condition's body (or any custom condition it references) contains a banned type, the loader rejects the passive effect.
+
+Conditions such as `item_held_label` and `any_item_equipped` are no longer restricted — the registry is now available at evaluation time.
 
 ---
 
