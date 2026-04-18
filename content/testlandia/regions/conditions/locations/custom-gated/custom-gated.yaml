@@ -4,7 +4,8 @@ metadata:
   name: custom-gated
 spec:
   displayName: "Custom Condition Gate"
-  description: "Requires level >= 10 via the test-high-level custom condition. Use
+  description:
+    "Requires level >= 10 via the test-high-level custom condition. Use
     the character controls to adjust level below and above 10 to verify the
     gate."
   region: conditions
