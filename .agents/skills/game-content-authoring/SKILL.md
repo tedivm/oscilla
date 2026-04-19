@@ -220,18 +220,24 @@ effects:
     milestone: defeated-the-dragon
 
   - type: item_drop
-    loot:
-      - item: gold-coins
-        weight: 80
-      - item: rare-gem
-        weight: 20
-    count: 2               # number of separate rolls (default: 1)
+    groups:
+      - count: 2             # number of draws from this group
+        entries:
+          - item: gold-coins
+            weight: 80
+          - item: rare-gem
+            weight: 20
 
   - type: item_drop
     loot_ref: forest-drops  # reference a LootTable manifest
 
-  - type: item_grant
-    item: ancient-key       # add exactly this item, no roll
+  # To guarantee a specific item with no random element, use a
+  # single-entry group — there is no standalone item_grant effect.
+  - type: item_drop
+    groups:
+      - entries:
+          - item: ancient-key
+            weight: 100
 
   - type: item_remove
     item: ancient-key       # remove one instance
@@ -239,11 +245,11 @@ effects:
   - type: skill_grant
     skill: quick-heal       # grant a skill permanently
 
-  - type: archetype_grant
-    archetype: warrior
+  - type: archetype_add
+    name: warrior
 
-  - type: archetype_revoke
-    archetype: cursed
+  - type: archetype_remove
+    name: cursed
 
   - type: quest_activate
     quest: missing-merchant
@@ -545,521 +551,6 @@ Multiple manifests of any kind may share a single `.yaml` file, separated by `--
 
 ---
 
-### `Game` — `game.yaml`
-
-Required. Defines game rules: progression triggers, item categories, passive effects, in-game time.
-
-```yaml
-apiVersion: oscilla/v1
-kind: Game
-metadata:
-  name: my-kingdom         # must match the package directory name
-spec:
-  displayName: "My Kingdom"
-  description: "A text-based medieval adventure."
-
-  # Fire adventures when a stat crosses a threshold
-  triggers:
-    on_stat_threshold:
-      - stat: xp
-        threshold: 100
-        trigger: level-2-reached   # name of a trigger_adventure
-      - stat: xp
-        threshold: 300
-        trigger: level-3-reached
-
-  # Adventures run automatically for triggers
-  trigger_adventures:
-    level-2-reached: level-up-2
-    level-3-reached: level-up-3
-
-  # Run an adventure automatically when a new character is created
-  on_character_create: initialize-character
-
-  # Game-wide passive modifiers (see Passive Effects section)
-  passive_effects: []
-
-  # Vocabulary of valid item category strings (optional; validated on items)
-  item_categories:
-    - weapon
-    - armor
-    - consumable
-    - quest
-```
-
-XP thresholds and HP are not special engine fields — they are implemented entirely through the stat and trigger systems. See [game-configuration.md](../../docs/authors/game-configuration.md) for a complete worked example.
-
----
-
-### `CharacterConfig` — `character_config.yaml`
-
-Required. Defines player stats, equipment slots, and pronoun options.
-
-```yaml
-apiVersion: oscilla/v1
-kind: CharacterConfig
-metadata:
-  name: my-kingdom-character
-spec:
-  public_stats:
-    - name: level
-      type: int
-      default: 1
-      bounds:
-        min: 1
-      description: "Character level."
-
-    - name: xp
-      type: int
-      default: 0
-      bounds:
-        min: 0
-
-    - name: hp
-      type: int
-      default: 20
-      bounds:
-        min: 0
-
-    - name: max_hp
-      type: int
-      derived: "{{ 10 + player.stats['level'] * 5 }}"
-      description: "Computed from level."
-
-    - name: strength
-      type: int
-      default: 10
-
-    - name: gold
-      type: int
-      default: 0
-      bounds:
-        min: 0
-
-  equipment_slots:
-    - name: weapon
-      label: "Weapon"
-    - name: armor
-      label: "Armor"
-
-  pronoun_sets:
-    - name: they
-      subject: they
-      object: them
-      possessive: their
-      possessive_standalone: theirs
-      reflexive: themselves
-    - name: she
-      subject: she
-      object: her
-      possessive: her
-      possessive_standalone: hers
-      reflexive: herself
-    - name: he
-      subject: he
-      object: him
-      possessive: his
-      possessive_standalone: his
-      reflexive: himself
-```
-
-**Stat types**: `int`, `float`, `str`, `bool`. Use `derived:` for computed stats — it is a Jinja2 expression string with `{{ }}` brackets required. Access other stats via `player.stats['name']`. Example: `derived: "{{ 10 + player.stats['level'] * 5 }}"`. `bool` stats cannot be derived.
-
-**String stats must have an explicit `default` value** (even `""`) — a null default means the stat is not present in the character's stats dict, which causes runtime errors when adventures reference it.
-
----
-
-### `Region`
-
-A named area containing locations. Regions can nest with `parent`.
-
-```yaml
-apiVersion: oscilla/v1
-kind: Region
-metadata:
-  name: the-forest
-spec:
-  displayName: "The Forest"
-  description: "Ancient woodland that hides many dangers."
-  # Optional: lock the region behind a condition
-  unlock:
-    type: milestone
-    name: found-the-forest
-  # Optional: nest inside another region
-  # parent: wilderness
-```
-
----
-
-### `Location`
-
-A place within a region where adventures happen. Each location has an adventure pool — weighted entries that the engine draws from when the player arrives.
-
-```yaml
-apiVersion: oscilla/v1
-kind: Location
-metadata:
-  name: hunters-camp
-spec:
-  displayName: "Hunter's Camp"
-  description: "A rough camp at the forest edge."
-  region: the-forest       # must match a Region metadata.name
-
-  adventures:
-    - ref: wolf-ambush     # Adventure metadata.name
-      weight: 60
-    - ref: lost-traveler
-      weight: 30
-    - ref: quiet-night
-      weight: 10
-
-  # Optional: starting location for new characters
-  # starting_location: true
-
-  # Optional: lock behind a condition
-  # unlock:
-  #   type: level
-  #   value: 3
-```
-
-The engine selects one adventure at random (weighted) each time the player enters the location. Adventures not in any pool will produce an orphaned-adventure warning on validation.
-
----
-
-### `Adventure`
-
-An interactive encounter. Adventures are sequences of steps.
-
-```yaml
-apiVersion: oscilla/v1
-kind: Adventure
-metadata:
-  name: wolf-ambush
-spec:
-  displayName: "Wolf Ambush"
-  description: "A pack of wolves blocks the trail."
-
-  # Optional: condition required to appear in pool
-  requires:
-    type: level
-    value: 2
-
-  # Optional: allow the adventure to repeat
-  repeatable: true
-  max_completions: 10    # optional cap on repeats
-  cooldown:
-    ticks: 3             # adventures that must complete before this can repeat
-
-  steps:
-    - type: narrative
-      text: |
-        Three wolves emerge from the undergrowth, growling.
-      effects:
-        - type: milestone_grant
-          milestone: encountered-wolves
-
-    - type: choice
-      prompt: "What do you do?"
-      options:
-        - text: "Fight"
-          effects:
-            - type: stat_change
-              stat: xp
-              amount: 10
-        - text: "Run"
-          requires:
-            type: character_stat
-            stat: agility
-            value: 8
-          effects:
-            - type: stat_change
-              stat: hp
-              amount: -5
-
-    - type: combat
-      enemy: forest-wolf
-      on_win:
-        effects:
-          - type: stat_change
-            stat: xp
-            amount: 75
-        steps:
-          - type: narrative
-            text: "The wolves scatter. You catch your breath."
-      on_defeat:
-        steps:
-          - type: narrative
-            text: "The wolves overwhelm you."
-      on_flee:
-        steps:
-          - type: narrative
-            text: "You sprint back to the road."
-
-    - type: ack
-      text: "The forest falls quiet again."
-```
-
-**Step types**:
-
-| Type         | Purpose                                                      |
-| ------------ | ------------------------------------------------------------ |
-| `narrative`  | Display text; optional effects fire on player acknowledgment |
-| `choice`     | Branching menu; each option has text, optional `requires`, and effects |
-| `combat`     | Turn-based fight; branches `on_win`, `on_defeat`, `on_flee`  |
-| `ack`        | Display text and wait for player to continue; no branching   |
-| `text_input` | Collect free-text from the player; store via effects         |
-| `skill_menu` | Show combat skill grid (used inside combat sub-steps)        |
-
----
-
-### `Enemy`
-
-A combat opponent referenced by `combat` steps.
-
-```yaml
-apiVersion: oscilla/v1
-kind: Enemy
-metadata:
-  name: forest-wolf
-spec:
-  displayName: "Forest Wolf"
-  description: "A lean, grey wolf with yellow eyes."
-  hp: 25
-  attack: 8
-  defense: 2
-  xp_reward: 75
-  loot:
-    - count: 1
-      method: weighted
-      entries:
-        - item: wolf-pelt
-          weight: 60
-        - item: wolf-fang
-          weight: 30
-        - item: nothing         # use an item with no value for "empty" drops
-          weight: 10
-  # Optional: skills the enemy can use in combat
-  skills:
-    - savage-bite
-```
-
-Combat damage per round: roughly `attacker.attack - defender.defense`, minimum 1.
-
----
-
-### `Item`
-
-Anything the player can carry, use, equip, or trade.
-
-```yaml
-# Consumable
-apiVersion: oscilla/v1
-kind: Item
-metadata:
-  name: healing-potion
-spec:
-  displayName: "Healing Potion"
-  description: "A red vial that mends wounds."
-  category: consumable
-  stackable: true
-  consumed_on_use: true
-  value: 50
-  use_effects:
-    - type: heal
-      amount: 30
-
----
-# Equipment
-apiVersion: oscilla/v1
-kind: Item
-metadata:
-  name: iron-sword
-spec:
-  displayName: "Iron Sword"
-  description: "A serviceable blade."
-  category: weapon
-  stackable: false
-  value: 120
-  equip:
-    slot: weapon
-    stat_modifiers:
-      - stat: strength
-        amount: 3
-    requires:              # optional equip gate
-      type: level
-      value: 3
-```
-
-**Key item fields**:
-
-| Field              | Purpose                                           |
-| ------------------ | ------------------------------------------------- |
-| `stackable`        | Multiple copies share one inventory slot          |
-| `consumed_on_use`  | Item is removed after `use_effects` fire          |
-| `charges`          | Item has N uses before being removed (not stackable) |
-| `use_effects`      | Effects that fire when the player uses the item   |
-| `equip.slot`       | Which equipment slot the item occupies            |
-| `equip.stat_modifiers` | Passive stat bonuses while equipped           |
-
----
-
-### `Skill`
-
-An activatable ability usable in combat, the overworld, or both.
-
-```yaml
-apiVersion: oscilla/v1
-kind: Skill
-metadata:
-  name: quick-heal
-spec:
-  displayName: "Quick Heal"
-  description: "Bind minor wounds mid-battle."
-  contexts:
-    - combat       # "combat" | "overworld" | both
-  cost:
-    stat: mana
-    amount: 15
-  cooldown:
-    scope: turn
-    turns: 1       # once per combat turn
-  use_effects:
-    - type: heal
-      amount: 25
-      target: player
-```
-
-Skill `requires` is evaluated every time the player attempts to activate it — not just at grant time. Use it to gate skills behind stat thresholds or milestones.
-
----
-
-### `Archetype`
-
-A named persistent state attached to a character. Grants passive bonuses and skills while held.
-
-```yaml
-apiVersion: oscilla/v1
-kind: Archetype
-metadata:
-  name: warrior
-spec:
-  displayName: "Warrior"
-  description: "A trained combatant."
-  # Effects fire once when archetype is granted
-  gain_effects:
-    - type: stat_change
-      stat: strength
-      amount: 5
-  # Effects fire once when archetype is removed
-  lose_effects:
-    - type: stat_change
-      stat: strength
-      amount: -5
-  # Always-on modifiers while held
-  passive_effects:
-    - stat_modifiers:
-        - stat: strength
-          amount: 2
-      skill_grants:
-        - power-attack
-```
-
-Grant archetypes with the `archetype_grant` effect; revoke with `archetype_revoke`.
-
----
-
-### `Quest`
-
-A multi-stage storyline tracked on the player. Stages advance when the player earns specific milestones.
-
-```yaml
-apiVersion: oscilla/v1
-kind: Quest
-metadata:
-  name: missing-merchant
-spec:
-  displayName: "The Missing Merchant"
-  description: "Old Gregor hasn't returned from the wilderness."
-  entry_stage: search-begun
-  stages:
-    - name: search-begun
-      description: "Head into the wilderness and look for clues."
-      advance_on:
-        - found-gregor-camp
-      next_stage: camp-found
-
-    - name: camp-found
-      description: "Gregor's camp was ransacked. Find who did it."
-      advance_on:
-        - defeated-bandit-leader
-      next_stage: complete
-
-    - name: complete
-      description: "Justice served. Report back to the village."
-      terminal: true
-```
-
-Activate a quest with the `quest_activate` effect. The engine validates the stage graph at load time — no orphan stages, no missing `next_stage` on non-terminal stages, no `next_stage` on terminal stages.
-
----
-
-### `LootTable`
-
-A reusable drop pool referenced by name. Useful when multiple enemies or adventures share the same reward pool.
-
-```yaml
-apiVersion: oscilla/v1
-kind: LootTable
-metadata:
-  name: forest-drops
-spec:
-  displayName: "Forest Drops"
-  description: "Common woodland loot."
-  groups:
-    - count: 1
-      method: weighted
-      entries:
-        - item: healing-herb
-          weight: 60
-          amount: 2
-        - item: wolf-pelt
-          weight: 30
-        - item: silver-coin
-          weight: 10
-          amount: 5
-```
-
-Reference with `loot_ref: forest-drops` in an `item_drop` effect.
-
----
-
-### `Recipe`
-
-A crafting formula: consume ingredient items, receive an output item.
-
-```yaml
-apiVersion: oscilla/v1
-kind: Recipe
-metadata:
-  name: brew-healing-potion
-spec:
-  displayName: "Brew Healing Potion"
-  description: "Combine herbs and water into a restorative draught."
-  inputs:
-    - item: healing-herb
-      quantity: 2
-    - item: water-flask
-      quantity: 1
-  output:
-    item: healing-potion
-    quantity: 1
-```
-
-All items in `inputs` and `output` must match loaded Item manifest names.
-
-
----
-
 ## Examples
 
 The examples below form a single cohesive game package — **Ironvale** — where goblin incursions have disrupted an iron mining operation. Every manifest cross-references the others: enemies use shared loot tables, adventures activate quests and grant archetypes, archetypes unlock skills, and conditions gate content on quest stage and player level.
@@ -1299,7 +790,7 @@ spec:
           weight: 25
 ```
 
-`mine-goblin` has no inline loot — drops are handled by the adventure's `on_win` effects (using `loot_ref: mine-drops`). `goblin-warchief` has inline loot that fires automatically when the enemy is defeated in combat, in addition to any `item_grant` effects in the adventure's `on_win` block.
+`mine-goblin` has no inline loot — drops are handled by the adventure's `on_win` effects (using `loot_ref: mine-drops`). `goblin-warchief` has inline loot that fires automatically when the enemy is defeated in combat, in addition to any `item_drop` effects in the adventure's `on_win` block.
 
 ---
 
@@ -1558,13 +1049,16 @@ spec:
         effects:
           - type: milestone_grant
             milestone: rescued-miners
-          - type: archetype_grant
-            archetype: ironworker
+          - type: archetype_add
+            name: ironworker
           - type: stat_change
             stat: xp
             amount: 200
-          - type: item_grant
-            item: miners-pick
+          - type: item_drop
+            groups:
+              - entries:
+                  - item: miners-pick
+                    weight: 100
         steps:
           - type: ack
             text: |
@@ -1582,7 +1076,7 @@ spec:
             text: "You break for the exit. The warchief lets out a rattling war cry behind you."
 ```
 
-The `requires` condition (`quest_stage`) filters this adventure from the pool until the quest is active at stage `searching`. On winning: `milestone_grant` advances the quest (the quest's `searching` stage lists `rescued-miners` in `advance_on`); `archetype_grant` gives the `ironworker` archetype; `item_grant` guarantees `miners-pick` as a reward on top of the warchief's inline loot.
+The `requires` condition (`quest_stage`) filters this adventure from the pool until the quest is active at stage `searching`. On winning: `milestone_grant` advances the quest (the quest's `searching` stage lists `rescued-miners` in `advance_on`); `archetype_add` gives the `ironworker` archetype; the guaranteed `miners-pick` reward is a single-entry `item_drop` group (weight 100) on top of the warchief's inline loot.
 
 ---
 
@@ -1618,8 +1112,11 @@ spec:
           effects:
             - type: milestone_grant
               milestone: opened-vault
-            - type: item_grant
-              item: ancient-sigil
+            - type: item_drop
+              groups:
+                - entries:
+                    - item: ancient-sigil
+                      weight: 100
             - type: stat_change
               stat: xp
               amount: 75

@@ -36,6 +36,7 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems)        | XL     | Combat Overhaul            |
 | [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades)                          | M      | Character Progression      |
 | [Extended Template Primitives](#extended-template-primitives)                               | S      | Engine Architecture        |
+| [Template Expressions in Condition Comparators](#template-expressions-in-condition-comparators) | M  | Engine Architecture        |
 | [Adventure Pipeline State-Machine Refactor](#adventure-pipeline-state-machine-refactor)     | XL     | Engine Architecture        |
 | [Player-Defined Pronouns](#player-defined-pronouns)                                         | S      | Character Configuration    |
 | [Cross-Iteration Conditions/Templates/Effects](#cross-iteration-conditionstemplateseffects) | M      | Character Progression      |
@@ -47,6 +48,7 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [Quest Progress Panel](#quest-progress-panel)                                               | M      | Quest Depth                |
 | [Faction and Reputation System](#faction-and-reputation-system)                             | M      | Quest Depth & Factions     |
 | [Content Inheritance / Prototypes](#content-inheritance--prototypes)                        | M      | Content Reuse              |
+| [Custom Effects](#custom-effects)                                                           | S      | Content Reuse              |
 | [Plugin and Extension System](#plugin-and-extension-system)                                 | L      | Engine Architecture        |
 | [Full TUI Upgrade](#full-tui-upgrade)                                                       | L      | Media and Presentation     |
 | [Region Maps](#region-maps)                                                                 | M      | Media and Presentation     |
@@ -197,6 +199,30 @@ Functions deferred from the stat-formula-templates change:
 - Additional pool manipulation: `drop_highest(pool, n)`, `drop_lowest(pool, n)`, `reroll_below(pool, sides, threshold)`
 
 All functions follow the existing SAFE_GLOBALS conventions: pure Python, sandboxed, `ValueError` on invalid input, precompile-and-mock-render at load time.
+
+### Template Expressions in Condition Comparators
+
+**Effort: M** · **Group: Engine Architecture**
+
+Allow numeric comparator fields on condition types (`gt`, `gte`, `lt`, `lte`, `eq`) to accept template strings in addition to literal integers and floats. The template is evaluated at runtime against the current player state, enabling cross-stat comparisons without requiring a dedicated derived stat.
+
+Example — check whether `hp` equals `max_hp` directly, without an `hp_deficit` derived stat:
+
+```yaml
+requires:
+  type: character_stat
+  name: hp
+  eq: "{{ player.stats['max_hp'] }}"
+```
+
+This applies uniformly to all condition types that accept numeric comparators: `character_stat`, `archetype_count`, `prestige_count`, `milestone_ticks_elapsed`, `archetype_ticks_elapsed`, and any future condition with a numeric comparison field.
+
+Implementation notes:
+
+- Comparator fields widen from `int | float | None` to `int | float | str | None`; string values are treated as template expressions.
+- Templates are rendered through the existing sandboxed evaluator and must resolve to a numeric value; a non-numeric result is a runtime error.
+- Load-time precompilation and mock-render validation applies to all template comparators, consistent with how template expressions are validated elsewhere in the engine.
+- When this ships, derived stats used solely as condition workarounds (e.g., `hp_deficit`) can be removed from content packages.
 
 ### Player-Defined Pronouns
 
@@ -372,6 +398,43 @@ When this system ships, `GameFeatureFlags` in the API must also gain a `has_fact
 ---
 
 ## Content Organization
+
+### Custom Effects
+
+**Effort: S** · **Group: Content Reuse**
+
+Mirrors the Custom Conditions system — allow content authors to define named, reusable effects as `kind: CustomEffect` manifests. A custom effect declares a parameter schema and a body composed entirely of standard effects, allowing complex effect sequences to be named, parameterized, and referenced by a single `type: custom` effect entry anywhere effects are accepted.
+
+Example: a `heal_percentage` custom effect that accepts a `percent` parameter and produces a `stat_change` on `hp` using a template expression:
+
+```yaml
+apiVersion: oscilla/v1
+kind: CustomEffect
+metadata:
+  name: heal_percentage
+spec:
+  parameters:
+    - name: percent
+      type: float
+  effects:
+    - type: stat_change
+      stat: hp
+      amount: "{{ min(player.stats['max_hp'] - player.stats['hp'], floor(player.stats['max_hp'] * params.percent)) }}"
+```
+
+Reference at a call site:
+
+```yaml
+effects:
+  - type: custom
+    ref: heal_percentage
+    params:
+      percent: 0.33
+```
+
+Load-time validation catches dangling refs, circular compositions, unknown parameters, and type mismatches. Custom effects can compose other custom effects. The primary motivation is eliminating repeated boilerplate for parameterized patterns — such as percentage heals, scaled stat changes, or multi-step reward sequences — that otherwise must be hand-rolled with identical template expressions everywhere they appear.
+
+---
 
 ### Content Inheritance / Prototypes
 

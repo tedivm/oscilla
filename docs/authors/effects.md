@@ -11,11 +11,12 @@ on_win:
       stat: xp
       amount: 100
     - type: item_drop
-      loot:
-        - item: gold-coins
-          weight: 70
-        - item: iron-sword
-          weight: 30
+      groups:
+        - entries:
+            - item: gold-coins
+              weight: 70
+            - item: iron-sword
+              weight: 30
     - type: milestone_grant
       milestone: "defeated-the-bandit-captain"
     - type: stat_change
@@ -58,56 +59,82 @@ The `item_drop` effect rolls a weighted loot table and gives the player whatever
 ```yaml
 effects:
   - type: item_drop
-    loot:
-      - item: healing-potion
-        weight: 60
-      - item: mana-potion
-        weight: 30
-      - item: rare-gem
-        weight: 10
+    groups:
+      - entries:
+          - item: healing-potion
+            weight: 60
+          - item: mana-potion
+            weight: 30
+          - item: rare-gem
+            weight: 10
 ```
 
-Each roll picks exactly one item. Use `count` to roll multiple times:
+Each group picks exactly one item by default. Use `count` on a group to roll multiple times from it:
 
 ```yaml
 effects:
   - type: item_drop
-    count: 3 # three separate rolls
-    loot:
-      - item: gold-coins
-        weight: 80
-      - item: silver-ring
-        weight: 20
+    groups:
+      - count: 3 # three separate rolls from this group
+        entries:
+          - item: gold-coins
+            weight: 80
+          - item: silver-ring
+            weight: 20
 ```
 
 `count` can also be a [template expression](./templates.md): `"{{ roll(1, 3) }}"`.
 
-Use `quantity` on any loot entry to grant more than one copy when that entry is selected:
+Use `amount` on any loot entry to grant more than one copy when that entry is selected:
 
 ```yaml
 effects:
   - type: item_drop
-    count: 1
-    loot:
-      - item: gold-coins
-        weight: 100
-        quantity: 5 # player always receives 5 coins from this roll
+    groups:
+      - entries:
+          - item: gold-coins
+            weight: 100
+            amount: 5 # player always receives 5 coins from this roll
 ```
 
-Instead of an inline `loot` list, you can reference a named [LootTable manifest](./items.md#loot-tables) or an enemy manifest by name using `loot_ref`:
+To guarantee a specific item with no random element, use a single-entry group with `weight: 100`:
 
 ```yaml
 effects:
   - type: item_drop
-    count: 1
+    groups:
+      - entries:
+          - item: ancient-key
+            weight: 100
+```
+
+You can supply multiple independent groups on a single effect; each group draws independently:
+
+```yaml
+effects:
+  - type: item_drop
+    groups:
+      - entries: # always drops one of these
+          - item: gold-coins
+            weight: 70
+          - item: silver-ring
+            weight: 30
+      - entries: # always also drops one of these
+          - item: healing-potion
+            weight: 60
+          - item: mana-potion
+            weight: 40
+```
+
+Instead of inline groups, you can reference a named [LootTable manifest](./loot-tables.md) by name using `loot_ref`:
+
+```yaml
+effects:
+  - type: item_drop
     loot_ref: dungeon-treasure # named LootTable manifest
-
-  - type: item_drop
-    count: 2
-    loot_ref: goblin-warrior # enemy manifest — uses its loot list
 ```
 
-Exactly one of `loot` or `loot_ref` must be set; providing both or neither is a load-time error.
+Exactly one of `groups` or `loot_ref` must be set; providing both or neither is a load-time error.
 
 ---
 
@@ -352,9 +379,10 @@ Effects fire in order. You can chain as many as you want on a single step:
       stat: xp
       amount: 75
     - type: item_drop
-      loot:
-        - item: stolen-purse
-          weight: 100
+      groups:
+        - entries:
+            - item: stolen-purse
+              weight: 100
     - type: milestone_grant
       milestone: "bandit-defeated"
     - type: stat_change
@@ -374,7 +402,7 @@ Four things happen at once: XP, item, milestone, reputation. That's the composab
 | ------------------ | -------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `stat_change`      | `stat`, `amount`     | —                                           | `int` stats only; `amount` can be template; use for XP, gold, damage, etc.                       |
 | `stat_set`         | `stat`, `value`      | —                                           | Works on `int` and `bool` stats                                                                  |
-| `item_drop`        | `loot` or `loot_ref` | `count` (default 1), `quantity` (per entry) | Weighted table; `count` can be template; `loot_ref` names a LootTable or Enemy                   |
+| `item_drop`        | `groups` or `loot_ref` | —                                           | `groups`: inline list of loot groups; `loot_ref`: named LootTable manifest; exactly one required  |
 | `use_item`         | `item`               | —                                           | Player must already hold the item                                                                |
 | `milestone_grant`  | `milestone`          | —                                           | Sets a permanent story flag; triggers quest advancement                                          |
 | `quest_activate`   | `quest_ref`          | —                                           | Activates a named quest; no-op if already active/complete                                        |
@@ -387,12 +415,23 @@ Four things happen at once: XP, item, milestone, reputation. That's the composab
 | `end_adventure`    | `outcome`            | —                                           | Terminates the adventure                                                                         |
 | `goto`             | `target`             | —                                           | Jumps to a labeled step                                                                          |
 
-### `item_drop` loot entry fields
+### `item_drop` fields
 
-| Field    | Type  | Required | Description                                |
-| -------- | ----- | -------- | ------------------------------------------ |
-| `item`   | `str` | yes      | [Item](./items.md) manifest name           |
-| `weight` | `int` | yes      | Relative probability; higher = more likely |
+**Group fields** (each element of `groups`):
+
+| Field     | Type           | Default      | Description                                                                     |
+| --------- | -------------- | ------------ | ------------------------------------------------------------------------------- |
+| `count`   | `int` or `str` | `1`          | How many entries to draw from this group; can be a template expression          |
+| `method`  | `str`          | `"weighted"` | `"weighted"` (with replacement) or `"unique"` (without replacement)            |
+| `entries` | list           | required     | At least one entry required                                                     |
+
+**Entry fields** (each element of `entries`):
+
+| Field    | Type           | Default | Description                                              |
+| -------- | -------------- | ------- | -------------------------------------------------------- |
+| `item`   | `str`          | required | [Item](./items.md) manifest name                        |
+| `weight` | `int`          | `1`     | Relative probability; higher = more likely               |
+| `amount` | `int` or `str` | `1`     | Copies granted when this entry is selected; can template |
 
 ### `apply_buff` fields
 
