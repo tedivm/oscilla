@@ -123,7 +123,7 @@ frontend_format_check:
 
 .PHONY: frontend_format_fix
 frontend_format_fix:
-	cd frontend && npx prettier --write src/
+	cd frontend && npx prettier --write src/ --log-level warn
 
 .PHONY: frontend_a11y
 frontend_a11y: frontend_build frontend_playwright_install

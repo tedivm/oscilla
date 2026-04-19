@@ -114,6 +114,8 @@ uv run oscilla validate --no-references         # skip cross-reference resolutio
 cat my.yaml | uv run oscilla validate --stdin --no-semantic --no-references  # validate from stdin
 ```
 
+> **IMPORTANT:** `oscilla validate` accepts **no positional arguments**. The `--game` flag (short: `-g`) takes the game's **name identifier** (e.g. `my-kingdom`), not a file path. Passing a path like `content/my-kingdom` will fail with "Got unexpected extra argument".
+
 **`--stdin` mode**: reads all YAML manifests from stdin and validates without loading any game package from disk. The `--game` flag is ignored in stdin mode. Useful for quickly checking a single manifest file in isolation. Only available on `oscilla validate`, not `oscilla content test`.
 
 **`--no-references`**: skips cross-reference resolution — useful for manifest snippets that reference kinds defined in other packages. Only available on `oscilla validate`, not `oscilla content test`.

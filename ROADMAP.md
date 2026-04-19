@@ -24,10 +24,9 @@ These items fix existing bugs, remove technical debt that actively misleads auth
 
 Since this project has not had a v1 release yet it is acceptable to break backwards compatibility, but we want to prioritize those features before the v1 release.
 
-| Item | Effort | Group |
-| ---- | ------ | ----- |
-
-> There are currently no high-priority pre-v1 items pending.
+| Item                                                            | Effort | Group          |
+| --------------------------------------------------------------- | ------ | -------------- |
+| [Remove Legacy Level Condition](#remove-legacy-level-condition) | S      | Technical Debt |
 
 ### All Items
 
@@ -54,12 +53,49 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [Picture Selection and ASCII Art](#picture-selection-and-ascii-art)                         | M      | Media and Presentation     |
 | [Content Documentation Generator](#content-documentation-generator)                         | M      | Author Tooling             |
 | [Website Authoring Mode](#website-authoring-mode)                                           | XL     | Author Tooling             |
+| [Remove Legacy Level Condition](#remove-legacy-level-condition)                             | S      | Technical Debt             |
+| [CLI Code Refactor](#cli-code-refactor)                                                     | S      | Developer Experience       |
 | [Adventure Log in Web Interface](#adventure-log-in-web-interface)                           | M      | Web Adventure Experience   |
 | [Combat Skill Usage in Web Interface](#combat-skill-usage-in-web-interface)                 | S      | Web Adventure Experience   |
 | [Post-Adventure Return to Location](#post-adventure-return-to-location)                     | XS     | Web Adventure Experience   |
 | [UI Color Themes](#ui-color-themes)                                                         | M      | Web Frontend Customization |
 | [In-Game Time Display in Web UI](#in-game-time-display-in-web-ui)                           | S      | Web Frontend Customization |
 | [Character Stat UI Customization](#character-stat-ui-customization)                         | M      | Web Frontend Customization |
+
+---
+
+## Technical Debt
+
+### Remove Legacy Level Condition
+
+**Effort: S** · **Group: Technical Debt**
+
+The engine previously had a hard-coded `level` stat and a `LevelCondition` condition type (`type: "level"`) that checked whether a character's level met a minimum threshold. The `level` stat has since been removed in favor of fully author-defined stats (games that want a level stat declare it in `character_config.yaml` like any other stat). However, the `LevelCondition` model and its handling have not been cleaned up:
+
+- `oscilla/engine/models/base.py` — `LevelCondition` class and its inclusion in the `Condition` union
+- `oscilla/engine/graph.py` — `"level"` case in the condition label helper
+
+These remnants should be removed. Any content that still uses `type: level` conditions must migrate to a stat-based condition (e.g., `type: stat_gte` on a `level` stat declared in `character_config.yaml`).
+
+---
+
+## Developer Experience
+
+### CLI Code Refactor
+
+**Effort: S** · **Group: Developer Experience**
+
+Reorganize the CLI source files to give the codebase a cleaner, more scalable structure:
+
+1. **Move `syncify` to `oscilla/services/cli.py`** — `syncify` is a utility used across CLI modules and does not belong in the top-level `cli.py` entrypoint. Moving it to the services layer makes it importable without creating circular dependencies as new command files are added.
+
+2. **Move `oscilla/cli_content.py` to `oscilla/commands/content.py`** — Introduce an `oscilla/commands/` package as the home for all domain-specific command groups. Future command files (e.g., `commands/admin.py`, `commands/reports.py`) follow the same pattern. The main `cli.py` becomes a thin entrypoint that mounts each sub-app from `commands/`.
+
+3. **Remove the `hello` command** — The `hello` command (`oscilla hello`) is a placeholder that prints a greeting and serves no real purpose. It should be removed from `cli.py` as part of this cleanup.
+
+4. **Update the `typer-cli` agent skill** — Revise the skill to reflect the new layout so that future commands are scaffolded in `oscilla/commands/<domain>.py` from the start.
+
+No user-visible behavior changes beyond the removal of the `hello` command.
 
 ---
 
@@ -87,14 +123,23 @@ This builds naturally on top of the condition evaluator — each decision node i
 
 The current combat system is tightly coupled to a single resolution model. Refactor it to expose a well-defined interface that allows content packages to specify custom combat systems — for example, a tactical positioning system, a card-draw-based system, or a stamina/cooldown model — without changes to core engine code.
 
+The existing `StandardCombatSystem` also contains hardcoded assumptions that belong in content, not in the engine:
+
+- **`strength`** is hardcoded as the player's offensive stat for damage calculation
+- **`dexterity`** is hardcoded as the player's defensive stat for incoming damage mitigation
+- **`hp`** is hardcoded as the player's hit point pool
+
+These stat names are currently implicit engine contracts with no mechanism for a content author to override them. A content package that uses different stat names (e.g., `power`, `agility`, `vitality`) must still silently define `strength`, `dexterity`, and `hp` or combat will silently use fallback defaults. The refactor should expose a configuration surface so the combat system's stat bindings are declared in `game.yaml`, not baked into the engine.
+
 Goals:
 
 - Define a `CombatSystem` protocol or base class that the engine dispatches to
 - Ship the existing combat logic as the default `StandardCombatSystem` implementation
 - Allow `game.yaml` to declare an alternate combat system by name
+- Allow `game.yaml` to configure which character stats map to the standard combat roles (attack, defense, hp)
 - Ensure the TUI and pipeline layers are agnostic to the specific combat system in use
 
-This is a prerequisite for games that want combat to feel meaningfully different from the default turn-based model.
+This is a prerequisite for games that want combat to feel meaningfully different from the default turn-based model, and also a correctness requirement for the existing system.
 
 ---
 
