@@ -26,7 +26,7 @@ dependencies = [
   "pydot>=4.0.1,<5",
   "pyjwt>=2.12.1",
   "redis",
-  "rich>=14.3.3",
+  "rich>=15.0.0",
   "ruamel-yaml>=0.19.1",
   "textual>=8.2.3",
   "typer",
