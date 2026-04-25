@@ -1,0 +1,182 @@
+# Burning Wheel — Scripted Combat (Versus Fight! System)
+#
+# APPROXIMATION — Possible but Awkward
+#
+# Burning Wheel's Fight! system is a scripted-simultaneously-revealed combat:
+# both sides secretly script 3 maneuvers before play begins, then reveal and
+# resolve them in order. The key mechanic is that NEITHER side knows the
+# other's choices at scripting time — the hidden-reveal dynamic is load-bearing.
+#
+# With turn_order: "simultaneous" and resolution_formulas, the engine now gives
+# correct ordering: the player commits their maneuver choice via use_effects
+# first (player action phase), the enemy commits a random maneuver via
+# enemy_damage_formulas next (enemy phase), and then resolution_formulas compare
+# both committed maneuvers and apply forte damage. Neither side sees a defeat
+# check until after both have committed.
+#
+# What this approximation still loses:
+#   - The player sees their own choice in the action menu and knows the enemy
+#     will randomize. In true Burning Wheel neither side has any information
+#     at scripting time.
+#   - Three-exchange scripts (the "volley" structure) compress to one choice per round.
+#   - The maneuver matchup tables (Charge vs. Avoid = specific outcome) are
+#     simplified to win/tie/lose via the combat_stat comparison.
+#
+# Maneuver encoding: 1 = Strike, 2 = Block, 3 = Avoid, 4 = Charge
+# Matchup rules simplified:
+#   Strike beats Block (player was open); Avoid beats Strike (player dodges);
+#   Charge beats Avoid (ram through); Block beats Charge (hold the line).
+#   Otherwise: tie (no damage either way).
+#
+# Fitness category: Possible but Awkward — the ordering is now correct (both
+#   sides commit before resolution) but sealed hidden input is still absent.
+# Key features illustrated: turn_order: "simultaneous"; resolution_formulas for
+#   both-sides comparison; intent-declaration skills; combat_stat inter-formula
+#   communication; maneuver encoding via stat comparison.
+
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: burning-wheel-fight
+spec:
+  player_defeat_condition:
+    type: character_stat
+    name: forte
+    lte: 0
+  enemy_defeat_condition:
+    type: enemy_stat
+    stat: forte
+    lte: 0
+  player_turn_mode: "choice"
+  skill_contexts: ["bw-fight"]
+  # In Burning Wheel all fighters have access to the four core Fight! maneuvers.
+  # system_skills injects them unconditionally — the player's choice IS the maneuver.
+  system_skills:
+    - skill: bw-strike
+    - skill: bw-block
+    - skill: bw-avoid
+    - skill: bw-charge
+  combat_stats:
+    - name: player_maneuver
+      default: 0 # Set by the chosen skill's use_effects (1=Strike, 2=Block, 3=Avoid, 4=Charge)
+    - name: enemy_maneuver
+      default: 0 # Set by enemy_damage_formulas (random each round)
+  # Enemy phase: randomize maneuver, then commit to combat_stats.
+  # With turn_order: "simultaneous", player use_effects have already committed
+  # player_maneuver before this runs. resolution_formulas then compare both.
+  turn_order: "simultaneous"
+  enemy_damage_formulas:
+    - target_stat: enemy_maneuver
+      target: combat
+      # Random maneuver: 1–4 (Strike/Block/Avoid/Charge).
+      # Delta-encode: emit (current - new) so that stat -= (current - new) = new.
+      formula: "{{ combat_stats['enemy_maneuver'] - roll(1, 4) }}"
+  # Resolution formulas fire after both sides have committed their maneuver.
+  # With full visibility into player_maneuver and enemy_maneuver, the matchup resolves cleanly.
+  resolution_formulas:
+    # Enemy wins the exchange when their maneuver counters the player's:
+    #   enemy=Strike(1) AND player=Block(2):   enemy punches past raised guard
+    #   enemy=Avoid(3)  AND player=Strike(1):  player whiffs, enemy creates opening
+    #   enemy=Charge(4) AND player=Avoid(3):   charges through the dodge
+    #   enemy=Block(2)  AND player=Charge(4):  holds the charge
+    - target_stat: forte
+      target: combat
+      display: "Forte"
+      formula: >-
+        {{ 1 if (
+          (combat_stats['enemy_maneuver'] == 1 and combat_stats['player_maneuver'] == 2) or
+          (combat_stats['enemy_maneuver'] == 3 and combat_stats['player_maneuver'] == 1) or
+          (combat_stats['enemy_maneuver'] == 4 and combat_stats['player_maneuver'] == 3) or
+          (combat_stats['enemy_maneuver'] == 2 and combat_stats['player_maneuver'] == 4)
+        ) else 0 }}
+    # Player wins the exchange when their maneuver counters the enemy's:
+    #   player=Strike(1) AND enemy=Block(2):   player breaks past guard
+    #   player=Avoid(3)  AND enemy=Strike(1):  enemy whiffs
+    #   player=Charge(4) AND enemy=Avoid(3):   charges through dodge
+    #   player=Block(2)  AND enemy=Charge(4):  holds the charge
+    - target_stat: forte
+      display: "Forte"
+      formula: >-
+        {{ roll(enemy_stats['power_die']) if (
+          (combat_stats['player_maneuver'] == 1 and combat_stats['enemy_maneuver'] == 2) or
+          (combat_stats['player_maneuver'] == 3 and combat_stats['enemy_maneuver'] == 1) or
+          (combat_stats['player_maneuver'] == 4 and combat_stats['enemy_maneuver'] == 3) or
+          (combat_stats['player_maneuver'] == 2 and combat_stats['enemy_maneuver'] == 4)
+        ) else 0 }}
+
+---
+# Skill: Strike (1) — offensive straightforward attack.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: bw-strike
+spec:
+  displayName: "Strike ⚔️"
+  contexts: ["bw-fight"]
+  use_effects:
+    - type: stat_set
+      stat: player_maneuver
+      target: combat
+      value: 1
+  combat_damage_formulas: [] # Damage is resolved by the CombatSystem's resolution_formulas
+
+---
+# Skill: Block (2) — defensive counter.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: bw-block
+spec:
+  displayName: "Block 🛡️"
+  contexts: ["bw-fight"]
+  use_effects:
+    - type: stat_set
+      stat: player_maneuver
+      target: combat
+      value: 2
+  combat_damage_formulas: []
+
+---
+# Skill: Avoid (3) — sidestep / disengage.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: bw-avoid
+spec:
+  displayName: "Avoid 🌪️"
+  contexts: ["bw-fight"]
+  use_effects:
+    - type: stat_set
+      stat: player_maneuver
+      target: combat
+      value: 3
+  combat_damage_formulas: []
+
+---
+# Skill: Charge (4) — aggressive rush.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: bw-charge
+spec:
+  displayName: "Charge 💨"
+  contexts: ["bw-fight"]
+  use_effects:
+    - type: stat_set
+      stat: player_maneuver
+      target: combat
+      value: 4
+  combat_damage_formulas: []
+
+---
+# Enemy: Orc Warchief — a brutish Burning Wheel combatant.
+# power_die: die size for damage on a winning exchange.
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: orc-warchief
+spec:
+  displayName: "Orc Warchief"
+  stats:
+    forte: 5 # Forte (health/endurance in Fight!) — out at 0
+    power_die: 6 # Damage: 1d6 on a winning exchange

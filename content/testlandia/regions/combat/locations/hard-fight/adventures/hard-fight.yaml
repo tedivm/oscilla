@@ -11,12 +11,18 @@ spec:
       on_win:
         steps:
           - type: narrative
-            text: "Miraculously defeated the iron golem!"
+            text:
+              "[bold]Victory![/bold] You miraculously defeated the Iron Golem! Combat
+              complete."
       on_defeat:
         steps:
           - type: narrative
-            text: "Defeated by the iron golem, as expected."
+            text:
+              "[bold]Defeat![/bold] The Iron Golem overpowered you, as expected. Combat
+              ended in defeat."
       on_flee:
         steps:
           - type: narrative
-            text: "Wisely fled from the iron golem."
+            text:
+              "[bold]Fled![/bold] You wisely retreated from the Iron Golem. Combat ended
+              without a result."

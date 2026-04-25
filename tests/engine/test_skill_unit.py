@@ -31,7 +31,7 @@ from oscilla.engine.steps.combat import _apply_damage_amplify, _apply_incoming_m
 
 
 def _empty_ctx() -> CombatContext:
-    return CombatContext(enemy_hp=100, enemy_ref="test-enemy")
+    return CombatContext(enemy_stats={"hp": 100}, enemy_ref="test-enemy")
 
 
 def _ctx_with_effects(effects: List[ActiveCombatEffect]) -> CombatContext:
@@ -453,44 +453,44 @@ def test_empty_skills_roundtrip(base_player: CharacterState, minimal_registry: "
 
 def test_combat_context_default_resources_empty() -> None:
     """CombatContext initializes with empty enemy_resources when none are supplied."""
-    ctx = CombatContext(enemy_hp=50, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 50}, enemy_ref="test-enemy")
     assert ctx.enemy_resources == {}
 
 
 def test_combat_context_resources_populated_from_spec() -> None:
     """enemy_resources is populated from the value passed in (mirrors EnemySpec.skill_resources)."""
-    ctx = CombatContext(enemy_hp=50, enemy_ref="fire-mage", enemy_resources={"mana": 80})
+    ctx = CombatContext(enemy_stats={"hp": 50}, enemy_ref="fire-mage", enemy_resources={"mana": 80})
     assert ctx.enemy_resources["mana"] == 80
 
 
 def test_combat_context_resources_supports_multiple_keys() -> None:
     """Multiple resource pools can be tracked simultaneously."""
     resources = {"mana": 80, "rage": 40}
-    ctx = CombatContext(enemy_hp=100, enemy_ref="dual-resource-enemy", enemy_resources=dict(resources))
+    ctx = CombatContext(enemy_stats={"hp": 100}, enemy_ref="dual-resource-enemy", enemy_resources=dict(resources))
     assert ctx.enemy_resources == {"mana": 80, "rage": 40}
 
 
 def test_combat_context_resource_mutation_does_not_affect_original() -> None:
     """Mutating enemy_resources does not affect the original dict (dict() copy)."""
     original: dict[str, int] = {"mana": 80}
-    ctx = CombatContext(enemy_hp=50, enemy_ref="test", enemy_resources=dict(original))
+    ctx = CombatContext(enemy_stats={"hp": 50}, enemy_ref="test", enemy_resources=dict(original))
     ctx.enemy_resources["mana"] = 0
     assert original["mana"] == 80
 
 
 def test_combat_context_initial_turn_number() -> None:
     """CombatContext starts at turn 1."""
-    ctx = CombatContext(enemy_hp=50, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 50}, enemy_ref="test-enemy")
     assert ctx.turn_number == 1
 
 
 def test_combat_context_initial_active_effects_empty() -> None:
     """CombatContext starts with no active effects."""
-    ctx = CombatContext(enemy_hp=50, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 50}, enemy_ref="test-enemy")
     assert ctx.active_effects == []
 
 
 def test_combat_context_initial_skill_uses_empty() -> None:
     """CombatContext starts with no recorded skill uses."""
-    ctx = CombatContext(enemy_hp=50, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 50}, enemy_ref="test-enemy")
     assert ctx.skill_uses_this_combat == {}

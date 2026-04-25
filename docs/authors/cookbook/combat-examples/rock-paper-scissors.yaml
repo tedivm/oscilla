@@ -1,0 +1,143 @@
+# Rock-Paper-Scissors Combat
+#
+# Fitness category: Fits Well
+#
+# The canonical example for turn_order: "simultaneous" and resolution_formulas.
+# Both sides commit their choice in the actor phases (player via skill use_effects,
+# enemy via enemy_damage_formulas), then resolution_formulas compare the two committed
+# choices and apply damage. No defeat check occurs mid-round — both sides always
+# complete their phases before outcomes are resolved.
+#
+# Key features illustrated:
+#   - turn_order: "simultaneous" (no mid-round defeat check)
+#   - Intent-declaration skills: use_effects only, no combat_damage_formulas
+#   - resolution_formulas with modular arithmetic to determine the winner
+#   - combat_stats scoping: player lives, player choice, and enemy choice are all
+#     encounter-scoped and discarded when combat ends
+#   - enemy_damage_formulas delta-encoding a random draw into a combat_stat
+#
+# Encoding: 1 = Rock, 2 = Paper, 3 = Scissors
+# Win condition: (p - e + 3) % 3 == 1 means p beats e.
+#   Rock(1) beats Scissors(3):  (1-3+3)%3 = 1%3 = 1  ✓
+#   Paper(2) beats Rock(1):     (2-1+3)%3 = 4%3 = 1  ✓
+#   Scissors(3) beats Paper(2): (3-2+3)%3 = 4%3 = 1  ✓
+#   Ties:                       (x-x+3)%3 = 3%3 = 0  → no damage ✓
+
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: rps-combat
+spec:
+  player_defeat_condition:
+    type: combat_stat
+    stat: player_lives
+    lte: 0
+  enemy_defeat_condition:
+    type: enemy_stat
+    stat: lives
+    lte: 0
+  player_turn_mode: "choice"
+  # Both phases always complete before defeat is checked.
+  turn_order: "simultaneous"
+  # simultaneous_defeat_result: "player_wins"  # default; ties can't occur in RPS
+  skill_contexts: ["rps"]
+  system_skills:
+    - skill: throw-rock
+    - skill: throw-paper
+    - skill: throw-scissors
+  # Combat-internal stats — initialized at encounter start, discarded when combat ends.
+  combat_stats:
+    - name: player_lives
+      default: 3
+    - name: player_choice
+      default: 0 # set by the chosen skill's use_effects each round
+    - name: enemy_choice
+      default: 0 # set by enemy_damage_formulas each round
+  # Enemy phase: commit a random throw (1–3) to combat_stats['enemy_choice'].
+  # Delta-encode: result is subtracted from current stat, so emit (current - new) to land on new.
+  # Example: current=0, new=2 → formula emits (0-2) = -2 → 0 - (-2) = 2. ✓
+  enemy_damage_formulas:
+    - target_stat: enemy_choice
+      target: combat
+      formula: "{{ combat_stats['enemy_choice'] - roll(1, 3) }}"
+  # Resolution formulas fire after both choices are committed.
+  # Both formulas share the same p/e values because combat_stats['player_choice'] and
+  # combat_stats['enemy_choice'] do not change between entries in this pass.
+  resolution_formulas:
+    # Reduce player lives by 1 if the enemy's throw beats the player's.
+    - target_stat: player_lives
+      target: combat
+      display: "Your Lives"
+      formula: >-
+        {% set p = combat_stats['player_choice'] %}
+        {% set e = combat_stats['enemy_choice'] %}
+        {{ 1 if (e - p + 3) % 3 == 1 else 0 }}
+    # Reduce enemy lives by 1 if the player's throw beats the enemy's.
+    - target_stat: lives
+      display: "Challenger Lives"
+      formula: >-
+        {% set p = combat_stats['player_choice'] %}
+        {% set e = combat_stats['enemy_choice'] %}
+        {{ 1 if (p - e + 3) % 3 == 1 else 0 }}
+  on_combat_victory:
+    - type: stat_change
+      stat: throws_won
+      amount: 1
+
+---
+# Enemy: The Challenger
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: the-challenger
+spec:
+  displayName: "The Challenger"
+  stats:
+    lives: 3
+
+---
+# Skill: Throw Rock (1)
+# Pure intent-declaration: use_effects set player_choice; no combat_damage_formulas.
+# All damage is determined by the CombatSystem's resolution_formulas.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: throw-rock
+spec:
+  displayName: "Rock ✊"
+  contexts: ["rps"]
+  use_effects:
+    - type: stat_set
+      stat: player_choice
+      target: combat
+      value: 1 # Rock = 1
+
+---
+# Skill: Throw Paper (2)
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: throw-paper
+spec:
+  displayName: "Paper ✋"
+  contexts: ["rps"]
+  use_effects:
+    - type: stat_set
+      stat: player_choice
+      target: combat
+      value: 2 # Paper = 2
+
+---
+# Skill: Throw Scissors (3)
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: throw-scissors
+spec:
+  displayName: "Scissors ✌️"
+  contexts: ["rps"]
+  use_effects:
+    - type: stat_set
+      stat: player_choice
+      target: combat
+      value: 3 # Scissors = 3

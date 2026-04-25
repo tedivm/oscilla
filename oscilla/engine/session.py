@@ -295,7 +295,7 @@ class GameSession:
                     continue
 
                 # Apply conditions gate — same as pool eligibility check.
-                if not evaluate(adv_manifest.spec.requires, self._character, self.registry):
+                if not evaluate(condition=adv_manifest.spec.requires, player=self._character, registry=self.registry):
                     logger.debug(
                         "Triggered adventure %r skipped: requires condition not met.",
                         adventure_ref,

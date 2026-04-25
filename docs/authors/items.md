@@ -260,31 +260,36 @@ loot:
 
 ### Item manifest fields
 
-| Field                         | Required | Default | Description                                            |
-| ----------------------------- | -------- | ------- | ------------------------------------------------------ |
-| `metadata.name`               | yes      | —       | Identifier used everywhere items are referenced        |
-| `spec.displayName`            | yes      | —       | Player-facing name                                     |
-| `spec.description`            | no       | `""`    | Short description shown in inventory                   |
-| `spec.category`               | no       | `""`    | Display-only category label (free string)              |
-| `spec.stackable`              | no       | `false` | If `true`, multiple copies stack as a count            |
-| `spec.value`                  | no       | `0`     | Numeric value (for display or shop mechanics)          |
-| `spec.labels`                 | no       | `[]`    | List of item label names from `game.yaml`              |
-| `spec.use_effects`            | no       | `[]`    | Effects that fire when the player activates the item   |
-| `spec.consumed_on_use`        | no       | `false` | Remove after use (stack decrements; instance removed)  |
-| `spec.charges`                | no       | `null`  | Per-instance use count; item removed when it reaches 0 |
-| `spec.equip`                  | no       | `null`  | If present, item can be equipped into slots            |
-| `spec.grants_skills_equipped` | no       | `[]`    | Skills available only while item is in a slot          |
-| `spec.grants_skills_held`     | no       | `[]`    | Skills available whenever item is in inventory         |
-| `spec.grants_buffs_equipped`  | no       | `[]`    | Buffs applied at combat start while equipped           |
-| `spec.grants_buffs_held`      | no       | `[]`    | Buffs applied at combat start while held               |
+| Field                         | Required | Default | Description                                                                                      |
+| ----------------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------ |
+| `metadata.name`               | yes      | —       | Identifier used everywhere items are referenced                                                  |
+| `spec.displayName`            | yes      | —       | Player-facing name                                                                               |
+| `spec.description`            | no       | `""`    | Short description shown in inventory                                                             |
+| `spec.category`               | no       | `""`    | Display-only category label (free string)                                                        |
+| `spec.stackable`              | no       | `false` | If `true`, multiple copies stack as a count                                                      |
+| `spec.value`                  | no       | `0`     | Numeric value (for display or shop mechanics)                                                    |
+| `spec.labels`                 | no       | `[]`    | List of item label names from `game.yaml`                                                        |
+| `spec.contexts`               | no       | `[]`    | Context strings; matched against `skill_contexts` in CombatSystem for choice-mode menu inclusion |
+| `spec.use_effects`            | no       | `[]`    | Effects that fire when the player activates the item                                             |
+| `spec.combat_damage_formulas` | no       | `[]`    | Formula-based damage entries run when item is used in combat                                     |
+| `spec.consumed_on_use`        | no       | `false` | Remove after use (stack decrements; instance removed)                                            |
+| `spec.charges`                | no       | `null`  | Per-instance use count; item removed when it reaches 0                                           |
+| `spec.equip`                  | no       | `null`  | If present, item can be equipped into slots                                                      |
+| `spec.grants_skills_equipped` | no       | `[]`    | Skills available only while item is in a slot                                                    |
+| `spec.grants_skills_held`     | no       | `[]`    | Skills available whenever item is in inventory                                                   |
+| `spec.grants_buffs_equipped`  | no       | `[]`    | Buffs applied at combat start while equipped                                                     |
+| `spec.grants_buffs_held`      | no       | `[]`    | Buffs applied at combat start while held                                                         |
 
 ### EquipSpec fields
 
-| Field            | Required | Default | Description                                                       |
-| ---------------- | -------- | ------- | ----------------------------------------------------------------- |
-| `slots`          | yes      | —       | List of slot names (min 1) from `CharacterConfig.equipment_slots` |
-| `stat_modifiers` | no       | `[]`    | List of `{stat, amount}` pairs active while equipped              |
-| `requires`       | no       | `null`  | Condition evaluated against base stats before allowing equip      |
+| Field                    | Required | Default | Description                                                           |
+| ------------------------ | -------- | ------- | --------------------------------------------------------------------- |
+| `slots`                  | yes      | —       | List of slot names (min 1) from `CharacterConfig.equipment_slots`     |
+| `stat_modifiers`         | no       | `[]`    | List of `{stat, amount}` pairs active while equipped                  |
+| `requires`               | no       | `null`  | Condition evaluated against base stats before allowing equip          |
+| `combat_damage_formulas` | no       | `[]`    | Formula-based damage entries applied when this item is used in combat |
+
+`spec.contexts` and `spec.combat_damage_formulas` support combat items in `choice`-mode encounters. Set `contexts: [combat]` and the item will appear in the combat action menu when the CombatSystem's `skill_contexts` includes `"combat"`. The `combat_damage_formulas` entries use the same `DamageFormulaEntry` schema as formulas in a `CombatSystem` manifest — see [Combat Systems §damage-formulas](./combat-systems.md#damage-formulas).
 
 ### Constraints
 

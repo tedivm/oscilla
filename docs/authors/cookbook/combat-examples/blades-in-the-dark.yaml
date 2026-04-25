@@ -1,0 +1,123 @@
+# Blades in the Dark — Dice Pool Resolution
+#
+# Roll a pool of d6s equal to your action rating. Count dice showing 4+ as successes.
+# The number of successes determines the outcome tier:
+#   0 successes (miss)    : something bad happens; player takes stress
+#   1–2 successes (partial): deal damage, but take stress (you're exposed)
+#   3+ successes (full)   : deal full damage cleanly
+#   Critical (two 6s in the pool): the formula naturally returns 3+ in most cases
+#
+# rollpool(n, sides, threshold) returns the count of successes. Combined with
+# threshold_effects this handles the full Blades outcome table.
+#
+# Fitness category: Fits Well — rollpool() enables the dice-pool mechanic directly.
+# Key features illustrated: rollpool(), threshold_effects with three outcome bands,
+#   choice-mode action selection (Blades is always a player-declared action).
+
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: blades-in-the-dark
+spec:
+  player_defeat_condition:
+    type: character_stat
+    name: hp
+    lte: 0
+  enemy_defeat_condition:
+    type: enemy_stat
+    stat: hp
+    lte: 0
+  player_turn_mode: "choice"
+  skill_contexts: ["blades-action"]
+  # In Blades all characters can always attempt any action — the rating just changes
+  # how many dice you roll. These moves are always present in the combat menu.
+  system_skills:
+    - skill: skirmish
+    - skill: shadow-strike
+  # The enemy clock advances after each player action regardless of outcome tier.
+  # In Blades, the GM always reacts — even on a full success something costs something.
+  enemy_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      # Enemy's harm: flat roll scaled to threat level.
+      formula: "{{ max(0, roll(6) - enemy_stats['quality_floor']) }}"
+  # stress tracks the "currency" of risk; rising stress forces hard choices.
+  combat_stats:
+    - name: heat
+      default: 0 # Heat accumulates on misses; could trigger escalation effects
+
+---
+# Skill: Skirmish (Fight action) — used for direct physical confrontation.
+# Action rating drives pool size; the player's skirmish_rating is looked up from stats.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: skirmish
+spec:
+  displayName: "Skirmish"
+  contexts: ["blades-action"]
+  combat_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      # Roll pool of d6s equal to skirmish_rating; count successes (4+).
+      formula: "{{ rollpool(player.stats['skirmish_rating'], 6, 4) }}"
+      threshold_effects:
+        - max: 0
+          # Miss — the enemy's position improves; player takes 2 stress and +1 heat.
+          effects:
+            - type: stat_change
+              stat: stress
+              amount: 2
+            - type: stat_change
+              stat: heat
+              target: combat
+              amount: 1
+        - min: 1
+          max: 2
+          # Partial — you land the hit but you're exposed; take 1 stress.
+          effects:
+            - type: stat_change
+              stat: stress
+              amount: 1
+        # 3+ successes: clean hit, no side-effect band needed.
+
+---
+# Skill: Prowl (Wraith stealth strike) — a high-risk opener.
+# Uses prowl_rating instead of skirmish_rating.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: shadow-strike
+spec:
+  displayName: "Shadow Strike"
+  contexts: ["blades-action"]
+  combat_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      # Prowl-based pool — successes translate directly to wound severity.
+      formula: "{{ rollpool(player.stats['prowl_rating'], 6, 4) }}"
+      threshold_effects:
+        - max: 0
+          effects:
+            - type: stat_change
+              stat: stress
+              amount: 3 # A botched stealth strike is very costly
+        - min: 1
+          max: 2
+          effects:
+            - type: stat_change
+              stat: stress
+              amount: 1
+
+---
+# Enemy: Bluecoat Guard — a city watch officer; tough but predictable.
+# quality_floor reduces raw die damage; his harm clock (hp) is finite.
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: bluecoat-guard
+spec:
+  displayName: "Bluecoat Guard"
+  stats:
+    hp: 4 # Harm clock: 4 ticks to Taken Out
+    quality_floor: 2 # Reduces raw random harm to simulate standard-quality foes

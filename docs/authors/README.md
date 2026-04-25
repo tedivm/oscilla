@@ -61,7 +61,8 @@ These documents cover each manifest kind in depth.
 | [Adventures](./adventures.md)                 | Narrative, combat, choice, and stat-check steps; goto/labels; outcome branches.                                                    |
 | [Items](./items.md)                           | Consumables, gear, charges, equip requirements, labels, skill/buff grants.                                                         |
 | [Loot Tables](./loot-tables.md)               | Reusable item pools: groups, weighted/unique sampling, conditional groups and entries, template count/amount, enemy loot.          |
-| [Enemies](./enemies.md)                       | Combat stats, loot tables, enemy skills and resources.                                                                             |
+| [Combat Systems](./combat-systems.md)         | CombatSystem manifests — damage formulas, defeat conditions, turn order, initiative, choice mode, combat stats, lifecycle hooks.   |
+| [Enemies](./enemies.md)                       | Enemy stats dict, on-defeat effects, loot tables, enemy skills and resources.                                                      |
 | [Skills](./skills.md)                         | Skill and Buff manifests, costs, cooldowns, buff modifiers, item skill/buff grants, enemy skills, CharacterConfig skill resources. |
 | [Archetypes](./archetypes.md)                 | Archetype manifests, `archetype_add`/`archetype_remove`/`skill_revoke` effects, archetype conditions, passive effects.             |
 | [Passive Effects](./passive-effects.md)       | Always-on and condition-gated stat bonuses and skill grants declared in `game.yaml`.                                               |
@@ -90,6 +91,7 @@ Not sure which guide to read? Find your goal:
 | Make narrative text mention the player's stats or pronouns | [Templates](./templates.md)                                                                                                |
 | Let players equip weapons and armor                        | [Game Configuration §equipment-slots](./game-configuration.md#equipment-slots) + [Items §gear](./items.md#equippable-gear) |
 | Create a boss fight                                        | [Enemies](./enemies.md) + [Adventures §combat](./adventures.md#combat) + [Skills](./skills.md)                             |
+| Define custom combat rules (formulas, turn order)          | [Combat Systems](./combat-systems.md)                                                                                      |
 | Track story progress across multiple adventures            | [Conditions §milestone](./conditions.md) + [Quests](./quests.md)                                                           |
 | Let players craft items from materials                     | [Recipes](./recipes.md)                                                                                                    |
 | Add skill abilities (heal, power attack, etc.)             | [Skills](./skills.md)                                                                                                      |
@@ -102,11 +104,12 @@ Not sure which guide to read? Find your goal:
 
 Ready-made patterns for common authoring challenges:
 
-| Recipe                                                      | What it covers                                                                       |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| [Reputation System](./cookbook/reputation-system.md)        | Tracking player standing with a faction using a stat, conditions, and templates      |
-| [Locked Doors](./cookbook/locked-doors.md)                  | Gating a choice behind a key item, one-time discovery, and item consumption          |
-| [Day-Night Narrative](./cookbook/day-night-narrative.md)    | Writing text that changes based on the real system clock                             |
-| [In-Game Time Patterns](./cookbook/ingame-time-patterns.md) | Seasonal events, era transitions, time skips, lunar gates, and time-reversal puzzles |
+| Recipe                                                         | What it covers                                                                              |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| [Reputation System](./cookbook/reputation-system.md)           | Tracking player standing with a faction using a stat, conditions, and templates             |
+| [Locked Doors](./cookbook/locked-doors.md)                     | Gating a choice behind a key item, one-time discovery, and item consumption                 |
+| [Day-Night Narrative](./cookbook/day-night-narrative.md)       | Writing text that changes based on the real system clock                                    |
+| [In-Game Time Patterns](./cookbook/ingame-time-patterns.md)    | Seasonal events, era transitions, time skips, lunar gates, and time-reversal puzzles        |
+| [Combat System Patterns](./cookbook/combat-system-patterns.md) | Classic HP combat, choice-mode skill menus, initiative, simultaneous resolution, dice pools |
 
 More recipes: [Cookbook README](./cookbook/README.md)

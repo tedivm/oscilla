@@ -893,7 +893,7 @@ class OscillaApp(App[None]):
                         accessible_regions = [
                             region
                             for region in registry.regions.all()
-                            if evaluate(region.spec.effective_unlock, player, registry)
+                            if evaluate(condition=region.spec.effective_unlock, player=player, registry=registry)
                         ]
                         if not accessible_regions:
                             self.query_one(NarrativeLog).append_text(
@@ -922,7 +922,7 @@ class OscillaApp(App[None]):
                                 loc
                                 for loc in registry.locations.all()
                                 if loc.spec.region == region_ref
-                                and evaluate(loc.spec.effective_unlock, player, registry)
+                                and evaluate(condition=loc.spec.effective_unlock, player=player, registry=registry)
                             ]
 
                             if not accessible_locs:
@@ -946,7 +946,7 @@ class OscillaApp(App[None]):
                             eligible = [
                                 entry
                                 for entry in location.spec.adventures
-                                if evaluate(entry.requires, player, registry)
+                                if evaluate(condition=entry.requires, player=player, registry=registry)
                                 and player.is_adventure_eligible(
                                     adventure_ref=entry.ref,
                                     spec=registry.adventures.require(entry.ref, "Adventure").spec,

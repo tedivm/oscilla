@@ -1,7 +1,5 @@
 <script lang="ts">
   import { onDestroy, untrack } from "svelte";
-  import { goto } from "$app/navigation";
-  import { base } from "$app/paths";
   import { gameSession } from "$lib/stores/gameSession.js";
   import { apiFetch, ApiError } from "$lib/api/client.js";
   import type { PendingStateRead } from "$lib/api/types.js";
@@ -82,8 +80,9 @@
   }
 
   async function handleAdventureComplete(): Promise<void> {
-    gameSession.close();
-    await goto(`${base}/characters/${character.id}`);
+    const { getOverworld } = await import("$lib/api/characters.js");
+    const overworldState = await getOverworld(character.id);
+    gameSession.setOverworld(overworldState);
   }
 
   // ── Session takeover ──────────────────────────────────────────────────────
@@ -127,8 +126,9 @@
       {characterId}
       overworldState={$gameSession.overworldState}
       {character}
-      onBeginAdventure={(locationRef) =>
-        gameSession.go(character.id, locationRef)}
+      initialRegion={$gameSession.lastRegionId}
+      onBeginAdventure={(locationRef, regionId) =>
+        gameSession.go(character.id, locationRef, regionId)}
     />
   {:else}
     <div class="adventure-layout">

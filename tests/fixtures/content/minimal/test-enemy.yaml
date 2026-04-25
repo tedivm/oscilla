@@ -5,8 +5,8 @@ metadata:
 spec:
   displayName: "Test Enemy"
   description: "A simple enemy for tests."
-  hp: 10
-  attack: 5
-  defense: 0
-  xp_reward: 10
+  stats:
+    hp: 10
+    attack: 5
+    defense: 0
   loot: []

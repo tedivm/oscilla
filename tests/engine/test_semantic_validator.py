@@ -13,6 +13,8 @@ from oscilla.engine.models.adventure import (
     OutcomeBranch,
 )
 from oscilla.engine.models.base import Metadata
+from oscilla.engine.models.combat_system import CombatSystemManifest
+from oscilla.engine.models.enemy import EnemyManifest
 from oscilla.engine.models.game import GameManifest, GameSpec
 from oscilla.engine.models.location import LocationManifest, LocationSpec
 from oscilla.engine.models.region import RegionManifest, RegionSpec
@@ -509,3 +511,187 @@ def test_missing_description_warns_for_location_and_region() -> None:
     refs = {i.manifest for i in warnings}
     assert "region:no-desc-region" in refs
     assert "location:no-desc-loc" in refs
+
+
+# ---------------------------------------------------------------------------
+# CombatSystem semantic validator tests (tasks 14.1-14.7)
+# ---------------------------------------------------------------------------
+
+
+def _make_combat_system(
+    name: str = "std",
+    player_turn_mode: str = "auto",
+    turn_order: str = "player_first",
+    player_damage_formulas: list | None = None,
+    player_initiative_formula: str | None = None,
+    enemy_initiative_formula: str | None = None,
+) -> "CombatSystemManifest":
+    from oscilla.engine.models.base import CharacterStatCondition, EnemyStatCondition
+    from oscilla.engine.models.combat_system import CombatSystemManifest, CombatSystemSpec
+
+    return CombatSystemManifest(
+        apiVersion="oscilla/v1",
+        kind="CombatSystem",
+        metadata=Metadata(name=name),
+        spec=CombatSystemSpec(
+            player_defeat_condition=CharacterStatCondition(type="character_stat", name="hp", lte=0),
+            enemy_defeat_condition=EnemyStatCondition(type="enemy_stat", stat="hp", lte=0),
+            turn_order=turn_order,
+            player_turn_mode=player_turn_mode,
+            player_damage_formulas=player_damage_formulas or [],
+            player_initiative_formula=player_initiative_formula,
+            enemy_initiative_formula=enemy_initiative_formula,
+        ),
+    )
+
+
+def _make_combat_adventure(name: str = "fight", enemy: str = "test-enemy") -> AdventureManifest:
+    return AdventureManifest(
+        apiVersion="oscilla/v1",
+        kind="Adventure",
+        metadata=Metadata(name=name),
+        spec=AdventureSpec(
+            displayName=name.title(),
+            steps=[
+                CombatStep(
+                    type="combat",
+                    enemy=enemy,
+                    on_win=OutcomeBranch(effects=[EndAdventureEffect(type="end_adventure", outcome="completed")]),
+                    on_defeat=OutcomeBranch(effects=[EndAdventureEffect(type="end_adventure", outcome="defeated")]),
+                    on_flee=OutcomeBranch(effects=[EndAdventureEffect(type="end_adventure", outcome="fled")]),
+                )
+            ],
+        ),
+    )
+
+
+def _make_enemy(name: str = "test-enemy", stats: dict | None = None) -> "EnemyManifest":
+    from oscilla.engine.models.enemy import EnemyManifest, EnemySpec
+
+    return EnemyManifest(
+        apiVersion="oscilla/v1",
+        kind="Enemy",
+        metadata=Metadata(name=name),
+        spec=EnemySpec(displayName=name.replace("-", " ").title(), stats=stats if stats is not None else {"hp": 20}),
+    )
+
+
+# --- 14.1 ---
+
+
+def test_validate_combat_system_required_error() -> None:
+    """CombatStep with no resolvable CombatSystem must produce a no_combat_system error."""
+    adventure = _make_combat_adventure()
+    enemy = _make_enemy()
+    registry = ContentRegistry.build(manifests=[adventure, enemy])
+    errors = [i for i in validate_semantic(registry) if i.severity == "error" and i.kind == "no_combat_system"]
+    assert errors, "Expected no_combat_system error when no CombatSystem is registered"
+
+
+# --- 14.2 ---
+
+
+def test_validate_choice_mode_with_player_damage_formulas_error() -> None:
+    """CombatSystem with player_turn_mode='choice' and player_damage_formulas must produce an error."""
+    from oscilla.engine.models.combat_system import DamageFormulaEntry
+
+    cs = _make_combat_system(
+        player_turn_mode="choice",
+        player_damage_formulas=[DamageFormulaEntry(formula="{{ 5 }}", target_stat="hp", target="enemy")],
+    )
+    registry = ContentRegistry.build(manifests=[cs])
+    errors = [
+        i for i in validate_semantic(registry) if i.severity == "error" and i.kind == "choice_mode_with_damage_formulas"
+    ]
+    assert errors, "Expected choice_mode_with_damage_formulas error"
+
+
+# --- 14.3 ---
+
+
+def test_validate_initiative_missing_formula_error() -> None:
+    """turn_order='initiative' with no initiative formula fields must produce an error."""
+    cs = _make_combat_system(turn_order="initiative")
+    registry = ContentRegistry.build(manifests=[cs])
+    errors = [
+        i for i in validate_semantic(registry) if i.severity == "error" and i.kind == "initiative_formula_missing"
+    ]
+    assert len(errors) >= 2, "Expected errors for both missing initiative formulas"
+
+
+# --- 14.4 ---
+
+
+def test_validate_enemy_stat_coverage_error() -> None:
+    """Enemy missing a stat key required by the CombatSystem player_damage_formulas must produce an error."""
+    from oscilla.engine.models.combat_system import DamageFormulaEntry
+
+    cs = _make_combat_system(
+        player_damage_formulas=[DamageFormulaEntry(formula="{{ 5 }}", target_stat="hp", target="enemy")],
+    )
+    # Enemy has no stats at all — missing "hp"
+    enemy = _make_enemy(stats={})
+    adventure = _make_combat_adventure()
+    registry = ContentRegistry.build(manifests=[cs, enemy, adventure])
+    errors = [i for i in validate_semantic(registry) if i.severity == "error" and i.kind == "enemy_stat_missing"]
+    assert errors, "Expected enemy_stat_missing error for missing 'hp' stat"
+
+
+# --- 14.5 ---
+
+
+def test_validate_heal_enemy_deprecation_warning() -> None:
+    """HealEffect(target='enemy') in any adventure step must produce a deprecated_heal_enemy warning."""
+    from oscilla.engine.models.adventure import HealEffect
+
+    adventure = AdventureManifest(
+        apiVersion="oscilla/v1",
+        kind="Adventure",
+        metadata=Metadata(name="heal-quest"),
+        spec=AdventureSpec(
+            displayName="Heal Quest",
+            steps=[
+                NarrativeStep(
+                    type="narrative",
+                    text="You heal the enemy.",
+                    effects=[HealEffect(type="heal", target="enemy")],
+                ),
+                NarrativeStep(
+                    type="narrative",
+                    text="Done.",
+                    effects=[EndAdventureEffect(type="end_adventure", outcome="completed")],
+                ),
+            ],
+        ),
+    )
+    registry = ContentRegistry.build(manifests=[adventure])
+    warnings = [i for i in validate_semantic(registry) if i.severity == "warning" and i.kind == "deprecated_heal_enemy"]
+    assert warnings, "Expected deprecated_heal_enemy warning for heal target='enemy'"
+
+
+# --- 14.6 ---
+
+
+def test_validate_formula_syntax_error() -> None:
+    """A DamageFormulaEntry with invalid Jinja2 syntax must produce a formula_render_error."""
+    from oscilla.engine.models.combat_system import DamageFormulaEntry
+
+    cs = _make_combat_system(
+        player_damage_formulas=[DamageFormulaEntry(formula="{{ unclosed", target_stat="hp", target="enemy")],
+    )
+    registry = ContentRegistry.build(manifests=[cs])
+    errors = [i for i in validate_semantic(registry) if i.severity == "error" and i.kind == "formula_render_error"]
+    assert errors, "Expected formula_render_error for invalid Jinja2 formula"
+
+
+# --- 14.7 ---
+
+
+def test_validate_target_stat_null_no_threshold_error() -> None:
+    """DamageFormulaEntry with target_stat=None and no threshold_effects is rejected at model level."""
+    from pydantic import ValidationError
+
+    from oscilla.engine.models.combat_system import DamageFormulaEntry
+
+    with pytest.raises(ValidationError, match="target_stat is null"):
+        DamageFormulaEntry(formula="{{ 5 }}", target_stat=None, threshold_effects=[])

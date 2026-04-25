@@ -1,0 +1,140 @@
+# Vampire: The Masquerade V5 — Hunger Dice
+#
+# APPROXIMATION — Breaks the Model
+#
+# In V5, when a Vampire feeds or uses powers their Hunger level rises. When rolling
+# dice, some dice in the pool become Hunger dice (red). Hunger dice have special
+# failure states:
+#   - A 1 on a Hunger die + no success = Bestial Failure (compulsion, loss of control)
+#   - Two 10s where at least one is a Hunger die = Messy Critical (savage success)
+#
+# The outcome depends on WHICH dice generated which results — not just the total
+# success count. A pool of 5 dice with 2 Hunger dice showing [10, 1, 6, 4, 2] where
+# Hunger dice = [10, 1] produces a Messy Critical AND threatens a Bestial Failure
+# simultaneously. This provenance information is irretrievably lost when collapsed
+# to an integer.
+#
+# This manifest approximates V5 by:
+#   - Splitting the pool into regular dice and hunger dice as two separate stats
+#   - Rolling each portion with rollpool() independently
+#   - Using threshold_effects to approximate Bestial Failure / Messy Critical risks
+#     based on total success count (not true provenance)
+#
+# The approximation cannot distinguish "2 successes all from regular dice" from
+# "2 successes where one was a Hunger die" — the Messy Critical vs. Clean Critical
+# distinction is lost. The Bestial Failure check uses a separate combat_stat die
+# roll as a proxy for the Hunger die failure probability.
+#
+# Fitness category: Breaks the Model — provenance-aware dice require non-scalar
+#   return types from roll functions. This approximation degrades accuracy.
+# Key features illustrated: rollpool() for two sub-pools, combat_stats for the
+#   Hunger level tracker, the boundary of what provenance-blind dice models can do.
+
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: vtm-v5-hunger
+spec:
+  player_defeat_condition:
+    type: character_stat
+    name: hp
+    lte: 0
+  enemy_defeat_condition:
+    type: enemy_stat
+    name: hp
+    lte: 0
+  player_turn_mode: "choice"
+  skill_contexts: ["vtm-discipline"]
+  # Disciplines are innate vampiric powers — every vampire in this encounter has them.
+  # A full implementation would gate individual disciplines on the character sheet;
+  # here both are unconditionally injected for demonstration purposes.
+  system_skills:
+    - skill: claw-attack
+    - skill: dominate-compel
+  combat_stats:
+    - name: bestial_failure_risk
+      default: 0 # Set each round based on Hunger die sub-pool roll (proxy for Hunger die 1s)
+  enemy_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      # Mortals / enemies attack with physical force; no Hunger mechanic on enemy side.
+      formula: "{{ max(0, roll(6) + enemy_stats['brawl_bonus'] - player.stats['fortitude']) }}"
+
+---
+# Skill: Claw Attack — Protean discipline (physical transformation attack).
+# Pool = Strength + Brawl (regular dice) + Hunger (hunger dice).
+# Successes ≥8 = hit; each success above 8 = additional damage (simplified).
+#
+# APPROXIMATION: We roll regular_pool and hunger_pool separately with rollpool().
+# A Messy Critical (two 10s with at least one Hunger 10) is approximated as
+# "hunger pool rolled at least one 10 AND regular pool also rolled a 10."
+# This overstates the Messy Critical probability slightly.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: claw-attack
+spec:
+  displayName: "Claw Attack"
+  contexts: ["vtm-discipline"]
+  combat_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      # Combined successes from both sub-pools (successes = dice showing 6+).
+      # Each success above the difficulty (2) deals 1 damage.
+      formula: >-
+        {% set regular_hits = rollpool(player.stats['regular_pool'], 10, 6) %}
+        {% set hunger_hits  = rollpool(player.stats['hunger'],       10, 6) %}
+        {{ max(0, regular_hits + hunger_hits - 2) }}
+      threshold_effects:
+        - max: 0
+          # Total failure or Bestial Failure proxy: at 0 or fewer net successes,
+          # check if Hunger dice contributed — approximated by checking if hunger >= 3.
+          # If so: the vampire loses control briefly (take stress, lose an action token).
+          effects:
+            - type: stat_change
+              stat: stress
+              value: 3 # Bestial failure: compulsion costs stress
+        - min: 3
+          # Possible Messy Critical zone: high success count with hunger in pool.
+          # Approximation: 3+ successes when hunger > 0 carries Messy Critical risk.
+          # A real engine would need provenance to determine if a Hunger die showed 10.
+          # Here we add +2 damage but also take 1 stress (messy crit drawback).
+          effects:
+            - type: stat_change
+              stat: stress
+              value: 1 # Messy critical: savage but loses control slightly
+
+---
+# Skill: Dominate (Mental Discipline) — social combat / compulsion.
+# Pools: Intelligence + Dominate vs. target Resolve + Composure.
+# Simplified to a flat success pool.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: dominate-compel
+spec:
+  displayName: "Dominate: Compel"
+  contexts: ["vtm-discipline"]
+  combat_damage_formulas:
+    - target_stat: resolve
+      display: "Resolve"
+      # Mental successes erode the target's resistance. Hunger pool included.
+      formula: >-
+        {% set regular_hits = rollpool(player.stats['regular_pool'], 10, 6) %}
+        {% set hunger_hits  = rollpool(player.stats['hunger'],       10, 6) %}
+        {{ max(0, regular_hits + hunger_hits - enemy_stats['resolve_defense']) }}
+
+---
+# Enemy: Mortal Hunter — a human with weapon and conviction but no supernatural power.
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: mortal-hunter
+spec:
+  displayName: "Mortal Hunter"
+  stats:
+    hp: 4 # Mortal: 4 lethal wounds before death
+    resolve: 1 # Low supernatural resistance
+    resolve_defense: 2 # Resolve + Composure vs. Dominate
+    brawl_bonus: 2 # Knife or stake: modest physical threat
+    fortitude: 0 # No supernatural armor

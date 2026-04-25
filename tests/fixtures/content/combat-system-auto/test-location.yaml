@@ -1,0 +1,11 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: test-location
+spec:
+  displayName: "Test Location"
+  description: "Location for combat system auto tests."
+  region: test-region
+  adventures:
+    - ref: test-combat
+      weight: 1

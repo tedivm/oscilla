@@ -45,13 +45,18 @@ class ActiveCombatEffect:
 class CombatContext:
     """Live state for a single combat encounter.
 
-    enemy_hp mirrors active_adventure.step_state["enemy_hp"] — the combat loop
-    writes back to step_state each round for persistence, but reads from here
-    for performance and clarity.
+    enemy_stats holds all mutable enemy combat stats keyed by stat name (e.g. ``hp``,
+    ``attack``, ``defense``).  The combat loop writes back to step_state each round for
+    persistence, but reads from here for performance and clarity.
+
+    combat_stats holds transient per-round or per-combat numeric values (e.g. ``round``,
+    formula output accumulators) that formulas and conditions may reference.
     """
 
-    enemy_hp: int
+    enemy_stats: Dict[str, int]
     enemy_ref: str
+    # Transient numeric values available to formulas and conditions during combat.
+    combat_stats: Dict[str, int] = field(default_factory=dict)
     # active_effects tick down each round; entries removed when remaining_turns hits 0.
     active_effects: List[ActiveCombatEffect] = field(default_factory=list)
     # skill_ref \u2192 turn number of last use; used for turn-scope cooldown enforcement.

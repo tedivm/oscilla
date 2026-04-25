@@ -33,6 +33,8 @@ export interface GameSessionState {
   pendingEvent: SSEEvent | null;
   completeEvent: SSEEvent | null;
   overworldState: OverworldStateRead | null;
+  /** The region node id (e.g. "region:combat") the player was browsing when they started the last adventure. Restored when returning to overworld. */
+  lastRegionId: string | null;
   error: string | null;
 }
 
@@ -82,6 +84,7 @@ const INITIAL: GameSessionState = {
   pendingEvent: null,
   completeEvent: null,
   overworldState: null,
+  lastRegionId: null,
   error: null,
 };
 
@@ -97,15 +100,26 @@ function createGameSession() {
 
   async function runStream(gen: AsyncGenerator<SSEEvent>): Promise<void> {
     update((s) => ({ ...s, mode: "loading", pendingEvent: null, error: null }));
+    let hasNewNarratives = false;
     try {
       for await (const event of gen) {
         // Abort if a newer stream has been started since this one began.
         if (gen !== activeGenerator) return;
+        if (event.type === "narrative") hasNewNarratives = true;
         update((s) => applyEvent(s, event));
       }
-      // Stream exhausted: if we're still in loading mode (no adventure_complete event
-      // was received), fall back to overworld so the player isn't stuck.
-      update((s) => (s.mode === "loading" ? { ...s, mode: "overworld" } : s));
+      // Stream exhausted: if we're still in loading mode (no pending decision event
+      // was received), fall back gracefully. When narrative content was shown during
+      // this stream but never acknowledged (e.g., adventure ended without a final
+      // ack_required, or the pipeline crashed mid-run), transition to "complete" mode
+      // so the player can read what happened before returning to the overworld.
+      // Otherwise go directly to overworld.
+      update((s) => {
+        if (s.mode !== "loading") return s;
+        return hasNewNarratives
+          ? { ...s, mode: "complete" }
+          : { ...s, mode: "overworld" };
+      });
     } catch (e) {
       update((s) => ({
         ...s,
@@ -127,6 +141,7 @@ function createGameSession() {
         pendingEvent: playState.pendingEvent,
         completeEvent: null,
         overworldState: playState.overworldState,
+        lastRegionId: null,
         error: null,
       });
     },
@@ -136,7 +151,12 @@ function createGameSession() {
       update((s) => ({ ...s, mode: "overworld", overworldState }));
     },
 
-    async go(characterId: string, locationRef: string): Promise<void> {
+    async go(
+      characterId: string,
+      locationRef: string,
+      regionId: string | null = null,
+    ): Promise<void> {
+      update((s) => ({ ...s, lastRegionId: regionId }));
       const gen = beginAdventureGo(characterId, locationRef);
       activeGenerator = gen;
       await runStream(gen);

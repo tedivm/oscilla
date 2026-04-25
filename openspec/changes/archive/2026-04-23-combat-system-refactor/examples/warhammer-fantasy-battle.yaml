@@ -1,0 +1,82 @@
+# Warhammer Fantasy Battle — Strength vs. Toughness Two-Stage Gated Damage
+#
+# Resolution requires TWO dice rolls: a to-hit roll (Weapon Skill vs. Weapon Skill)
+# followed by a to-wound roll (Strength vs. Toughness). If either roll fails, no
+# wounds are dealt. The classic Warhammer wound table is encoded as an inline ternary
+# since wound_table() is not a built-in helper.
+#
+# Wound thresholds (S = Strength, T = Toughness):
+#   S >= T+2 : wound on 2+
+#   S >= T+1 : wound on 3+
+#   S == T   : wound on 4+
+#   S == T-1 : wound on 5+
+#   S <= T-2 : wound on 6+
+#
+# Fitness category: Fits Well — all logic is expressible with inline ternaries.
+# Key features illustrated: two-stage gated damage in a single formula expression,
+#   stat-vs-stat comparisons for both rolls.
+
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: warhammer-fantasy-battle
+spec:
+  player_defeat_condition:
+    type: character_stat
+    name: wounds
+    lte: 0
+  enemy_defeat_condition:
+    type: enemy_stat
+    name: wounds
+    lte: 0
+  player_damage_formulas:
+    - target_stat: wounds
+      display: "Wounds"
+      # Step 1: to-hit — d6 + player weapon_skill must beat enemy weapon_skill.
+      # Step 2: to-wound — d6 must meet or exceed the threshold from the wound table.
+      # The threshold is derived inline from the S vs T comparison.
+      formula: >-
+        {% set hit_roll   = roll(6) %}
+        {% set wound_roll = roll(6) %}
+        {{ 1 if (
+          hit_roll + player.stats['weapon_skill'] > enemy_stats['weapon_skill']
+          and wound_roll >= (
+            2 if player.stats['strength'] >= enemy_stats['toughness'] + 2
+            else (3 if player.stats['strength'] >= enemy_stats['toughness'] + 1
+            else (4 if player.stats['strength'] == enemy_stats['toughness']
+            else (5 if player.stats['strength'] == enemy_stats['toughness'] - 1
+            else 6)))
+          )
+        ) else 0 }}
+  enemy_damage_formulas:
+    - target_stat: wounds
+      display: "Wounds"
+      # Enemy attacks the player using the same two-step resolution.
+      formula: >-
+        {% set hit_roll   = roll(6) %}
+        {% set wound_roll = roll(6) %}
+        {{ 1 if (
+          hit_roll + enemy_stats['weapon_skill'] > player.stats['weapon_skill']
+          and wound_roll >= (
+            2 if enemy_stats['strength'] >= player.stats['toughness'] + 2
+            else (3 if enemy_stats['strength'] >= player.stats['toughness'] + 1
+            else (4 if enemy_stats['strength'] == player.stats['toughness']
+            else (5 if enemy_stats['strength'] == player.stats['toughness'] - 1
+            else 6)))
+          )
+        ) else 0 }}
+
+---
+# Enemy: Orc Boy — a rank-and-file Warhammer greenskin.
+# Strength 4, Toughness 4 — mutual 4+ wound rolls against an average human.
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: orc-boy
+spec:
+  displayName: "Orc Boy"
+  stats:
+    wounds: 1 # Single wound model; most WFB infantry has 1 wound
+    weapon_skill: 3 # WS3 — hits on 4+ against WS3 opponent
+    strength: 4 # Str 4 — wounds T3 on 3+; wounds T4 on 4+
+    toughness: 4 # Tgh 4 — resists Str3 on 5+; resists Str4 on 4+

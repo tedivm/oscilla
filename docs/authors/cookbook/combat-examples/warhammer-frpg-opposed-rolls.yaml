@@ -1,0 +1,87 @@
+# Warhammer Fantasy Roleplay — Opposed Simultaneous Rolls
+#
+# APPROXIMATION — Possible but Awkward
+#
+# In WFRP both sides roll simultaneously. The side whose roll beats the other's
+# (by margin of success) wins and deals damage. The outcome is a single shared
+# resolution event — not two independent damage applications.
+#
+# The sequential formula model serializes this using a combat_stat to communicate
+# the first actor's roll result to the second actor's formula — the same encoding
+# pattern used in the RPS example. The enemy "rolls" first (storing their result in
+# a combat_stat), then the player formula compares both results.
+#
+# The fundamental gap: in true opposed resolution neither side knows the other's
+# roll when rolling. Here the enemy rolls first and the player formula reads it.
+# The semantics are correct but the ordering is inverted from the narrative (enemy
+# "goes first" in formula evaluation, even though the fiction is simultaneous).
+#
+# This example models a WFRP Weapon Skill test: both sides roll d100 under their WS.
+# Margin of Success (MoS) determines who wins and by how much.
+#
+# Fitness category: Possible but Awkward — works, but the serialization of
+#   simultaneous resolution is unintuitive for authors.
+# Key features illustrated: combat_stat as inter-formula communication channel,
+#   sequential encoding of opposed simultaneous rolls.
+
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: wfrp-opposed-rolls
+spec:
+  player_defeat_condition:
+    type: character_stat
+    name: wounds
+    lte: 0
+  enemy_defeat_condition:
+    type: enemy_stat
+    stat: wounds
+    lte: 0
+  combat_stats:
+    - name: enemy_roll_result
+      default: 0 # Stores the enemy's d100 WS test result each round
+  # Enemy phase fires first each round to store their roll result.
+  # The player phase then reads enemy_roll_result for the opposed comparison.
+  turn_order: "enemy_first"
+  enemy_damage_formulas:
+    - target_stat: enemy_roll_result
+      target: combat
+      # Roll d100 under enemy WS. Store how far under they rolled (margin of success).
+      # Positive = success by N degrees; 0 or negative = failure.
+      # Formula: (enemy_WS - d100roll), clamped to 0 for failures.
+      # Storing via stat delta: result = (enemy_WS - roll) - current_enemy_roll_result.
+      formula: "{{ (enemy_stats['weapon_skill'] - roll(100)) - combat_stats['enemy_roll_result'] }}"
+    - target_stat: wounds
+      # Enemy wins the opposed test if their MoS > player MoS.
+      # Player MoS: player.stats['weapon_skill'] - (a separate roll, but we can't store it here).
+      # APPROXIMATION: use a fixed player roll estimate (player_ws / 2) as the comparison baseline.
+      # A precise implementation stores both rolls in combat_stats across two formula passes.
+      formula: "{{ 1 if combat_stats['enemy_roll_result'] > player.stats['weapon_skill'] // 2 else 0 }}"
+  player_damage_formulas:
+    - target_stat: wounds
+      display: "Wounds"
+      # Player MoS: weapon_skill minus d100 roll.
+      # Player wins if their MoS exceeds the enemy's stored MoS.
+      # Damage = 1 wound per 2 full degrees of success over the opponent.
+      #
+      # {% set %} binds the player's roll exactly once so the same value is used
+      # in both the conditional check and the margin-of-success calculation.
+      # Without it, two roll(100) calls would produce different values — the
+      # if-guard might pass on one result while the damage formula uses a different roll.
+      formula: >-
+        {% set player_roll = roll(100) %}
+        {{ max(0, (player.stats['weapon_skill'] - player_roll - combat_stats['enemy_roll_result']) // 10)
+           if player.stats['weapon_skill'] - player_roll > combat_stats['enemy_roll_result']
+           else 0 }}
+
+---
+# Enemy: Beastman Gor — a WFRP standard hostile.
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: beastman-gor
+spec:
+  displayName: "Beastman Gor"
+  stats:
+    wounds: 10
+    weapon_skill: 35 # WS 35% — hits roughly one-third of contested tests vs WS 35

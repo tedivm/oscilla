@@ -1,0 +1,95 @@
+# 13th Age Escalation Die
+#
+# Each complete round of combat, the escalation die increments by 1 (starting from 0
+# at the top of round 1, reaching 1 after the first complete round, capping at 6).
+# Player attack rolls add the escalation die; monsters do not.
+#
+# Certain abilities unlock only when escalation >= a threshold — demonstrated here
+# via a system_skill (Rally) gated on a combat_stat condition.
+#
+# Fitness category: Fits Well — near-canonical use of combat_stats + on_round_end.
+# Key features illustrated: combat_stats counter, on_round_end increment,
+#   escalation-modified attack formula, system_skills with combat_stat condition.
+#
+# NOTE: The escalation die is capped at 6 in 13th Age. This manifest does not enforce
+# the cap; the die will continue incrementing past 6 in very long combats. Engine
+# support for conditional stat_change (stat_change if < max) would close this gap.
+
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: 13th-age-escalation
+spec:
+  player_defeat_condition:
+    type: character_stat
+    name: hp
+    lte: 0
+  enemy_defeat_condition:
+    type: enemy_stat
+    name: hp
+    lte: 0
+  # escalation starts at 0; becomes 1 after the first complete round.
+  combat_stats:
+    - name: escalation
+      default: 0
+  on_round_end:
+    - type: stat_change
+      stat: escalation
+      target: combat
+      value: 1
+  player_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      # Attack roll: d20 + fighting_bonus + escalation_die vs enemy AC.
+      # On hit: weapon damage (1d8 + str_mod). Escalation boosts both to-hit and damage.
+      formula: >-
+        {% set attack = roll(20) + player.stats['fighting_bonus'] + combat_stats['escalation'] %}
+        {% set damage = roll(8)  + player.stats['str_mod']        + combat_stats['escalation'] %}
+        {{ max(0, damage) if attack >= enemy_stats['ac'] else 0 }}
+  enemy_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      # Monsters do not benefit from the escalation die (core 13th Age rule).
+      formula: >-
+        {% set attack = roll(20) + enemy_stats['attack_bonus'] %}
+        {% set damage = roll(6)  + enemy_stats['attack_bonus'] %}
+        {{ max(0, damage) if attack >= player.stats['ac'] else 0 }}
+  # Rally: a system_skill available to all players in this combat system.
+  # Hidden until escalation >= 3 — only accessible in the deeper rounds of a hard fight.
+  # In auto mode this is unused; it is here for completeness if turn_mode is switched to choice.
+  player_turn_mode: "auto"
+  system_skills:
+    - skill: rally
+      condition:
+        type: combat_stat
+        name: escalation
+        gte: 3
+
+---
+# Skill: Rally — heals the player when the fight has gone on long enough.
+# Only appears in the action menu at escalation 3+.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: rally
+spec:
+  displayName: "Rally"
+  contexts: ["13th-age"]
+  use_effects:
+    - type: heal
+      amount: 20
+
+---
+# Enemy: Iron Golem — a sluggish but heavily armored opponent.
+# High AC rewards the escalation die's to-hit bonus in longer fights.
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: iron-golem
+spec:
+  displayName: "Iron Golem"
+  stats:
+    hp: 40
+    ac: 18 # Heavy plating; hard to hit early rounds
+    attack_bonus: 8 # Powerful slam
+    dmg_bonus: 4 # d6+4 fist damage

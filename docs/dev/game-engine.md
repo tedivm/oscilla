@@ -308,10 +308,28 @@ Each step type has a dedicated handler module:
 
 ### Combat (`oscilla/engine/steps/combat.py`)
 
-- Turn-based combat loop
-- Player/enemy attack exchange
-- Handles win/defeat/flee outcomes
-- Updates player HP and records statistics
+The combat step resolves a `type: combat` adventure step using a **CombatSystem manifest** (defined in `oscilla/engine/models/combat_system.py`). The system is selected by searching for the most specific assignment: a per-step `combat_system` override, then the region's `combat_system`, then the game's `default_combat_system`.
+
+**CombatSystem manifest fields** (see `CombatSystemSpec` and `CombatSystemManifest`):
+
+- `defeat_conditions` — list of `TargetStatCondition` entries checked each turn; combat ends when any condition is met
+- `damage_formulas` — default `DamageFormulaEntry` list applied each round to each side
+- `turn_order` — `player_first` | `enemy_first` | `simultaneous` | `initiative` (formula-based tiebreaking)
+- `player_turn_mode` — `auto` (no interaction) | `choice` (player selects from skill menu)
+- `combat_stats` — per-encounter accumulators (counters, buffers) that live only for the fight
+- `lifecycle_hooks` — `on_combat_start`, `on_turn_start`, `on_turn_end` effect lists
+- `resolution_formulas` — optional per-turn overrides for resolution order
+- `system_skills` — skills surfaced in the `choice`-mode action menu
+- `skill_contexts` — context strings matched against skill/item `contexts` for menu inclusion
+
+**Formula execution** uses `CombatFormulaContext` which provides `player`, `enemy_stats`, `combat_stats`, and `turn_number` as template variables. Formulas are rendered via the standard Jinja-based expression evaluator. Always use `.get('stat_name', default)` in formulas — the context objects are dicts.
+
+**`DamageFormulaEntry`** fields: `formula` (required), `target_stat` (stat to modify), `target` (`player` | `enemy`), `display` (round message), `threshold_effects` (list of `ThresholdEffectEntry`). If `target_stat` is `None`, `threshold_effects` must be non-empty (model-level validator).
+
+- Win/defeat/flee outcomes and branch execution
+- Updates player HP and records statistics (enemies defeated counter)
+- Enemy `spec.on_defeat_effects` fire after the CombatSystem defeat conditions are met but before loot resolution
+- `enemy_stats` per-step overrides allow partial stat substitution without a new Enemy manifest
 
 ### Choice (`oscilla/engine/steps/choice.py`)
 

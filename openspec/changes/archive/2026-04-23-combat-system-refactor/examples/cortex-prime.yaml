@@ -1,0 +1,119 @@
+# Cortex Prime — Dynamic Dice Pool Assembly
+#
+# APPROXIMATION — Breaks the Model
+#
+# Cortex Prime's defining mechanic is that the dice pool itself is a player choice:
+# the player selects dice from multiple Trait Sets (Attributes, Values, Skills,
+# Relationships, Distinctions, Assets, SFX) on the fly, assembling a bespoke pool
+# for each action. The result is the sum of the two highest dice. The pool can be
+# modified in real time: spending Plot Points to add dice, Stepping Up die sizes,
+# rolling Hitches (1s on non-Distinction dice add Doom/Complications), or invoking
+# Distinctions for a d8 vs. taking a d4 for a Plot Point.
+#
+# The formula model assumes inputs are fixed at render time. Cortex's pool assembly
+# is a combinatorial pre-roll player decision — it happens before any die is cast.
+# There is no mapping to a single formula expression or to a fixed choice-mode skill
+# selection that represents one fixed pool.
+#
+# This manifest approximates Cortex by:
+#   - Treating each Trait Set contribution as a fixed stat in character_config.yaml
+#     (the player's "effective die size" per Trait Set, stored as 4/6/8/10/12)
+#   - Simulating the "sum of two highest dice" using {% set %} bindings so each die
+#     is rolled exactly once and referenced twice (in both the sum and the min-drop)
+#   - Plot Points and dynamic pool manipulation are not representable and are omitted
+#
+# What this approximation cannot do:
+#   - Dynamic pool composition (choose which dice to include mid-scene)
+#   - Step Up / Step Back die sizes in response to situation
+#   - SFX triggers (narrative abilities attached to specific dice results)
+#   - Plot Point economy (spend/earn during the roll itself)
+#   - Doom Pool (GM resource that grows on Hitches) — no asymmetric resource system
+#
+# Fitness category: Breaks the Model — the poll assembly phase requires a
+#   fundamentally different player input model before formula evaluation.
+# Key features illustrated: stat-as-die-size, approximate "sum of 2 highest"
+#   via fixed three-roll formula, the hard boundary of the scalar formula model.
+
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: cortex-prime-combat
+spec:
+  player_defeat_condition:
+    type: character_stat
+    name: stress
+    gte: 12 # Stressed Out when total Stress reaches d12 equivalent (12 points)
+  enemy_defeat_condition:
+    type: enemy_stat
+    name: stress
+    gte: 12
+  player_turn_mode: "choice"
+  skill_contexts: ["cortex-action"]
+  # Cortex actions are built from player Traits — all characters can attempt any
+  # action type. Inject both unconditionally as the available combat moves.
+  system_skills:
+    - skill: engage
+    - skill: maneuver
+  enemy_damage_formulas:
+    - target_stat: stress
+      display: "Stress"
+      # Enemy effect roll: fixed die pool (Attributes + Skill).
+      # Sum of two rolls, approximating "highest two of the pool."
+      formula: "{{ roll(enemy_stats['attribute_die']) + roll(enemy_stats['skill_die']) - player.stats['resistance_die'] }}"
+
+---
+# Skill: Engage — physical combat action using Strength + Fighting.
+#
+# APPROXIMATION: the player's pool is fixed as attribute_die + skill_die + specialty_die.
+# In true Cortex the player selects which Trait Sets to include based on narrative.
+# Plot Points, Distinctions, and SFX are not modeled here.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: engage
+spec:
+  displayName: "Engage (Strength + Fighting)"
+  contexts: ["cortex-action"]
+  combat_damage_formulas:
+    - target_stat: stress
+      display: "Stress"
+      # Sum of three dice, take the top two.
+      # {% set %} binds each die roll exactly once. Without it, the naive formula
+      # would call roll() 6 times (each reference independent), so the min() would
+      # drop the smallest of a SECOND independent set of 3 rolls — not the smallest
+      # of the original 3. With set-bindings every reference uses the same value.
+      formula: >-
+        {% set ra = roll(player.stats['strength_die']) %}
+        {% set rb = roll(player.stats['fighting_die']) %}
+        {% set rc = roll(player.stats['specialty_die']) %}
+        {{ ra + rb + rc - min(ra, min(rb, rc)) - enemy_stats['resistance_die'] }}
+
+---
+# Skill: Maneuver — create an Asset to add to a future roll.
+# In Cortex, a Maneuver succeeds → player gains an Asset die for the next roll.
+# Approximated here as a heal/buff effect; the Asset die is not truly re-usable.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: maneuver
+spec:
+  displayName: "Maneuver (Create Asset)"
+  contexts: ["cortex-action"]
+  use_effects:
+    - type: heal
+      amount: 3 # Proxy for "reducing existing Stress" via a successful Maneuver
+  combat_damage_formulas: []
+
+---
+# Enemy: Crime Lord — a named villain (Wild Card equivalent) with decent pools.
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: crime-lord
+spec:
+  displayName: "Crime Lord"
+  stats:
+    stress: 0 # Starts at 0; Stressed Out at 12
+    attribute_die: 8 # d8 Strength
+    skill_die: 8 # d8 Combat
+    resistance_die: 4 # d4 resistance — takes more stress from successful actions

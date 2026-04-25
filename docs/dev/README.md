@@ -113,7 +113,7 @@ The SvelteKit SPA architecture, API client conventions, route patterns, componen
 
 ### [Game Engine](./game-engine.md)
 
-Engine internals, architecture, and extend points for the text-based adventure system.
+Engine internals, architecture, and extend points for the text-based adventure system. Covers the adventure pipeline, condition evaluator, stat architecture, CombatSystem manifest execution, skill/buff system, and MockTUI testing.
 
 ### [CLI Interface](./tui.md)
 

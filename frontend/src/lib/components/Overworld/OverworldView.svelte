@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, untrack } from "svelte";
   import type {
     OverworldStateRead,
     CharacterStateRead,
@@ -17,16 +17,23 @@
     characterId: string;
     overworldState: OverworldStateRead | null;
     character: CharacterStateRead;
-    onBeginAdventure: (locationRef: string) => void;
+    onBeginAdventure: (locationRef: string, regionId: string | null) => void;
+    initialRegion?: string | null;
   }
 
-  let { characterId, overworldState, character, onBeginAdventure }: Props =
-    $props();
+  let {
+    characterId,
+    overworldState,
+    character,
+    onBeginAdventure,
+    initialRegion = null,
+  }: Props = $props();
 
   let localState: OverworldStateRead | null = $state(null);
 
-  // currentRegion: null = world map (show root regions); set = show that region's children.
-  let currentRegion: string | null = $state(null);
+  // Restore the region the player was browsing before the adventure started.
+  // untrack() tells Svelte we deliberately want only the initial prop value here.
+  let currentRegion: string | null = $state(untrack(() => initialRegion));
 
   // Keep localState in sync when the parent passes new state.
   $effect(() => {
@@ -174,7 +181,7 @@
                   <Button
                     variant="primary"
                     disabled={!loc.adventures_available}
-                    onclick={() => onBeginAdventure(loc.ref)}
+                    onclick={() => onBeginAdventure(loc.ref, currentRegion)}
                   >
                     Begin Adventure
                   </Button>

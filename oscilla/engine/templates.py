@@ -242,6 +242,14 @@ class PlayerContext:
     milestones: PlayerMilestoneView
     pronouns: PlayerPronounView
 
+    def get(self, key: str, default: "int | bool | None" = None) -> "int | bool | None":
+        """Convenience shorthand for player.stats.get(key, default).
+
+        Allows templates to use player.get('strength', 5) in ExpressionContext,
+        matching the player dict API used in CombatFormulaContext.
+        """
+        return self.stats.get(key, default)
+
     @classmethod
     def from_character(cls, char: "CharacterState") -> "PlayerContext":
         # Merge stored stats with current derived stat shadow values so templates
@@ -264,9 +272,10 @@ class CombatContextView:
     Only present when a template is rendered inside a CombatStep handler.
     """
 
-    enemy_hp: int
+    enemy_stats: Dict[str, int]
     enemy_name: str
     turn: int
+    combat_stats: Dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -304,6 +313,59 @@ class ExpressionContext:
     combat: CombatContextView | None = None
     game: GameContext = field(default_factory=GameContext)
     ingame_time: "InGameTimeView | None" = None
+
+
+@dataclass
+class CombatFormulaContext:
+    """Context passed to formula rendering during a combat encounter.
+
+    Provides the numeric values available to Jinja2 formula strings:
+    - ``player``: effective player stats (e.g. ``player["strength"]``).
+    - ``enemy_stats``: mutable enemy stats from ``CombatContext.enemy_stats``.
+    - ``combat_stats``: transient per-combat values from ``CombatContext.combat_stats``.
+    - ``turn_number``: current combat turn (1-indexed).
+    """
+
+    player: Dict[str, int]
+    enemy_stats: Dict[str, int]
+    combat_stats: Dict[str, int]
+    turn_number: int
+
+
+class FormulaRenderError(Exception):
+    """Raised when a combat damage formula fails to render or produces a non-int result."""
+
+
+def render_formula(formula: str, ctx: CombatFormulaContext) -> int:
+    """Render a Jinja2 formula string in a CombatFormulaContext and return an int.
+
+    The formula may contain ``{% set %}`` blocks before the ``{{ }}`` output
+    expression. All ``SAFE_GLOBALS`` are available alongside ``player``,
+    ``enemy_stats``, ``combat_stats``, and ``turn_number`` from the context.
+
+    Raises ``FormulaRenderError`` on Jinja2 errors or if the result cannot be
+    coerced to ``int``.
+    """
+    from jinja2 import Environment, StrictUndefined, TemplateSyntaxError, UndefinedError
+
+    env = Environment(undefined=StrictUndefined)  # noqa: S701 - safe globals restrict execution
+    render_ctx: Dict[str, Any] = {}
+    render_ctx.update(SAFE_GLOBALS)
+    render_ctx["player"] = ctx.player
+    render_ctx["enemy_stats"] = ctx.enemy_stats
+    render_ctx["combat_stats"] = ctx.combat_stats
+    render_ctx["turn_number"] = ctx.turn_number
+
+    try:
+        template = env.from_string(formula)
+        result = template.render(**render_ctx)
+    except (TemplateSyntaxError, UndefinedError) as exc:
+        raise FormulaRenderError(f"Formula render failed: {exc}") from exc
+
+    try:
+        return int(result)
+    except (ValueError, TypeError) as exc:
+        raise FormulaRenderError(f"Formula produced non-integer result {result!r}: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -564,6 +626,54 @@ def _stat_mod(value: int) -> int:
     return (value - 10) // 2
 
 
+# ---------------------------------------------------------------------------
+# Combat formula dice helpers (single-call convenience wrappers)
+# ---------------------------------------------------------------------------
+
+
+def _rollpool(n: int, sides: int, threshold: int) -> int:
+    """Roll n dice of ``sides`` sides and return the count of dice whose result is >= threshold.
+
+    Raises ValueError on invalid inputs (n < 1, sides < 2, threshold < 1).
+    """
+    if n < 1:
+        raise ValueError(f"rollpool(): n must be >= 1, got {n}")
+    if sides < 2:
+        raise ValueError(f"rollpool(): sides must be >= 2, got {sides}")
+    if threshold < 1:
+        raise ValueError(f"rollpool(): threshold must be >= 1, got {threshold}")
+    return sum(1 for _ in range(n) if random.randint(1, sides) >= threshold)
+
+
+def _rollsum(n: int, sides: int) -> int:
+    """Roll n dice of ``sides`` sides and return their sum.
+
+    Raises ValueError on invalid inputs (n < 1, sides < 2).
+    """
+    if n < 1:
+        raise ValueError(f"rollsum(): n must be >= 1, got {n}")
+    if sides < 2:
+        raise ValueError(f"rollsum(): sides must be >= 2, got {sides}")
+    return sum(random.randint(1, sides) for _ in range(n))
+
+
+def _keephigh(n: int, sides: int, k: int) -> int:
+    """Roll n dice of ``sides`` sides and return the sum of the highest k.
+
+    Raises ValueError when k > n or other invalid inputs (n < 1, sides < 2, k < 1).
+    """
+    if n < 1:
+        raise ValueError(f"keephigh(): n must be >= 1, got {n}")
+    if sides < 2:
+        raise ValueError(f"keephigh(): sides must be >= 2, got {sides}")
+    if k < 1:
+        raise ValueError(f"keephigh(): k must be >= 1, got {k}")
+    if k > n:
+        raise ValueError(f"keephigh(): k={k} exceeds n={n}")
+    rolls = sorted((random.randint(1, sides) for _ in range(n)), reverse=True)
+    return sum(rolls[:k])
+
+
 SAFE_GLOBALS: Dict[str, Any] = {
     "roll": _safe_roll,
     "choice": _safe_choice,
@@ -608,6 +718,10 @@ SAFE_GLOBALS: Dict[str, Any] = {
     "explode": _safe_explode,
     "roll_fudge": _safe_roll_fudge,
     "weighted_roll": _safe_weighted_roll,
+    # Combat formula helpers (single-call convenience wrappers)
+    "rollpool": _rollpool,
+    "rollsum": _rollsum,
+    "keephigh": _keephigh,
     # Die shorthand aliases
     "d4": _d4,
     "d6": _d6,
@@ -721,14 +835,23 @@ class _MockPlayer:
             label="player.stats",
         )
 
+    def get(self, key: str, default: Any = None) -> Any:
+        """Convenience shorthand for player.stats.get(key, default) — mirrors PlayerContext.get()."""
+        return self.stats.get(key, default)
+
     def __getattr__(self, name: str) -> Any:
         raise TemplateValidationError(f"player has no attribute {name!r}")
 
 
 class _MockCombatContext:
-    enemy_hp: int = 20
+    enemy_stats: Dict[str, int] = field(default_factory=dict)
     enemy_name: str = "Test Enemy"
     turn: int = 1
+    combat_stats: Dict[str, int] = field(default_factory=dict)
+
+    def __init__(self) -> None:
+        self.enemy_stats = {}
+        self.combat_stats = {}
 
     def __getattr__(self, name: str) -> Any:
         raise TemplateValidationError(f"combat has no attribute {name!r}")
@@ -784,7 +907,14 @@ def build_mock_context(
     mock_game = _MockGame()
     ctx["game"] = mock_game
     if include_combat:
-        ctx["combat"] = _MockCombatContext()
+        mock_combat = _MockCombatContext()
+        ctx["combat"] = mock_combat
+        # Also expose top-level aliases so skill use_effects templates can use
+        # enemy_stats/combat_stats/turn_number directly, consistent with
+        # CombatFormulaContext (used in player_damage_formulas).
+        ctx["enemy_stats"] = mock_combat.enemy_stats
+        ctx["combat_stats"] = mock_combat.combat_stats
+        ctx["turn_number"] = mock_combat.turn
     # Override the season function with a closure that respects mock hemisphere.
     ctx["season"] = lambda date: calendar_utils.season(date, hemisphere=mock_game.season_hemisphere)
     ctx["today"] = lambda: datetime.date.today()
@@ -883,6 +1013,13 @@ class GameTemplateEngine:
         render_ctx["player"] = ctx.player
         render_ctx["combat"] = ctx.combat
         render_ctx["game"] = ctx.game
+        # When a CombatContextView is present, also expose its fields at the top level
+        # (enemy_stats, combat_stats, turn_number) so that skill use_effects templates
+        # can use the same variable names as player_damage_formulas in CombatFormulaContext.
+        if ctx.combat is not None:
+            render_ctx["enemy_stats"] = ctx.combat.enemy_stats
+            render_ctx["combat_stats"] = ctx.combat.combat_stats
+            render_ctx["turn_number"] = ctx.combat.turn
         # Override time functions from SAFE_GLOBALS with closures that respect
         # the game's configured timezone. today() and now() return values in the
         # game's timezone; season() uses the hemisphere from that same context.

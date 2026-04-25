@@ -1,0 +1,7 @@
+apiVersion: oscilla/v1
+kind: Game
+metadata:
+  name: test-game
+spec:
+  displayName: "Combat System Initiative Test"
+  default_combat_system: initiative-combat

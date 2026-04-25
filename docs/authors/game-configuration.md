@@ -159,6 +159,22 @@ See [Passive Effects](./passive-effects.md) for the full system.
 
 ---
 
+## Default Combat System
+
+If your game package has a single CombatSystem manifest that should apply everywhere, set `default_combat_system` in `game.yaml`:
+
+```yaml
+spec:
+  displayName: "My Adventure Game"
+  default_combat_system: standard-combat
+```
+
+The engine uses this system for any combat encounter whose region does not specify a `combat_system`. If neither the region nor the game specifies one, combat falls back to the legacy built-in engine.
+
+See [Combat Systems](./combat-systems.md) for how to create and configure a CombatSystem manifest.
+
+---
+
 ## Timezone Configuration
 
 ### season_hemisphere
@@ -369,17 +385,18 @@ spec:
 
 ### `game.yaml` spec fields
 
-| Field                | Required | Description                                                                                      |
-| -------------------- | -------- | ------------------------------------------------------------------------------------------------ |
-| `displayName`        | yes      | Player-facing game title                                                                         |
-| `description`        | no       | One or two sentence description                                                                  |
-| `item_labels`        | no       | List of label definitions (see above)                                                            |
-| `passive_effects`    | no       | List of game-wide passive effect entries                                                         |
-| `season_hemisphere`  | no       | `northern` (default) or `southern` — flips which months are which season                         |
-| `timezone`           | no       | IANA timezone name (e.g. `"America/New_York"`); defaults to server local time                    |
-| `time`               | no       | In-game time system configuration — cycles, eras, epoch. See [In-Game Time](./ingame-time.md).   |
-| `triggers`           | no       | Trigger declarations: `custom`, `on_game_rejoin`, `on_stat_threshold`, `max_trigger_queue_depth` |
-| `trigger_adventures` | no       | Maps trigger keys to ordered adventure ref lists (see Triggered Adventures above)                |
+| Field                   | Required | Description                                                                                      |
+| ----------------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `displayName`           | yes      | Player-facing game title                                                                         |
+| `description`           | no       | One or two sentence description                                                                  |
+| `item_labels`           | no       | List of label definitions (see above)                                                            |
+| `passive_effects`       | no       | List of game-wide passive effect entries                                                         |
+| `default_combat_system` | no       | `metadata.name` of the CombatSystem to use when no region-level system is assigned               |
+| `season_hemisphere`     | no       | `northern` (default) or `southern` — flips which months are which season                         |
+| `timezone`              | no       | IANA timezone name (e.g. `"America/New_York"`); defaults to server local time                    |
+| `time`                  | no       | In-game time system configuration — cycles, eras, epoch. See [In-Game Time](./ingame-time.md).   |
+| `triggers`              | no       | Trigger declarations: `custom`, `on_game_rejoin`, `on_stat_threshold`, `max_trigger_queue_depth` |
+| `trigger_adventures`    | no       | Maps trigger keys to ordered adventure ref lists (see Triggered Adventures above)                |
 
 ### `character_config.yaml` spec fields
 

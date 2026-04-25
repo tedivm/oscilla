@@ -5,10 +5,14 @@ metadata:
 spec:
   displayName: "Iron Golem"
   description: "Massive construct that hits very hard."
-  hp: 9999
-  attack: 50
-  defense: 10
-  xp_reward: 1000
+  stats:
+    hp: 9999
+    attack: 50
+    defense: 10
+  on_defeat_effects:
+    - type: stat_change
+      stat: xp
+      amount: 100
   loot:
     - entries:
         - item: test-widget

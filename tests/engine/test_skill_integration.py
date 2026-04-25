@@ -354,11 +354,11 @@ async def test_stat_change_enemy_target_with_combat(
     """stat_change target=enemy with CombatContext reduces enemy HP."""
     from tests.engine.conftest import MockTUI
 
-    ctx = CombatContext(enemy_hp=20, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 20}, enemy_ref="test-enemy")
     tui = MockTUI()
     effect = StatChangeEffect(type="stat_change", stat="hp", amount=-5, target="enemy")
     await run_effect(effect=effect, player=base_player, registry=minimal_registry, tui=tui, combat=ctx)
-    assert ctx.enemy_hp == 15
+    assert ctx.enemy_stats["hp"] == 15
 
 
 @pytest.mark.asyncio
@@ -390,7 +390,7 @@ async def test_apply_buff_adds_active_effect(
 ) -> None:
     from tests.engine.conftest import MockTUI
 
-    ctx = CombatContext(enemy_hp=30, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 30}, enemy_ref="test-enemy")
     tui = MockTUI()
     effect = ApplyBuffEffect(type="apply_buff", buff_ref="test-buff-dot", target="enemy", variables={})
     await run_effect(effect=effect, player=base_player, registry=skill_combat_registry, tui=tui, combat=ctx)
@@ -422,7 +422,7 @@ async def test_apply_buff_with_variable_override(
     """apply_buff with variable override resolves overridden percent."""
     from tests.engine.conftest import MockTUI
 
-    ctx = CombatContext(enemy_hp=30, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 30}, enemy_ref="test-enemy")
     tui = MockTUI()
     effect = ApplyBuffEffect(
         type="apply_buff",

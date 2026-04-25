@@ -1,0 +1,67 @@
+# Call of Cthulhu — Sanity and HP Dual-Track Defeat
+#
+# Encountering a monster has an immediate sanity cost (on_combat_start), and the
+# creature continues eroding the investigator's mind each round alongside physical
+# harm. The player loses if either their hp OR sanity reaches 0.
+#
+# Fitness category: Fits Well — demonstrates multi-vital defeat conditions and
+#   lifecycle hooks targeting player stats.
+# Key features illustrated: any-condition player defeat, on_combat_start sanity
+#   drain, multi-formula enemy turn targeting different stats.
+
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: cthulhu-investigation-combat
+spec:
+  # The investigator is incapacitated if either vital hits 0.
+  player_defeat_condition:
+    type: any
+    conditions:
+      - type: character_stat
+        name: hp
+        lte: 0
+      - type: character_stat
+        name: sanity
+        lte: 0
+  enemy_defeat_condition:
+    type: enemy_stat
+    stat: hp
+    lte: 0
+  # Seeing the creature is itself a sanity shock — fires once on combat start, not on resume.
+  on_combat_start:
+    - type: stat_change
+      stat: sanity
+      amount: -3 # negative value reduces the stat (stat_change adds; negative = drain)
+  player_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      # Physical strike: firearms or brawling. Skill check gated on Fighting roll.
+      formula: >-
+        {% set skill_check = roll(100) %}
+        {% set damage      = roll(6) + player.stats['fighting'] %}
+        {{ max(0, damage) if skill_check <= player.stats['fighting_skill'] else 0 }}
+  enemy_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      # Claw/bite: physical damage based on creature STR.
+      formula: "{{ max(0, roll(6) + enemy_stats['str_bonus']) }}"
+    - target_stat: sanity
+      display: "Sanity"
+      # Mental assault: each round the creature's mere presence chips away at reason.
+      # Mitigation comes from the investigator's POW (power) stat.
+      formula: "{{ max(0, enemy_stats['sanity_drain'] - player.stats['pow'] // 10) }}"
+
+---
+# Enemy: Deep One Hybrid — lurks in coastal towns; shocking to behold.
+# Physical stats for combat; sanity_drain for the psychological horror track.
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: deep-one-hybrid
+spec:
+  displayName: "Deep One Hybrid"
+  stats:
+    hp: 12
+    str_bonus: 2 # Claw damage: 1d6+2
+    sanity_drain: 2 # Loses 0–2 sanity per round based on investigator POW

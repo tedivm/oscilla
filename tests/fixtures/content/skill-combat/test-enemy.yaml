@@ -5,10 +5,10 @@ metadata:
 spec:
   displayName: "Test Enemy"
   description: "A sturdy enemy that uses poison every 3 turns."
-  hp: 20
-  attack: 5
-  defense: 0
-  xp_reward: 20
+  stats:
+    hp: 20
+    attack: 5
+    defense: 0
   loot: []
   skills:
     - skill_ref: test-skill-poison

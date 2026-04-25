@@ -26,7 +26,7 @@ async def run_choice(
     never sees them. If all options are gated (empty eligible list), a fallback
     message is shown and the step completes without branching.
     """
-    eligible = [opt for opt in step.options if evaluate(opt.requires, player, registry)]
+    eligible = [opt for opt in step.options if evaluate(condition=opt.requires, player=player, registry=registry)]
 
     if not eligible:
         # No options available; show a notice and continue the adventure.

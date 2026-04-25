@@ -1,0 +1,14 @@
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: basic-attack
+spec:
+  displayName: "Basic Attack"
+  description: "Strike the enemy for your full strength."
+  contexts:
+    - combat
+  effects:
+    - type: stat_change
+      target: enemy
+      stat: hp
+      amount: -5

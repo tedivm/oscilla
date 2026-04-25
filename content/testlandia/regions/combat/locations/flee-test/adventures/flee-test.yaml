@@ -11,12 +11,14 @@ spec:
       on_win:
         steps:
           - type: narrative
-            text: "Victory against flee test enemy."
+            text: "[bold]Victory![/bold] You defeated the Iron Golem. Combat complete."
       on_defeat:
         steps:
           - type: narrative
-            text: "Defeat against flee test enemy."
+            text: "[bold]Defeat![/bold] The Iron Golem crushed you. Combat ended in defeat."
       on_flee:
         steps:
           - type: narrative
-            text: "**FLEE TEST SUCCESSFUL** - You successfully fled from combat when prompted."
+            text:
+              "[bold]FLEE TEST SUCCESSFUL[/bold] — You successfully fled from combat.
+              Combat ended without a result."

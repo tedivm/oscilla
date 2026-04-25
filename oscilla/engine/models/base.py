@@ -559,6 +559,52 @@ class CustomConditionRef(BaseModel):
     name: str
 
 
+class EnemyStatCondition(BaseModel):
+    """True when an enemy stat satisfies the comparator. Only valid during combat.
+
+    Returns False with a logger.warning when evaluated outside a combat context
+    (i.e., when enemy_stats is not passed to evaluate()).
+    At least one of gt/gte/lt/lte/eq must be set.
+    """
+
+    type: Literal["enemy_stat"]
+    stat: str = Field(description="Enemy stat key to compare against.")
+    gt: int | None = None
+    gte: int | None = None
+    lt: int | None = None
+    lte: int | None = None
+    eq: int | None = None
+
+    @model_validator(mode="after")
+    def require_comparator(self) -> "EnemyStatCondition":
+        if all(v is None for v in [self.gt, self.gte, self.lt, self.lte, self.eq]):
+            raise ValueError("enemy_stat condition must specify at least one of: gt, gte, lt, lte, eq")
+        return self
+
+
+class CombatStatCondition(BaseModel):
+    """True when a combat-scoped stat satisfies the comparator. Only valid during combat.
+
+    Returns False with a logger.warning when evaluated outside a combat context
+    (i.e., when combat_stats is not passed to evaluate()).
+    At least one of gt/gte/lt/lte/eq must be set.
+    """
+
+    type: Literal["combat_stat"]
+    stat: str = Field(description="Combat stat key to compare against.")
+    gt: int | None = None
+    gte: int | None = None
+    lt: int | None = None
+    lte: int | None = None
+    eq: int | None = None
+
+    @model_validator(mode="after")
+    def require_comparator(self) -> "CombatStatCondition":
+        if all(v is None for v in [self.gt, self.gte, self.lt, self.lte, self.eq]):
+            raise ValueError("combat_stat condition must specify at least one of: gt, gte, lt, lte, eq")
+        return self
+
+
 Condition = Annotated[
     Union[
         AllCondition,
@@ -599,6 +645,8 @@ Condition = Annotated[
         DateBetweenCondition,
         TimeBetweenCondition,
         CustomConditionRef,
+        EnemyStatCondition,
+        CombatStatCondition,
     ],
     Field(discriminator="type"),
 ]

@@ -1,0 +1,13 @@
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: basic-attack
+spec:
+  displayName: "Attack"
+  contexts:
+    - combat
+  use_effects:
+    - type: stat_change
+      target: enemy
+      stat: hp
+      amount: -10

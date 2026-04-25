@@ -4,12 +4,16 @@ metadata:
   name: testlandia
 spec:
   displayName: "Testlandia"
-  description: "A developer sandbox for manually exercising engine features. No plot, no rules — just levers."
+  description: "A developer sandbox for manually exercising engine features. No
+    plot, no rules — just levers."
+  default_combat_system: standard-combat
 
   # Item label vocabulary for label rendering, sorting, and condition tests.
   item_labels:
     - name: test-consumable
-      description: "Single-use or limited-charge items — used to test label badges and condition predicates."
+      description:
+        "Single-use or limited-charge items — used to test label badges and
+        condition predicates."
       color: "green"
       sort_priority: 1
     - name: test-equippable
@@ -17,7 +21,9 @@ spec:
       color: "cyan"
       sort_priority: 2
     - name: test-legendary
-      description: "Rare items that activate the passive effect — used to test passive stat bonuses."
+      description:
+        "Rare items that activate the passive effect — used to test passive
+        stat bonuses."
       color: "gold1"
       sort_priority: 3
 

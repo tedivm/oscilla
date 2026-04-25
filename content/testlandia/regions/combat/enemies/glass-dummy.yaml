@@ -5,7 +5,11 @@ metadata:
 spec:
   displayName: "Glass Dummy"
   description: "Training dummy that breaks easily."
-  hp: 1
-  attack: 0
-  defense: 0
-  xp_reward: 5
+  stats:
+    hp: 1
+    attack: 0
+    defense: 0
+  on_defeat_effects:
+    - type: stat_change
+      stat: xp
+      amount: 10

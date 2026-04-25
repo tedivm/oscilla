@@ -1,0 +1,24 @@
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: choice-combat
+spec:
+  player_defeat_condition:
+    type: character_stat
+    name: hp
+    lte: 0
+  enemy_defeat_condition:
+    type: enemy_stat
+    stat: hp
+    lte: 0
+  turn_order: player_first
+  player_turn_mode: choice
+  skill_contexts:
+    - combat
+  system_skills:
+    - skill: basic-attack
+  enemy_damage_formulas:
+    - formula: "{{ clamp(enemy_stats.get('attack', 0), 0, 9999) * -1 }}"
+      target_stat: hp
+      target: player
+      display: "Enemy strikes"

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { NarrativeEntry } from "$lib/stores/gameSession.js";
+  import { renderMarkup } from "$lib/utils/markup.js";
 
   interface Props {
     entry: NarrativeEntry;
@@ -16,7 +17,7 @@
   animation but are already visible by the time the user sees them, so
   the 300ms fade is imperceptible in practice.
 -->
-<p class="narrative-entry">{entry.text}</p>
+<p class="narrative-entry">{@html renderMarkup(entry.text)}</p>
 
 <style>
   .narrative-entry {

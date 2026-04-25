@@ -1,0 +1,16 @@
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: test-enemy
+spec:
+  displayName: "Test Enemy"
+  description: "A basic enemy used for initiative-mode combat system tests."
+  stats:
+    hp: 20
+    attack: 5
+    speed: 4
+  on_defeat_effects:
+    - type: stat_change
+      stat: xp
+      amount: 10
+  loot: []

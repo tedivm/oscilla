@@ -476,25 +476,26 @@ spec:
 
 Supported manifest kinds and their primary spec fields:
 
-| Kind              | Purpose                    | Key Spec Fields                                                                        |
-| ----------------- | -------------------------- | -------------------------------------------------------------------------------------- |
-| `Game`            | Game-level configuration   | `displayName`, `time`, `triggers`, `passives`, `equipment_slots`, `character_creation` |
-| `CharacterConfig` | Starting stat definitions  | `stats: List[StatDefinition]`, `equipment_slots`, `skill_category_rules`               |
-| `Region`          | World hierarchy node       | `displayName`, `parent`, `unlock` (Condition)                                          |
-| `Location`        | Explorable place           | `displayName`, `region`, `unlock`, `adventures` (weighted pool)                        |
-| `Adventure`       | Sequence of steps          | `steps`, `ticks`, `trigger_adventures`, `repeat_limit`, `repeat_cooldown`              |
-| `Enemy`           | Combat opponent            | `hp`, `attack`, `defense`, `xp_reward`, `loot`, `skills`                               |
-| `Item`            | Inventory object           | `category`, `stackable`, `equip` (slots, stat_modifiers), `use_effects`, `charges`     |
-| `Skill`           | Activatable ability        | `contexts`, `cost`, `cooldown`, `use_effects`, `requires`                              |
-| `Buff`            | Timed combat modifier      | `duration`, `modifiers`, `per_turn_effects`                                            |
-| `Quest`           | Multi-stage storyline      | `entry_stage`, `stages` (DAG with advance_on, terminal)                                |
-| `Archetype`       | Persistent character state | `gain_effects`, `lose_effects`, `passive_effects`                                      |
-| `LootTable`       | Reusable drop table        | `groups` (weighted/unique sampling)                                                    |
-| `Recipe`          | Crafting formula           | `inputs`, `output`                                                                     |
+| Kind              | Purpose                    | Key Spec Fields                                                                          |
+| ----------------- | -------------------------- | ---------------------------------------------------------------------------------------- |
+| `Game`            | Game-level configuration   | `displayName`, `time`, `triggers`, `passives`, `equipment_slots`, `character_creation`   |
+| `CharacterConfig` | Starting stat definitions  | `stats: List[StatDefinition]`, `equipment_slots`, `skill_category_rules`                 |
+| `Region`          | World hierarchy node       | `displayName`, `parent`, `unlock` (Condition)                                            |
+| `Location`        | Explorable place           | `displayName`, `region`, `unlock`, `adventures` (weighted pool)                          |
+| `Adventure`       | Sequence of steps          | `steps`, `ticks`, `trigger_adventures`, `repeat_limit`, `repeat_cooldown`                |
+| `CombatSystem`    | Pluggable combat ruleset   | `defeat_conditions`, `damage_formulas`, `turn_order`, `player_turn_mode`, `combat_stats` |
+| `Enemy`           | Combat opponent            | `stats` (free-form dict), `on_defeat_effects`, `loot`, `skills`                          |
+| `Item`            | Inventory object           | `category`, `stackable`, `equip` (slots, stat_modifiers), `use_effects`, `charges`       |
+| `Skill`           | Activatable ability        | `contexts`, `cost`, `cooldown`, `use_effects`, `requires`                                |
+| `Buff`            | Timed combat modifier      | `duration`, `modifiers`, `per_turn_effects`                                              |
+| `Quest`           | Multi-stage storyline      | `entry_stage`, `stages` (DAG with advance_on, terminal)                                  |
+| `Archetype`       | Persistent character state | `gain_effects`, `lose_effects`, `passive_effects`                                        |
+| `LootTable`       | Reusable drop table        | `groups` (weighted/unique sampling)                                                      |
+| `Recipe`          | Crafting formula           | `inputs`, `output`                                                                       |
 
 A single YAML file may contain multiple manifests separated by `---` (multi-document YAML).
 
-See [Adventures](authors/adventures.md), [Items](authors/items.md), [Enemies](authors/enemies.md), etc. for full authoring references.
+See [Adventures](authors/adventures.md), [Items](authors/items.md), [Enemies](authors/enemies.md), [Combat Systems](authors/combat-systems.md), etc. for full authoring references.
 
 ### Condition Evaluator
 

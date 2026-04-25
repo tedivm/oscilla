@@ -148,9 +148,9 @@ def _manifest_summary(manifest: "ManifestEnvelope", kind_label: str) -> Dict[str
                 "no" if not spec.repeatable else (str(spec.max_completions) if spec.max_completions else "yes")
             )
         case "Enemy":
-            base["hp"] = str(spec.hp)
-            base["attack"] = str(spec.attack)
-            base["xp"] = str(spec.xp_reward)
+            base["hp"] = str(spec.stats.get("hp", "—"))
+            base["attack"] = str(spec.stats.get("attack", "—"))
+            base["stats"] = str(len(spec.stats))
         case "Item":
             base["category"] = spec.category
             base["labels"] = ", ".join(spec.labels) or "—"

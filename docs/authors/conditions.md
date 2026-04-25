@@ -710,43 +710,77 @@ requires:
 
 ---
 
+## Combat-Context Conditions
+
+Two condition types are only meaningful during a combat encounter: `enemy_stat` and `combat_stat`. Outside of combat both conditions evaluate to `false` and emit a warning in the validation report. They are safe to use in skill `requires` or buff `per_turn_effects` that would only ever fire during combat.
+
+### `enemy_stat`
+
+Checks the current value of a stat on the enemy the player is fighting:
+
+```yaml
+- type: enemy_stat
+  stat: hp
+  lte: 10 # true when enemy hp is 10 or below
+```
+
+Use this in threshold effects to trigger special events when an enemy is nearly defeated, or in skill `requires` to unlock finisher moves.
+
+### `combat_stat`
+
+Checks a stat being tracked by the CombatSystem's `combat_stats` block — counters and accumulators that live only for the duration of the fight:
+
+```yaml
+- type: combat_stat
+  stat: combo_counter
+  gte: 3 # true when the combo counter has reached 3
+```
+
+Combat stats are declared in the `CombatSystem` manifest. They are initialized at combat start and discarded when combat ends. See [Combat Systems §combat-stats](./combat-systems.md#combat-stats).
+
+> **Semantic validator note**: References to `enemy_stat` conditions during validation emit an `enemy_stat_condition_unverifiable` warning rather than an error because the enemy involved in a particular encounter is not known at validation time. The condition will still work correctly at runtime.
+
+---
+
 ## Reference
 
 ### All Condition Types
 
-| Type                      | Required fields            | Optional fields            | Notes                                                                                           |
-| ------------------------- | -------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------- |
-| `level`                   | `value`                    | —                          | True when player level ≥ value                                                                  |
-| `milestone`               | `name`                     | —                          | True when player holds the milestone                                                            |
-| `item`                    | `item_ref`                 | `quantity` (default 1)     | Checks inventory count ≥ quantity                                                               |
-| `character_stat`          | `stat`, one operator       | `stat_source`              | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                                       |
-| `item_equipped`           | `item`                     | —                          | Checks a specific item is equipped                                                              |
-| `item_held_label`         | `label`                    | —                          | Any inventory item has this label                                                               |
-| `any_item_equipped`       | `label`                    | —                          | Any equipped item has this label                                                                |
-| `skill`                   | `skill_ref`                | `mode` (default `learned`) | `mode`: `learned` or `available`                                                                |
-| `enemies_defeated`        | `name`, one operator       | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                                       |
-| `locations_visited`       | `name`, one operator       | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                                       |
-| `adventures_completed`    | `name`, one operator       | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                                       |
-| `prestige_count`          | one operator               | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                                       |
-| `milestone_ticks_elapsed` | `name`, one of `gte`/`lte` | —                          | True when ticks since milestone grant meet the comparison; false if milestone not held          |
-| `has_archetype`           | `name`                     | —                          | True when the character holds the named archetype                                               |
-| `has_all_archetypes`      | `names`                    | —                          | True when the character holds **all** named archetypes                                          |
-| `has_any_archetypes`      | `names`                    | —                          | True when the character holds **at least one** of the named archetypes                          |
-| `archetype_count`         | one operator               | —                          | True when the number of held archetypes satisfies the comparison; operators: `gte`, `lte`, `eq` |
-| `archetype_ticks_elapsed` | `name`, one of `gte`/`lte` | —                          | True when ticks since archetype grant meet the comparison; false if archetype not held          |
-| `all`                     | `conditions`               | —                          | All child conditions must pass (AND)                                                            |
-| `any`                     | `conditions`               | —                          | Any child condition must pass (OR)                                                              |
-| `not`                     | `condition`                | —                          | Inverts the single child condition                                                              |
-| `custom`                  | `name`                     | —                          | References a named `CustomCondition` manifest; resolved at evaluation time via the registry     |
-| `season_is`               | `value`                    | —                          | True when meteorological season matches; `spring` \| `summer` \| `autumn` \| `winter`           |
-| `moon_phase_is`           | `value`                    | —                          | True when lunar phase matches (approximate ±1 day)                                              |
-| `zodiac_is`               | `value`                    | —                          | True when Western zodiac sign matches today's date                                              |
-| `chinese_zodiac_is`       | `value`                    | —                          | True when Chinese zodiac animal matches the current year                                        |
-| `month_is`                | `value`                    | —                          | Integer 1–12 or full English month name                                                         |
-| `day_of_week_is`          | `value`                    | —                          | Integer 0–6 (Mon=0) or full English weekday name                                                |
-| `date_is`                 | `month`, `day`             | `year`                     | Annual when `year` omitted; one-off when `year` included                                        |
-| `date_between`            | `start`, `end`             | —                          | Each has `month` + `day`; wraps year boundary when `start` > `end`                              |
-| `time_between`            | `start`, `end`             | —                          | `HH:MM` 24-hour format; wraps midnight when `start` > `end`                                     |
+| Type                      | Required fields            | Optional fields            | Notes                                                                                                                                                                   |
+| ------------------------- | -------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enemy_stat`              | `stat`, one operator       | —                          | Combat-context only. True when enemy's current stat satisfies the comparison. Returns false outside combat. Operators: `gte`, `lte`, `eq`, `gt`, `lt`                   |
+| `combat_stat`             | `stat`, one operator       | —                          | Combat-context only. True when the CombatSystem's tracked combat stat satisfies the comparison. Returns false outside combat. Operators: `gte`, `lte`, `eq`, `gt`, `lt` |
+| `level`                   | `value`                    | —                          | True when player level ≥ value                                                                                                                                          |
+| `milestone`               | `name`                     | —                          | True when player holds the milestone                                                                                                                                    |
+| `item`                    | `item_ref`                 | `quantity` (default 1)     | Checks inventory count ≥ quantity                                                                                                                                       |
+| `character_stat`          | `stat`, one operator       | `stat_source`              | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                                                                                                               |
+| `item_equipped`           | `item`                     | —                          | Checks a specific item is equipped                                                                                                                                      |
+| `item_held_label`         | `label`                    | —                          | Any inventory item has this label                                                                                                                                       |
+| `any_item_equipped`       | `label`                    | —                          | Any equipped item has this label                                                                                                                                        |
+| `skill`                   | `skill_ref`                | `mode` (default `learned`) | `mode`: `learned` or `available`                                                                                                                                        |
+| `enemies_defeated`        | `name`, one operator       | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                                                                                                               |
+| `locations_visited`       | `name`, one operator       | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                                                                                                               |
+| `adventures_completed`    | `name`, one operator       | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                                                                                                               |
+| `prestige_count`          | one operator               | —                          | Operators: `gte`, `lte`, `eq`, `gt`, `lt`                                                                                                                               |
+| `milestone_ticks_elapsed` | `name`, one of `gte`/`lte` | —                          | True when ticks since milestone grant meet the comparison; false if milestone not held                                                                                  |
+| `has_archetype`           | `name`                     | —                          | True when the character holds the named archetype                                                                                                                       |
+| `has_all_archetypes`      | `names`                    | —                          | True when the character holds **all** named archetypes                                                                                                                  |
+| `has_any_archetypes`      | `names`                    | —                          | True when the character holds **at least one** of the named archetypes                                                                                                  |
+| `archetype_count`         | one operator               | —                          | True when the number of held archetypes satisfies the comparison; operators: `gte`, `lte`, `eq`                                                                         |
+| `archetype_ticks_elapsed` | `name`, one of `gte`/`lte` | —                          | True when ticks since archetype grant meet the comparison; false if archetype not held                                                                                  |
+| `all`                     | `conditions`               | —                          | All child conditions must pass (AND)                                                                                                                                    |
+| `any`                     | `conditions`               | —                          | Any child condition must pass (OR)                                                                                                                                      |
+| `not`                     | `condition`                | —                          | Inverts the single child condition                                                                                                                                      |
+| `custom`                  | `name`                     | —                          | References a named `CustomCondition` manifest; resolved at evaluation time via the registry                                                                             |
+| `season_is`               | `value`                    | —                          | True when meteorological season matches; `spring` \| `summer` \| `autumn` \| `winter`                                                                                   |
+| `moon_phase_is`           | `value`                    | —                          | True when lunar phase matches (approximate ±1 day)                                                                                                                      |
+| `zodiac_is`               | `value`                    | —                          | True when Western zodiac sign matches today's date                                                                                                                      |
+| `chinese_zodiac_is`       | `value`                    | —                          | True when Chinese zodiac animal matches the current year                                                                                                                |
+| `month_is`                | `value`                    | —                          | Integer 1–12 or full English month name                                                                                                                                 |
+| `day_of_week_is`          | `value`                    | —                          | Integer 0–6 (Mon=0) or full English weekday name                                                                                                                        |
+| `date_is`                 | `month`, `day`             | `year`                     | Annual when `year` omitted; one-off when `year` included                                                                                                                |
+| `date_between`            | `start`, `end`             | —                          | Each has `month` + `day`; wraps year boundary when `start` > `end`                                                                                                      |
+| `time_between`            | `start`, `end`             | —                          | `HH:MM` 24-hour format; wraps midnight when `start` > `end`                                                                                                             |
 
 ### `stat_source` Values
 

@@ -1,0 +1,58 @@
+# Morale System
+#
+# The enemy does not need to be killed to be defeated — it flees when its morale
+# breaks. The enemy_defeat_condition checks morale, not hp. The player's
+# Presence stat chips away at morale each round; the enemy may also lose morale
+# from suffering damage (via a second formula targeting hp, causing the enemy to
+# check both pools simultaneously).
+#
+# Fitness category: Fits Well — demonstrates that defeat does not require hp=0.
+# Key features illustrated: enemy_defeat_condition on a non-hp stat, multiple
+#   enemy formulas driving different "health" pools.
+
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: morale-combat
+spec:
+  player_defeat_condition:
+    type: character_stat
+    name: hp
+    lte: 0
+  # The enemy breaks and flees when morale hits 0.
+  # hp is not tracked for defeat — only morale matters to the outcome.
+  enemy_defeat_condition:
+    type: enemy_stat
+    name: morale
+    lte: 0
+  player_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      # Physical strike: base weapon damage minus enemy armor.
+      formula: "{{ max(0, roll(6) + player.stats['strength'] - enemy_stats['armor']) }}"
+    - target_stat: morale
+      display: "Morale"
+      # Intimidation pressure: the player's Presence stat rattles the enemy each round.
+      # More Presence = faster morale collapse without necessarily winning the DPS race.
+      formula: "{{ max(0, player.stats['presence'] - enemy_stats['resolve']) }}"
+  enemy_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      # Enemy swings back as long as its morale holds.
+      formula: "{{ max(0, roll(6) + enemy_stats['attack'] - player.stats['defense']) }}"
+
+---
+# Enemy: Bandit Thug — tough enough in a straight fight but not particularly brave.
+# morale starts at 5; with enough Presence it will crack before hp does.
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: bandit-thug
+spec:
+  displayName: "Bandit Thug"
+  stats:
+    hp: 14
+    morale: 5 # Breaks when this hits 0
+    resolve: 1 # Weak will — Presence of 3 drains 2 morale/round
+    attack: 3
+    armor: 1

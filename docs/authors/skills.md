@@ -529,9 +529,35 @@ contexts:
   - overworld # Can be used from the overworld actions screen
 ```
 
+The `contexts` list accepts any string values; `"overworld"` is a reserved value with engine meaning (controls overworld menu visibility). Other values — like `"combat"` — are matched against the `skill_contexts` list on a `CombatSystem` manifest to determine which skills appear in the choice-mode action menu. You may define custom context names for any purpose.
+
 At least one context must be declared. A skill with only `overworld` does not appear in combat menus, and vice versa.
 
 > **Note:** Buff-related effects (`apply_buff`, `dispel`) are silently skipped outside combat. This ensures that items and skills are safe to use in overworld contexts even if they include buff effects alongside other effects (such as heals).
+
+---
+
+## Combat Damage Formulas
+
+Skills can also declare `combat_damage_formulas` to run formula-based damage when the skill is used in combat. This is the primary mechanism for player-controlled damage in `choice` mode CombatSystems:
+
+```yaml
+spec:
+  displayName: "Power Strike"
+  description: "A heavy blow that deals double your strength."
+  contexts:
+    - combat
+  combat_damage_formulas:
+    - formula: "{{ player.get('strength', 5) * 2 * -1 }}"
+      target_stat: hp
+      target: enemy
+      display: "Power Strike"
+  use_effects:
+    - type: narrative
+      text: "You wind up and swing with full force!"
+```
+
+`combat_damage_formulas` entries use the same `DamageFormulaEntry` schema as formulas in a `CombatSystem` manifest. They run after `use_effects`. See [Combat Systems §damage-formulas](./combat-systems.md#damage-formulas) for the full formula syntax, including dice functions and threshold effects.
 
 ---
 

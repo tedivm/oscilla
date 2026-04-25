@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Literal
+from typing import TYPE_CHECKING, Dict, List, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
 from oscilla.engine.models.adventure import Effect
 from oscilla.engine.models.base import Condition, ManifestEnvelope
+
+if TYPE_CHECKING:
+    from oscilla.engine.models.combat_system import DamageFormulaEntry
 
 
 class StatModifier(BaseModel):
@@ -22,6 +25,9 @@ class EquipSpec(BaseModel):
     # When stat_source is "effective", the item's own bonuses are excluded
     # from the check to prevent self-justification.
     requires: Condition | None = None
+    # Damage formulas applied automatically each round while this item is equipped.
+    # Scoped to combat systems whose skill_contexts intersect the parent item's contexts.
+    combat_damage_formulas: List["DamageFormulaEntry"] = []
 
 
 class BuffGrant(BaseModel):
@@ -54,6 +60,11 @@ class ItemSpec(BaseModel):
     # Maximum number of uses before the instance is removed (non-stackable only).
     # Mutually exclusive with consumed_on_use: true and stackable: true.
     charges: int | None = None
+    # Combat participation contexts. An item whose contexts intersect a CombatSystem's
+    # skill_contexts is eligible as an active-use action in choice-mode combat.
+    # Also scopes which combat systems receive any EquipSpec.combat_damage_formulas.
+    # Leave empty for items that play no role in combat.
+    contexts: List[str] = []
     # Skills granted only while this item occupies an equipment slot.
     grants_skills_equipped: List[str] = []
     # Skills granted while this item is anywhere in inventory (stacks or instances).
@@ -62,6 +73,9 @@ class ItemSpec(BaseModel):
     grants_buffs_equipped: List[BuffGrant] = []
     # Buff grants applied at the start of each combat while this item is anywhere in inventory.
     grants_buffs_held: List[BuffGrant] = []
+    # Damage formulas applied when this item is used as an active combat action in choice mode.
+    # The parent item's contexts field scopes which combat systems this applies to.
+    combat_damage_formulas: List["DamageFormulaEntry"] = []
 
     @model_validator(mode="after")
     def validate_stackable_equip(self) -> "ItemSpec":
@@ -89,3 +103,10 @@ class ItemSpec(BaseModel):
 class ItemManifest(ManifestEnvelope):
     kind: Literal["Item"]
     spec: ItemSpec
+
+
+# Resolve forward reference: DamageFormulaEntry is defined in combat_system.py.
+from oscilla.engine.models.combat_system import DamageFormulaEntry as _DamageFormulaEntry  # noqa: E402
+
+EquipSpec.model_rebuild(_types_namespace={"DamageFormulaEntry": _DamageFormulaEntry})
+ItemSpec.model_rebuild(_types_namespace={"DamageFormulaEntry": _DamageFormulaEntry})

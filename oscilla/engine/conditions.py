@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 from logging import getLogger
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict
 
 from oscilla.engine import calendar_utils
 from oscilla.engine.models.base import (
@@ -16,12 +16,14 @@ from oscilla.engine.models.base import (
     ArchetypeTicksElapsedCondition,
     CharacterStatCondition,
     ChineseZodiacIsCondition,
+    CombatStatCondition,
     Condition,
     CustomConditionRef,
     DateBetweenCondition,
     DateIsCondition,
     DayOfWeekIsCondition,
     EnemiesDefeatedCondition,
+    EnemyStatCondition,
     GameCalendarCycleCondition,
     GameCalendarEraCondition,
     GameCalendarTimeCondition,
@@ -68,6 +70,8 @@ def evaluate(
     player: "CharacterState",
     registry: "ContentRegistry | None" = None,
     exclude_item: str | None = None,
+    enemy_stats: Dict[str, int] | None = None,
+    combat_stats: Dict[str, int] | None = None,
 ) -> bool:
     """Evaluate a condition tree against the given player state.
 
@@ -77,6 +81,12 @@ def evaluate(
     exclude_item: when set, the named item's stat bonuses are excluded from
     effective_stats() lookups. Used for the self-justification guard when
     evaluating EquipSpec.requires.
+
+    enemy_stats: current enemy stat dict. Required for EnemyStatCondition;
+    evaluates False with a warning when None (outside combat context).
+
+    combat_stats: current combat-scoped stat dict. Required for CombatStatCondition;
+    evaluates False with a warning when None (outside combat context).
     """
     if condition is None:
         return True
@@ -84,11 +94,11 @@ def evaluate(
     match condition:
         # --- Branch nodes ---
         case AllCondition(conditions=children):
-            return all(evaluate(c, player, registry, exclude_item) for c in children)
+            return all(evaluate(c, player, registry, exclude_item, enemy_stats, combat_stats) for c in children)
         case AnyCondition(conditions=children):
-            return any(evaluate(c, player, registry, exclude_item) for c in children)
+            return any(evaluate(c, player, registry, exclude_item, enemy_stats, combat_stats) for c in children)
         case NotCondition(condition=child):
-            return not evaluate(child, player, registry, exclude_item)
+            return not evaluate(child, player, registry, exclude_item, enemy_stats, combat_stats)
 
         # --- Player attribute leaves ---
         case LevelCondition(value=v):
@@ -315,7 +325,21 @@ def evaluate(
                 # registry was built from a subset of manifests. Fail safe.
                 logger.warning("type: custom condition %r not found in registry — evaluating False.", n)
                 return False
-            return evaluate(defn.spec.condition, player, registry, exclude_item)
+            return evaluate(defn.spec.condition, player, registry, exclude_item, enemy_stats, combat_stats)
+
+        # --- Combat context leaves ---
+
+        case EnemyStatCondition(stat=s) as c:
+            if enemy_stats is None:
+                logger.warning("enemy_stat condition on %r evaluated outside combat context — returning False.", s)
+                return False
+            return _numeric_compare(enemy_stats.get(s, 0), c)
+
+        case CombatStatCondition(stat=s) as c:
+            if combat_stats is None:
+                logger.warning("combat_stat condition on %r evaluated outside combat context — returning False.", s)
+                return False
+            return _numeric_compare(combat_stats.get(s, 0), c)
 
         # --- In-game calendar predicates ---
 

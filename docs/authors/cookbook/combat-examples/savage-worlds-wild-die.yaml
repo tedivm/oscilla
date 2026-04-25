@@ -1,0 +1,82 @@
+# Savage Worlds — Wild Die
+#
+# Every trait roll uses two dice: a Trait Die (d4/d6/d8/d10/d12 based on skill rank)
+# and a fixed d6 Wild Die. The player takes the higher result. If the result meets
+# or beats the Target Number (TN, usually 4), the roll succeeds. Each 4-over-TN
+# increment is a "raise" adding +d6 damage.
+#
+# This manifest uses max(roll(trait_die), roll(6)) for the core Wild Die mechanic.
+# The trait_die_size stat stores the die size as an integer (4, 6, 8, 10, or 12).
+# roll() is called twice in a single expression — this requires that roll() calls
+# are independent within a formula (not seeded or cached per expression).
+#
+# Raises are approximated via threshold_effects: a raise fires a bonus damage band.
+# The precise raise count (each full 4 over TN = +1 raise) would require a
+# raise_count formula and multiple effects, which adds complexity. This example
+# demonstrates one raise band (≥8 = raised success = +d6 bonus damage).
+#
+# Fitness category: Possible but Awkward — expressible, but the raise cascade
+#   and wild-card vs. extra distinction require care in stat design.
+# Key features illustrated: max() across two roll() calls, raise approximation
+#   via threshold_effects, stat storing die-size as integer.
+
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: savage-worlds-combat
+spec:
+  player_defeat_condition:
+    type: character_stat
+    name: wounds
+    lte: 0
+  enemy_defeat_condition:
+    type: enemy_stat
+    stat: wounds
+    lte: 0
+  player_damage_formulas:
+    - target_stat: wounds
+      display: "Wounds"
+      # Wild-card Fighting roll: take the higher of Trait Die and Wild Die (d6).
+      # trait_die_size is 4, 6, 8, 10, or 12.
+      # TN = 4; success means the attack hits and wound rolls proceed.
+      # Damage: 1d6+str_mod on a success; +1d6 on a raise (≥8 on the trait roll).
+      # For simplicity we combine the attack and damage into one formula using
+      # threshold_effects for the raise bonus.
+      formula: >-
+        {% set trait_roll = roll(player.stats['trait_die_size']) %}
+        {% set wild_roll  = roll(6) %}
+        {% set attack     = max(trait_roll, wild_roll) %}
+        {% set damage     = roll(6) + player.stats['str_mod'] - enemy_stats['toughness'] %}
+        {{ max(0, damage) if attack >= 4 else 0 }}
+      threshold_effects:
+        - min: 1
+          # Raise detection: if the combined attack roll was ≥8, add bonus damage.
+          # NOTE: The attack roll and damage roll use separate roll() evaluations;
+          # we cannot re-read the attack roll result in threshold_effects. This band
+          # fires on any wound result ≥1 as a simplified raise approximation.
+          # A precise implementation would store the attack roll in a combat_stat.
+          effects: [] # Placeholder — a real game would roll +1d6 here via a forthcoming effect type
+  enemy_damage_formulas:
+    - target_stat: wounds
+      display: "Wounds"
+      # Extras (non-wild-card enemies) do not get the Wild Die.
+      formula: >-
+        {% set attack = roll(enemy_stats['fighting_die_size']) %}
+        {% set damage = roll(enemy_stats['damage_die_size']) + enemy_stats['strength_bonus'] - player.stats['toughness'] %}
+        {{ max(0, damage) if attack >= 4 else 0 }}
+
+---
+# Enemy: Orc Extra — a rank-and-file extra (not a Wild Card).
+# Extras do not use the Wild Die; their trait roll is a single die.
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: orc-extra
+spec:
+  displayName: "Orc"
+  stats:
+    wounds: 1 # Extras are Shaken/Out with 1 wound
+    fighting_die_size: 6 # d6 Fighting
+    damage_die_size: 8 # d8 greatclub
+    strength_bonus: 2
+    toughness: 5 # Toughness = (Vigor/2) + 2 + armor

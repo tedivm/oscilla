@@ -1,0 +1,17 @@
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: basic-strike
+spec:
+  displayName: "Strike"
+  description: "A basic attack. Deals strength minus enemy defense, minimum 1 damage."
+  contexts:
+    - combat
+  use_effects:
+    - type: stat_change
+      stat: hp
+      target: enemy
+      # Match the formula from the auto-mode player_damage_formulas so damage is unchanged.
+      amount:
+        "{{ clamp(player.get('strength', 5) - enemy_stats.get('defense', 0), 1,
+        9999) * -1 }}"

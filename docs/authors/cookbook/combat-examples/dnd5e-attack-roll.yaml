@@ -1,0 +1,56 @@
+# D&D 5e Attack Roll
+#
+# Demonstrates conditional (gated) damage — the foundational d20 pattern.
+# The player rolls d20 + attack_bonus vs the enemy's AC. On a hit, the weapon
+# die is rolled and str_mod is added. On a miss, 0 damage. The enemy follows
+# the same pattern with its own attack and damage stats.
+#
+# Fitness category: Fits Well — no new primitives required.
+# Key features illustrated: gated damage formula, stat-vs-stat comparison.
+
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: dnd5e-attack-roll
+spec:
+  player_defeat_condition:
+    type: character_stat
+    name: hp
+    lte: 0
+  enemy_defeat_condition:
+    type: enemy_stat
+    stat: hp
+    lte: 0
+  player_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      # Attack roll: d20 + attack_bonus vs enemy AC.
+      # On a hit: longsword damage (1d8 + str_mod), floored at 0.
+      # On a miss: 0 damage — the formula gates on the comparison result.
+      formula: >-
+        {% set attack = roll(20) + player.stats['attack_bonus'] %}
+        {% set damage = roll(8)  + player.stats['str_mod'] %}
+        {{ max(0, damage) if attack >= enemy_stats['ac'] else 0 }}
+  enemy_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      # Monster attack: same pattern. On a hit: scimitar (1d6 + dmg_bonus).
+      formula: >-
+        {% set attack = roll(20) + enemy_stats['attack_bonus'] %}
+        {% set damage = roll(6)  + enemy_stats['dmg_bonus'] %}
+        {{ max(0, damage) if attack >= player.stats['ac'] else 0 }}
+
+---
+# Enemy: Goblin Warrior
+# Stats reflect the D&D 5e MM goblin (AC 15, HP 7, +4 to hit, 1d6+2 scimitar).
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: goblin-warrior
+spec:
+  displayName: "Goblin Warrior"
+  stats:
+    hp: 7
+    ac: 15 # Leather armor + shield
+    attack_bonus: 4 # +2 proficiency + 2 DEX
+    dmg_bonus: 2 # Scimitar 1d6+2

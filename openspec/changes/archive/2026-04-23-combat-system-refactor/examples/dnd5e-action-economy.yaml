@@ -1,0 +1,139 @@
+# D&D 5e Action Economy — Approximation
+#
+# APPROXIMATION — Possible but Awkward
+#
+# D&D 5e grants each character one Action, one Bonus Action, and a Reaction per
+# turn. The engine supports a single choice-mode selection per actor per phase;
+# there is no concept of ordered sub-phases within one turn.
+#
+# This manifest approximates the Action + Bonus Action pair by treating them as
+# two sequential system_skills visible each round — one main-action slot and one
+# bonus-action slot. The player picks one skill from the choice menu; the other
+# fires automatically via an equipped item's equip formula (or is omitted).
+#
+# The fundamental gap: the player cannot split their single choice into two
+# independent selections in one round. A Fighter who wants to attack (Action) AND
+# heal with Second Wind (Bonus Action, healing skill) cannot do both from a single
+# choice-mode selection. Authors must design around this by merging the two phases
+# into one compound skill (e.g., "Attack + Second Wind" as a single option).
+#
+# This example models a Fighter vs. Skeleton with Action Attack + passive Bonus
+# Action (a healing item triggers automatically via equip formula approximation).
+#
+# Fitness category: Possible but Awkward — single-phase model limits expressiveness.
+# Key features illustrated: system_skills gating, equip formula for passive effects,
+#   the boundary where action economy breaks.
+
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: dnd5e-action-economy
+spec:
+  player_defeat_condition:
+    type: character_stat
+    name: hp
+    lte: 0
+  enemy_defeat_condition:
+    type: enemy_stat
+    name: hp
+    lte: 0
+  player_turn_mode: "choice"
+  skill_contexts: ["dnd5e-combat"]
+  # Bonus Action approximation: Second Wind is a system_skill gated on hp <= 50.
+  # In true 5e it is an independent choice from the main action. Here it appears
+  # in the same choice menu — the player must spend their single action on it,
+  # forfeiting their attack. Authors who want simultaneous Attack + Second Wind
+  # must create a combined "Attack + Second Wind" compound skill.
+  system_skills:
+    # Longsword Attack is always available — every Fighter can make a weapon attack.
+    - skill: longsword-attack
+    # Second Wind and the compound Attack+Second Wind are only shown when bloodied
+    # (HP ≤ 50), approximating the bonus-action-only availability of the feature.
+    - skill: second-wind
+      condition:
+        type: character_stat
+        name: hp
+        lte: 50
+    - skill: attack-and-second-wind
+      condition:
+        type: character_stat
+        name: hp
+        lte: 50
+  enemy_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      formula: >-
+        {% set attack = roll(20) + enemy_stats['attack_bonus'] %}
+        {% set damage = roll(6)  + enemy_stats['dmg_bonus'] %}
+        {{ max(0, damage) if attack >= player.stats['ac'] else 0 }}
+
+---
+# Skill: Longsword Attack — the Fighter's standard Action.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: longsword-attack
+spec:
+  displayName: "Longsword Attack"
+  contexts: ["dnd5e-combat"]
+  combat_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      formula: >-
+        {% set attack = roll(20) + player.stats['attack_bonus'] %}
+        {% set damage = roll(8)  + player.stats['str_mod'] %}
+        {{ max(0, damage) if attack >= enemy_stats['ac'] else 0 }}
+
+---
+# Skill: Second Wind — Fighter Bonus Action self-heal.
+# APPROXIMATION NOTE: In 5e this is used as a Bonus Action alongside a main Action.
+# In this system it costs the player their full turn choice to activate.
+# A compound "Attack + Second Wind" skill below demonstrates the workaround.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: second-wind
+spec:
+  displayName: "Second Wind (Bonus Action)"
+  contexts: ["dnd5e-combat"]
+  use_effects:
+    - type: heal
+      amount: 10 # 1d10 + Fighter level — simplified to flat 10
+
+---
+# Skill: Attack + Second Wind (Compound workaround)
+# Merges Action and Bonus Action into one combined choice.
+# This is the recommended pattern when action economy is required:
+# design compound skills that represent the combined turn.
+# Only appears when hp <= 50 (same condition as Second Wind alone).
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: attack-and-second-wind
+spec:
+  displayName: "Attack + Second Wind"
+  contexts: ["dnd5e-combat"]
+  use_effects:
+    - type: heal
+      amount: 10
+  combat_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      formula: >-
+        {% set attack = roll(20) + player.stats['attack_bonus'] %}
+        {% set damage = roll(8)  + player.stats['str_mod'] %}
+        {{ max(0, damage) if attack >= enemy_stats['ac'] else 0 }}
+
+---
+# Enemy: Skeleton — CR 1/4 undead, fragile but immune to exhaustion.
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: skeleton
+spec:
+  displayName: "Skeleton"
+  stats:
+    hp: 13
+    ac: 13 # Armor scraps
+    attack_bonus: 4 # +2 proficiency + 2 STR (shortsword)
+    dmg_bonus: 2 # 1d6+2

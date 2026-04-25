@@ -1,0 +1,136 @@
+# High Card Duel (Poker-style Combat)
+#
+# Fitness category: Fits Well
+#
+# A simplified poker-inspired card game where both sides draw a card each round.
+# The higher draw wins the round; the loser surrenders a chip. First side to
+# run out of chips loses.
+#
+# The player chooses a draw strategy before the draw resolves:
+#   Careful Draw — draws from the lower half of the deck (1–8), lower variance
+#   Bold Draw    — draws from the upper half of the deck (5–13), higher floor
+#
+# The enemy always draws uniformly from 1–13.
+#
+# Key features illustrated:
+#   - turn_order: "simultaneous" (both sides draw, then compare)
+#   - Strategy-encoding skills: use_effects commit strategy to combat_stats
+#   - resolution_formulas state-sharing across entries:
+#       Entry 1 computes and stores player_draw based on strategy
+#       Entries 2–3 read player_draw (just set) for the comparison
+#   - Delta-encoding pattern to SET a combat_stat to an arbitrary value
+#   - Multi-round chip accumulation: combat ends when a side reaches 0 chips
+#   - enemy_damage_formulas: set enemy_draw each round via delta-encode
+#
+# Delta-encode pattern: to set combat_stats['x'] to value V,
+# emit formula = (combat_stats['x'] - V) so that
+# stat = stat - (stat - V) = V. Works for any non-negative V.
+
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: high-card-duel
+spec:
+  player_defeat_condition:
+    type: combat_stat
+    name: player_chips
+    lte: 0
+  enemy_defeat_condition:
+    type: combat_stat
+    name: enemy_chips
+    lte: 0
+  player_turn_mode: "choice"
+  # Both sides commit their draw (or draw strategy) before anyone loses chips.
+  turn_order: "simultaneous"
+  skill_contexts: ["card-duel"]
+  system_skills:
+    - skill: careful-draw
+    - skill: bold-draw
+  # Combat-internal stats — all scoped to the encounter.
+  combat_stats:
+    - name: player_chips
+      default: 5 # player starts with 5 chips
+    - name: enemy_chips
+      default: 5 # enemy starts with 5 chips
+    - name: player_strategy
+      default: 0 # 0 = no strategy yet (treated as bold), 1 = careful, 2 = bold
+    - name: player_draw
+      default: 0 # computed by resolution_formulas entry 1 each round
+    - name: enemy_draw
+      default: 0 # set by enemy_damage_formulas each round
+  # Enemy phase: commit a random draw (1–13) to combat_stats['enemy_draw'].
+  # Delta-encode: current - new, so stat = stat - (stat - new) = new.
+  enemy_damage_formulas:
+    - target_stat: enemy_draw
+      target: combat
+      formula: "{{ combat_stats['enemy_draw'] - roll(13) }}"
+  # Resolution formulas fire after both strategy and enemy draw are committed.
+  # Entries run in order; each one's effect on combat_stats is visible to later entries.
+  resolution_formulas:
+    # Entry 1: compute the player's actual draw from their chosen strategy and store it.
+    # strategy=1 (Careful): draw from 1–8; strategy=2 or 0 (Bold/default): draw from 5–13.
+    # Using delta-encode: emit (player_draw - new_draw) so stat = new_draw after applying.
+    - target_stat: player_draw
+      target: combat
+      formula: >-
+        {% set new_draw = roll(1, 8) if combat_stats['player_strategy'] == 1 else roll(5, 13) %}
+        {{ combat_stats['player_draw'] - new_draw }}
+    # Entry 2: if the enemy drew higher, player loses a chip.
+    # player_draw was just set by entry 1 — the updated value is visible here.
+    - target_stat: player_chips
+      target: combat
+      display: "Your Chips"
+      formula: "{{ 1 if combat_stats['enemy_draw'] > combat_stats['player_draw'] else 0 }}"
+    # Entry 3: if the player drew higher, enemy loses a chip.
+    - target_stat: enemy_chips
+      target: combat
+      display: "Dealer Chips"
+      formula: "{{ 1 if combat_stats['player_draw'] > combat_stats['enemy_draw'] else 0 }}"
+    # Ties: neither side loses a chip (0 damage from both entries above). The pot stays.
+
+---
+# Enemy: The House Dealer
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: the-dealer
+spec:
+  displayName: "The House Dealer"
+  stats:
+    intimidation:
+      3 # Intimidation is not a combat stat here — illustrates that enemy.spec.stats
+      # can carry non-combat flavor fields. Defeat is based on combat_stats only.
+
+---
+# Skill: Careful Draw
+# Commits strategy=1 to combat_stats. Resolution formula uses 1–8 for the draw.
+# Lower ceiling than Bold, but avoids the low cards (1–4) entirely — lower variance.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: careful-draw
+spec:
+  displayName: "Careful Draw 🃏"
+  contexts: ["card-duel"]
+  use_effects:
+    - type: stat_set
+      stat: player_strategy
+      target: combat
+      value: 1 # 1 = Careful: draw range 1–8
+
+---
+# Skill: Bold Draw
+# Commits strategy=2 to combat_stats. Resolution formula uses 5–13 for the draw.
+# Higher floor than Careful, but never draws below 5. Higher ceiling risk/reward.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: bold-draw
+spec:
+  displayName: "Bold Draw 🎴"
+  contexts: ["card-duel"]
+  use_effects:
+    - type: stat_set
+      stat: player_strategy
+      target: combat
+      value: 2 # 2 = Bold: draw range 5–13

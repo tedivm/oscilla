@@ -1,0 +1,21 @@
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: test-combat-system
+spec:
+  player_turn_mode: choice
+  turn_order: player_first
+  player_defeat_condition:
+    type: character_stat
+    name: hp
+    lte: 0
+  enemy_defeat_condition:
+    type: enemy_stat
+    stat: hp
+    lte: 0
+  system_skills:
+    - skill: basic-attack
+  enemy_damage_formulas:
+    - formula: "{{ enemy_stats.get('attack', 0) * -1 }}"
+      target: player
+      target_stat: hp

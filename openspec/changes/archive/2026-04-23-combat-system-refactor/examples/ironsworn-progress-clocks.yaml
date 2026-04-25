@@ -1,0 +1,130 @@
+# Ironsworn — Progress Clocks
+#
+# In Ironsworn, combat is not measured by draining enemy hit points but by filling
+# a progress clock — a track of N segments representing the narrative momentum
+# toward defeating a foe. Filling all segments triggers the victory condition.
+#
+# The enemy's "defeat" fires when the combat_stat `progress` reaches the clock
+# maximum (8 ticks for a Dangerous foe). Successful player moves advance the
+# clock; failed moves may reverse it or trigger enemy harm.
+#
+# The move resolution uses Ironsworn's action+challenge dice system:
+#   Roll 1d6 + action_bonus vs. two d10 challenge dice.
+#   Strong Hit (beat both): advance clock by 2
+#   Weak Hit (beat one):    advance clock by 1
+#   Miss (beat neither):    pay a cost (take harm, no progress)
+#
+# Fitness category: Possible but Awkward — clock mechanics work, but the
+#   frontend cannot know to render `progress` as a segmented clock vs. a bar.
+#   This is the display gap noted in the fitness review (Stat Display Type roadmap item).
+# Key features illustrated: victory condition on combat_stat, threshold_effects
+#   driving clock advancement, Ironsworn action-die resolution.
+
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: ironsworn-progress-clock
+spec:
+  # The player is Broken when hp hits 0 — stays as a player defeat track.
+  player_defeat_condition:
+    type: character_stat
+    name: hp
+    lte: 0
+  # Victory: the foe's progress clock fills (8 ticks = Dangerous foe).
+  enemy_defeat_condition:
+    type: combat_stat
+    name: progress
+    gte: 8
+  player_turn_mode: "choice"
+  skill_contexts: ["ironsworn-combat"]
+  # Ironsworn moves are universal — no acquisition required. Inject both moves
+  # unconditionally so any character facing this combat system has them.
+  system_skills:
+    - skill: strike
+    - skill: secure-advantage
+  combat_stats:
+    - name: progress
+      default: 0 # Clock advances toward 8; enemy is vanquished at 8
+  # The enemy attacks back on every round (Ironsworn: the foe's moves).
+  enemy_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      # Foe's harm: fixed value per rank minus player iron (armor/will) stat.
+      formula: "{{ max(0, enemy_stats['harm'] - player.stats['iron']) }}"
+
+---
+# Skill: Strike — the core Ironsworn combat move (melee).
+# Uses +iron (or +edge for ranged). Outcome drives clock advancement.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: strike
+spec:
+  displayName: "Strike"
+  contexts: ["ironsworn-combat"]
+  combat_damage_formulas:
+    - target_stat: progress
+      target: combat
+      display: "Progress"
+      # Action die (1d6 + iron) vs. two challenge dice (d10 each).
+      # Strong Hit (beat both challenge dice): advance 2.
+      # Weak Hit (beat one): advance 1.
+      # Miss (beat neither): 0 (and pay a cost via threshold_effects).
+      #
+      # Encoding: both challenge dice must be rolled and compared. We approximate
+      # the two-challenge-die pattern by rolling the action die once and checking
+      # against fixed thresholds that approximate Strong Hit / Weak Hit probability:
+      #   Action+stat ≥ 7 → Strong Hit (~beat both d10s)
+      #   Action+stat ≥ 4 → Weak Hit (~beat one d10)
+      #   Action+stat < 4 → Miss
+      #
+      # A precise implementation would store both d10 challenge dice as combat_stats
+      # and compare them explicitly. This approximation validates the clock mechanic.
+      formula: >-
+        {% set action = roll(6) + player.stats['iron'] %}
+        {{ 2 if action >= 7 else (1 if action >= 4 else 0) }}
+      threshold_effects:
+        - max: 0
+          # Miss — pay the cost: take 1 harm from the foe's counter (in addition to
+          # the regular enemy_damage_formulas harm applied each round).
+          effects:
+            - type: stat_change
+              stat: hp
+              value: -2
+
+---
+# Skill: Secure an Advantage — set up your next move for a bonus.
+# Does not directly advance the progress clock; instead heals/buffs.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: secure-advantage
+spec:
+  displayName: "Secure an Advantage"
+  contexts: ["ironsworn-combat"]
+  combat_damage_formulas:
+    - target_stat: progress
+      target: combat
+      display: "Progress"
+      # This move does not directly advance the clock; it recovers 5 HP on a hit.
+      formula: "{{ 0 }}"
+      threshold_effects:
+        - min: 0
+          # Any result (even a miss) — in a real implementation the move outcome
+          # would vary. Here we demonstrate a healing use_effects pattern.
+          effects: []
+  use_effects:
+    - type: heal
+      amount: 5
+
+---
+# Enemy: Ironbound Raider — a Dangerous Ironsworn foe (clock size 8).
+# harm: base damage dealt each round before iron mitigation.
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: ironbound-raider
+spec:
+  displayName: "Ironbound Raider"
+  stats:
+    harm: 3 # Dangerous foe inflicts 3 harm per move (Ironsworn standard)

@@ -1,0 +1,25 @@
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: standard-combat
+spec:
+  player_defeat_condition:
+    type: character_stat
+    name: hp
+    lte: 0
+  enemy_defeat_condition:
+    type: enemy_stat
+    stat: hp
+    lte: 0
+  turn_order: player_first
+  player_turn_mode: auto
+  player_damage_formulas:
+    - formula: "{{ clamp(player.get('strength', 5), 1, 9999) * -1 }}"
+      target_stat: hp
+      target: enemy
+      display: "Attack"
+  enemy_damage_formulas:
+    - formula: "{{ clamp(enemy_stats.get('attack', 0), 0, 9999) * -1 }}"
+      target_stat: hp
+      target: player
+      display: "Enemy strikes"

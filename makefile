@@ -274,8 +274,16 @@ mypy_check:
 	$(UV) run mypy ${PACKAGE_SLUG}
 
 .PHONY: validate
-validate:
+validate: validate_cookbook
 	$(UV) run oscilla validate
+
+.PHONY: validate_cookbook
+validate_cookbook:
+	@set -e; \
+	find ./docs/authors/cookbook -name "*.yaml" | sort | while read f; do \
+		echo "Validating $$f..."; \
+		$(UV) run oscilla validate --stdin --no-semantic < "$$f"; \
+	done
 
 .PHONY: prettier_check
 prettier_check: frontend_install

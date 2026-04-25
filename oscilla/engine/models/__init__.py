@@ -7,6 +7,7 @@ from oscilla.engine.models.archetype import ArchetypeManifest
 from oscilla.engine.models.base import ManifestEnvelope
 from oscilla.engine.models.buff import BuffManifest
 from oscilla.engine.models.character_config import CharacterConfigManifest
+from oscilla.engine.models.combat_system import CombatSystemManifest
 from oscilla.engine.models.custom_condition import CustomConditionManifest
 from oscilla.engine.models.enemy import EnemyManifest
 from oscilla.engine.models.game import GameManifest
@@ -20,6 +21,7 @@ from oscilla.engine.models.skill import SkillManifest
 
 MANIFEST_REGISTRY: Dict[str, Type[ManifestEnvelope]] = {
     "Archetype": ArchetypeManifest,
+    "CombatSystem": CombatSystemManifest,
     "Region": RegionManifest,
     "Location": LocationManifest,
     "Adventure": AdventureManifest,
@@ -39,6 +41,7 @@ __all__ = [
     "MANIFEST_REGISTRY",
     "AdventureManifest",
     "ArchetypeManifest",
+    "CombatSystemManifest",
     "BuffManifest",
     "CharacterConfigManifest",
     "CustomConditionManifest",

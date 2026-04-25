@@ -91,14 +91,15 @@ Use narrative steps to set scenes, deliver story beats, and describe the outcome
 
 ### Combat
 
-Turn-based combat against an [enemy](./enemies.md). The player and enemy trade attacks each round until one dies or the player flees. Attach branching outcomes for each resolution.
+Turn-based combat against an [enemy](./enemies.md). The engine runs the assigned [CombatSystem](./combat-systems.md) for the encounter. Attach branching outcomes for each resolution.
 
 ```yaml
 - type: combat
   enemy: town-rat # must match an Enemy manifest's metadata.name
   on_win:
     effects:
-      - type: xp_grant
+      - type: stat_change
+        stat: xp
         amount: 25
     steps:
       - type: narrative
@@ -120,6 +121,22 @@ Turn-based combat against an [enemy](./enemies.md). The player and enemy trade a
 - `goto` — jump to a labeled step elsewhere in the adventure
 
 `effects` and `steps`/`goto` are independent: you can have both. Effects fire first, then steps run (or the jump happens).
+
+#### Overriding the Combat System
+
+By default, a combat step uses whatever CombatSystem is assigned to the enemy's region. You can override this per-step:
+
+```yaml
+- type: combat
+  enemy: corrupted-guardian
+  combat_system: boss-combat # use a specific CombatSystem manifest for this fight
+  on_win:
+    steps:
+      - type: narrative
+        text: "The guardian's corruption fades."
+```
+
+The `combat_system` field must match a loaded `CombatSystem` manifest's `metadata.name`.
 
 ### Choice
 

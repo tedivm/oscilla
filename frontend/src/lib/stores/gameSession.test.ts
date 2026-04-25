@@ -43,6 +43,7 @@ describe("applyEvent", () => {
     pendingEvent: null,
     completeEvent: null,
     overworldState: null,
+    lastRegionId: null,
     error: null,
   });
 

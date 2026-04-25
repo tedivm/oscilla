@@ -1,0 +1,31 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: test-combat
+spec:
+  displayName: "Initiative Combat Test"
+  description: "A combat adventure for testing the initiative turn_order CombatSystem."
+  steps:
+    - type: combat
+      enemy: test-enemy
+      on_win:
+        effects:
+          - type: end_adventure
+            outcome: completed
+        steps:
+          - type: narrative
+            text: "You defeated the enemy!"
+      on_defeat:
+        effects:
+          - type: end_adventure
+            outcome: defeated
+        steps:
+          - type: narrative
+            text: "You were defeated."
+      on_flee:
+        effects:
+          - type: end_adventure
+            outcome: fled
+        steps:
+          - type: narrative
+            text: "You fled the battle."

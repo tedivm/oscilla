@@ -247,9 +247,13 @@ def _resolve_loot_groups(
     results: List[tuple[str, int]] = []
 
     for group in groups:
-        if group.requires is not None and not evaluate(group.requires, player, registry):
+        if group.requires is not None and not evaluate(condition=group.requires, player=player, registry=registry):
             continue
-        pool = [e for e in group.entries if e.requires is None or evaluate(e.requires, player, registry)]
+        pool = [
+            e
+            for e in group.entries
+            if e.requires is None or evaluate(condition=e.requires, player=player, registry=registry)
+        ]
         if not pool:
             continue
 
@@ -297,15 +301,29 @@ async def run_effect(
     """
     # Resolve any template strings in numeric fields before dispatch.
     if registry.template_engine is not None:
-        from oscilla.engine.templates import ExpressionContext, GameContext, PlayerContext
+        from oscilla.engine.templates import CombatContextView, ExpressionContext, GameContext, PlayerContext
 
         if ctx is None:
             game_spec = registry.game.spec if registry.game is not None else None
             hemisphere = game_spec.season_hemisphere if game_spec is not None else "northern"
             timezone = game_spec.timezone if game_spec is not None else None
+            # When a CombatContext is provided, build a CombatContextView so that
+            # templates in skill use_effects can reference enemy_stats and combat_stats.
+            combat_view: CombatContextView | None = None
+            if combat is not None:
+                enemy_ref = getattr(combat, "enemy_ref", "")
+                enemy_manifest = registry.enemies.get(enemy_ref)
+                enemy_name = enemy_manifest.spec.displayName if enemy_manifest is not None else enemy_ref
+                combat_view = CombatContextView(
+                    enemy_stats=dict(combat.enemy_stats),
+                    enemy_name=enemy_name,
+                    turn=combat.turn_number,
+                    combat_stats=dict(combat.combat_stats),
+                )
             ctx = ExpressionContext(
                 player=PlayerContext.from_character(player),
                 game=GameContext(season_hemisphere=hemisphere, timezone=timezone),
+                combat=combat_view,
             )
         engine = registry.template_engine
 
@@ -404,8 +422,8 @@ async def run_effect(
                     # Enemy max_hp is not tracked; log warning and skip.
                     logger.warning("heal target='enemy' with amount='full' is not supported — skipping.")
                     return
-                combat.enemy_hp = max(0, combat.enemy_hp + int(amount))
-                await tui.show_text(f"Enemy healed for {amount}. (Enemy HP: {combat.enemy_hp})")
+                combat.enemy_stats["hp"] = max(0, combat.enemy_stats["hp"] + int(amount))
+                await tui.show_text(f"Enemy healed for {amount}. (Enemy HP: {combat.enemy_stats['hp']})")
                 return
             # — player target — hp and max_hp are declared stats, not CharacterState fields.
             hp_val = player.stats.get("hp")
@@ -436,11 +454,20 @@ async def run_effect(
                 if combat is None:
                     logger.warning("stat_change with target='enemy' called outside combat — skipping effect.")
                     return
-                combat.enemy_hp += amount
-                # Enemy HP floor is 0.
-                combat.enemy_hp = max(0, combat.enemy_hp)
+                if stat not in combat.enemy_stats:
+                    logger.warning("stat_change target='enemy': stat %r not in enemy_stats — skipping.", stat)
+                    return
+                old_enemy_val = combat.enemy_stats[stat]
+                combat.enemy_stats[stat] = max(0, old_enemy_val + amount)
                 action = "damaged" if amount < 0 else "healed"
-                await tui.show_text(f"Enemy {action} for {abs(amount)}. (Enemy HP: {combat.enemy_hp})")
+                await tui.show_text(f"Enemy {action} for {abs(amount)}. (Enemy {stat}: {combat.enemy_stats[stat]})")
+                return
+            if target == "combat":
+                if combat is None:
+                    logger.warning("stat_change with target='combat' called outside combat — skipping effect.")
+                    return
+                current = combat.combat_stats.get(stat, 0)
+                combat.combat_stats[stat] = current + amount
                 return
             # — player target (original logic) —
             if stat not in player.stats:
@@ -485,7 +512,13 @@ async def run_effect(
             for name in displaced:
                 await tui.show_text(f"[yellow]⚠ {name} unequipped: requirements no longer met.[/yellow]")
 
-        case StatSetEffect(stat=stat, value=value):
+        case StatSetEffect(stat=stat, value=value, target=target):
+            if target == "combat":
+                if combat is None:
+                    logger.warning("stat_set with target='combat' called outside combat — skipping effect.")
+                    return
+                combat.combat_stats[stat] = value if isinstance(value, int) else 0
+                return
             if stat not in player.stats:
                 await tui.show_text(f"[red]Error: stat {stat!r} not found[/red]")
                 return

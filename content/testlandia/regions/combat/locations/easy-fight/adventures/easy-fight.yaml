@@ -11,12 +11,18 @@ spec:
       on_win:
         steps:
           - type: narrative
-            text: "Glass dummy defeated easily."
+            text:
+              "[bold]Victory![/bold] You defeated the Glass Dummy without breaking a
+              sweat. Combat complete."
       on_defeat:
         steps:
           - type: narrative
-            text: "Unexpected defeat."
+            text:
+              "[bold]Defeat![/bold] The Glass Dummy somehow bested you. This was
+              unexpected — the dummy has only 1 HP. Something may be wrong."
       on_flee:
         steps:
           - type: narrative
-            text: "Fled from combat."
+            text:
+              "[bold]Fled![/bold] You fled from the Glass Dummy. Combat ended without a
+              result."

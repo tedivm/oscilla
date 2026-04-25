@@ -33,7 +33,6 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | Item                                                                                            | Effort | Group                      |
 | ----------------------------------------------------------------------------------------------- | ------ | -------------------------- |
 | [Decision Tree AI for Enemies](#decision-tree-ai-for-enemies)                                   | L      | Combat Overhaul            |
-| [Combat System Refactor](#combat-system-revisit--refactor-for-custom-combat-systems)            | XL     | Combat Overhaul            |
 | [Talent Trees / Passive Upgrades](#talent-trees--passive-upgrades)                              | M      | Character Progression      |
 | [Extended Template Primitives](#extended-template-primitives)                                   | S      | Engine Architecture        |
 | [Template Expressions in Condition Comparators](#template-expressions-in-condition-comparators) | M      | Engine Architecture        |
@@ -63,6 +62,7 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [UI Color Themes](#ui-color-themes)                                                             | M      | Web Frontend Customization |
 | [In-Game Time Display in Web UI](#in-game-time-display-in-web-ui)                               | S      | Web Frontend Customization |
 | [Character Stat UI Customization](#character-stat-ui-customization)                             | M      | Web Frontend Customization |
+| [Stat Display Type](#stat-display-type)                                                         | S      | Web Frontend Customization |
 
 ---
 
@@ -118,32 +118,6 @@ Example use cases:
 - A cowardly enemy attempts to flee if outmatched
 
 This builds naturally on top of the condition evaluator — each decision node is a condition that the engine already knows how to evaluate. The AI system is purely a structured way to sequence those decisions at combat step resolution time.
-
-### Combat System Revisit / Refactor for Custom Combat Systems
-
-**Effort: XL** · **Group: Combat Overhaul**
-
-The current combat system is tightly coupled to a single resolution model. Refactor it to expose a well-defined interface that allows content packages to specify custom combat systems — for example, a tactical positioning system, a card-draw-based system, or a stamina/cooldown model — without changes to core engine code.
-
-The existing `StandardCombatSystem` also contains hardcoded assumptions that belong in content, not in the engine:
-
-- **`strength`** is hardcoded as the player's offensive stat for damage calculation
-- **`dexterity`** is hardcoded as the player's defensive stat for incoming damage mitigation
-- **`hp`** is hardcoded as the player's hit point pool
-
-These stat names are currently implicit engine contracts with no mechanism for a content author to override them. A content package that uses different stat names (e.g., `power`, `agility`, `vitality`) must still silently define `strength`, `dexterity`, and `hp` or combat will silently use fallback defaults. The refactor should expose a configuration surface so the combat system's stat bindings are declared in `game.yaml`, not baked into the engine.
-
-Goals:
-
-- Define a `CombatSystem` protocol or base class that the engine dispatches to
-- Ship the existing combat logic as the default `StandardCombatSystem` implementation
-- Allow `game.yaml` to declare an alternate combat system by name
-- Allow `game.yaml` to configure which character stats map to the standard combat roles (attack, defense, hp)
-- Ensure the TUI and pipeline layers are agnostic to the specific combat system in use
-
-This is a prerequisite for games that want combat to feel meaningfully different from the default turn-based model, and also a correctness requirement for the existing system.
-
----
 
 ## Player Progression
 
@@ -416,10 +390,11 @@ spec:
   parameters:
     - name: percent
       type: float
+      default: 33
   effects:
     - type: stat_change
       stat: hp
-      amount: "{{ min(player.stats['max_hp'] - player.stats['hp'], floor(player.stats['max_hp'] * params.percent)) }}"
+      amount: "{{ min(player.stats['max_hp'] - player.stats['hp'], floor(player.stats['max_hp'] * (params.percent/100))) }}"
 ```
 
 Reference at a call site:
@@ -427,9 +402,9 @@ Reference at a call site:
 ```yaml
 effects:
   - type: custom
-    ref: heal_percentage
+    name: heal_percentage
     params:
-      percent: 0.33
+      percent: 50
 ```
 
 Load-time validation catches dangling refs, circular compositions, unknown parameters, and type mismatches. Custom effects can compose other custom effects. The primary motivation is eliminating repeated boilerplate for parameterized patterns — such as percentage heals, scaled stat changes, or multi-step reward sequences — that otherwise must be hand-rolled with identical template expressions everywhere they appear.
@@ -674,6 +649,48 @@ Goals:
 - Support optional icon or label theming per stat group to visually differentiate resource pools, progression values, and attribute scores
 - Customization preferences (collapsed groups, ordering) persist to local storage per game and character
 - The system must be generic: it works for whatever stats a content package defines, using only author-declared display metadata, and makes no assumptions about what stats mean
+
+### Stat Display Type
+
+**Effort: S** · **Group: Web Frontend Customization**
+
+Adds an optional `display_type` field to stat declarations in `character_config.yaml`, enemy specs, and combat stat entries. The field is a hint to any display layer (web UI, TUI, HUD) about how to render the stat — as a numeric value, a bar, a segmented clock, a badge, or hidden entirely.
+
+```yaml
+# character_config.yaml example
+stats:
+  - name: hp
+    type: int
+    default: 100
+    display_type: bar # render as a filled/empty bar (requires a paired max stat)
+    display_max: max_hp # name of the stat that represents the maximum
+  - name: sanity
+    type: int
+    default: 10
+    display_type: clock # render as a segmented clock (Ironsworn-style progress tracker)
+    display_max: 10 # fixed maximum for clock segment count
+  - name: internal_flag
+    type: int
+    default: 0
+    display_type: hidden # never shown to the player
+```
+
+Allowed `display_type` values:
+
+| Value     | Meaning                                                                       |
+| --------- | ----------------------------------------------------------------------------- |
+| `numeric` | Default. Show the raw integer value.                                          |
+| `bar`     | Filled/empty progress bar. Requires `display_max` (stat name or literal int). |
+| `clock`   | Segmented clock (N filled / M total segments). Requires `display_max`.        |
+| `badge`   | A small labeled chip — useful for binary or low-range values.                 |
+| `hidden`  | Not shown to the player at all.                                               |
+
+The field is a display-only hint. The engine stores and manipulates the stat as a plain integer regardless of `display_type`; no behavior changes. Display layers that do not yet support a given type fall back to `numeric`. This applies uniformly to:
+
+- Stats in `character_config.yaml`
+- `DamageFormulaEntry.display` companion field — adds `display_type` alongside the existing `display` label
+- `CombatStatEntry` — lets combat-internal trackers (lives, clocks, escalation dice) render meaningfully in the combat HUD
+- Enemy stat entries — allows enemy health pools to be shown as bars or clocks in the enemy HUD
 
 ---
 

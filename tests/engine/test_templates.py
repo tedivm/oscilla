@@ -209,14 +209,14 @@ def test_invalid_stat_name_raises_validation_error() -> None:
 def test_combat_context_unavailable_in_adventure_context() -> None:
     engine = _make_engine()
     with pytest.raises(TemplateValidationError):
-        engine.precompile_and_validate("{{ combat.enemy_hp }}", "test-combat-in-adventure", "adventure")
+        engine.precompile_and_validate("{{ combat.enemy_stats }}", "test-combat-in-adventure", "adventure")
 
 
 def test_combat_context_available_in_combat_context() -> None:
     engine = _make_engine()
     # Should NOT raise — combat context is available in "combat" context type.
-    engine.precompile_and_validate("{{ combat.enemy_hp }}", "test-combat-in-combat", "combat")
-    combat_view = CombatContextView(enemy_hp=30, enemy_name="Goblin", turn=1)
+    engine.precompile_and_validate("{{ combat.enemy_stats.get('hp', 0) }}", "test-combat-in-combat", "combat")
+    combat_view = CombatContextView(enemy_stats={"hp": 30}, enemy_name="Goblin", turn=1)
     ctx = ExpressionContext(player=_make_player(), combat=combat_view)
     result = engine.render("test-combat-in-combat", ctx)
     assert result == "30"

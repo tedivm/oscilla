@@ -264,7 +264,7 @@ class AdventurePipeline:
 
         # Skip the step entirely when its requires condition is not met.
         requires = getattr(step, "requires", None)
-        if requires is not None and not evaluate(requires, self._player, self._registry):
+        if requires is not None and not evaluate(condition=requires, player=self._player, registry=self._registry):
             return AdventureOutcome.COMPLETED
 
         from oscilla.engine.steps.choice import run_choice

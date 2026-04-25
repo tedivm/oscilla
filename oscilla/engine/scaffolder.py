@@ -98,10 +98,6 @@ def scaffold_enemy(
     game_name: str,
     name: str,
     display_name: str,
-    hp: int = 30,
-    attack: int = 5,
-    defense: int = 2,
-    xp_reward: int = 20,
     description: str = "",
 ) -> Path:
     data: Dict = {
@@ -111,10 +107,14 @@ def scaffold_enemy(
         "spec": {
             "displayName": display_name,
             "description": description,
-            "hp": hp,
-            "attack": attack,
-            "defense": defense,
-            "xp_reward": xp_reward,
+            # Define stat values used by your game's CombatSystem manifest.
+            # Common stat names: hp, attack, defense. See docs/authors/combat-systems.md.
+            "stats": {
+                "hp": 30,
+                "attack": 5,
+                "defense": 2,
+            },
+            "on_defeat_effects": [],
             "loot": [],
         },
     }

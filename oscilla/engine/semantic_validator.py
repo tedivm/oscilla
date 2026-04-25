@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, List, Set, Tuple
 
 if TYPE_CHECKING:
+    from oscilla.engine.models.base import Condition
     from oscilla.engine.registry import ContentRegistry
 
 
@@ -42,6 +43,16 @@ def validate_semantic(registry: "ContentRegistry") -> List[SemanticIssue]:
     issues.extend(_check_unreachable_adventures(registry))
     issues.extend(_validate_time_spec(registry))
     issues.extend(_check_missing_descriptions(registry))
+    issues.extend(_check_heal_enemy_deprecation(registry))
+    issues.extend(_check_combat_system_required(registry))
+    issues.extend(_check_player_turn_mode_conflict(registry))
+    issues.extend(_check_initiative_formula_requirements(registry))
+    issues.extend(_check_enemy_stat_coverage(registry))
+    issues.extend(_check_combat_stat_condition_refs(registry))
+    issues.extend(_check_system_skill_refs(registry))
+    issues.extend(_check_target_stat_null_validity(registry))
+    issues.extend(_check_formula_mock_render(registry))
+    issues.extend(_check_dynamic_stat_change_value(registry))
     return issues
 
 
@@ -540,4 +551,363 @@ def _check_missing_descriptions(registry: "ContentRegistry") -> List[SemanticIss
                         severity="warning",
                     )
                 )
+    return issues
+
+
+def _check_heal_enemy_deprecation(registry: "ContentRegistry") -> List[SemanticIssue]:
+    """Warn when any adventure step uses ``heal target='enemy'``.
+
+    Direct enemy healing via the HealEffect is deprecated. Authors should
+    instead use ``stat_change target='enemy'`` with a positive amount on the
+    appropriate enemy stat (typically ``hp``).
+    """
+    from oscilla.engine.graph import _walk_all_effects
+    from oscilla.engine.models.adventure import HealEffect
+
+    issues: List[SemanticIssue] = []
+    for adv in registry.adventures.all():
+        for effect in _walk_all_effects(adv.spec.steps):
+            if isinstance(effect, HealEffect) and effect.target == "enemy":
+                issues.append(
+                    SemanticIssue(
+                        kind="deprecated_heal_enemy",
+                        message=(
+                            "heal with target='enemy' is deprecated; use "
+                            "stat_change target='enemy' with a positive amount instead."
+                        ),
+                        manifest=f"Adventure:{adv.metadata.name}",
+                        severity="warning",
+                    )
+                )
+    return issues
+
+
+def _check_combat_system_required(registry: "ContentRegistry") -> List[SemanticIssue]:
+    """Error if any adventure contains a CombatStep but no CombatSystem is resolvable."""
+    from oscilla.engine.graph import _walk_all_steps
+    from oscilla.engine.models.adventure import CombatStep
+
+    issues: List[SemanticIssue] = []
+    for adv in registry.adventures.all():
+        for step in _walk_all_steps(adv.spec.steps):
+            if isinstance(step, CombatStep):
+                resolved = registry.resolve_combat_system(step.combat_system)
+                if resolved is None:
+                    issues.append(
+                        SemanticIssue(
+                            kind="no_combat_system",
+                            message=(
+                                f"Combat step targeting enemy {step.enemy!r} has no resolvable "
+                                "CombatSystem. Define default_combat_system in game.yaml or "
+                                "register exactly one CombatSystem manifest."
+                            ),
+                            manifest=f"adventure:{adv.metadata.name}",
+                        )
+                    )
+    return issues
+
+
+def _check_player_turn_mode_conflict(registry: "ContentRegistry") -> List[SemanticIssue]:
+    """Error if a CombatSystem uses choice mode but also defines player_damage_formulas."""
+    issues: List[SemanticIssue] = []
+    for cs in registry.combat_systems.all():
+        if cs.spec.player_turn_mode == "choice" and cs.spec.player_damage_formulas:
+            issues.append(
+                SemanticIssue(
+                    kind="choice_mode_with_damage_formulas",
+                    message=(
+                        "player_turn_mode is 'choice' but player_damage_formulas is non-empty. "
+                        "In choice mode, player_damage_formulas are ignored — move them to skill "
+                        "manifests or remove them."
+                    ),
+                    manifest=f"CombatSystem:{cs.metadata.name}",
+                )
+            )
+    return issues
+
+
+def _check_initiative_formula_requirements(registry: "ContentRegistry") -> List[SemanticIssue]:
+    """Error if initiative mode is missing formulas; warn if formulas present without initiative."""
+    issues: List[SemanticIssue] = []
+    for cs in registry.combat_systems.all():
+        spec = cs.spec
+        name = f"CombatSystem:{cs.metadata.name}"
+        if spec.turn_order == "initiative":
+            if spec.player_initiative_formula is None:
+                issues.append(
+                    SemanticIssue(
+                        kind="initiative_formula_missing",
+                        message="turn_order is 'initiative' but player_initiative_formula is not set.",
+                        manifest=name,
+                    )
+                )
+            if spec.enemy_initiative_formula is None:
+                issues.append(
+                    SemanticIssue(
+                        kind="initiative_formula_missing",
+                        message="turn_order is 'initiative' but enemy_initiative_formula is not set.",
+                        manifest=name,
+                    )
+                )
+        else:
+            if spec.player_initiative_formula is not None or spec.enemy_initiative_formula is not None:
+                issues.append(
+                    SemanticIssue(
+                        kind="initiative_formula_unused",
+                        message=(
+                            "Initiative formulas are defined but turn_order is not 'initiative' — "
+                            "the formulas will never be used."
+                        ),
+                        manifest=name,
+                        severity="warning",
+                    )
+                )
+    return issues
+
+
+def _check_enemy_stat_coverage(registry: "ContentRegistry") -> List[SemanticIssue]:
+    """Error when an enemy is missing a stat key required by the applicable CombatSystem."""
+    from oscilla.engine.graph import _walk_all_steps
+    from oscilla.engine.models.adventure import CombatStep
+
+    issues: List[SemanticIssue] = []
+    # Track (enemy_name, combat_system_name) pairs already checked to avoid duplicates.
+    checked: Set[Tuple[str, str]] = set()
+    for adv in registry.adventures.all():
+        for step in _walk_all_steps(adv.spec.steps):
+            if not isinstance(step, CombatStep):
+                continue
+            cs = registry.resolve_combat_system(step.combat_system)
+            if cs is None:
+                continue  # already caught by _check_combat_system_required
+            enemy = registry.enemies.get(step.enemy)
+            if enemy is None:
+                continue  # already caught by _check_undefined_enemy_refs
+            key = (step.enemy, cs.metadata.name)
+            if key in checked:
+                continue
+            checked.add(key)
+            required_stats = {
+                e.target_stat
+                for e in cs.spec.player_damage_formulas + cs.spec.enemy_damage_formulas
+                if e.target_stat is not None and (e.target is None or e.target == "enemy")
+            }
+            missing = required_stats - set(enemy.spec.stats.keys())
+            for stat in sorted(missing):
+                issues.append(
+                    SemanticIssue(
+                        kind="enemy_stat_missing",
+                        message=(
+                            f"Enemy {step.enemy!r} is missing stat {stat!r} required by "
+                            f"CombatSystem {cs.metadata.name!r}."
+                        ),
+                        manifest=f"Enemy:{step.enemy}",
+                    )
+                )
+    return issues
+
+
+def _walk_condition_tree(condition: "Condition") -> "List[Condition]":
+    """Flatten a nested condition tree into a list including the root and all descendants."""
+    from oscilla.engine.models.base import AllCondition, AnyCondition, NotCondition
+
+    result: List = [condition]
+    if isinstance(condition, (AllCondition, AnyCondition)):
+        for sub in condition.conditions:
+            result.extend(_walk_condition_tree(sub))
+    elif isinstance(condition, NotCondition):
+        result.extend(_walk_condition_tree(condition.condition))
+    return result
+
+
+def _check_combat_stat_condition_refs(registry: "ContentRegistry") -> List[SemanticIssue]:
+    """Verify stat references in defeat conditions match declared combat_stats entries."""
+    from oscilla.engine.models.base import CombatStatCondition, EnemyStatCondition
+
+    issues: List[SemanticIssue] = []
+    for cs in registry.combat_systems.all():
+        name = f"CombatSystem:{cs.metadata.name}"
+        declared_combat_stats = {e.name for e in cs.spec.combat_stats}
+        for cond_field, cond in [
+            ("player_defeat_condition", cs.spec.player_defeat_condition),
+            ("enemy_defeat_condition", cs.spec.enemy_defeat_condition),
+        ]:
+            for leaf in _walk_condition_tree(cond):
+                if isinstance(leaf, CombatStatCondition):
+                    if leaf.stat not in declared_combat_stats:
+                        issues.append(
+                            SemanticIssue(
+                                kind="undeclared_combat_stat",
+                                message=(
+                                    f"{cond_field} references combat stat {leaf.stat!r} which is "
+                                    "not declared in the combat_stats list."
+                                ),
+                                manifest=name,
+                            )
+                        )
+                elif isinstance(leaf, EnemyStatCondition):
+                    # EnemyStatCondition keys are dynamic (per enemy manifest) — warn only.
+                    issues.append(
+                        SemanticIssue(
+                            kind="enemy_stat_condition_unverifiable",
+                            message=(
+                                f"{cond_field} uses enemy_stat condition on {leaf.stat!r}. "
+                                "Verify this stat is populated in all relevant enemy manifests."
+                            ),
+                            manifest=name,
+                            severity="warning",
+                        )
+                    )
+    return issues
+
+
+def _check_system_skill_refs(registry: "ContentRegistry") -> List[SemanticIssue]:
+    """Error when a SystemSkillEntry references a skill not present in the registry."""
+    issues: List[SemanticIssue] = []
+    for cs in registry.combat_systems.all():
+        for entry in cs.spec.system_skills:
+            if registry.skills.get(entry.skill) is None:
+                issues.append(
+                    SemanticIssue(
+                        kind="undefined_ref",
+                        message=f"system_skills references unknown skill {entry.skill!r}",
+                        manifest=f"CombatSystem:{cs.metadata.name}",
+                    )
+                )
+    return issues
+
+
+def _check_target_stat_null_validity(registry: "ContentRegistry") -> List[SemanticIssue]:
+    """Error if a DamageFormulaEntry has target_stat=None and empty threshold_effects.
+
+    Such an entry has no effect and is almost certainly a content authoring mistake.
+    """
+    issues: List[SemanticIssue] = []
+    for cs in registry.combat_systems.all():
+        name = f"CombatSystem:{cs.metadata.name}"
+        spec = cs.spec
+        all_entries = spec.player_damage_formulas + spec.enemy_damage_formulas + spec.resolution_formulas
+        for entry in all_entries:
+            if entry.target_stat is None and not entry.threshold_effects:
+                issues.append(
+                    SemanticIssue(
+                        kind="no_op_formula",
+                        message=(
+                            f"DamageFormulaEntry has target_stat=null and no threshold_effects "
+                            f"— the formula {entry.formula!r} will have no effect"
+                        ),
+                        manifest=name,
+                    )
+                )
+    return issues
+
+
+def _check_formula_mock_render(registry: "ContentRegistry") -> List[SemanticIssue]:
+    """Error if any CombatSystem formula fails Jinja2 syntax validation at load time."""
+    from oscilla.engine.templates import CombatFormulaContext, FormulaRenderError, render_formula
+
+    issues: List[SemanticIssue] = []
+    zero_ctx = CombatFormulaContext(
+        player={},
+        enemy_stats={},
+        combat_stats={},
+        turn_number=0,
+    )
+    for cs in registry.combat_systems.all():
+        name = f"CombatSystem:{cs.metadata.name}"
+        spec = cs.spec
+        formula_entries: List[Tuple[str, str]] = []
+        for entry in spec.player_damage_formulas + spec.enemy_damage_formulas + spec.resolution_formulas:
+            label = f"formula targeting {entry.target_stat or '(threshold-only)'}"
+            formula_entries.append((label, entry.formula))
+        if spec.player_initiative_formula:
+            formula_entries.append(("player_initiative_formula", spec.player_initiative_formula))
+        if spec.enemy_initiative_formula:
+            formula_entries.append(("enemy_initiative_formula", spec.enemy_initiative_formula))
+        for label, formula in formula_entries:
+            try:
+                render_formula(formula=formula, ctx=zero_ctx)
+            except FormulaRenderError as exc:
+                issues.append(
+                    SemanticIssue(
+                        kind="formula_render_error",
+                        message=f"{label}: formula failed to render — {exc}",
+                        manifest=name,
+                    )
+                )
+            except Exception as exc:
+                issues.append(
+                    SemanticIssue(
+                        kind="formula_render_error",
+                        message=f"{label}: unexpected error during formula render — {exc}",
+                        manifest=name,
+                    )
+                )
+    return issues
+
+
+def _check_dynamic_stat_change_value(registry: "ContentRegistry") -> List[SemanticIssue]:
+    """Validate string amounts in stat_change effects inside threshold_effects bands.
+
+    String amounts in threshold_effects are rendered via render_formula — these are
+    validated by mock-rendering with a zeroed CombatFormulaContext.
+
+    String amounts in CombatSystem lifecycle hooks (on_combat_start, on_round_end, etc.)
+    are not supported and produce a hard error.
+    """
+    from oscilla.engine.models.adventure import StatChangeEffect
+    from oscilla.engine.templates import CombatFormulaContext, FormulaRenderError, render_formula
+
+    issues: List[SemanticIssue] = []
+    zero_ctx = CombatFormulaContext(
+        player={},
+        enemy_stats={},
+        combat_stats={},
+        turn_number=0,
+    )
+    for cs in registry.combat_systems.all():
+        name = f"CombatSystem:{cs.metadata.name}"
+        spec = cs.spec
+
+        # Validate formula-style amounts in threshold_effects bands.
+        for entry in spec.player_damage_formulas + spec.enemy_damage_formulas + spec.resolution_formulas:
+            for band in entry.threshold_effects:
+                for effect in band.effects:
+                    if isinstance(effect, StatChangeEffect) and isinstance(effect.amount, str):
+                        try:
+                            render_formula(formula=effect.amount, ctx=zero_ctx)
+                        except (FormulaRenderError, Exception) as exc:
+                            issues.append(
+                                SemanticIssue(
+                                    kind="dynamic_stat_change_invalid",
+                                    message=(
+                                        f"threshold_effects stat_change has invalid formula "
+                                        f"amount {effect.amount!r}: {exc}"
+                                    ),
+                                    manifest=name,
+                                )
+                            )
+
+        # String amounts in lifecycle hooks are not yet supported — emit hard error.
+        lifecycle_hooks: List[Tuple[str, List]] = [
+            ("on_combat_start", spec.on_combat_start),
+            ("on_combat_end", spec.on_combat_end),
+            ("on_combat_victory", spec.on_combat_victory),
+            ("on_combat_defeat", spec.on_combat_defeat),
+            ("on_round_end", spec.on_round_end),
+        ]
+        for hook_name, hook_effects in lifecycle_hooks:
+            for effect in hook_effects:
+                if isinstance(effect, StatChangeEffect) and isinstance(effect.amount, str):
+                    issues.append(
+                        SemanticIssue(
+                            kind="dynamic_stat_change_unsupported",
+                            message=(
+                                f"{hook_name} stat_change has string amount {effect.amount!r} — "
+                                "dynamic amounts in CombatSystem lifecycle hooks are not supported. "
+                                "Use an integer amount instead."
+                            ),
+                            manifest=name,
+                        )
+                    )
     return issues

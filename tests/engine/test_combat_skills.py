@@ -13,8 +13,15 @@ from uuid import uuid4
 import pytest
 
 from oscilla.engine.character import AdventurePosition, CharacterState, ItemInstance
-from oscilla.engine.models.adventure import ApplyBuffEffect, CombatStep, Cooldown, DispelEffect, OutcomeBranch
-from oscilla.engine.models.base import Metadata
+from oscilla.engine.models.adventure import (
+    ApplyBuffEffect,
+    CombatStep,
+    Cooldown,
+    DispelEffect,
+    OutcomeBranch,
+    StatChangeEffect,
+)
+from oscilla.engine.models.base import CharacterStatCondition, EnemyStatCondition, Metadata
 from oscilla.engine.models.buff import (
     BuffDuration,
     BuffManifest,
@@ -25,6 +32,12 @@ from oscilla.engine.models.buff import (
     StoredBuff,
 )
 from oscilla.engine.models.character_config import CharacterConfigManifest, CharacterConfigSpec, StatDefinition
+from oscilla.engine.models.combat_system import (
+    CombatSystemManifest,
+    CombatSystemSpec,
+    DamageFormulaEntry,
+    SystemSkillEntry,
+)
 from oscilla.engine.models.enemy import EnemyManifest, EnemySkillEntry, EnemySpec
 from oscilla.engine.models.game import GameManifest, GameSpec
 from oscilla.engine.models.item import BuffGrant, ItemManifest, ItemSpec
@@ -73,16 +86,48 @@ def _make_game_registry(enemy_attack: int = 3, enemy_hp: int = 5, enemy_defense:
     )
     registry.character_config = char_config
 
+    # Basic attack skill that deals 10 damage — maps to option 1 in choice-mode menu.
+    basic_attack = SkillManifest(
+        apiVersion="oscilla/v1",
+        kind="Skill",
+        metadata=Metadata(name="basic-attack"),
+        spec=SkillSpec(
+            displayName="Attack",
+            contexts=["combat"],
+            use_effects=[StatChangeEffect(type="stat_change", target="enemy", stat="hp", amount=-10)],
+        ),
+    )
+    registry.skills.register(basic_attack)
+
+    # Single CombatSystem auto-promoted by resolve_combat_system when step.combat_system is None.
+    combat_system = CombatSystemManifest(
+        apiVersion="oscilla/v1",
+        kind="CombatSystem",
+        metadata=Metadata(name="standard-combat"),
+        spec=CombatSystemSpec(
+            player_turn_mode="choice",
+            turn_order="player_first",
+            system_skills=[SystemSkillEntry(skill="basic-attack")],
+            player_defeat_condition=CharacterStatCondition(type="character_stat", name="hp", lte=0),
+            enemy_defeat_condition=EnemyStatCondition(type="enemy_stat", stat="hp", lte=0),
+            enemy_damage_formulas=[
+                DamageFormulaEntry(
+                    formula="{{ enemy_stats.get('attack', 0) * -1 }}",
+                    target="player",
+                    target_stat="hp",
+                )
+            ],
+        ),
+    )
+    registry.combat_systems.register(combat_system)
+
     enemy = EnemyManifest(
         apiVersion="oscilla/v1",
         kind="Enemy",
         metadata=Metadata(name="test-enemy"),
         spec=EnemySpec(
             displayName="Test Enemy",
-            hp=enemy_hp,
-            attack=enemy_attack,
-            defense=enemy_defense,
-            xp_reward=10,
+            stats={"hp": enemy_hp, "attack": enemy_attack, "defense": enemy_defense},
         ),
     )
     registry.enemies.register(enemy)
@@ -368,10 +413,7 @@ async def test_enemy_skill_fires_on_scheduled_turn() -> None:
         metadata=Metadata(name="skill-enemy"),
         spec=EnemySpec(
             displayName="Skill Enemy",
-            hp=100,
-            attack=1,
-            defense=0,
-            xp_reward=10,
+            stats={"hp": 100, "attack": 1, "defense": 0},
             skills=[EnemySkillEntry(skill_ref="enemy-poison", use_every_n_turns=2)],
         ),
     )
@@ -423,7 +465,7 @@ async def test_apply_buff_label_matches_manifest_name() -> None:
     )
 
     player = _make_player_with_mana(registry)
-    ctx = CombatContext(enemy_hp=10, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 10}, enemy_ref="test-enemy")
     tui = MockTUI()
 
     effect = ApplyBuffEffect(type="apply_buff", buff_ref="my-named-buff", target="player", variables={})
@@ -448,7 +490,7 @@ async def test_dispel_removes_active_buff_by_label() -> None:
     registry = _make_game_registry()
     player = _make_player_with_mana(registry)
 
-    ctx = CombatContext(enemy_hp=20, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 20}, enemy_ref="test-enemy")
     # Manually insert a dummy active effect.
     ctx.active_effects = [
         ActiveCombatEffect(
@@ -618,7 +660,7 @@ async def test_grants_buffs_equipped_with_variable_override() -> None:
     player.equipment["weapon"] = instance.instance_id
 
     # Manually simulate one combat-entry buff application.
-    ctx = CombatContext(enemy_hp=30, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 30}, enemy_ref="test-enemy")
     tui = MockTUI()
 
     effect = ApplyBuffEffect(
@@ -656,7 +698,7 @@ async def test_apply_buff_with_variables_override_during_combat() -> None:
     )
 
     player = _make_player_with_mana(registry, hp=100)
-    ctx = CombatContext(enemy_hp=30, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 30}, enemy_ref="test-enemy")
     tui = MockTUI()
 
     effect = ApplyBuffEffect(
@@ -717,7 +759,7 @@ async def test_exclusion_block_mode_stronger_blocks_weaker() -> None:
     _add_buff_with_exclusion(registry, "buff-low", duration_turns=3, exclusion_group="def-group", priority=30)
 
     player = _make_player_with_mana(registry)
-    ctx = CombatContext(enemy_hp=10, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 10}, enemy_ref="test-enemy")
     tui = MockTUI()
 
     # Apply the stronger buff first.
@@ -753,7 +795,7 @@ async def test_exclusion_block_mode_equal_priority_blocks() -> None:
     _add_buff_with_exclusion(registry, "buff-b", duration_turns=3, exclusion_group="def-group", priority=50)
 
     player = _make_player_with_mana(registry)
-    ctx = CombatContext(enemy_hp=10, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 10}, enemy_ref="test-enemy")
     tui = MockTUI()
 
     await run_effect(
@@ -786,7 +828,7 @@ async def test_exclusion_block_mode_no_group_never_blocked() -> None:
     _add_buff_with_exclusion(registry, "buff-no-group-b", duration_turns=3, exclusion_group=None, priority=0)
 
     player = _make_player_with_mana(registry)
-    ctx = CombatContext(enemy_hp=10, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 10}, enemy_ref="test-enemy")
     tui = MockTUI()
 
     await run_effect(
@@ -818,7 +860,7 @@ async def test_exclusion_block_mode_per_target_isolation() -> None:
     _add_buff_with_exclusion(registry, "shared-buff", duration_turns=3, exclusion_group="shared-group", priority=50)
 
     player = _make_player_with_mana(registry)
-    ctx = CombatContext(enemy_hp=10, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 10}, enemy_ref="test-enemy")
     tui = MockTUI()
 
     await run_effect(
@@ -854,7 +896,7 @@ async def test_exclusion_replace_mode_stronger_evicts_weaker() -> None:
     )
 
     player = _make_player_with_mana(registry)
-    ctx = CombatContext(enemy_hp=10, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 10}, enemy_ref="test-enemy")
     tui = MockTUI()
 
     await run_effect(
@@ -893,7 +935,7 @@ async def test_exclusion_replace_mode_weaker_does_not_apply() -> None:
     )
 
     player = _make_player_with_mana(registry)
-    ctx = CombatContext(enemy_hp=10, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 10}, enemy_ref="test-enemy")
     tui = MockTUI()
 
     await run_effect(
@@ -935,7 +977,7 @@ async def test_permanent_dispel_clears_stored_buff() -> None:
         StoredBuff(buff_ref="other-buff", remaining_turns=3, variables={}),
     ]
 
-    ctx = CombatContext(enemy_hp=20, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 20}, enemy_ref="test-enemy")
     ctx.active_effects = []  # No active in-combat effects needed for this test.
 
     tui = MockTUI()
@@ -961,7 +1003,7 @@ async def test_non_permanent_dispel_leaves_stored_buff_intact() -> None:
         StoredBuff(buff_ref="strong-shield", remaining_turns=2, variables={}),
     ]
 
-    ctx = CombatContext(enemy_hp=20, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 20}, enemy_ref="test-enemy")
     # Put a combat-scope entry so the dispel has something to remove there.
     ctx.active_effects = [
         ActiveCombatEffect(
@@ -1202,7 +1244,7 @@ async def test_variable_priority_replace_evicts_weaker() -> None:
     )
 
     player = _make_player_with_mana(registry)
-    ctx = CombatContext(enemy_hp=10, enemy_ref="test-enemy")
+    ctx = CombatContext(enemy_stats={"hp": 10}, enemy_ref="test-enemy")
     tui = MockTUI()
 
     # Apply with strength=30.

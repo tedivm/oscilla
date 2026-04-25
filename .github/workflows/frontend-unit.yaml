@@ -1,0 +1,23 @@
+name: Frontend Unit Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  frontend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+
+      - name: Install Dependencies
+        run: make frontend_install
+
+      - name: Run Vitest Unit Tests
+        run: make frontend_test

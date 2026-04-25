@@ -167,6 +167,11 @@ class GameSpec(BaseModel):
     # Optional prestige configuration. Absent = prestige is disabled.
     # Any adventure using type: prestige raises a ContentLoadError if this is None.
     prestige: PrestigeConfig | None = None
+    # Optional default combat system. When set, all CombatStep encounters that do
+    # not declare their own combat_system use this manifest name.
+    # When absent, a single registered CombatSystem is auto-promoted; if none are
+    # registered and a CombatStep exists, a load-time error is raised.
+    default_combat_system: str | None = None
 
 
 class GameManifest(ManifestEnvelope):

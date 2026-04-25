@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Dict, List, Literal, Union
+from typing import TYPE_CHECKING, Annotated, Dict, List, Literal, Union
 
 from pydantic import BaseModel, Field, model_validator
 
 from oscilla.engine.models.base import Condition, ManifestEnvelope
 from oscilla.engine.models.loot_table import LootGroup
 
-# NOTE: Dict is imported for use in ApplyBuffEffect and DispelEffect.
+if TYPE_CHECKING:
+    from oscilla.engine.models.combat_system import CombatStepOverrides
 
 
 # ---------------------------------------------------------------------------
@@ -77,19 +78,17 @@ class HealEffect(BaseModel):
 
 class StatChangeEffect(BaseModel):
     type: Literal["stat_change"]
-    stat: str = Field(description="Character stat name (player) or ignored when target is 'enemy'.")
+    stat: str = Field(description="Character stat name (player), enemy stat key (enemy), or combat stat key (combat).")
     # str = template string resolving to int.
     amount: int | str = Field(description="Amount to add/subtract; can be negative or a template string.")
-    # When target is "enemy", stat is ignored and amount is applied directly to enemy_hp.
-    target: Literal["player", "enemy"] = "player"
+    target: Literal["player", "enemy", "combat"] = "player"
 
 
 class StatSetEffect(BaseModel):
     type: Literal["stat_set"]
-    stat: str = Field(description="Character stat name")
+    stat: str = Field(description="Character stat name (player) or combat stat key (combat).")
     value: int | bool | None = Field(description="New value for stat")
-    # target "enemy" is not supported for stat_set — enemies have no named stats.
-    target: Literal["player"] = "player"
+    target: Literal["player", "combat"] = "player"
 
 
 class UseItemEffect(BaseModel):
@@ -332,6 +331,10 @@ class CombatStep(BaseModel):
     on_defeat: OutcomeBranch = Field(default_factory=OutcomeBranch)
     on_flee: OutcomeBranch = Field(default_factory=OutcomeBranch)
     requires: Condition | None = None
+    # Optional: override the game-level default combat system for this encounter.
+    combat_system: str | None = None
+    # Optional: field-level overrides merged on top of the resolved CombatSystemSpec.
+    combat_overrides: "CombatStepOverrides | None" = None
 
 
 class ChoiceOption(BaseModel):
@@ -384,7 +387,9 @@ Step = Annotated[
 
 # Rebuild all forward-referenced models
 NarrativeStep.model_rebuild()
-CombatStep.model_rebuild()
+from oscilla.engine.models.combat_system import CombatStepOverrides as _CombatStepOverrides  # noqa: E402
+
+CombatStep.model_rebuild(_types_namespace={"CombatStepOverrides": _CombatStepOverrides})
 OutcomeBranch.model_rebuild()
 ChoiceOption.model_rebuild()
 ChoiceStep.model_rebuild()

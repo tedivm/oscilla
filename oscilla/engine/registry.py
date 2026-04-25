@@ -7,6 +7,7 @@ from oscilla.engine.models.archetype import ArchetypeManifest
 from oscilla.engine.models.base import ManifestEnvelope
 from oscilla.engine.models.buff import BuffManifest
 from oscilla.engine.models.character_config import CharacterConfigManifest
+from oscilla.engine.models.combat_system import CombatSystemManifest
 from oscilla.engine.models.custom_condition import CustomConditionManifest
 from oscilla.engine.models.enemy import EnemyManifest
 from oscilla.engine.models.game import GameManifest
@@ -74,6 +75,7 @@ class ContentRegistry:
         self.buffs: KindRegistry[BuffManifest] = KindRegistry()
         self.skills: KindRegistry[SkillManifest] = KindRegistry()
         self.custom_conditions: KindRegistry[CustomConditionManifest] = KindRegistry()
+        self.combat_systems: KindRegistry[CombatSystemManifest] = KindRegistry()
         self.game: GameManifest | None = None
         self.character_config: CharacterConfigManifest | None = None
         # Holds precompiled templates; populated by loader.py after validation.
@@ -128,6 +130,8 @@ class ContentRegistry:
                     registry.buffs.register(cast(BuffManifest, m))
                 case "CustomCondition":
                     registry.custom_conditions.register(cast(CustomConditionManifest, m))
+                case "CombatSystem":
+                    registry.combat_systems.register(cast(CombatSystemManifest, m))
                 case "Game":
                     registry.game = cast(GameManifest, m)
                     # Build the in-game time resolver once the game manifest is available.
@@ -165,3 +169,27 @@ class ContentRegistry:
             return loot_table.spec.groups if loot_table.spec.groups else None
 
         return None
+
+    def resolve_combat_system(self, name: str | None) -> "CombatSystemManifest | None":
+        """Resolve a CombatSystem manifest by name with fallback logic.
+
+        Resolution order:
+        1. The explicit ``name`` argument (if provided).
+        2. The game manifest's ``default_combat_system`` field.
+        3. Auto-promote when exactly one CombatSystem is registered.
+        """
+        if name is not None:
+            return self.combat_systems.get(name)
+
+        if self.game is not None and self.game.spec.default_combat_system is not None:
+            return self.combat_systems.get(self.game.spec.default_combat_system)
+
+        all_systems = list(self.combat_systems.all())
+        if len(all_systems) == 1:
+            return all_systems[0]
+
+        return None
+
+    def get_default_combat_system(self) -> "CombatSystemManifest | None":
+        """Return the default combat system for this content package."""
+        return self.resolve_combat_system(name=None)

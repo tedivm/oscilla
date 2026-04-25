@@ -25,7 +25,7 @@ async def run_stat_check(
     lives inside the on_pass / on_fail branch steps authored by the content
     creator.
     """
-    if evaluate(step.condition, player, registry):
+    if evaluate(condition=step.condition, player=player, registry=registry):
         return await run_outcome_branch(step.on_pass)
     else:
         return await run_outcome_branch(step.on_fail)

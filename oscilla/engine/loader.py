@@ -1297,6 +1297,18 @@ def _collect_all_template_strings(
             if enemy.spec.loot:
                 _walk_loot_groups(enemy.spec.loot, f"{enemy.metadata.name}:loot", "adventure")
 
+    # Walk Skill manifests for use_effects template strings.
+    # Skill use_effects that include a combat context string are compiled with
+    # context_type "combat" so that enemy_stats and combat_stats are available.
+    # Skills without any combat context use "adventure" context.
+    for manifest in manifests:
+        if manifest.kind == "Skill":
+            skill = cast(SkillManifest, manifest)
+            name = skill.metadata.name
+            has_combat_context = any(ctx != "overworld" for ctx in skill.spec.contexts)
+            context_type = "combat" if has_combat_context else "adventure"
+            _walk_effects(skill.spec.use_effects, f"{name}:use_effects", context_type)
+
     return results
 
 

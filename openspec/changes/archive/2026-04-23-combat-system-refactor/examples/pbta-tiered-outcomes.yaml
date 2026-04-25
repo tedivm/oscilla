@@ -1,0 +1,143 @@
+# PbtA (Powered by the Apocalypse) — Tiered Outcome Moves
+#
+# Roll 2d6 + a stat; the result falls into one of three outcome tiers:
+#   10+ : Full success — deal weapon damage with no drawback
+#   7–9 : Partial success — deal weapon damage, but the player is also exposed (stress)
+#   6–  : Miss — no damage; player takes heavy stress; enemy presses forward
+#
+# Implemented with `target_stat: null` (threshold-only mode) and dynamic
+# `stat_change.value` formula strings in the threshold bands.
+#
+# `target_stat: null` is essential for PbtA correctness: without it, the move roll
+# result (e.g. 8) would be applied as 8 HP damage — semantically wrong. The roll
+# selects a tier; the tier's effects declare what actually happens, including
+# weapon-die damage via `value: "{{ roll(player.stats['damage_die']) }}"`.
+#
+# This example models Dungeon World's Hack and Slash and Defend moves. The player
+# is a Fighter; the enemy is a Dragon.
+#
+# Fitness category: Fits Well — threshold_effects with target_stat: null and
+#   dynamic values covers the tiered outcome pattern directly.
+# Key features illustrated: target_stat: null (threshold-only formula), dynamic
+#   stat_change.value as formula string, 2d6+stat move structure, choice mode.
+
+apiVersion: oscilla/v1
+kind: CombatSystem
+metadata:
+  name: pbta-dungeon-world
+spec:
+  player_defeat_condition:
+    type: character_stat
+    name: hp
+    lte: 0
+  enemy_defeat_condition:
+    type: enemy_stat
+    name: hp
+    lte: 0
+  player_turn_mode: "choice"
+  skill_contexts: ["pbta-combat"]
+  # In PbtA all players always have access to the core moves — they are not acquired.
+  # system_skills injects them unconditionally into the choice menu.
+  system_skills:
+    - skill: hack-and-slash
+    - skill: defend
+  enemy_damage_formulas:
+    - target_stat: hp
+      display: "HP"
+      # The Dragon attacks regardless of the player's move outcome.
+      formula: "{{ max(0, roll(10) + enemy_stats['damage_bonus']) }}"
+
+---
+# Skill: Hack and Slash — the core melee attack move.
+# On a 10+: deal weapon damage (clean hit).
+# On a 7–9: deal weapon damage but the player takes the enemy's damage too (exposed).
+# On a 6–: the enemy seizes the initiative (heavy stress; player deals no damage).
+#
+# target_stat: null — "threshold-only" mode. The formula result (the move roll) triggers
+# which band fires, but is NOT applied as raw HP damage. Without target_stat: null,
+# a roll of 8 would incorrectly deal 8 HP damage regardless of outcome tier.
+# With it, all stat changes are declared explicitly in the threshold bands.
+#
+# stat_change.value as formula string — the 7–9 and 10+ bands use
+# "{{ roll(player.stats['damage_die']) }}" so the actual weapon damage is a die roll
+# scoped to the band, not a fixed integer or the raw move-roll result.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: hack-and-slash
+spec:
+  displayName: "Hack and Slash"
+  contexts: ["pbta-combat"]
+  combat_damage_formulas:
+    - target_stat: null # threshold-only: the move roll selects a tier; no raw damage applied
+      formula: "{{ roll(6) + roll(6) + player.stats['str_mod'] }}"
+      threshold_effects:
+        - max: 6
+          # Miss — no damage; player takes heavy stress from the enemy's counter-attack.
+          effects:
+            - type: stat_change
+              stat: stress
+              value: 3
+        - min: 7
+          max: 9
+          # Partial success — damage lands, but the player is exposed and takes a hit too.
+          effects:
+            - type: stat_change
+              stat: hp
+              target: enemy
+              value: "{{ roll(player.stats['damage_die']) }}" # weapon die damage to enemy
+            - type: stat_change
+              stat: stress
+              value: 1 # enemy's riposte costs stress
+        - min: 10
+          # Full success — clean hit; weapon damage with no drawback.
+          effects:
+            - type: stat_change
+              stat: hp
+              target: enemy
+              value: "{{ roll(player.stats['damage_die']) }}" # weapon die damage only
+
+---
+# Skill: Defend — hold your ground and reduce incoming harm.
+# Uses target_stat: null (threshold-only) — the move roll selects the tier;
+# all HP and stress effects are declared explicitly in the bands.
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: defend
+spec:
+  displayName: "Defend"
+  contexts: ["pbta-combat"]
+  combat_damage_formulas:
+    - target_stat: null # threshold-only: no raw damage applied from the roll result
+      formula: "{{ roll(6) + roll(6) + player.stats['str_mod'] }}"
+      threshold_effects:
+        - max: 6
+          # Miss — Defend backfires; extra stress.
+          effects:
+            - type: stat_change
+              stat: stress
+              value: 2
+        - min: 7
+          max: 9
+          # Partial — hold steady; small heal representing catching your breath.
+          effects:
+            - type: heal
+              amount: 5
+        - min: 10
+          # Full success — major recovery.
+          effects:
+            - type: heal
+              amount: 15
+
+---
+# Enemy: Ancient Dragon
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: ancient-dragon
+spec:
+  displayName: "Ancient Dragon"
+  stats:
+    hp: 16 # Dungeon World HP (damage is 2d6-scale; hp pools are smaller)
+    damage_bonus: 3 # Bite/claw: 1d10+3; devastating

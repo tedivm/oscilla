@@ -55,7 +55,7 @@ class AdventurePosition:
     adventure_ref: str
     step_index: int
     # mid-step scratch space — e.g. enemy HP persisted between combat rounds
-    step_state: Dict[str, int | float | str | bool | None] = field(default_factory=dict)
+    step_state: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

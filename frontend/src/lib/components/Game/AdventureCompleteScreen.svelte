@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { SSEEvent } from "$lib/stores/gameSession.js";
   import type { AdventureCompleteEventData } from "$lib/api/types.js";
+  import { renderMarkup } from "$lib/utils/markup.js";
   import Button from "$lib/components/Button.svelte";
 
   interface Props {
@@ -19,11 +20,11 @@
   <div class="outcome-banner">
     <h2 class="outcome-heading">Adventure Complete</h2>
     {#if eventData?.outcome}
-      <p class="outcome">{eventData.outcome}</p>
+      <p class="outcome">{@html renderMarkup(eventData.outcome)}</p>
     {/if}
   </div>
   {#if eventData?.narrative}
-    <p class="summary">{eventData.narrative}</p>
+    <p class="summary">{@html renderMarkup(eventData.narrative)}</p>
   {/if}
   <Button variant="primary" onclick={onContinue}>Return to Overworld</Button>
 </div>
