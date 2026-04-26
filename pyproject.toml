@@ -28,7 +28,7 @@ dependencies = [
   "redis",
   "rich>=15.0.0",
   "ruamel-yaml>=0.19.1",
-  "textual>=8.2.3",
+  "textual>=8.2.4",
   "typer",
   "uvicorn[standard]",
   "zxcvbn>=4.5.0",
