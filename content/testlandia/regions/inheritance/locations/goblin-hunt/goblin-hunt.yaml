@@ -1,0 +1,11 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: inheritance-goblin-hunt
+spec:
+  displayName: "Goblin Hunt"
+  description: "Test inherited goblin enemies and sword items."
+  region: inheritance
+  adventures:
+    - ref: inheritance-goblin-hunt
+      weight: 100

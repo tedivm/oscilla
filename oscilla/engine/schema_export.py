@@ -97,9 +97,28 @@ def export_union_schema() -> Dict[str, Any]:
 
     inner_schema: Dict[str, Any] = dict(AnyManifest.model_json_schema())
 
+    # Post-process: inject '+' sibling fields for list/dict properties in each spec def.
+    _inject_plus_fields(inner_schema)
+
     # Wrap in if/then so the schema is a no-op for files that lack apiVersion: oscilla/v1.
     # $defs must stay at the top level so $ref paths resolve correctly.
     then_body = {k: v for k, v in inner_schema.items() if k != "$defs"}
+
+    # Add abstract permissive arm: when metadata.abstract is true, allow any spec content.
+    # This is prepended to the oneOf so it takes priority for abstract manifests.
+    if "oneOf" in then_body:
+        abstract_arm: Dict[str, Any] = {
+            "properties": {
+                "metadata": {
+                    "properties": {"abstract": {"const": True}},
+                    "required": ["abstract"],
+                }
+            },
+            "required": ["metadata"],
+            "additionalProperties": True,
+        }
+        then_body["oneOf"].insert(0, abstract_arm)
+
     schema: Dict[str, Any] = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "https://oscilla.tedivm.com/schemas/manifest.json",
@@ -113,6 +132,37 @@ def export_union_schema() -> Dict[str, Any]:
     if "$defs" in inner_schema:
         schema["$defs"] = inner_schema["$defs"]
     return schema
+
+
+def _inject_plus_fields(schema: Dict[str, Any]) -> None:
+    """Walk $defs and inject '<field>+' sibling properties for list/dict fields.
+
+    For every property in a spec model whose type is 'array' or '$ref' to an object,
+    inject a sibling '<fieldname>+' property with the same type and a description note
+    about extending inherited values.
+    """
+    defs = schema.get("$defs", {})
+    for def_name, def_schema in defs.items():
+        props = def_schema.get("properties", {})
+        if not isinstance(props, dict):
+            continue
+        to_add: Dict[str, Any] = {}
+        for prop_name, prop_schema in list(props.items()):
+            if not isinstance(prop_schema, dict):
+                continue
+            prop_type = prop_schema.get("type")
+            ref = prop_schema.get("$ref")
+            # Inject '+' for arrays and objects (refs to other defs are objects).
+            if prop_type == "array" or ref is not None:
+                plus_name = f"{prop_name}+"
+                desc = prop_schema.get("description", "")
+                plus_schema = dict(prop_schema)
+                plus_schema["description"] = (
+                    f"{desc} (extends the inherited list/dict rather than replacing it)".strip()
+                )
+                to_add[plus_name] = plus_schema
+        if to_add:
+            props.update(to_add)
 
 
 def valid_kinds() -> list[str]:

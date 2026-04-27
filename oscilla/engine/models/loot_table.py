@@ -4,7 +4,7 @@ from typing import List, Literal
 
 from pydantic import BaseModel, Field
 
-from oscilla.engine.models.base import Condition, ManifestEnvelope
+from oscilla.engine.models.base import BaseSpec, Condition, ManifestEnvelope
 
 
 class LootEntry(BaseModel):
@@ -40,7 +40,7 @@ class LootGroup(BaseModel):
     entries: List[LootEntry] = Field(min_length=1)
 
 
-class LootTableSpec(BaseModel):
+class LootTableSpec(BaseSpec):
     displayName: str
     description: str = ""
     groups: List[LootGroup] = Field(min_length=1)

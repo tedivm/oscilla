@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Dict, List, Literal
 
 from pydantic import BaseModel, Field
 
-from oscilla.engine.models.base import ManifestEnvelope
+from oscilla.engine.models.base import BaseSpec, ManifestEnvelope
 from oscilla.engine.models.loot_table import LootGroup  # noqa: F401 — re-exported for callers
 
 if TYPE_CHECKING:
@@ -25,7 +25,7 @@ class EnemySkillEntry(BaseModel):
     )
 
 
-class EnemySpec(BaseModel):
+class EnemySpec(BaseSpec):
     """Enemy combat stats and behavior.
 
     Stats are declared as a free-form dict keyed by stat name. The stat names

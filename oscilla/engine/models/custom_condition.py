@@ -4,12 +4,10 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel
-
-from oscilla.engine.models.base import Condition, ManifestEnvelope
+from oscilla.engine.models.base import BaseSpec, Condition, ManifestEnvelope
 
 
-class CustomConditionSpec(BaseModel):
+class CustomConditionSpec(BaseSpec):
     display_name: str | None = None
     # The stored condition body. Typed as Condition but imported via TYPE_CHECKING to
     # avoid a circular import: base.py's Condition union will include CustomConditionRef,

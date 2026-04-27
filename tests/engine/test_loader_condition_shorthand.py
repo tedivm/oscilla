@@ -24,7 +24,7 @@ def test_bare_key_condition_is_hard_error(tmp_path: Path) -> None:
         """)
     )
 
-    manifests, errors = parse([manifest])
+    manifests, errors, _ = parse([manifest])
 
     assert len(manifests) == 0
     assert len(errors) == 1
@@ -49,7 +49,7 @@ def test_explicit_condition_loads_cleanly(tmp_path: Path) -> None:
         """)
     )
 
-    manifests, errors = parse([manifest])
+    manifests, errors, _ = parse([manifest])
 
     assert len(errors) == 0
     assert len(manifests) == 1

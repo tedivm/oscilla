@@ -2,12 +2,10 @@
 
 from typing import Literal
 
-from pydantic import BaseModel
-
-from oscilla.engine.models.base import Condition, ManifestEnvelope
+from oscilla.engine.models.base import BaseSpec, Condition, ManifestEnvelope
 
 
-class RegionSpec(BaseModel):
+class RegionSpec(BaseSpec):
     displayName: str
     description: str = ""
     parent: str | None = None  # metadata.name of parent Region

@@ -4,16 +4,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, List, Literal
 
-from pydantic import BaseModel
 
-from oscilla.engine.models.base import ManifestEnvelope
+from oscilla.engine.models.base import BaseSpec, ManifestEnvelope
 
 if TYPE_CHECKING:
     from oscilla.engine.models.adventure import Effect
     from oscilla.engine.models.game import PassiveEffect
 
 
-class ArchetypeSpec(BaseModel):
+class ArchetypeSpec(BaseSpec):
     """Spec block for an Archetype manifest.
 
     Archetypes are named persistent states held in CharacterState.archetypes.

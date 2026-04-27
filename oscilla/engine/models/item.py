@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Dict, List, Literal
 from pydantic import BaseModel, Field, model_validator
 
 from oscilla.engine.models.adventure import Effect
-from oscilla.engine.models.base import Condition, ManifestEnvelope
+from oscilla.engine.models.base import BaseSpec, Condition, ManifestEnvelope
 
 if TYPE_CHECKING:
     from oscilla.engine.models.combat_system import DamageFormulaEntry
@@ -45,7 +45,7 @@ class BuffGrant(BaseModel):
     )
 
 
-class ItemSpec(BaseModel):
+class ItemSpec(BaseSpec):
     category: str
     displayName: str
     description: str = ""

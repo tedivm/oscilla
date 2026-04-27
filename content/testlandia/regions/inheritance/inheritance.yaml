@@ -1,0 +1,7 @@
+apiVersion: oscilla/v1
+kind: Region
+metadata:
+  name: inheritance
+spec:
+  displayName: "Inheritance Testing Realm"
+  description: "A realm for testing manifest inheritance features."

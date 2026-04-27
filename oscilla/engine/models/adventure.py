@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Annotated, Dict, List, Literal, Union
 
 from pydantic import BaseModel, Field, model_validator
 
-from oscilla.engine.models.base import Condition, ManifestEnvelope
+from oscilla.engine.models.base import BaseSpec, Condition, ManifestEnvelope
 from oscilla.engine.models.loot_table import LootGroup
 
 if TYPE_CHECKING:
@@ -442,7 +442,7 @@ class Cooldown(BaseModel):
         return self
 
 
-class AdventureSpec(BaseModel):
+class AdventureSpec(BaseSpec):
     displayName: str
     description: str = ""
     requires: Condition | None = None

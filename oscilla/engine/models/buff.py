@@ -7,7 +7,7 @@ from typing import Annotated, Dict, List, Literal, Union
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from oscilla.engine.models.adventure import Effect
-from oscilla.engine.models.base import ManifestEnvelope
+from oscilla.engine.models.base import BaseSpec, ManifestEnvelope
 
 
 class BuffDuration(BaseModel):
@@ -139,7 +139,7 @@ CombatModifier = Annotated[
 ]
 
 
-class BuffSpec(BaseModel):
+class BuffSpec(BaseSpec):
     """A named, reusable timed combat effect.
 
     Buffs are declarative: content authors write a `kind: Buff` manifest once and

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, List, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from oscilla.engine.models.base import Condition, ManifestEnvelope
+from oscilla.engine.models.base import BaseSpec, Condition, ManifestEnvelope
 
 if TYPE_CHECKING:
     from oscilla.engine.models.adventure import Effect
@@ -90,7 +90,7 @@ class DamageFormulaEntry(BaseModel):
         return self
 
 
-class CombatSystemSpec(BaseModel):
+class CombatSystemSpec(BaseSpec):
     """Full specification for a combat encounter resolution system.
 
     The engine reads this manifest to determine turn order, defeat conditions,

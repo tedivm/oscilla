@@ -1,0 +1,54 @@
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: goblin-base
+  abstract: true
+spec:
+  displayName: "Goblin"
+  description: "A goblin enemy base for inheritance testing."
+  stats:
+    hp: 10
+    attack: 3
+    defense: 1
+  loot:
+    - entries:
+        - item: test-widget
+          weight: 1
+
+---
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: goblin-scout
+  base: goblin-base
+spec:
+  displayName: "Goblin Scout"
+  stats:
+    hp: 8
+    attack: 2
+
+---
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: goblin-chief
+  base: goblin-base
+spec:
+  displayName: "Goblin Chief"
+  stats:
+    hp: 20
+    attack: 5
+    defense: 3
+
+---
+apiVersion: oscilla/v1
+kind: Enemy
+metadata:
+  name: goblin-king
+  base: goblin-chief
+spec:
+  displayName: "Goblin King"
+  stats:
+    hp: 30
+    attack: 8
+    defense: 5

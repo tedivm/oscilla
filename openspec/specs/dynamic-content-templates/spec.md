@@ -98,6 +98,16 @@ The `ingame_time` field SHALL expose an `InGameTimeView` when the game has a `ti
 - **WHEN** a game has no `time:` block and a template contains `{% if ingame_time %}{{ ingame_time.game_ticks }}{% endif %}`
 - **THEN** the block is skipped and no error is raised
 
+#### Scenario: Template accesses this property value
+
+- **WHEN** `{{ this.get('damage_die', 4) }}` is rendered with `this = {"damage_die": 6}`
+- **THEN** the rendered output contains `"6"`
+
+#### Scenario: Template uses this.get() default when key missing
+
+- **WHEN** `{{ this.get('damage_die', 4) }}` is rendered with `this = {}`
+- **THEN** the rendered output contains `"4"`
+
 ---
 
 ### Requirement: Built-in safe functions are available in all templates

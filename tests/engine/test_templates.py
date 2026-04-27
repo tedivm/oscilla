@@ -407,3 +407,88 @@ def test_game_unknown_field_raises_validation_error() -> None:
     engine = _make_engine()
     with pytest.raises(TemplateValidationError):
         engine.precompile_and_validate("{{ game.nonexistent_field }}", "game-bad-field", "adventure")
+
+
+# ---------------------------------------------------------------------------
+# `this` — manifest properties in template context
+# ---------------------------------------------------------------------------
+
+
+def test_this_in_expression_context_render() -> None:
+    """this is available in GameTemplateEngine.render() via ExpressionContext."""
+    engine = _make_engine()
+    ctx = ExpressionContext(
+        player=_make_player(),
+        this={"damage_die": 6, "label": "sharp"},
+    )
+    engine.precompile_and_validate(
+        "{{ this['damage_die'] }}-{{ this['label'] }}",
+        "test-this-render",
+        "adventure",
+        manifest_properties={"damage_die": 6, "label": "sharp"},
+    )
+    result = engine.render("test-this-render", ctx)
+    assert result == "6-sharp"
+
+
+def test_this_empty_by_default() -> None:
+    """this is empty when no manifest_properties are provided."""
+    engine = _make_engine()
+    ctx = ExpressionContext(player=_make_player())
+    engine.precompile_and_validate("{{ this | length }}", "test-this-empty", "adventure")
+    result = engine.render("test-this-empty", ctx)
+    assert result == "0"
+
+
+def test_this_in_build_mock_context() -> None:
+    """build_mock_context() populates this from manifest_properties."""
+    from oscilla.engine.templates import build_mock_context
+
+    ctx = build_mock_context(
+        stat_names=["strength"],
+        manifest_properties={"damage_die": 8, "label": "heavy"},
+    )
+    assert ctx["this"] == {"damage_die": 8, "label": "heavy"}
+
+
+def test_this_in_build_mock_context_empty_default() -> None:
+    """build_mock_context() defaults this to empty dict when not provided."""
+    from oscilla.engine.templates import build_mock_context
+
+    ctx = build_mock_context(stat_names=["strength"])
+    assert ctx["this"] == {}
+
+
+def test_this_in_load_time_validation() -> None:
+    """Load-time template validation passes when this is used with manifest_properties."""
+    engine = _make_engine()
+    # This should NOT raise — manifest_properties provides the `this` context.
+    engine.precompile_and_validate(
+        "{{ this.get('damage_die', 4) }}",
+        "test-this-validation",
+        "adventure",
+        manifest_properties={"damage_die": 6},
+    )
+    ctx = ExpressionContext(
+        player=_make_player(),
+        this={"damage_die": 6},
+    )
+    result = engine.render("test-this-validation", ctx)
+    assert result == "6"
+
+
+def test_this_with_string_property() -> None:
+    """this supports string properties in templates."""
+    engine = _make_engine()
+    ctx = ExpressionContext(
+        player=_make_player(),
+        this={"flavor": "enchanted"},
+    )
+    engine.precompile_and_validate(
+        "This weapon is {{ this['flavor'] }}",
+        "test-this-string",
+        "adventure",
+        manifest_properties={"flavor": "enchanted"},
+    )
+    result = engine.render("test-this-string", ctx)
+    assert result == "This weapon is enchanted"

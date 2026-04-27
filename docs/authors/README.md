@@ -53,21 +53,22 @@ These documents explain the three cross-cutting systems you'll use in almost eve
 
 These documents cover each manifest kind in depth.
 
-| Guide                                         | What it covers                                                                                                                     |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| [Game Configuration](./game-configuration.md) | `game.yaml` and `character_config.yaml` — XP thresholds, HP formula, item labels, stats, equipment slots, custom pronoun sets.     |
-| [In-Game Time](./ingame-time.md)              | Calendar cycles, dual clocks, eras, tick-based cooldowns, and time conditions.                                                     |
-| [World Building](./world-building.md)         | Regions, nested regions, locations, adventure pools, unlock conditions.                                                            |
-| [Adventures](./adventures.md)                 | Narrative, combat, choice, and stat-check steps; goto/labels; outcome branches.                                                    |
-| [Items](./items.md)                           | Consumables, gear, charges, equip requirements, labels, skill/buff grants.                                                         |
-| [Loot Tables](./loot-tables.md)               | Reusable item pools: groups, weighted/unique sampling, conditional groups and entries, template count/amount, enemy loot.          |
-| [Combat Systems](./combat-systems.md)         | CombatSystem manifests — damage formulas, defeat conditions, turn order, initiative, choice mode, combat stats, lifecycle hooks.   |
-| [Enemies](./enemies.md)                       | Enemy stats dict, on-defeat effects, loot tables, enemy skills and resources.                                                      |
-| [Skills](./skills.md)                         | Skill and Buff manifests, costs, cooldowns, buff modifiers, item skill/buff grants, enemy skills, CharacterConfig skill resources. |
-| [Archetypes](./archetypes.md)                 | Archetype manifests, `archetype_add`/`archetype_remove`/`skill_revoke` effects, archetype conditions, passive effects.             |
-| [Passive Effects](./passive-effects.md)       | Always-on and condition-gated stat bonuses and skill grants declared in `game.yaml`.                                               |
-| [Quests](./quests.md)                         | Multi-stage storylines with milestone-driven stage advancement.                                                                    |
-| [Recipes](./recipes.md)                       | Crafting formulas: input items + quantities → output item.                                                                         |
+| Guide                                             | What it covers                                                                                                                     |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| [Game Configuration](./game-configuration.md)     | `game.yaml` and `character_config.yaml` — XP thresholds, HP formula, item labels, stats, equipment slots, custom pronoun sets.     |
+| [In-Game Time](./ingame-time.md)                  | Calendar cycles, dual clocks, eras, tick-based cooldowns, and time conditions.                                                     |
+| [World Building](./world-building.md)             | Regions, nested regions, locations, adventure pools, unlock conditions.                                                            |
+| [Adventures](./adventures.md)                     | Narrative, combat, choice, and stat-check steps; goto/labels; outcome branches.                                                    |
+| [Items](./items.md)                               | Consumables, gear, charges, equip requirements, labels, skill/buff grants.                                                         |
+| [Loot Tables](./loot-tables.md)                   | Reusable item pools: groups, weighted/unique sampling, conditional groups and entries, template count/amount, enemy loot.          |
+| [Combat Systems](./combat-systems.md)             | CombatSystem manifests — damage formulas, defeat conditions, turn order, initiative, choice mode, combat stats, lifecycle hooks.   |
+| [Enemies](./enemies.md)                           | Enemy stats dict, on-defeat effects, loot tables, enemy skills and resources.                                                      |
+| [Skills](./skills.md)                             | Skill and Buff manifests, costs, cooldowns, buff modifiers, item skill/buff grants, enemy skills, CharacterConfig skill resources. |
+| [Archetypes](./archetypes.md)                     | Archetype manifests, `archetype_add`/`archetype_remove`/`skill_revoke` effects, archetype conditions, passive effects.             |
+| [Passive Effects](./passive-effects.md)           | Always-on and condition-gated stat bonuses and skill grants declared in `game.yaml`.                                               |
+| [Quests](./quests.md)                             | Multi-stage storylines with milestone-driven stage advancement.                                                                    |
+| [Recipes](./recipes.md)                           | Crafting formulas: input items + quantities → output item.                                                                         |
+| [Manifest Inheritance](./manifest-inheritance.md) | Base manifests, abstract templates, `+` field extension, `properties` and `this` variable, chained inheritance.                    |
 
 ---
 

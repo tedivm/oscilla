@@ -1,0 +1,60 @@
+apiVersion: oscilla/v1
+kind: Item
+metadata:
+  name: sword-base
+  abstract: true
+spec:
+  displayName: "Sword"
+  description: "A sword base for inheritance testing."
+  category: weapon
+  stackable: false
+  equip:
+    slots:
+      - weapon
+    stat_modifiers:
+      - stat: strength
+        amount: 1
+  grants_skills_equipped:
+    - basic-slash
+  combat_damage_formulas:
+    - target_stat: hp
+      target: enemy
+      formula: "{{ this.get('damage_die', 4) * player['strength'] }}"
+
+---
+apiVersion: oscilla/v1
+kind: Item
+metadata:
+  name: iron-sword
+  base: sword-base
+spec:
+  displayName: "Iron Sword"
+  properties:
+    damage_die: 4
+  value: 10
+
+---
+apiVersion: oscilla/v1
+kind: Item
+metadata:
+  name: steel-sword
+  base: sword-base
+spec:
+  displayName: "Steel Sword"
+  properties:
+    damage_die: 6
+  value: 25
+
+---
+apiVersion: oscilla/v1
+kind: Item
+metadata:
+  name: silver-sword
+  base: sword-base
+spec:
+  displayName: "Silver Sword"
+  properties:
+    damage_die: 8
+  grants_skills_equipped+:
+    - silver-strike
+  value: 50

@@ -74,6 +74,219 @@ logger = getLogger(__name__)
 _yaml = YAML(typ="safe")
 
 
+# ---------------------------------------------------------------------------
+# Inheritance pre-pass data structures and helpers
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class _RawManifest:
+    """A YAML doc that has been parsed but not yet Pydantic-validated."""
+
+    kind: str
+    name: str
+    abstract: bool
+    base: str | None
+    raw: Dict[str, Any]
+    source: Path
+
+
+def _merge_spec_dicts(
+    base_spec: Dict[str, Any],
+    child_spec: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Merge child spec fields onto base spec fields, recursively.
+
+    Keys ending with '+' extend the base list or dict rather than replacing it.
+    The '+' is stripped from the key in the output. When a '+' key holds a dict,
+    the merge recurses into that dict so nested '+' keys are also respected —
+    e.g. ``equip+: {stat_modifiers+: [...]}`` correctly extends the nested list.
+
+    Type mismatches on '+' keys fall back to the child value.
+    """
+    result: Dict[str, Any] = dict(base_spec)
+    for key, value in child_spec.items():
+        if key.endswith("+"):
+            base_key = key[:-1]
+            base_val = result.get(base_key)
+            if isinstance(value, list) and isinstance(base_val, list):
+                result[base_key] = base_val + value
+            elif isinstance(value, dict) and isinstance(base_val, dict):
+                # Recurse: the child dict may itself contain '+' keys.
+                result[base_key] = _merge_spec_dicts(base_val, value)
+            else:
+                result[base_key] = value
+        else:
+            result[key] = value
+    return result
+
+
+def _topo_sort_inheritance(
+    deferred: List[_RawManifest],
+    abstract_raws: Dict[Tuple[str, str], Dict[str, Any]],
+    concrete_raws: Dict[Tuple[str, str], Dict[str, Any]],
+) -> Tuple[List[_RawManifest], List[LoadError]]:
+    """Return deferred manifests in dependency order (bases before children).
+
+    Errors accumulate for: missing base refs, mismatched kinds, circular chains.
+    """
+    errors: List[LoadError] = []
+    by_key: Dict[Tuple[str, str], _RawManifest] = {(m.kind, m.name): m for m in deferred}
+
+    # Pre-compute the set of all known manifest names (across all kinds) for
+    # precise error messages when a base ref exists but under the wrong kind.
+    all_known_names: Set[str] = set()
+    for _, n in abstract_raws:
+        all_known_names.add(n)
+    for _, n in concrete_raws:
+        all_known_names.add(n)
+    for _, n in by_key:
+        all_known_names.add(n)
+
+    order: List[_RawManifest] = []
+    visited: Set[Tuple[str, str]] = set()
+    visiting: Set[Tuple[str, str]] = set()
+
+    def visit(key: Tuple[str, str], chain: List[str]) -> None:
+        if key in visited:
+            return
+        if key in visiting:
+            cycle = " → ".join(chain + [key[1]])
+            errors.append(
+                LoadError(
+                    file=Path(f"<{key[1]}>"),
+                    message=f"circular inheritance in {key[0]} {key[1]!r}: {cycle}",
+                )
+            )
+            return
+        manifest = by_key.get(key)
+        if manifest is None:
+            return  # Already-validated concrete base, not in deferred
+        visiting.add(key)
+        assert manifest.base is not None
+        base_key = (manifest.kind, manifest.base)
+        # Check if the base exists under the correct kind.
+        base_found = base_key in abstract_raws or base_key in concrete_raws or base_key in by_key
+        if not base_found:
+            if manifest.base in all_known_names:
+                errors.append(
+                    LoadError(
+                        file=manifest.source,
+                        message=(
+                            f"metadata.base references {manifest.base!r} which is not a {manifest.kind} (kind mismatch)"
+                        ),
+                    )
+                )
+            else:
+                errors.append(
+                    LoadError(
+                        file=manifest.source,
+                        message=f"metadata.base references unknown {manifest.base!r} (kind: {manifest.kind})",
+                    )
+                )
+        else:
+            visit(base_key, chain + [key[1]])
+        visiting.remove(key)
+        visited.add(key)
+        order.append(manifest)
+
+    for m in deferred:
+        visit((m.kind, m.name), [])
+
+    return order, errors
+
+
+def _resolve_inheritance(
+    immediate: List[ManifestEnvelope],
+    deferred: List[_RawManifest],
+    abstract_raws: Dict[Tuple[str, str], Dict[str, Any]],
+) -> Tuple[List[ManifestEnvelope], List[LoadError], List[LoadWarning]]:
+    """Merge and Pydantic-validate all deferred (inheriting) manifests.
+
+    Returns (resolved_manifests, errors, warnings). Warnings include unused
+    abstract manifests that were never referenced as a base.
+    """
+    errors: List[LoadError] = []
+    warnings: List[LoadWarning] = []
+
+    # Track which abstract manifests are actually used as a base.
+    used_abstracts: Set[Tuple[str, str]] = set()
+
+    # Build lookup of already-validated concrete manifest spec dicts for use as bases.
+    concrete_raws: Dict[Tuple[str, str], Dict[str, Any]] = {
+        (m.kind, m.metadata.name): m.spec.model_dump(mode="python")  # type: ignore[attr-defined]
+        for m in immediate
+        if hasattr(m, "spec") and m.spec is not None
+    }
+
+    ordered, sort_errors = _topo_sort_inheritance(deferred, abstract_raws, concrete_raws)
+    if sort_errors:
+        return [], sort_errors, []
+
+    resolved: List[ManifestEnvelope] = []
+    # resolved_raws tracks newly-resolved children as concrete bases for their own children.
+    resolved_raws: Dict[Tuple[str, str], Dict[str, Any]] = {}
+
+    for raw_manifest in ordered:
+        assert raw_manifest.base is not None
+        base_key = (raw_manifest.kind, raw_manifest.base)
+
+        # Look up base spec raw from abstract_raws, concrete_raws, or newly resolved.
+        if base_key in abstract_raws:
+            used_abstracts.add(base_key)
+        base_spec_raw: Dict[str, Any] = (
+            abstract_raws.get(base_key) or resolved_raws.get(base_key) or concrete_raws.get(base_key) or {}
+        )
+
+        child_spec_raw: Dict[str, Any] = raw_manifest.raw.get("spec") or {}
+        merged_spec = _merge_spec_dicts(base_spec_raw, child_spec_raw)
+
+        merged_raw = {
+            "apiVersion": raw_manifest.raw.get("apiVersion"),
+            "kind": raw_manifest.kind,
+            "metadata": raw_manifest.raw.get("metadata"),
+            "spec": merged_spec,
+        }
+
+        model_cls = MANIFEST_REGISTRY.get(raw_manifest.kind)
+        if model_cls is None:
+            # Already caught during raw parse; skip.
+            continue
+        try:
+            envelope = model_cls.model_validate(merged_raw)
+        except ValidationError as exc:
+            for err in exc.errors():
+                loc = " → ".join(str(x) for x in err["loc"])
+                errors.append(
+                    LoadError(
+                        file=raw_manifest.source,
+                        message=f"{loc}: {err['msg']}",
+                    )
+                )
+            continue
+
+        # Abstract manifests are never registered; they only serve as bases.
+        # Concrete manifests are both registered and available as bases.
+        if raw_manifest.abstract:
+            abstract_raws[(raw_manifest.kind, raw_manifest.name)] = merged_spec
+        else:
+            resolved.append(envelope)
+            resolved_raws[(raw_manifest.kind, raw_manifest.name)] = merged_spec
+
+    # Warn about abstract manifests that were never referenced as a base.
+    for abs_key in list(abstract_raws.keys()):
+        if abs_key not in used_abstracts:
+            warnings.append(
+                LoadWarning(
+                    file=None,
+                    message=f"abstract {abs_key[0]} {abs_key[1]!r} is never referenced as a base by any other manifest",
+                    suggestion="Remove the manifest or set metadata.abstract: false if it should be a real entity.",
+                )
+            )
+
+    return resolved, errors, warnings
+
+
 @dataclass
 class LoadError:
     file: Path | None
@@ -116,13 +329,26 @@ def scan(content_dir: Path) -> List[Path]:
 def _parse_text(
     text: str,
     source: Path,
-) -> Tuple[List[ManifestEnvelope], List[LoadError]]:
-    """Parse all YAML documents from a string.
+) -> Tuple[
+    List[ManifestEnvelope],
+    List[_RawManifest],
+    Dict[Tuple[str, str], Dict[str, Any]],
+    List[LoadError],
+]:
+    """Parse all YAML documents from a string, categorizing by inheritance role.
+
+    Returns four outputs:
+    - immediate: manifests with no base and not abstract (validated now)
+    - deferred: manifests declaring metadata.base (validated after merge)
+    - abstract_raws: abstract manifest spec dicts keyed by (kind, name)
+    - errors: any parse or validation errors
 
     Uses source as the Path label in errors so messages are identifiable.
     Mirrors the per-path inner loop of parse() exactly.
     """
-    manifests: List[ManifestEnvelope] = []
+    immediate: List[ManifestEnvelope] = []
+    deferred: List[_RawManifest] = []
+    abstract_raws: Dict[Tuple[str, str], Dict[str, Any]] = {}
     errors: List[LoadError] = []
 
     try:
@@ -130,7 +356,7 @@ def _parse_text(
         docs = list(_yaml.load_all(text))
     except YAMLError as exc:
         errors.append(LoadError(file=source, message=f"YAML parse error: {exc}"))
-        return manifests, errors
+        return immediate, deferred, abstract_raws, errors
 
     for doc_index, raw in enumerate(docs):
         # Suffix added only when there is more than one document to keep
@@ -147,25 +373,88 @@ def _parse_text(
             errors.append(LoadError(file=source, message=f"{label}: Unknown kind: {kind!r}"))
             continue
 
-        try:
-            manifests.append(model_cls.model_validate(raw))
-        except ValidationError as exc:
-            for err in exc.errors():
-                loc = " → ".join(str(x) for x in err["loc"])
-                errors.append(LoadError(file=source, message=f"{label}: {loc}: {err['msg']}"))
+        # Extract metadata for categorization before Pydantic validation.
+        metadata_raw = raw.get("metadata", {})
+        if not isinstance(metadata_raw, dict):
+            errors.append(LoadError(file=source, message=f"{label}: metadata must be a mapping"))
+            continue
 
-    return manifests, errors
+        name = metadata_raw.get("name")
+        if not isinstance(name, str):
+            errors.append(LoadError(file=source, message=f"{label}: metadata.name must be a string"))
+            continue
+
+        is_abstract = bool(metadata_raw.get("abstract", False))
+        base_ref = metadata_raw.get("base")
+        if isinstance(base_ref, str):
+            base_ref = base_ref  # keep as str
+        else:
+            base_ref = None
+
+        # Categorize: abstract → side dict; has base → deferred; else → immediate.
+        key = (str(kind), name)
+        if is_abstract:
+            if key in abstract_raws:
+                errors.append(
+                    LoadError(
+                        file=source,
+                        message=f"{label}: duplicate abstract manifest {key[1]!r} (kind: {kind})",
+                    )
+                )
+                continue
+            if key in {
+                (m.kind, m.metadata.name) for m in immediate if hasattr(m, "metadata") and m.metadata is not None
+            }:
+                errors.append(
+                    LoadError(
+                        file=source,
+                        message=(
+                            f"{label}: abstract manifest {name!r} (kind: {kind}) "
+                            f"collides with concrete manifest of the same name"
+                        ),
+                    )
+                )
+                continue
+            abstract_raws[key] = raw.get("spec") or {}
+        elif base_ref:
+            deferred.append(
+                _RawManifest(
+                    kind=str(kind),
+                    name=name,
+                    abstract=False,
+                    base=base_ref,
+                    raw=raw,
+                    source=Path(label),
+                )
+            )
+        else:
+            try:
+                immediate.append(model_cls.model_validate(raw))
+            except ValidationError as exc:
+                for err in exc.errors():
+                    loc = " → ".join(str(x) for x in err["loc"])
+                    errors.append(LoadError(file=source, message=f"{label}: {loc}: {err['msg']}"))
+
+    return immediate, deferred, abstract_raws, errors
 
 
-def parse(paths: List[Path]) -> Tuple[List[ManifestEnvelope], List[LoadError]]:
+def parse(
+    paths: List[Path],
+) -> Tuple[List[ManifestEnvelope], List[LoadError], List[LoadWarning]]:
     """Parse YAML files and validate against Pydantic models. Accumulates errors.
 
     Each path may contain multiple YAML documents separated by '---' dividers.
     Every document is validated independently. Errors include a document index
     suffix (e.g. '[doc 2]') for files with more than one document.
+
+    Returns a 3-tuple of (manifests, errors, warnings). Warnings include unused
+    abstract manifests and other non-fatal issues.
     """
-    manifests: List[ManifestEnvelope] = []
+    immediate: List[ManifestEnvelope] = []
+    deferred: List[_RawManifest] = []
+    abstract_raws: Dict[Tuple[str, str], Dict[str, Any]] = {}
     errors: List[LoadError] = []
+    warnings: List[LoadWarning] = []
 
     for path in paths:
         try:
@@ -174,11 +463,19 @@ def parse(paths: List[Path]) -> Tuple[List[ManifestEnvelope], List[LoadError]]:
             errors.append(LoadError(file=path, message=f"File read error: {exc}"))
             continue
 
-        path_manifests, path_errors = _parse_text(text, source=path)
-        manifests.extend(path_manifests)
-        errors.extend(path_errors)
+        p_immediate, p_deferred, p_abstracts, p_errors = _parse_text(text, source=path)
+        immediate.extend(p_immediate)
+        deferred.extend(p_deferred)
+        abstract_raws.update(p_abstracts)
+        errors.extend(p_errors)
 
-    return manifests, errors
+    if deferred:
+        resolved, inheritance_errors, inheritance_warnings = _resolve_inheritance(immediate, deferred, abstract_raws)
+        immediate.extend(resolved)
+        errors.extend(inheritance_errors)
+        warnings.extend(inheritance_warnings)
+
+    return immediate, errors, warnings
 
 
 def _collect_step_enemy_refs(step: Step, refs: Set[str]) -> None:
@@ -1220,82 +1517,96 @@ def build_effective_conditions(manifests: List[ManifestEnvelope]) -> Tuple[List[
 
 def _collect_all_template_strings(
     manifests: List[ManifestEnvelope],
-) -> List[tuple[str, str, str]]:
-    """Walk manifest trees and collect (template_id, template_str, context_type) triples.
+) -> List[tuple[str, str, str, Dict[str, int | float | str | bool]]]:
+    """Walk manifest trees and collect (template_id, template_str, context_type, manifest_properties) quads.
 
     context_type is 'combat' for strings inside CombatStep branches; 'adventure' otherwise.
     template_id is a stable human-readable path for error messages.
+    manifest_properties is the spec's properties dict (from BaseSpec) for `this` context.
     """
     from oscilla.engine.models.adventure import ChoiceStep, CombatStep, NarrativeStep, StatCheckStep
 
-    results: List[tuple[str, str, str]] = []
+    results: List[tuple[str, str, str, Dict[str, int | float | str | bool]]] = []
 
     def _is_template(value: object) -> bool:
         if not isinstance(value, str):
             return False
         return "{{" in value or "{%" in value or bool(re.search(r"\{[A-Za-z]+\}", value))
 
-    def _walk_loot_groups(groups: List[LootGroup], path: str, context_type: str) -> None:
+    def _walk_loot_groups(
+        groups: List[LootGroup], path: str, context_type: str, props: Dict[str, int | float | str | bool]
+    ) -> None:
         """Collect template strings from LootGroup.count and LootEntry.amount fields."""
         for group in groups:
             if _is_template(group.count):
-                results.append((f"__lootgroup_count_{id(group)}", group.count, context_type))  # type: ignore[arg-type]
+                results.append((f"__lootgroup_count_{id(group)}", group.count, context_type, props))  # type: ignore[arg-type]
             for entry in group.entries:
                 if _is_template(entry.amount):
-                    results.append((f"__lootentry_amount_{id(entry)}", entry.amount, context_type))  # type: ignore[arg-type]
+                    results.append((f"__lootentry_amount_{id(entry)}", entry.amount, context_type, props))  # type: ignore[arg-type]
 
-    def _walk_effects(effects: List[Effect], path: str, context_type: str) -> None:
+    def _walk_effects(
+        effects: List[Effect], path: str, context_type: str, props: Dict[str, int | float | str | bool]
+    ) -> None:
         for effect in effects:
             if isinstance(effect, StatChangeEffect) and _is_template(effect.amount):
-                results.append((f"__effect_statchange_{id(effect)}", effect.amount, context_type))  # type: ignore[arg-type]
+                results.append((f"__effect_statchange_{id(effect)}", effect.amount, context_type, props))  # type: ignore[arg-type]
             elif isinstance(effect, ItemDropEffect) and effect.groups is not None:
-                _walk_loot_groups(effect.groups, f"{path}.groups", context_type)
+                _walk_loot_groups(effect.groups, f"{path}.groups", context_type, props)
 
-    def _walk_branch(branch: OutcomeBranch, path: str, context_type: str) -> None:
-        _walk_effects(branch.effects, path, context_type)
+    def _walk_branch(
+        branch: OutcomeBranch, path: str, context_type: str, props: Dict[str, int | float | str | bool]
+    ) -> None:
+        _walk_effects(branch.effects, path, context_type, props)
         for i, substep in enumerate(branch.steps):
-            _walk_step(substep, f"{path}.steps[{i}]", context_type)
+            _walk_step(substep, f"{path}.steps[{i}]", context_type, props)
 
-    def _walk_step(step: Step, path: str, context_type: str) -> None:
+    def _walk_step(step: Step, path: str, context_type: str, props: Dict[str, int | float | str | bool]) -> None:
         if isinstance(step, NarrativeStep):
             if _is_template(step.text):
                 # Use id(step) so the same key is reproduced in run_narrative at runtime.
-                results.append((f"__narrative_{id(step)}", step.text, context_type))
-            _walk_effects(step.effects, path, context_type)
+                results.append((f"__narrative_{id(step)}", step.text, context_type, props))
+            _walk_effects(step.effects, path, context_type, props)
         elif isinstance(step, ChoiceStep):
             for j, option in enumerate(step.options):
                 # ChoiceOption has effects and substeps like OutcomeBranch but is a distinct type.
-                _walk_effects(option.effects, f"{path}.options[{j}]", context_type)
+                _walk_effects(option.effects, f"{path}.options[{j}]", context_type, props)
                 for k, substep in enumerate(option.steps):
-                    _walk_step(substep, f"{path}.options[{j}].steps[{k}]", context_type)
+                    _walk_step(substep, f"{path}.options[{j}].steps[{k}]", context_type, props)
         elif isinstance(step, CombatStep):
-            _walk_branch(step.on_win, f"{path}.on_victory", "combat")
-            _walk_branch(step.on_defeat, f"{path}.on_defeat", "combat")
+            _walk_branch(step.on_win, f"{path}.on_victory", "combat", props)
+            _walk_branch(step.on_defeat, f"{path}.on_defeat", "combat", props)
             if step.on_flee:
-                _walk_branch(step.on_flee, f"{path}.on_flee", "combat")
+                _walk_branch(step.on_flee, f"{path}.on_flee", "combat", props)
         elif isinstance(step, StatCheckStep):
-            _walk_branch(step.on_pass, f"{path}.on_success", context_type)
-            _walk_branch(step.on_fail, f"{path}.on_failure", context_type)
+            _walk_branch(step.on_pass, f"{path}.on_success", context_type, props)
+            _walk_branch(step.on_fail, f"{path}.on_failure", context_type, props)
+
+    # Helper to extract properties from any spec that inherits from BaseSpec.
+    def _get_props(manifest: ManifestEnvelope) -> Dict[str, int | float | str | bool]:
+        return getattr(manifest.spec, "properties", {})
 
     for manifest in manifests:
         if manifest.kind == "Adventure":
             adv_manifest = cast(AdventureManifest, manifest)
             name = adv_manifest.metadata.name
+            props = _get_props(manifest)
             for i, step in enumerate(adv_manifest.spec.steps):
-                _walk_step(step, f"{name}:step[{i}]", "adventure")
+                _walk_step(step, f"{name}:step[{i}]", "adventure", props)
 
     # Walk LootTable manifests for group/entry template strings.
     for manifest in manifests:
         if manifest.kind == "LootTable":
             lt = cast(LootTableManifest, manifest)
-            _walk_loot_groups(lt.spec.groups, f"{lt.metadata.name}:groups", "adventure")
+            props = _get_props(manifest)
+            _walk_loot_groups(lt.spec.groups, f"{lt.metadata.name}:groups", "adventure", props)
 
     # Walk Enemy manifests for loot group/entry template strings.
     for manifest in manifests:
         if manifest.kind == "Enemy":
             enemy = cast(EnemyManifest, manifest)
             if enemy.spec.loot:
-                _walk_loot_groups(enemy.spec.loot, f"{enemy.metadata.name}:loot", "adventure")
+                props = _get_props(manifest)
+                _walk_loot_groups(enemy.spec.loot, f"{enemy.metadata.name}:loot", "adventure", props)
 
     # Walk Skill manifests for use_effects template strings.
     # Skill use_effects that include a combat context string are compiled with
@@ -1307,7 +1618,8 @@ def _collect_all_template_strings(
             name = skill.metadata.name
             has_combat_context = any(ctx != "overworld" for ctx in skill.spec.contexts)
             context_type = "combat" if has_combat_context else "adventure"
-            _walk_effects(skill.spec.use_effects, f"{name}:use_effects", context_type)
+            props = _get_props(manifest)
+            _walk_effects(skill.spec.use_effects, f"{name}:use_effects", context_type, props)
 
     return results
 
@@ -1320,10 +1632,10 @@ def _validate_templates(
     from oscilla.engine.templates import TemplateValidationError
 
     errors: List[LoadError] = []
-    triples = _collect_all_template_strings(manifests)
-    for template_id, template_str, context_type in triples:
+    quads = _collect_all_template_strings(manifests)
+    for template_id, template_str, context_type, manifest_props in quads:
         try:
-            engine.precompile_and_validate(template_str, template_id, context_type)
+            engine.precompile_and_validate(template_str, template_id, context_type, manifest_properties=manifest_props)
         except TemplateValidationError as exc:
             errors.append(LoadError(file=Path(template_id), message=str(exc)))
     return errors
@@ -2105,7 +2417,9 @@ def _run_pipeline(
     return registry, warnings
 
 
-def load_from_disk(content_path: Path) -> Tuple["ContentRegistry", List[LoadWarning]]:
+def load_from_disk(
+    content_path: Path,
+) -> Tuple["ContentRegistry", List[LoadWarning]]:
     """Orchestrate scan → parse → validate_references → build_effective_conditions → template validation.
 
     content_path may be either a directory (scanned recursively for .yaml/.yml files)
@@ -2121,8 +2435,9 @@ def load_from_disk(content_path: Path) -> Tuple["ContentRegistry", List[LoadWarn
         paths = [content_path]
     else:
         paths = scan(content_path)
-    manifests, parse_errors = parse(paths)
-    return _run_pipeline(manifests=manifests, parse_errors=parse_errors, skip_references=False)
+    manifests, parse_errors, parse_warnings = parse(paths)
+    registry, pipeline_warnings = _run_pipeline(manifests=manifests, parse_errors=parse_errors, skip_references=False)
+    return registry, parse_warnings + pipeline_warnings
 
 
 def load_from_text(
@@ -2137,8 +2452,19 @@ def load_from_text(
 
     Raises ContentLoadError on hard errors; returns (registry, warnings) on success.
     """
-    manifests, parse_errors = _parse_text(text, source=Path("<stdin>"))
-    return _run_pipeline(manifests=manifests, parse_errors=parse_errors, skip_references=skip_references)
+    immediate, deferred, abstract_raws, parse_errors = _parse_text(text, source=Path("<stdin>"))
+    parse_warnings: List[LoadWarning] = []
+
+    if deferred:
+        resolved, inheritance_errors, inheritance_warnings = _resolve_inheritance(immediate, deferred, abstract_raws)
+        immediate.extend(resolved)
+        parse_errors.extend(inheritance_errors)
+        parse_warnings.extend(inheritance_warnings)
+
+    registry, pipeline_warnings = _run_pipeline(
+        manifests=immediate, parse_errors=parse_errors, skip_references=skip_references
+    )
+    return registry, parse_warnings + pipeline_warnings
 
 
 def compute_epoch_offset(spec: "GameTimeSpec") -> int:

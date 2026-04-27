@@ -1,0 +1,72 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: inheritance-goblin-hunt
+spec:
+  displayName: "Inheritance Goblin Hunt"
+  description: "Test inherited goblin enemies and sword items with this variable."
+  steps:
+    - type: narrative
+      text: "You find an iron sword on the ground. Pick it up."
+      effects:
+        - type: item_drop
+          groups:
+            - entries:
+                - item: iron-sword
+                  weight: 1
+    - type: combat
+      enemy: goblin-scout
+      on_win:
+        steps:
+          - type: narrative
+            text: "You defeated the Goblin Scout. A steel sword lies nearby."
+            effects:
+              - type: item_drop
+                groups:
+                  - entries:
+                      - item: steel-sword
+                        weight: 1
+      on_defeat:
+        steps:
+          - type: narrative
+            text: "The Goblin Scout defeated you. Try again with better gear."
+      on_flee:
+        steps:
+          - type: narrative
+            text: "You fled from the Goblin Scout."
+    - type: combat
+      enemy: goblin-chief
+      on_win:
+        steps:
+          - type: narrative
+            text: "You defeated the Goblin Chief. A silver sword glints in the distance."
+            effects:
+              - type: item_drop
+                groups:
+                  - entries:
+                      - item: silver-sword
+                        weight: 1
+      on_defeat:
+        steps:
+          - type: narrative
+            text: "The Goblin Chief defeated you. Retreat and prepare."
+      on_flee:
+        steps:
+          - type: narrative
+            text: "You fled from the Goblin Chief."
+    - type: combat
+      enemy: goblin-king
+      on_win:
+        steps:
+          - type: narrative
+            text:
+              "You defeated the Goblin King! All sword variants and goblin inheritance
+              tested successfully."
+      on_defeat:
+        steps:
+          - type: narrative
+            text: "The Goblin King defeated you. The hunt is over."
+      on_flee:
+        steps:
+          - type: narrative
+            text: "You fled from the Goblin King."

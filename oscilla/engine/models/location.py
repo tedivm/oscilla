@@ -4,7 +4,7 @@ from typing import List, Literal
 
 from pydantic import BaseModel, Field
 
-from oscilla.engine.models.base import Condition, ManifestEnvelope
+from oscilla.engine.models.base import BaseSpec, Condition, ManifestEnvelope
 
 
 class AdventurePoolEntry(BaseModel):
@@ -13,7 +13,7 @@ class AdventurePoolEntry(BaseModel):
     requires: Condition | None = None
 
 
-class LocationSpec(BaseModel):
+class LocationSpec(BaseSpec):
     displayName: str
     description: str = ""
     region: str  # Region manifest name

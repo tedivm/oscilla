@@ -4,7 +4,7 @@ from typing import Dict, Type
 
 from oscilla.engine.models.adventure import AdventureManifest
 from oscilla.engine.models.archetype import ArchetypeManifest
-from oscilla.engine.models.base import ManifestEnvelope
+from oscilla.engine.models.base import BaseSpec, ManifestEnvelope
 from oscilla.engine.models.buff import BuffManifest
 from oscilla.engine.models.character_config import CharacterConfigManifest
 from oscilla.engine.models.combat_system import CombatSystemManifest
@@ -38,6 +38,7 @@ MANIFEST_REGISTRY: Dict[str, Type[ManifestEnvelope]] = {
 }
 
 __all__ = [
+    "BaseSpec",
     "MANIFEST_REGISTRY",
     "AdventureManifest",
     "ArchetypeManifest",

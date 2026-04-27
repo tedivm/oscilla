@@ -307,12 +307,16 @@ class ExpressionContext:
 
     ingame_time is None when the time system is not configured. Templates
     must guard with {% if ingame_time %} before accessing it.
+
+    this exposes the current manifest's properties dict for template access.
     """
 
     player: PlayerContext
     combat: CombatContextView | None = None
     game: GameContext = field(default_factory=GameContext)
     ingame_time: "InGameTimeView | None" = None
+    # Properties from the current manifest (adventure, item, etc.). Empty when not applicable.
+    this: Dict[str, int | float | str | bool] = field(default_factory=dict)
 
 
 @dataclass
@@ -324,12 +328,15 @@ class CombatFormulaContext:
     - ``enemy_stats``: mutable enemy stats from ``CombatContext.enemy_stats``.
     - ``combat_stats``: transient per-combat values from ``CombatContext.combat_stats``.
     - ``turn_number``: current combat turn (1-indexed).
+    - ``this``: properties from the triggering manifest (item, skill, or enemy).
     """
 
     player: Dict[str, int]
     enemy_stats: Dict[str, int]
     combat_stats: Dict[str, int]
     turn_number: int
+    # Properties from the triggering manifest (item, skill, or enemy). Empty when not applicable.
+    this: Dict[str, int | float | str | bool] = field(default_factory=dict)
 
 
 class FormulaRenderError(Exception):
@@ -355,6 +362,7 @@ def render_formula(formula: str, ctx: CombatFormulaContext) -> int:
     render_ctx["enemy_stats"] = ctx.enemy_stats
     render_ctx["combat_stats"] = ctx.combat_stats
     render_ctx["turn_number"] = ctx.turn_number
+    render_ctx["this"] = ctx.this
 
     try:
         template = env.from_string(formula)
@@ -897,6 +905,7 @@ def build_mock_context(
     stat_names: List[str],
     include_combat: bool = False,
     has_ingame_time: bool = False,
+    manifest_properties: Dict[str, int | float | str | bool] | None = None,
 ) -> Dict[str, Any]:
     """Build a comprehensive mock context for load-time template validation."""
     ctx: Dict[str, Any] = {}
@@ -906,6 +915,8 @@ def build_mock_context(
     # so they share the same object rather than creating two separate instances.
     mock_game = _MockGame()
     ctx["game"] = mock_game
+    # Expose manifest properties as `this` for template validation.
+    ctx["this"] = manifest_properties if manifest_properties is not None else {}
     if include_combat:
         mock_combat = _MockCombatContext()
         ctx["combat"] = mock_combat
@@ -966,6 +977,7 @@ class GameTemplateEngine:
         raw: str,
         template_id: str,
         context_type: str,
+        manifest_properties: Dict[str, int | float | str | bool] | None = None,
     ) -> None:
         """Preprocess, compile, and mock-render a template string.
 
@@ -973,6 +985,7 @@ class GameTemplateEngine:
         so errors become ContentLoadErrors before the registry is built.
 
         context_type is one of: 'adventure', 'combat', 'effect'
+        manifest_properties is the current manifest's properties dict for `this` context.
         """
         # Step 1: pronoun preprocessing
         processed = preprocess_pronouns(raw)
@@ -989,6 +1002,7 @@ class GameTemplateEngine:
             self._stat_names,
             include_combat=include_combat,
             has_ingame_time=self._has_ingame_time,
+            manifest_properties=manifest_properties,
         )
         try:
             template.render(**mock_ctx)
@@ -1013,6 +1027,7 @@ class GameTemplateEngine:
         render_ctx["player"] = ctx.player
         render_ctx["combat"] = ctx.combat
         render_ctx["game"] = ctx.game
+        render_ctx["this"] = ctx.this
         # When a CombatContextView is present, also expose its fields at the top level
         # (enemy_stats, combat_stats, turn_number) so that skill use_effects templates
         # can use the same variable names as player_damage_formulas in CombatFormulaContext.

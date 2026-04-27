@@ -7,13 +7,30 @@ Condition models are defined here and imported by other manifest modules.
 from __future__ import annotations
 
 import calendar as _calendar_module  # stdlib; aliased to avoid shadowing local variables
-from typing import Annotated, List, Literal, Union
+from typing import Annotated, Dict, List, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Metadata(BaseModel):
     name: str = Field(description="Unique identifier for this entity within its kind.")
+    abstract: bool = Field(
+        default=False,
+        description="If true, this manifest is a template-only base and will not be registered at runtime.",
+    )
+    base: str | None = Field(
+        default=None,
+        description="Name of another same-kind manifest to inherit unspecified spec fields from.",
+    )
+
+
+class BaseSpec(BaseModel):
+    """Parent class for all spec models. Provides the properties dict for manifest-level constants."""
+
+    properties: Dict[str, int | float | str | bool] = Field(
+        default_factory=dict,
+        description="Static manifest-level values available as 'this' in formula and template contexts.",
+    )
 
 
 class ManifestEnvelope(BaseModel):

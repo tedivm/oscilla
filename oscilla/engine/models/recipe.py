@@ -4,7 +4,7 @@ from typing import List, Literal
 
 from pydantic import BaseModel, Field
 
-from oscilla.engine.models.base import ManifestEnvelope
+from oscilla.engine.models.base import BaseSpec, ManifestEnvelope
 
 
 class RecipeIngredient(BaseModel):
@@ -17,7 +17,7 @@ class RecipeOutput(BaseModel):
     quantity: int = Field(default=1, ge=1)
 
 
-class RecipeSpec(BaseModel):
+class RecipeSpec(BaseSpec):
     displayName: str
     description: str = ""
     inputs: List[RecipeIngredient] = Field(min_length=1)

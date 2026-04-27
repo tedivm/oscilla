@@ -40,7 +40,7 @@ def test_load_broken_refs_raises() -> None:
 def test_parse_bad_yaml_accumulates_error(tmp_path: Path) -> None:
     bad = tmp_path / "bad.yaml"
     bad.write_text("key: [unclosed bracket\n", encoding="utf-8")
-    _, errors = parse([bad])
+    _, errors, _ = parse([bad])
     assert len(errors) == 1
     assert "YAML parse error" in errors[0].message
 
@@ -51,7 +51,7 @@ def test_parse_unknown_kind_accumulates_error(tmp_path: Path) -> None:
         "apiVersion: oscilla/v1\nkind: NotARealKind\nmetadata:\n  name: x\nspec: {}\n",
         encoding="utf-8",
     )
-    _, errors = parse([unknown])
+    _, errors, _ = parse([unknown])
     assert len(errors) == 1
     assert "Unknown kind" in errors[0].message
 
@@ -233,7 +233,7 @@ def test_parse_multi_document_file(tmp_path: Path) -> None:
     """Two valid documents in one file both load successfully."""
     multi = tmp_path / "items.yaml"
     multi.write_text(_ITEM_DOC_SWORD + "---\n" + _ITEM_DOC_SHIELD, encoding="utf-8")
-    manifests, errors = parse([multi])
+    manifests, errors, _ = parse([multi])
     assert errors == []
     assert len(manifests) == 2
     names = {m.metadata.name for m in manifests}
@@ -244,7 +244,7 @@ def test_parse_multi_document_mixed_kinds(tmp_path: Path) -> None:
     """Documents of different kinds in one file both load successfully."""
     multi = tmp_path / "mixed.yaml"
     multi.write_text(_ITEM_DOC_SWORD + "---\n" + _ENEMY_DOC_GOBLIN, encoding="utf-8")
-    manifests, errors = parse([multi])
+    manifests, errors, _ = parse([multi])
     assert errors == []
     assert len(manifests) == 2
     kinds = {m.kind for m in manifests}
@@ -268,7 +268,7 @@ spec:
 """
     multi = tmp_path / "items.yaml"
     multi.write_text(_ITEM_DOC_SWORD + "---\n" + bad_doc, encoding="utf-8")
-    manifests, errors = parse([multi])
+    manifests, errors, _ = parse([multi])
     assert len(errors) >= 1
     assert any("[doc 2]" in e.message for e in errors)
 
@@ -289,7 +289,7 @@ spec:
 """
     single = tmp_path / "item.yaml"
     single.write_text(bad_doc, encoding="utf-8")
-    _, errors = parse([single])
+    _, errors, _ = parse([single])
     assert all("[doc" not in e.message for e in errors)
 
 
@@ -297,7 +297,7 @@ def test_parse_empty_document_in_multi_doc_file(tmp_path: Path) -> None:
     """An empty document between --- dividers is reported as an error, not silently skipped."""
     multi = tmp_path / "items.yaml"
     multi.write_text(_ITEM_DOC_SWORD + "---\n" + "---\n" + _ITEM_DOC_SHIELD, encoding="utf-8")
-    manifests, errors = parse([multi])
+    manifests, errors, _ = parse([multi])
     # The two valid documents load; the empty one produces an error.
     assert len(manifests) == 2
     assert len(errors) == 1

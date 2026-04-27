@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, List, Literal, Set
 
 from pydantic import BaseModel, model_validator
 
-from oscilla.engine.models.base import Condition, ManifestEnvelope
+from oscilla.engine.models.base import BaseSpec, Condition, ManifestEnvelope
 
 if TYPE_CHECKING:
     from oscilla.engine.models.adventure import Effect
@@ -27,7 +27,7 @@ class QuestStage(BaseModel):
     fail_effects: List["Effect"] = []
 
 
-class QuestSpec(BaseModel):
+class QuestSpec(BaseSpec):
     displayName: str
     description: str = ""
     entry_stage: str

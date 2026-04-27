@@ -1,0 +1,30 @@
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: basic-slash
+spec:
+  displayName: "Slash"
+  description: "A basic sword slash. Deals damage based on attack stat."
+  contexts:
+    - combat
+  use_effects:
+    - type: stat_change
+      stat: hp
+      target: enemy
+      amount: "{{ clamp(player.get('attack', 5) - enemy_stats.get('defense', 0), 1, 9999) * -1 }}"
+
+---
+apiVersion: oscilla/v1
+kind: Skill
+metadata:
+  name: silver-strike
+spec:
+  displayName: "Silver Strike"
+  description: "A powerful silver-infused strike. Deals bonus damage."
+  contexts:
+    - combat
+  use_effects:
+    - type: stat_change
+      stat: hp
+      target: enemy
+      amount: "{{ clamp(player.get('attack', 5) * 2 - enemy_stats.get('defense', 0), 1, 9999) * -1 }}"

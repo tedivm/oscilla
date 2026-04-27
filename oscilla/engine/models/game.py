@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Dict, List, Literal
 
 from pydantic import BaseModel, Field
 
-from oscilla.engine.models.base import Condition, ManifestEnvelope
+from oscilla.engine.models.base import BaseSpec, Condition, ManifestEnvelope
 from oscilla.engine.models.item import StatModifier
 from oscilla.engine.models.time import GameTimeSpec
 
@@ -133,7 +133,7 @@ class PrestigeConfig(BaseModel):
     post_prestige_effects: List["Effect"] = Field(default_factory=list)
 
 
-class GameSpec(BaseModel):
+class GameSpec(BaseSpec):
     displayName: str
     description: str = ""
     # xp_thresholds and hp_formula removed — XP thresholds are now declared as

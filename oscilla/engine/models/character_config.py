@@ -4,7 +4,7 @@ from typing import List, Literal, Set
 
 from pydantic import BaseModel, Field, model_validator
 
-from oscilla.engine.models.base import Condition, ManifestEnvelope
+from oscilla.engine.models.base import BaseSpec, Condition, ManifestEnvelope
 
 StatType = Literal["int", "bool"]
 StatContext = Literal["stored", "effective"]
@@ -82,7 +82,7 @@ class SlotDefinition(BaseModel):
     show_when_locked: bool = False
 
 
-class CharacterConfigSpec(BaseModel):
+class CharacterConfigSpec(BaseSpec):
     public_stats: List[StatDefinition] = []
     hidden_stats: List[StatDefinition] = []
     equipment_slots: List[SlotDefinition] = []

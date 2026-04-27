@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, List, Literal
 from pydantic import BaseModel, Field
 
 from oscilla.engine.models.adventure import Cooldown, Effect
-from oscilla.engine.models.base import Condition, ManifestEnvelope
+from oscilla.engine.models.base import BaseSpec, Condition, ManifestEnvelope
 
 if TYPE_CHECKING:
     from oscilla.engine.models.combat_system import DamageFormulaEntry
@@ -20,7 +20,7 @@ class SkillCost(BaseModel):
     amount: int = Field(ge=1, description="Amount deducted from the resource stat.")
 
 
-class SkillSpec(BaseModel):
+class SkillSpec(BaseSpec):
     displayName: str
     description: str = ""
     # Display/organisation category — purely informational unless skill_category_rules
