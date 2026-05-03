@@ -1,12 +1,12 @@
-# Custom Condition Validation
+# Custom Condition Validation (Delta)
 
 ## Purpose
 
-Defines load-time validation rules that catch dangling `CustomConditionRef` references and circular dependency chains among `CustomCondition` manifests, raising `ContentLoadError` before any game state is created.
+Extends the existing custom condition validation to add a parallel validation pass for `CustomEffectRef` usage.
 
 ---
 
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Dangling `type: custom` references raise `ContentLoadError`
 

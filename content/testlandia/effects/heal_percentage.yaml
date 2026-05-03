@@ -1,0 +1,16 @@
+apiVersion: oscilla/v1
+kind: CustomEffect
+metadata:
+  name: heal_percentage
+spec:
+  displayName: "Heal Percentage"
+  description: "Heals the player for a percentage of their max HP, clamped to max."
+  parameters:
+    - name: percent
+      type: float
+      default: 25
+  effects:
+    - type: stat_change
+      stat: hp
+      amount: "{{ min(player.stats['max_hp'] - player.stats['hp'], floor(player.stats['max_hp'] * params.percent / 100)) }}"
+      target: player

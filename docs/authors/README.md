@@ -66,6 +66,7 @@ These documents cover each manifest kind in depth.
 | [Skills](./skills.md)                             | Skill and Buff manifests, costs, cooldowns, buff modifiers, item skill/buff grants, enemy skills, CharacterConfig skill resources. |
 | [Archetypes](./archetypes.md)                     | Archetype manifests, `archetype_add`/`archetype_remove`/`skill_revoke` effects, archetype conditions, passive effects.             |
 | [Passive Effects](./passive-effects.md)           | Always-on and condition-gated stat bonuses and skill grants declared in `game.yaml`.                                               |
+| [Custom Effects](./custom-effects.md)             | Named, parameterized effect sequences — declare once, call anywhere with different parameters.                                     |
 | [Quests](./quests.md)                             | Multi-stage storylines with milestone-driven stage advancement.                                                                    |
 | [Recipes](./recipes.md)                           | Crafting formulas: input items + quantities → output item.                                                                         |
 | [Manifest Inheritance](./manifest-inheritance.md) | Base manifests, abstract templates, `+` field extension, `properties` and `this` variable, chained inheritance.                    |

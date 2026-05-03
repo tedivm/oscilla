@@ -9,6 +9,7 @@ from oscilla.engine.models.buff import BuffManifest
 from oscilla.engine.models.character_config import CharacterConfigManifest
 from oscilla.engine.models.combat_system import CombatSystemManifest
 from oscilla.engine.models.custom_condition import CustomConditionManifest
+from oscilla.engine.models.custom_effect import CustomEffectManifest
 from oscilla.engine.models.enemy import EnemyManifest
 from oscilla.engine.models.game import GameManifest
 from oscilla.engine.models.item import ItemManifest
@@ -75,6 +76,7 @@ class ContentRegistry:
         self.buffs: KindRegistry[BuffManifest] = KindRegistry()
         self.skills: KindRegistry[SkillManifest] = KindRegistry()
         self.custom_conditions: KindRegistry[CustomConditionManifest] = KindRegistry()
+        self.custom_effects: KindRegistry[CustomEffectManifest] = KindRegistry()
         self.combat_systems: KindRegistry[CombatSystemManifest] = KindRegistry()
         self.game: GameManifest | None = None
         self.character_config: CharacterConfigManifest | None = None
@@ -130,6 +132,8 @@ class ContentRegistry:
                     registry.buffs.register(cast(BuffManifest, m))
                 case "CustomCondition":
                     registry.custom_conditions.register(cast(CustomConditionManifest, m))
+                case "CustomEffect":
+                    registry.custom_effects.register(cast(CustomEffectManifest, m))
                 case "CombatSystem":
                     registry.combat_systems.register(cast(CombatSystemManifest, m))
                 case "Game":

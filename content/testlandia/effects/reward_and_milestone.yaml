@@ -1,0 +1,21 @@
+apiVersion: oscilla/v1
+kind: CustomEffect
+metadata:
+  name: reward_and_milestone
+spec:
+  displayName: "Reward and Milestone"
+  description: "Grants a stat bonus and records a milestone."
+  parameters:
+    - name: stat
+      type: str
+    - name: amount
+      type: int
+    - name: milestone
+      type: str
+  effects:
+    - type: stat_change
+      stat: "{{ params.stat }}"
+      amount: "{{ params.amount }}"
+      target: player
+    - type: milestone_grant
+      milestone: "{{ params.milestone }}"

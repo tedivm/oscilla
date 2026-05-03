@@ -414,6 +414,7 @@ Four things happen at once: XP, item, milestone, reputation. That's the composab
 | `dispel`           | `label`                | `target`, `permanent` (default `false`) | Combat only; removes buff by manifest name; `permanent: true` also clears stored persistent buff |
 | `end_adventure`    | `outcome`              | —                                       | Terminates the adventure                                                                         |
 | `goto`             | `target`               | —                                       | Jumps to a labeled step                                                                          |
+| `custom_effect`    | `name`                 | `params`                                | Calls a named [CustomEffect](./custom-effects.md) manifest; `params` overrides defaults          |
 
 ### `item_drop` fields
 
@@ -478,6 +479,121 @@ spec:
 | --------- | ---------------- | -------- | ----------------------------------------------------------- |
 | `type`    | `"emit_trigger"` | yes      | Identifies this effect type                                 |
 | `trigger` | `str`            | yes      | Custom trigger name declared in `game.yaml triggers.custom` |
+
+---
+
+## Custom Effects
+
+Custom effects let you define **named, parameterized sequences of standard effects** that can be reused anywhere. They are the equivalent of functions in a scripting language — declare once, call many times with different parameters.
+
+Custom effects are defined as [`CustomEffect` manifests](./custom-effects.md). At call sites, use `type: custom_effect` in any `effects:` list:
+
+```yaml
+effects:
+  - type: custom_effect
+    name: heal_percentage
+    params:
+      percent: 50
+```
+
+### Parameter Types
+
+Custom effects declare a **parameter schema** with typed parameters (`int`, `float`, `str`, `bool`). Parameters can have defaults:
+
+```yaml
+apiVersion: oscilla/v1
+kind: CustomEffect
+metadata:
+  name: heal_percentage
+spec:
+  displayName: "Heal Percentage"
+  parameters:
+    - name: percent
+      type: float
+      default: 25
+  effects:
+    - type: stat_change
+      stat: hp
+      amount: "{{ min(player.stats['max_hp'] - player.stats['hp'], floor(player.stats['max_hp'] * params.percent / 100)) }}"
+      target: player
+```
+
+At the call site, you override the default:
+
+```yaml
+effects:
+  - type: custom_effect
+    name: heal_percentage
+    params:
+      percent: 75
+```
+
+If a parameter has no default, it is **required** — omitting it is a load-time error.
+
+### Template Access
+
+Inside a custom effect's body, parameters are available via `params.<name>` in template expressions:
+
+```yaml
+effects:
+  - type: stat_change
+    stat: "{{ params.stat }}"
+    amount: "{{ params.amount }}"
+    target: player
+```
+
+### Composition
+
+Custom effects can call other custom effects, enabling **composable effect chains**:
+
+```yaml
+apiVersion: oscilla/v1
+kind: CustomEffect
+metadata:
+  name: full_recovery
+spec:
+  displayName: "Full Recovery"
+  parameters: []
+  effects:
+    - type: custom_effect
+      name: heal_percentage
+      params:
+        percent: 100
+    - type: custom_effect
+      name: reward_and_milestone
+      params:
+        stat: gold
+        amount: 50
+        milestone: recovered
+```
+
+### Where Custom Effects Can Be Used
+
+Custom effects can be called from any `effects:` list:
+
+- Adventure steps (narrative, choice options, stat check branches, combat outcomes)
+- Item `use_effects`
+- Skill `use_effects`
+- Archetype `gain_effects` and `lose_effects`
+- Buff `per_turn_effects`
+- Other custom effects (nested composition)
+
+### Load-Time Validation
+
+The engine validates custom effects at load time and reports errors for:
+
+- **Dangling references**: `name` doesn't match any CustomEffect manifest
+- **Circular dependencies**: A → B → A chains are rejected
+- **Unknown parameters**: `params` key not declared in the target's parameter schema
+- **Type mismatches**: `bool` passed where `int` is expected (Python bool is a subclass of int)
+- **Missing required parameters**: Parameters without defaults that are not supplied at the call site
+
+Note: `int` values are accepted where `float` is declared, since integers are valid floats.
+
+### Limitations
+
+- **Params must be literal scalars**: `params:` values must be literal `int`, `float`, `str`, or `bool`. Template expressions like `"{{ player.stats.hp }}"` are not allowed in params.
+- **No return values**: Custom effects execute their body effects sequentially but do not return values. Use stat mutations or milestones to communicate results.
 
 ---
 

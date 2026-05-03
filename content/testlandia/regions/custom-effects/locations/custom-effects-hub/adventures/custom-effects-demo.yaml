@@ -1,0 +1,52 @@
+apiVersion: oscilla/v1
+kind: Adventure
+metadata:
+  name: custom-effects-demo
+spec:
+  displayName: "Custom Effects Demo"
+  description: "Test custom effects and nested composition."
+  steps:
+    - type: narrative
+      text: "**Custom Effects Demo** — Choose an action to test custom effects."
+
+    - type: choice
+      prompt: "What do you want to test?"
+      options:
+        - label: "Test chain composition"
+          effects:
+            - type: custom_effect
+              name: chain_demo
+          steps:
+            - type: narrative
+              text: "**Chain Demo Complete** — You were healed for 50% max HP, gained 5 strength, and earned the 'chain_demo_completed' milestone."
+              effects:
+                - type: end_adventure
+                  outcome: completed
+
+        - label: "Test heal percentage (75%)"
+          effects:
+            - type: custom_effect
+              name: heal_percentage
+              params:
+                percent: 75
+          steps:
+            - type: narrative
+              text: "**Heal Complete** — You were healed for 75% of your max HP."
+              effects:
+                - type: end_adventure
+                  outcome: completed
+
+        - label: "Test reward and milestone"
+          effects:
+            - type: custom_effect
+              name: reward_and_milestone
+              params:
+                stat: gold
+                amount: 100
+                milestone: custom_effects_gold_earned
+          steps:
+            - type: narrative
+              text: "**Reward Complete** — You gained 100 gold and earned the 'custom_effects_gold_earned' milestone."
+              effects:
+                - type: end_adventure
+                  outcome: completed

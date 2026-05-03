@@ -62,6 +62,7 @@ def export_union_schema() -> Dict[str, Any]:
     from oscilla.engine.models.archetype import ArchetypeManifest
     from oscilla.engine.models.buff import BuffManifest
     from oscilla.engine.models.character_config import CharacterConfigManifest
+    from oscilla.engine.models.custom_effect import CustomEffectManifest
     from oscilla.engine.models.enemy import EnemyManifest
     from oscilla.engine.models.game import GameManifest
     from oscilla.engine.models.item import ItemManifest
@@ -81,6 +82,7 @@ def export_union_schema() -> Dict[str, Any]:
                 ArchetypeManifest,
                 BuffManifest,
                 CharacterConfigManifest,
+                CustomEffectManifest,
                 EnemyManifest,
                 GameManifest,
                 ItemManifest,

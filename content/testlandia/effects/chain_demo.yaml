@@ -1,0 +1,19 @@
+apiVersion: oscilla/v1
+kind: CustomEffect
+metadata:
+  name: chain_demo
+spec:
+  displayName: "Chain Demo"
+  description: "Demonstrates nested composition: calls heal_percentage and reward_and_milestone."
+  parameters: []
+  effects:
+    - type: custom_effect
+      name: heal_percentage
+      params:
+        percent: 50
+    - type: custom_effect
+      name: reward_and_milestone
+      params:
+        stat: strength
+        amount: 5
+        milestone: chain_demo_completed

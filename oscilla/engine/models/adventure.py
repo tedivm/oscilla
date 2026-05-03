@@ -264,6 +264,22 @@ class SkillRevokeEffect(BaseModel):
     skill: str
 
 
+class CustomEffectRef(BaseModel):
+    """Reference to a named CustomEffect manifest declared in the same content package.
+
+    Resolved at evaluation time against registry.custom_effects.
+    Validated at load time: dangling references, circular dependency chains,
+    unknown parameters, and type mismatches all raise ContentLoadError.
+    """
+
+    type: Literal["custom_effect"]
+    name: str = Field(description="CustomEffect manifest name to invoke.")
+    params: Dict[str, int | float | str | bool] = Field(
+        default_factory=dict,
+        description="Per-call parameter overrides. Merged on top of the CustomEffect's declared defaults.",
+    )
+
+
 Effect = Annotated[
     Union[
         ItemDropEffect,
@@ -286,6 +302,7 @@ Effect = Annotated[
         ArchetypeAddEffect,
         ArchetypeRemoveEffect,
         SkillRevokeEffect,
+        CustomEffectRef,
     ],
     Field(discriminator="type"),
 ]
@@ -511,3 +528,10 @@ class AdventureSpec(BaseSpec):
 class AdventureManifest(ManifestEnvelope):
     kind: Literal["Adventure"]
     spec: AdventureSpec
+
+
+# Rebuild CustomEffectSpec and CustomEffectManifest now that Effect union is fully defined.
+from oscilla.engine.models.custom_effect import CustomEffectManifest, CustomEffectSpec  # noqa: E402
+
+CustomEffectSpec.model_rebuild()
+CustomEffectManifest.model_rebuild()

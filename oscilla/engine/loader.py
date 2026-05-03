@@ -1464,6 +1464,7 @@ def validate_references(manifests: List[ManifestEnvelope]) -> List[LoadError]:
     errors.extend(_validate_archetype_refs(manifests))
     errors.extend(_validate_loot_condition_refs(manifests))
     errors.extend(_validate_custom_condition_refs(manifests))
+    errors.extend(_validate_custom_effect_refs(manifests))
     errors.extend(_validate_passive_effect_conditions(manifests))
 
     return errors
@@ -1858,6 +1859,221 @@ def _validate_custom_condition_refs(manifests: List[ManifestEnvelope]) -> List[L
     for name in sorted(adjacency):
         if name not in visited:
             _dfs(name, [name])
+
+    return errors
+
+
+# ---------------------------------------------------------------------------
+# Custom effect cross-reference validation
+# ---------------------------------------------------------------------------
+
+
+def _collect_custom_effect_refs_in_effect(effect: Effect) -> List[Tuple[str, Dict[str, Any]]]:
+    """Recursively collect all CustomEffectRef (name, params) pairs from an effect tree.
+
+    Returns list of (name, params) tuples.
+    """
+    from oscilla.engine.models.adventure import CustomEffectRef
+
+    results: List[Tuple[str, Dict[str, Any]]] = []
+    if isinstance(effect, CustomEffectRef):
+        results.append((effect.name, dict(effect.params)))
+    return results
+
+
+def _collect_custom_effect_refs_from_effects(effects: List[Effect]) -> List[Tuple[str, Dict[str, Any]]]:
+    """Collect all CustomEffectRef (name, params) pairs from a list of effects."""
+    results: List[Tuple[str, Dict[str, Any]]] = []
+    for effect in effects:
+        results.extend(_collect_custom_effect_refs_in_effect(effect))
+    return results
+
+
+def _collect_custom_effect_refs_from_manifest(m: ManifestEnvelope) -> List[Tuple[str, Dict[str, Any]]]:
+    """Collect all CustomEffectRef (name, params) pairs from a manifest's effect fields."""
+    from oscilla.engine.models.archetype import ArchetypeManifest
+    from oscilla.engine.models.buff import BuffManifest
+    from oscilla.engine.models.custom_effect import CustomEffectManifest
+    from oscilla.engine.models.item import ItemManifest
+    from oscilla.engine.models.skill import SkillManifest
+
+    results: List[Tuple[str, Dict[str, Any]]] = []
+
+    def _add(effects: List[Effect]) -> None:
+        results.extend(_collect_custom_effect_refs_from_effects(effects))
+
+    match m.kind:
+        case "CustomEffect":
+            ce = cast(CustomEffectManifest, m)
+            _add(ce.spec.effects)
+        case "Adventure":
+            adv = cast(AdventureManifest, m)
+            for step in adv.spec.steps:
+                match step:
+                    case NarrativeStep():
+                        _add(step.effects)
+                    case ChoiceStep():
+                        for opt in step.options:
+                            _add(opt.effects)
+                    case PassiveStep():
+                        _add(step.effects)
+                    case StatCheckStep():
+                        _add(step.on_pass.effects)
+                        _add(step.on_fail.effects)
+                    case CombatStep():
+                        for branch in [step.on_win, step.on_defeat, step.on_flee]:
+                            _add(branch.effects)
+        case "Item":
+            item = cast(ItemManifest, m)
+            _add(item.spec.use_effects)
+        case "Skill":
+            skill = cast(SkillManifest, m)
+            _add(skill.spec.use_effects)
+        case "Archetype":
+            arch = cast(ArchetypeManifest, m)
+            _add(arch.spec.gain_effects)
+            _add(arch.spec.lose_effects)
+        case "Buff":
+            buff = cast(BuffManifest, m)
+            _add(buff.spec.per_turn_effects)
+        case _:
+            pass
+
+    return results
+
+
+def _validate_custom_effect_refs(manifests: List[ManifestEnvelope]) -> List[LoadError]:
+    """Validate all CustomEffectRef usages across manifests.
+
+    Three checks:
+    1. Every referenced name must exist as a declared CustomEffect manifest.
+    2. No CustomEffect body may form a circular reference chain.
+    3. All call-site params must be declared in the target's parameter schema
+       and must match the declared type.
+    """
+    from oscilla.engine.models.custom_effect import CustomEffectManifest
+
+    errors: List[LoadError] = []
+
+    known_names: Set[str] = {m.metadata.name for m in manifests if m.kind == "CustomEffect"}
+
+    # Build name -> manifest map for parameter validation.
+    ce_map: Dict[str, CustomEffectManifest] = {
+        m.metadata.name: cast(CustomEffectManifest, m) for m in manifests if m.kind == "CustomEffect"
+    }
+
+    # --- Pass 1: dangling reference check ---
+    for m in manifests:
+        refs = _collect_custom_effect_refs_from_manifest(m)
+        for ref_name, _ in refs:
+            if ref_name not in known_names:
+                errors.append(
+                    LoadError(
+                        file=Path(f"<{m.metadata.name}>"),
+                        message=f"type: custom_effect references unknown CustomEffect: {ref_name!r}",
+                    )
+                )
+
+    # --- Pass 2: circular reference detection (DFS over CustomEffect bodies) ---
+    adjacency: Dict[str, Set[str]] = {}
+    for m in manifests:
+        if m.kind == "CustomEffect":
+            ce = cast(CustomEffectManifest, m)
+            body_refs = _collect_custom_effect_refs_from_effects(ce.spec.effects)
+            # Only names that are themselves declared CustomEffects form edges.
+            adjacency[m.metadata.name] = {ref_name for ref_name, _ in body_refs if ref_name in known_names}
+
+    visited: Set[str] = set()
+    in_stack: Set[str] = set()
+
+    def _dfs(node: str, path: List[str]) -> None:
+        in_stack.add(node)
+        for neighbour in sorted(adjacency.get(node, set())):
+            if neighbour in in_stack:
+                cycle_start = path.index(neighbour)
+                cycle_path = " \u2192 ".join(path[cycle_start:] + [neighbour])
+                errors.append(
+                    LoadError(
+                        file=Path(f"<{node}>"),
+                        message=f"circular reference in CustomEffect {node!r}: {cycle_path}",
+                    )
+                )
+            elif neighbour not in visited:
+                _dfs(neighbour, path + [neighbour])
+        in_stack.discard(node)
+        visited.add(node)
+
+    for name in sorted(adjacency):
+        if name not in visited:
+            _dfs(name, [name])
+
+    # --- Pass 3: parameter validation (unknown keys + type mismatch + missing required) ---
+    type_map: Dict[str, type | Tuple[type, type]] = {
+        "int": int,
+        "float": (int, float),
+        "str": str,
+        "bool": bool,
+    }
+
+    for m in manifests:
+        refs = _collect_custom_effect_refs_from_manifest(m)
+        for ref_name, call_params in refs:
+            if ref_name not in ce_map:
+                continue  # Already reported as dangling in pass 1.
+            target = ce_map[ref_name]
+            param_schema: Dict[str, str] = {p.name: p.type for p in target.spec.parameters}
+
+            # Check for missing required parameters.
+            required_params = {p.name for p in target.spec.parameters if p.default is None}
+            missing = required_params - set(call_params.keys())
+            if missing:
+                errors.append(
+                    LoadError(
+                        file=Path(f"<{m.metadata.name}>"),
+                        message=(
+                            f"custom_effect {ref_name!r} called from {m.kind} {m.metadata.name!r}: "
+                            f"missing required parameter(s): {sorted(missing)}"
+                        ),
+                    )
+                )
+
+            for param_name, param_value in call_params.items():
+                if param_name not in param_schema:
+                    errors.append(
+                        LoadError(
+                            file=Path(f"<{m.metadata.name}>"),
+                            message=(
+                                f"custom_effect {ref_name!r} called from {m.kind} {m.metadata.name!r}: "
+                                f"unknown parameter {param_name!r} "
+                                f"(declared: {list(param_schema.keys())})"
+                            ),
+                        )
+                    )
+                else:
+                    expected_type_name = param_schema[param_name]
+                    expected_types = type_map[expected_type_name]
+                    # bool is a subclass of int in Python; explicit check.
+                    if expected_type_name == "int" and isinstance(param_value, bool):
+                        errors.append(
+                            LoadError(
+                                file=Path(f"<{m.metadata.name}>"),
+                                message=(
+                                    f"custom_effect {ref_name!r} called from {m.kind} {m.metadata.name!r}: "
+                                    f"parameter {param_name!r} expects {expected_type_name}, got bool"
+                                ),
+                            )
+                        )
+                    elif not isinstance(param_value, expected_types):
+                        errors.append(
+                            LoadError(
+                                file=Path(f"<{m.metadata.name}>"),
+                                message=(
+                                    f"custom_effect {ref_name!r} called from {m.kind} {m.metadata.name!r}: "
+                                    f"parameter {param_name!r} expects {expected_type_name}, "
+                                    f"got {type(param_value).__name__}"
+                                ),
+                            )
+                        )
 
     return errors
 

@@ -46,7 +46,6 @@ Since this project has not had a v1 release yet it is acceptable to break backwa
 | [Quest Branching](#quest-branching)                                                             | M      | Quest Depth & Factions     |
 | [Quest Progress Panel](#quest-progress-panel)                                                   | M      | Quest Depth                |
 | [Faction and Reputation System](#faction-and-reputation-system)                                 | M      | Quest Depth & Factions     |
-| [Content Inheritance / Prototypes](#content-inheritance--prototypes)                            | M      | Content Reuse              |
 | [Custom Effects](#custom-effects)                                                               | S      | Content Reuse              |
 | [Plugin and Extension System](#plugin-and-extension-system)                                     | L      | Engine Architecture        |
 | [Full TUI Upgrade](#full-tui-upgrade)                                                           | L      | Media and Presentation     |
@@ -408,39 +407,6 @@ effects:
 ```
 
 Load-time validation catches dangling refs, circular compositions, unknown parameters, and type mismatches. Custom effects can compose other custom effects. The primary motivation is eliminating repeated boilerplate for parameterized patterns — such as percentage heals, scaled stat changes, or multi-step reward sequences — that otherwise must be hand-rolled with identical template expressions everywhere they appear.
-
----
-
-### Content Inheritance / Prototypes
-
-**Effort: M** · **Group: Content Reuse**
-
-Allow manifests to declare a `base:` reference and inherit all unspecified fields from it. Particularly useful for enemy variants (goblin-scout, goblin-chief, goblin-king all sharing the same loot table and description prefix) and item families (five sword tiers that differ only in damage and value).
-
-```yaml
-# base manifest
-apiVersion: oscilla/v1
-kind: Enemy
-metadata:
-  name: goblin-base
-spec:
-  description: "A small, aggressive humanoid with yellowed fangs."
-  loot_table:
-    - item: goblin-ear
-      weight: 80
-
-# variant inherits and overrides
-apiVersion: oscilla/v1
-kind: Enemy
-metadata:
-  name: goblin-chief
-spec:
-  base: goblin-base       # Inherit description and loot_table
-  displayName: "Goblin Chief"
-  level: 8
-  hp: 80
-  damage: 22
-```
 
 ---
 

@@ -1,0 +1,7 @@
+apiVersion: oscilla/v1
+kind: Region
+metadata:
+  name: custom-effects
+spec:
+  displayName: "Custom Effects Lab"
+  description: "A testing area for custom effect features and composition."

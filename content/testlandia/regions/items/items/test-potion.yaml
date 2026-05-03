@@ -4,11 +4,13 @@ metadata:
   name: test-potion
 spec:
   displayName: "Test Potion"
-  description: "A glowing vial used to verify heal use_effects and consumed_on_use mechanics."
+  description: "A glowing vial that uses a custom effect for healing."
   category: consumable
   stackable: true
   use_effects:
-    - type: heal
-      amount: 20
+    - type: custom_effect
+      name: heal_percentage
+      params:
+        percent: 20
   consumed_on_use: true
   value: 0

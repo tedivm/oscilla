@@ -32,6 +32,7 @@ def _load_kinds() -> List[ManifestKind]:
     from oscilla.engine.models.archetype import ArchetypeManifest
     from oscilla.engine.models.buff import BuffManifest
     from oscilla.engine.models.character_config import CharacterConfigManifest
+    from oscilla.engine.models.custom_effect import CustomEffectManifest
     from oscilla.engine.models.enemy import EnemyManifest
     from oscilla.engine.models.game import GameManifest
     from oscilla.engine.models.item import ItemManifest
@@ -53,6 +54,9 @@ def _load_kinds() -> List[ManifestKind]:
             "CharacterConfig",
             CharacterConfigManifest,
             creatable=False,
+        ),
+        ManifestKind(
+            "custom-effect", "custom-effects", "custom_effects", "CustomEffect", CustomEffectManifest, creatable=True
         ),
         ManifestKind("enemy", "enemies", "enemies", "Enemy", EnemyManifest, creatable=True),
         ManifestKind("game", "games", "game", "Game", GameManifest, creatable=False),

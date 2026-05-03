@@ -14,6 +14,7 @@ from oscilla.engine.models.adventure import (
     ApplyBuffEffect,
     ArchetypeAddEffect,
     ArchetypeRemoveEffect,
+    CustomEffectRef,
     DispelEffect,
     Effect,
     EmitTriggerEffect,
@@ -884,3 +885,16 @@ async def run_effect(
 
         case SkillRevokeEffect(skill=skill_ref):
             player.known_skills.discard(skill_ref)
+
+        case CustomEffectRef(name=ce_name, params=call_params):
+            from oscilla.engine.custom_effect import run_custom_effect
+
+            await run_custom_effect(
+                ce_name=ce_name,
+                call_params=call_params,
+                player=player,
+                registry=registry,
+                tui=tui,
+                combat=combat,
+                ctx=ctx,
+            )

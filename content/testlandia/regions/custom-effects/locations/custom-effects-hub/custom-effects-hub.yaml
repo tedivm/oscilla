@@ -1,0 +1,11 @@
+apiVersion: oscilla/v1
+kind: Location
+metadata:
+  name: custom-effects-hub
+spec:
+  displayName: "Custom Effects Hub"
+  description: "A testing hub for custom effect features and composition."
+  region: custom-effects
+  adventures:
+    - ref: custom-effects-demo
+      weight: 100

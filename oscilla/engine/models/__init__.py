@@ -9,6 +9,7 @@ from oscilla.engine.models.buff import BuffManifest
 from oscilla.engine.models.character_config import CharacterConfigManifest
 from oscilla.engine.models.combat_system import CombatSystemManifest
 from oscilla.engine.models.custom_condition import CustomConditionManifest
+from oscilla.engine.models.custom_effect import CustomEffectManifest
 from oscilla.engine.models.enemy import EnemyManifest
 from oscilla.engine.models.game import GameManifest
 from oscilla.engine.models.item import EquipSpec, ItemManifest, StatModifier
@@ -35,6 +36,7 @@ MANIFEST_REGISTRY: Dict[str, Type[ManifestEnvelope]] = {
     "Buff": BuffManifest,
     "LootTable": LootTableManifest,
     "CustomCondition": CustomConditionManifest,
+    "CustomEffect": CustomEffectManifest,
 }
 
 __all__ = [
@@ -46,6 +48,7 @@ __all__ = [
     "BuffManifest",
     "CharacterConfigManifest",
     "CustomConditionManifest",
+    "CustomEffectManifest",
     "EquipSpec",
     "EnemyManifest",
     "GameManifest",

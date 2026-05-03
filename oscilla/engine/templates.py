@@ -317,6 +317,8 @@ class ExpressionContext:
     ingame_time: "InGameTimeView | None" = None
     # Properties from the current manifest (adventure, item, etc.). Empty when not applicable.
     this: Dict[str, int | float | str | bool] = field(default_factory=dict)
+    # Parameters from the current CustomEffect call site. Empty when not in a custom effect body.
+    params: Dict[str, int | float | str | bool] = field(default_factory=dict)
 
 
 @dataclass
@@ -906,6 +908,7 @@ def build_mock_context(
     include_combat: bool = False,
     has_ingame_time: bool = False,
     manifest_properties: Dict[str, int | float | str | bool] | None = None,
+    params: Dict[str, int | float | str | bool] | None = None,
 ) -> Dict[str, Any]:
     """Build a comprehensive mock context for load-time template validation."""
     ctx: Dict[str, Any] = {}
@@ -917,6 +920,8 @@ def build_mock_context(
     ctx["game"] = mock_game
     # Expose manifest properties as `this` for template validation.
     ctx["this"] = manifest_properties if manifest_properties is not None else {}
+    # Expose params for custom effect template validation.
+    ctx["params"] = params if params is not None else {}
     if include_combat:
         mock_combat = _MockCombatContext()
         ctx["combat"] = mock_combat
@@ -1028,6 +1033,7 @@ class GameTemplateEngine:
         render_ctx["combat"] = ctx.combat
         render_ctx["game"] = ctx.game
         render_ctx["this"] = ctx.this
+        render_ctx["params"] = ctx.params
         # When a CombatContextView is present, also expose its fields at the top level
         # (enemy_stats, combat_stats, turn_number) so that skill use_effects templates
         # can use the same variable names as player_damage_formulas in CombatFormulaContext.
